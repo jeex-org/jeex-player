@@ -1,0 +1,42 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>JEEX dev — a baked project by url</title>
+    <style>
+      /*
+        Only what a viewer needs to boot, plus one line of text naming the bake
+        on screen. The page itself is not under test; `scripts/browser-check.ts`
+        (`checkProjectLoad`) and `tests/e2e/project.spec.ts` drive it.
+      */
+      body {
+        margin: 0;
+        background: #0d1111;
+        color: #dfe7e7;
+        font:
+          13px/1.5 system-ui,
+          sans-serif;
+      }
+      #stage {
+        position: fixed;
+        inset: 0 0 26px 0;
+      }
+      #project-label {
+        position: fixed;
+        inset: auto 0 0 0;
+        height: 26px;
+        display: flex;
+        align-items: center;
+        padding: 0 10px;
+        background: #0a0e0e;
+        font-variant-numeric: tabular-nums;
+      }
+    </style>
+  </head>
+  <body>
+    <div id="stage"></div>
+    <div id="project-label">loading…</div>
+    <script type="module" src="/dev/project.ts"></script>
+  </body>
+</html>

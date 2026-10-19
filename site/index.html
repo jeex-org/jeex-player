@@ -1,0 +1,370 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>JEEX Player - an open-source 3D tour player for your website</title>
+<link rel="icon" type="image/svg+xml" href="assets/favicon.svg">
+<meta name="theme-color" content="#0A0D14">
+<meta name="description" content="An open-source 3D apartment tour player: a 2D plan, a 3D top view, a 360 orbit, a walk and a guided tour of one scene, embedded as a custom element, an ES module or an iframe. Apache-2.0.">
+<link rel="canonical" href="https://player.jeex.org/">
+<meta property="og:site_name" content="JEEX Player">
+<meta property="og:title" content="JEEX Player - an open-source 3D tour player for your website">
+<meta property="og:description" content="Five views of one apartment on your own page, as a custom element, an ES module or an iframe. Apache-2.0.">
+<meta property="og:type" content="website">
+<meta property="og:url" content="https://player.jeex.org/">
+<meta property="og:image" content="https://player.jeex.org/assets/og.png">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta property="og:image:alt" content="The JEEX Player demo apartment, rendered in 3D">
+<meta property="og:locale" content="en_US">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="JEEX Player - an open-source 3D tour player for your website">
+<meta name="twitter:description" content="Five views of one apartment on your own page, as a custom element, an ES module or an iframe. Apache-2.0.">
+<meta name="twitter:image" content="https://player.jeex.org/assets/og.png">
+<link rel="stylesheet" href="assets/site.css">
+<script src="assets/site.js" defer></script>
+</head>
+<body id="top">
+<a class="skip" href="#main">Skip to content</a>
+
+<header class="nav">
+  <div class="wrap">
+    <a class="brand" href="#top" aria-label="JEEX Player, back to top">
+      <svg viewBox="0 0 64 64" aria-hidden="true"><path d="M32 8 52 19.5v25L32 56 12 44.5v-25Z" fill="none" stroke="#5CC8FF" stroke-width="4" stroke-linejoin="round"/><path d="M12 19.5 32 31l20-11.5M32 31v25" fill="none" stroke="#5CC8FF" stroke-width="4" stroke-linejoin="round"/><path d="M32 31 52 19.5v25L32 56Z" fill="#5CC8FF" fill-opacity=".22"/></svg>
+      JEEX <span>Player</span>
+    </a>
+    <nav class="nav-links" aria-label="Sections">
+      <a href="#views">Views</a>
+      <a href="#embed">Embed</a>
+      <a href="#customise">Customise</a>
+      <a href="#faq">FAQ</a>
+      <a href="#open-source">Open source</a>
+      <a href="integration.html">Integration guide</a>
+      <a class="back" href="https://jeex.org">jeex.org</a>
+      <a class="btn btn-primary btn-github" href="https://github.com/jeex-org/jeex-player"><svg viewBox="0 0 16 16" aria-hidden="true" focusable="false"><path fill="currentColor" d="M6.766 11.328c-2.063-.25-3.516-1.734-3.516-3.656 0-.781.281-1.625.75-2.188-.203-.515-.172-1.609.063-2.062.625-.078 1.468.25 1.968.703.594-.187 1.219-.281 1.985-.281.765 0 1.39.094 1.953.265.484-.437 1.344-.765 1.969-.687.218.422.25 1.515.046 2.047.5.593.766 1.39.766 2.203 0 1.922-1.453 3.375-3.547 3.64.531.344.89 1.094.89 1.954v1.625c0 .468.391.734.86.547C13.781 14.359 16 11.53 16 8.03 16 3.61 12.406 0 7.984 0 3.563 0 0 3.61 0 8.031a7.88 7.88 0 0 0 5.172 7.422c.422.156.828-.125.828-.547v-1.25c-.219.094-.5.156-.75.156-1.031 0-1.64-.562-2.078-1.609-.172-.422-.36-.672-.719-.719-.187-.015-.25-.093-.25-.187 0-.188.313-.328.625-.328.453 0 .844.281 1.25.86.313.452.64.655 1.031.655s.641-.14 1-.5c.266-.265.47-.5.657-.656"/></svg>GitHub</a>
+    </nav>
+    <button class="menu-btn" type="button" popovertarget="menu" aria-controls="menu" aria-expanded="false" aria-label="Menu">
+      <svg class="i-open" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16M4 12h16M4 17h16" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>
+      <svg class="i-close" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6 6 18" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>
+    </button>
+  </div>
+</header>
+
+<nav class="menu" id="menu" popover aria-label="Menu">
+  <ul>
+    <li><a href="#views">Views</a></li>
+    <li><a href="#embed">Embed</a></li>
+    <li><a href="#customise">Customise</a></li>
+    <li><a href="#faq">FAQ</a></li>
+    <li><a href="#open-source">Open source</a></li>
+    <li><a href="integration.html">Integration guide</a></li>
+    <li><a href="https://jeex.org">Back to jeex.org</a></li>
+  </ul>
+  <a class="btn btn-primary btn-github" href="https://github.com/jeex-org/jeex-player"><svg viewBox="0 0 16 16" aria-hidden="true" focusable="false"><path fill="currentColor" d="M6.766 11.328c-2.063-.25-3.516-1.734-3.516-3.656 0-.781.281-1.625.75-2.188-.203-.515-.172-1.609.063-2.062.625-.078 1.468.25 1.968.703.594-.187 1.219-.281 1.985-.281.765 0 1.39.094 1.953.265.484-.437 1.344-.765 1.969-.687.218.422.25 1.515.046 2.047.5.593.766 1.39.766 2.203 0 1.922-1.453 3.375-3.547 3.64.531.344.89 1.094.89 1.954v1.625c0 .468.391.734.86.547C13.781 14.359 16 11.53 16 8.03 16 3.61 12.406 0 7.984 0 3.563 0 0 3.61 0 8.031a7.88 7.88 0 0 0 5.172 7.422c.422.156.828-.125.828-.547v-1.25c-.219.094-.5.156-.75.156-1.031 0-1.64-.562-2.078-1.609-.172-.422-.36-.672-.719-.719-.187-.015-.25-.093-.25-.187 0-.188.313-.328.625-.328.453 0 .844.281 1.25.86.313.452.64.655 1.031.655s.641-.14 1-.5c.266-.265.47-.5.657-.656"/></svg>GitHub</a>
+</nav>
+
+<main id="main">
+
+  <section class="hero" aria-labelledby="hero-title">
+    <div class="wrap">
+      <div class="hero-copy">
+        <p class="eyebrow">Open source &middot; Apache-2.0</p>
+        <h1 id="hero-title">An open-source <em>3D tour player</em> for your website.</h1>
+        <p class="lede">Five views of one apartment &mdash; a 2D plan, a 3D top view, a 360 orbit, a walk and a guided tour &mdash; on your own page, embedded as a custom element, an ES module or an iframe.</p>
+        <div class="cta-row">
+          <a class="btn btn-primary" href="#demo" data-demo-open>Explore the apartment</a>
+          <a class="btn btn-ghost" href="integration.html">Integration guide</a>
+        </div>
+        <ul class="facts">
+          <li>Three.js bundled in, no script loaded at runtime</li>
+          <li>Read-only for visitors by default</li>
+          <li>Keyboard and screen-reader operable</li>
+        </ul>
+      </div>
+
+      <figure class="demo panel" id="demo" data-demo>
+        <div class="panel-bar">
+          <i></i><i></i><i></i><span>demo apartment &middot; 360 orbit</span>
+          <button class="demo-close" type="button" data-demo-close hidden>
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6 6 18" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+            Close the live demo
+          </button>
+        </div>
+        <div class="demo-stage" data-demo-stage data-demo-src="demo/embed.html?view=orbit&amp;tour=paused&amp;readonly=1&amp;chromeAutoHide=0&amp;motion=auto&amp;lang=en">
+          <img class="demo-poster" src="assets/poster.webp" width="1600" height="900" alt="The demo apartment in 3D, seen from above at an angle, as the player renders it." fetchpriority="high">
+          <button class="btn btn-primary demo-open" type="button" data-demo-open hidden>Explore the apartment</button>
+        </div>
+        <figcaption>
+          <span><b>Demo apartment</b> &middot; the player's own sample scene, rendered live with WebGL</span>
+          <button class="demo-fullscreen" type="button" data-demo-fullscreen hidden>
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+            <span data-fullscreen-label>Fullscreen</span>
+          </button>
+        </figcaption>
+      </figure>
+    </div>
+  </section>
+
+  <section class="band agent" id="ai-agent" aria-labelledby="agent-title">
+    <div class="wrap">
+      <div class="band-head">
+        <p class="eyebrow">For your AI agent</p>
+        <h2 id="agent-title">Give this to your AI agent.</h2>
+        <p class="lede">Paste the prompt into the coding agent that works on your site. It leads the agent to <a class="text-link" href="llms.txt">llms.txt</a>, the index of this site, and from there to <a class="text-link" href="install.md">install.md</a>, the step-by-step instruction: build the player from source, copy the files to your site, embed it and check that it runs.</p>
+      </div>
+      <div class="panel prompt" data-copy>
+        <div class="panel-bar">
+          <i></i><i></i><i></i><span>prompt</span>
+          <button class="copy-btn" type="button" data-copy-button hidden>
+            <svg class="i-copy" viewBox="0 0 24 24" aria-hidden="true"><rect x="8" y="8" width="12" height="12" rx="2" fill="none" stroke="currentColor" stroke-width="2"/><path d="M16 8V6a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v8a2 2 0 0 0 2 2h2" fill="none" stroke="currentColor" stroke-width="2"/></svg>
+            <svg class="i-done" viewBox="0 0 24 24" aria-hidden="true"><path d="m5 12.5 4.5 4.5L19 7.5" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+            <span data-copy-label>Copy prompt</span>
+          </button>
+        </div>
+        <p class="prompt-text" data-copy-text>Install the JEEX Player on my website. Follow the instructions at https://player.jeex.org/llms.txt</p>
+        <p class="visually-hidden" role="status" data-copy-status></p>
+      </div>
+    </div>
+  </section>
+
+  <section class="band" id="views" aria-labelledby="views-title">
+    <div class="wrap">
+      <div class="band-head">
+        <p class="eyebrow">Five views, one scene</p>
+        <h2 id="views-title">Every view draws the same scene.</h2>
+        <p class="lede">The player renders one scene document &mdash; walls, openings, rooms, furniture and finishes &mdash; and the visitor switches between five views of it in the control bar.</p>
+      </div>
+      <ul class="benefits five">
+        <li class="benefit">
+          <span class="tag">2D</span>
+          <h3>2D plan</h3>
+          <p>The floor plan as a drawing, with room names, areas and facade dimension lines, and a marker where the camera stands.</p>
+        </li>
+        <li class="benefit">
+          <span class="tag">3D</span>
+          <h3>3D top view</h3>
+          <p>The same plan in three dimensions, seen from above.</p>
+        </li>
+        <li class="benefit">
+          <span class="tag">360</span>
+          <h3>360 orbit</h3>
+          <p>The dollhouse: rotate, pan and zoom around the whole apartment.</p>
+        </li>
+        <li class="benefit">
+          <span class="tag">Walk</span>
+          <h3>Walk</h3>
+          <p>A person at eye height. Click a floor point to walk there or use W A S D; walls and closed doors stop you.</p>
+        </li>
+        <li class="benefit">
+          <span class="tag">Tour</span>
+          <h3>Guided tour</h3>
+          <p>A route through the rooms with play, pause and a scrub bar, and fully drivable from your own script.</p>
+        </li>
+      </ul>
+      <ul class="ticks cols">
+        <li>Interactive doors <span>&mdash; they open on approach and close behind the walker</span></li>
+        <li>Mini-map with click-to-travel <span>&mdash; in walk and tour</span></li>
+        <li>Interior presets <span>&mdash; a preset button when the scene carries them</span></li>
+        <li>Stills and panoramas <span>&mdash; rendered beside the live view, each with its provenance</span></li>
+      </ul>
+    </div>
+  </section>
+
+  <section class="band" id="embed" aria-labelledby="embed-title">
+    <div class="wrap">
+      <div class="band-head">
+        <p class="eyebrow">Put it on your site</p>
+        <h2 id="embed-title">Three ways in, one set of options.</h2>
+        <p class="lede">All three paths share the same option names, the same handle API and the same events. In the snippets, <code>/jeex-viewer/</code> is where your own site serves its copy of the built <code>dist-lib/</code> files, and the scene is the demo apartment from this site, there for trying the player.</p>
+      </div>
+      <ol class="paths">
+        <li class="path">
+          <div class="path-copy">
+            <h3>Custom element</h3>
+            <p>Plain HTML: one script tag and the element, no inline code. A classic-script build registers the same element for a CMS that strips <code>type="module"</code>.</p>
+          </div>
+          <div class="panel">
+            <div class="panel-bar"><i></i><i></i><i></i><span>property-page.html</span></div>
+<pre class="code"><span class="c">&lt;!-- /jeex-viewer/ is your site's copy of dist-lib/ --&gt;</span>
+<span class="t">&lt;script</span> <span class="a">type</span>=<span class="s">"module"</span> <span class="a">src</span>=<span class="s">"/jeex-viewer/jeex-viewer-element.js"</span><span class="t">&gt;&lt;/script&gt;</span>
+<span class="c">&lt;!-- the demo apartment, for trying the player; your own scene goes here --&gt;</span>
+<span class="t">&lt;jeex-viewer</span> <span class="a">src</span>=<span class="s">"https://player.jeex.org/demo/demo-apartment.json"</span> <span class="a">lang</span>=<span class="s">"en"</span><span class="t">&gt;&lt;/jeex-viewer&gt;</span></pre>
+          </div>
+        </li>
+        <li class="path">
+          <div class="path-copy">
+            <h3>ES module</h3>
+            <p><code>mountViewer</code> mounts the player into a container of yours and hands back a handle for playback, modes and captures. The container needs a height; the viewer fills it.</p>
+          </div>
+          <div class="panel">
+            <div class="panel-bar"><i></i><i></i><i></i><span>listing.js</span></div>
+<pre class="code"><span class="c">// /jeex-viewer/ is your site's copy of dist-lib/</span>
+<span class="t">import</span> { mountViewer } <span class="t">from</span> <span class="s">'/jeex-viewer/jeex-viewer.js'</span>;
+
+<span class="t">const</span> viewer = mountViewer(document.getElementById(<span class="s">'apartment'</span>), {
+  <span class="c">// the demo apartment, for trying the player; your own scene goes here</span>
+  <span class="a">scene</span>: { <span class="a">url</span>: <span class="s">'https://player.jeex.org/demo/demo-apartment.json'</span> },
+  <span class="a">view</span>: { <span class="a">mode</span>: <span class="s">'walk'</span>, <span class="a">minimap</span>: <span class="t">true</span> },
+});
+
+<span class="t">await</span> viewer.ready;</pre>
+          </div>
+        </li>
+        <li class="path">
+          <div class="path-copy">
+            <h3>iframe</h3>
+            <p>Any page that allows an iframe; the viewer runs on its own origin. A small host helper adds postMessage control on top: play, seek, switch modes, listen to events.</p>
+          </div>
+          <div class="panel">
+            <div class="panel-bar"><i></i><i></i><i></i><span>property-page.html</span></div>
+<pre class="code"><span class="c">&lt;!-- /jeex-viewer/ is your copy of dist-lib/; ?scene= is the demo apartment --&gt;</span>
+<span class="t">&lt;iframe</span> <span class="a">src</span>=<span class="s">"/jeex-viewer/embed.html?scene=https%3A%2F%2Fplayer.jeex.org%2Fdemo%2Fdemo-apartment.json&amp;lang=en"</span>
+  <span class="a">title</span>=<span class="s">"Apartment tour"</span> <span class="a">loading</span>=<span class="s">"lazy"</span> <span class="a">allow</span>=<span class="s">"fullscreen"</span>
+  <span class="a">style</span>=<span class="s">"display:block;width:100%;aspect-ratio:16/9;border:0"</span><span class="t">&gt;&lt;/iframe&gt;</span></pre>
+          </div>
+        </li>
+      </ol>
+      <ul class="ticks cols">
+        <li>Your origin serves the built files <span>&mdash; the whole <code>dist-lib/</code> directory, because the ES entries import hashed sibling chunks</span></li>
+        <li>Your scene URL answers with CORS <span>&mdash; <code>access-control-allow-origin</code>, fetched without credentials</span></li>
+        <li>The demo apartment is for trying it out <span>&mdash; for your property you make your own apartment's scene</span></li>
+        <li>Built from source <span>&mdash; <code>bun run build:lib</code> in a checkout of the repository</span></li>
+      </ul>
+      <div class="cta-row after-paths">
+        <a class="btn btn-primary" href="integration.html">Read the integration guide</a>
+        <a class="btn btn-ghost" aria-disabled="true">Create your plan in the studio <span class="soon">Soon</span></a>
+        <a class="btn btn-ghost" href="https://github.com/jeex-org/jeex-player/blob/main/README.md#paste-into-any-site">README: Paste into any site</a>
+      </div>
+    </div>
+  </section>
+
+  <section class="band" id="customise" aria-labelledby="customise-title">
+    <div class="wrap">
+      <div class="band-head">
+        <p class="eyebrow">Make it yours</p>
+        <h2 id="customise-title">Your page decides what the player shows.</h2>
+        <p class="lede">What the player shows is set by mount options on your page: an object key, an attribute or a query parameter.</p>
+      </div>
+      <ul class="benefits three">
+        <li class="benefit">
+          <h3>Player controls</h3>
+          <p>Show or hide the control bar, the mode switcher, the status pill, the hint card and the brand block one by one, or pick a preset: <code>kiosk</code>, <code>embed</code>, <code>unbranded</code>.</p>
+        </li>
+        <li class="benefit">
+          <h3>Theming</h3>
+          <p>Ten documented custom properties (accent, surface, text, radius, font, colour scheme and more), set on the viewer's own <code>.jeex-viewer</code> root, plus seven shadow parts for the rest.</p>
+        </li>
+        <li class="benefit">
+          <h3>Languages</h3>
+          <p>Seven complete catalogues ship: English, German, French, Italian, Spanish, Serbian (Latin script) and Russian. The German, French, Italian and Spanish ones were machine-translated from the English source; corrections are welcome. Add your own with <code>registerLocale</code>.</p>
+        </li>
+        <li class="benefit">
+          <h3>Keyboard</h3>
+          <p>The canvas is focusable: W A S D or the arrows walk or pan. Every control in the chrome is its own tab stop with a visible focus ring.</p>
+        </li>
+        <li class="benefit">
+          <h3>Reduced motion</h3>
+          <p>By default the player follows <code>prefers-reduced-motion</code>: an engaged tour opens paused and scripted travel lands at once. <code>motion</code> forces either way.</p>
+        </li>
+        <li class="benefit">
+          <h3>Strict CSP</h3>
+          <p>Runs under <code>default-src 'self'</code> with no <code>unsafe-inline</code>; the stylesheet arrives through <code>adoptedStyleSheets</code>, and swatches need <code>img-src data:</code>.</p>
+        </li>
+      </ul>
+    </div>
+  </section>
+
+  <section class="band" id="faq" aria-labelledby="faq-title">
+    <div class="wrap">
+      <div class="band-head">
+        <p class="eyebrow">Practical questions</p>
+        <h2 id="faq-title">Before you embed it.</h2>
+      </div>
+      <div class="faq">
+        <details name="faq" open>
+          <summary>Where do scenes come from?</summary>
+          <div>
+            <p>The player loads a scene document (schema 2.1: walls, openings, rooms, furniture, finishes) or a baked <code>project.json</code>. A JSON Schema generated from the same type ships with the library build. The player does not create scenes; it validates, renders and plays them. You make your own apartment's scene; to try the player first, load the demo apartment at <code>https://player.jeex.org/demo/demo-apartment.json</code>.</p>
+          </div>
+        </details>
+        <details name="faq">
+          <summary>What do I have to host?</summary>
+          <div>
+            <p>The built files on one origin: the whole <code>dist-lib/</code> directory for the custom element and the ES module, or the built <code>embed.html</code> with its assets for an iframe. And the scene: a URL that answers with CORS and a <code>Content-Type</code> of <code>application/json</code>, at most 8 MB.</p>
+          </div>
+        </details>
+        <details name="faq">
+          <summary>Which browsers does it support?</summary>
+          <div>
+            <p>The stylesheet is built for Chrome and Edge 123, Firefox 120 and Safari 17.5, the first versions that ship <code>light-dark()</code>. That is the configured CSS floor of the build, not a list of tested devices. The scene is drawn with WebGL.</p>
+          </div>
+        </details>
+        <details name="faq">
+          <summary>Is it free?</summary>
+          <div>
+            <p>The player is licensed under Apache-2.0: you may use, change and redistribute it under the licence's terms. The terms are in <code>LICENSE</code> and <code>NOTICE</code> at the root of the repository.</p>
+          </div>
+        </details>
+        <details name="faq">
+          <summary>Can I install it from npm?</summary>
+          <div>
+            <p>Not yet. The package is not published to a registry; the documented route is a build from source, described step by step in the <a class="text-link" href="integration.html">integration guide</a>.</p>
+          </div>
+        </details>
+        <details name="faq">
+          <summary>Does it show the JEEX name?</summary>
+          <div>
+            <p>The control bar's brand block is an option (<code>brand="0"</code> turns it off). A project whose manifest carries a mark shows a small &laquo;Made with JEEX&raquo; link in the corner; that comes from the published data, and no option removes it.</p>
+          </div>
+        </details>
+      </div>
+    </div>
+  </section>
+
+  <section class="band" id="open-source" aria-labelledby="open-title">
+    <div class="wrap">
+      <div class="band-head">
+        <p class="eyebrow">Open source</p>
+        <h2 id="open-title">Read it, run it, change it.</h2>
+        <p class="lede">The player's repository is <code>jeex-player</code>; the package and the element are named <code>jeex-viewer</code>. Issues and contributions are welcome on GitHub.</p>
+      </div>
+      <ul class="link-cards">
+        <li><a href="https://github.com/jeex-org/jeex-player"><b>Source</b><span>github.com/jeex-org/jeex-player</span></a></li>
+        <li><a href="https://github.com/jeex-org/jeex-player/blob/main/LICENSE"><b>Licence</b><span>Apache-2.0</span></a></li>
+        <li><a href="https://github.com/jeex-org/jeex-player/issues"><b>Issues</b><span>Report a bug or ask a question</span></a></li>
+        <li><a href="https://github.com/jeex-org/jeex-player/blob/main/CONTRIBUTING.md"><b>Contributing</b><span>How to send a change</span></a></li>
+        <li><a href="https://github.com/jeex-org/jeex-player/blob/main/CHANGELOG.md"><b>Changelog</b><span>What changed, release by release</span></a></li>
+      </ul>
+      <p class="built-from" data-viewer-sha>This site and its demo were built from viewer commit <a href="https://github.com/jeex-org/jeex-player/commit/{{VIEWER_SHA}}">{{VIEWER_SHA}}</a>.</p>
+    </div>
+  </section>
+
+</main>
+
+<footer class="foot">
+  <div class="wrap">
+    <div>
+      <a class="brand" href="#top" aria-label="JEEX Player, back to top">
+        <svg viewBox="0 0 64 64" aria-hidden="true"><path d="M32 8 52 19.5v25L32 56 12 44.5v-25Z" fill="none" stroke="#5CC8FF" stroke-width="4" stroke-linejoin="round"/><path d="M12 19.5 32 31l20-11.5M32 31v25" fill="none" stroke="#5CC8FF" stroke-width="4" stroke-linejoin="round"/><path d="M32 31 52 19.5v25L32 56Z" fill="#5CC8FF" fill-opacity=".22"/></svg>
+        JEEX <span>Player</span>
+      </a>
+      <p>The open-source 3D tour player of JEEX, for your own website.</p>
+    </div>
+    <nav aria-label="Footer">
+      <ul>
+        <li><a href="#views">Views</a></li>
+        <li><a href="#embed">Embed</a></li>
+        <li><a href="#customise">Customise</a></li>
+        <li><a href="#faq">FAQ</a></li>
+        <li><a href="#open-source">Open source</a></li>
+        <li><a href="integration.html">Integration guide</a></li>
+        <li><a href="https://github.com/jeex-org/jeex-player">GitHub</a></li>
+        <li><a href="https://jeex.org">jeex.org</a></li>
+      </ul>
+    </nav>
+    <p class="legal">&copy; 2026 JEEX <span data-viewer-sha>viewer {{VIEWER_SHA}}</span></p>
+  </div>
+</footer>
+</body>
+</html>

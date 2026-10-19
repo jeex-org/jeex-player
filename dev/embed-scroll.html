@@ -1,0 +1,61 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>JEEX embed — a viewer inside a scrolling page</title>
+    <style>
+      /*
+        An agency listing page: text above and below the viewer, and the page
+        scrolls. The viewer must not steal that scroll until it is engaged.
+      */
+      body {
+        margin: 0;
+        padding: 20px;
+        background: #101615;
+        color: #e9e1d4;
+        font-family: Inter, ui-sans-serif, system-ui, sans-serif;
+      }
+      main {
+        max-inline-size: 900px;
+        margin: 0 auto;
+      }
+      h1 {
+        margin: 0 0 8px;
+        font-size: 18px;
+        font-weight: 600;
+      }
+      p {
+        margin: 0 0 16px;
+        color: rgba(233, 225, 212, 0.7);
+        font-size: 13px;
+        line-height: 1.6;
+      }
+      .stage {
+        position: relative;
+        block-size: 460px;
+        margin-block: 20px;
+        border-radius: 14px;
+        overflow: hidden;
+        box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.1);
+      }
+      .filler {
+        block-size: 1600px;
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <h1>Two-room apartment, 64 m²</h1>
+      <p>
+        Scroll the page with the pointer over the tour: the page scrolls and the tour says how to zoom it. Ctrl + scroll (⌘ + scroll on a
+        Mac) zooms without scrolling the page. Click the tour and the wheel is the tour's until you click elsewhere.
+      </p>
+      <div class="stage" id="stage"></div>
+      <p>The listing text goes on below the viewer, long enough for the page to scroll.</p>
+      <div class="filler"></div>
+      <p>End of the listing.</p>
+    </main>
+    <script type="module" src="/dev/embed-scroll.ts"></script>
+  </body>
+</html>

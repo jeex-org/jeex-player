@@ -1,0 +1,19 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <!-- Responsive iframes: the embedding page may size this frame to #jeex-size. -->
+    <meta name="responsive-embedded-sizing" content="allow-origins=*" />
+    <meta name="theme-color" content="#0d1111" />
+    <meta name="description" content="JEEX interactive apartment viewer, embedded" />
+    <title>JEEX Player (embed)</title>
+  </head>
+  <body>
+    <!-- The viewer builds its own markup inside this box (`src/ui/viewer-shell.ts`). -->
+    <div id="app"></div>
+    <!-- The page's content box: the frame's width at ?ratio= (`src/ui/styles/frame.css`). -->
+    <div id="jeex-size" aria-hidden="true"></div>
+    <script type="module" src="/src/main-embed.ts"></script>
+  </body>
+</html>

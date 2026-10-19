@@ -1,0 +1,83 @@
+{
+  "format": "jeex-project",
+  "formatVersion": 2,
+  "projectId": "01a12fec-9d28-71d3-9f13-24f36f8cb88c",
+  "bakeId": "01a12fec-9d29-73ce-8bb1-c59b52b14c54",
+  "bakedAt": "2026-09-11T09:00:00.000Z",
+  "title": "Fixture project",
+  "scene": "scene.json",
+  "library": {
+    "manifestVersion": "1.0",
+    "id": "01a12fec-9d28-71d3-9f13-24f36f8cb88c",
+    "name": "Fixture library",
+    "publisher": "01a12fec-9d2a-7190-95af-61ba91a556ed",
+    "license": "CC0-1.0",
+    "objects": [
+      {
+        "id": "01a12fec-9d2b-7b29-a1f8-52f300eb0d8b",
+        "name": "Box sofa",
+        "category": "furniture/sofas",
+        "dims": [2.1, 0.85, 0.95],
+        "anchor": "floor",
+        "wallSnap": true,
+        "clearance": 0.6,
+        "tags": ["living", "fixture"],
+        "model": "obj/box-sofa@1.0.0.glb",
+        "materialSlots": { "upholstery": "seat" },
+        "slots": ["frame", "upholstery"],
+        "defaultFinishes": {
+          "frame": "01a12fec-9d2d-7a44-8991-7dada752fe18",
+          "upholstery": "01a12fec-9d2e-79bd-a184-d53d62036c87"
+        },
+        "primarySlot": "upholstery",
+        "variants": [
+          {
+            "id": "01a12fec-9d2c-7a6d-8966-e2c9fce179df",
+            "name": "Box sofa",
+            "version": "1.0.0",
+            "dims": [2.1, 0.85, 0.95],
+            "finishes": {
+              "frame": "01a12fec-9d2d-7a44-8991-7dada752fe18",
+              "upholstery": "01a12fec-9d2e-79bd-a184-d53d62036c87"
+            },
+            "pricing": { "model": "free" },
+            "model": "obj/box-sofa@1.0.0.glb"
+          }
+        ],
+        "defaultVariant": "01a12fec-9d2c-7a6d-8966-e2c9fce179df",
+        "layout": { "caseGood": false }
+      }
+    ],
+    "materials": [
+      {
+        "id": "01a12fec-9d2d-7a44-8991-7dada752fe18",
+        "name": "Fixture oak",
+        "tags": ["floor", "wood"],
+        "apply": ["floor", "furniture"],
+        "generator": { "kind": "plank_floor", "tone": "#b5855a", "seed": 1 },
+        "tile": 3.2
+      },
+      {
+        "id": "01a12fec-9d2e-79bd-a184-d53d62036c87",
+        "name": "Fixture white",
+        "tags": ["wall", "paint"],
+        "apply": ["wall", "furniture"],
+        "generator": { "kind": "painted_plaster", "tone": "#f1eee8", "seed": 2 },
+        "tile": 2.4
+      }
+    ]
+  },
+  "rights": {
+    "workspaceId": "01a12fec-9d2a-7190-95af-61ba91a556ed",
+    "perpetual": true,
+    "assets": [
+      {
+        "assetId": "01a12fec-9d2b-7b29-a1f8-52f300eb0d8b",
+        "variantId": "01a12fec-9d2c-7a6d-8966-e2c9fce179df",
+        "version": "1.0.0",
+        "access": "free"
+      }
+    ]
+  },
+  "generator": { "name": "tests/fixtures/project", "version": "1" }
+}

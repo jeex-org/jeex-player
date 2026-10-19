@@ -1,0 +1,176 @@
+# The quality gate, run on a machine nobody owns.
+#
+# The step list below is the step list of `scripts/check.sh`, with two
+# documented differences (`scripts/ci-parity.test.ts` proves no other one
+# appears):
+#
+#  1. `code-ranker` is an optional structural lint a contributor installs
+#     globally (`npm i -g code-ranker`). `check.sh` runs it when it is
+#     installed and skips it otherwise; CI does not install it, so it has no
+#     step here.
+#  2. The Chromium the two browser levels drive is already on a developer's
+#     machine (`bunx playwright install chromium`, once), so `check.sh` just
+#     runs the tests. Here it has to be fetched and cached first, which is the
+#     three `playwright` steps — they install nothing the gate itself checks.
+#
+# Every other step — both type checks, lint, format, the three test levels
+# with their two coverage floors, the console and listener policies, the two
+# builds, the two budgets, module size, source hygiene, the layer policy, dead
+# code, the schema gate, the two packaging checks and the audit — runs in both
+# places, calling the SAME script where `check.sh` extracted one
+# (`scripts/console-policy.sh`, `scripts/schema-gate.sh`), so the two lists
+# cannot drift apart silently.
+#
+# The order below differs from `check.sh`'s own: this workflow runs the
+# hygiene, size, layer, dead-code and schema steps AFTER the three test levels
+# (bun test, component tests, e2e), while `check.sh` runs every cheap static
+# step first so a static failure surfaces in seconds. This is cosmetic, not a
+# coverage gap: both files run the same step LIST, only in a different order
+# (`scripts/ci-parity.test.ts` proves the list still matches).
+#
+# Screenshot comparisons in the e2e level run only locally; with `CI` set they
+# are skipped, because the baselines are rendered on the maintainers' machines.
+#
+# `bun audit` runs here AND in `check.sh`: a dependency advisory published
+# after a developer's last local run is exactly what a scheduled CI run is for.
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  # A vulnerability can appear in a dependency of a commit that never changes.
+  schedule:
+    - cron: '17 6 * * 1'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.1.0
+
+      - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
+        with:
+          bun-version-file: .bun-version
+
+      # setup-bun caches the Bun BINARY, not the packages it installs.
+      - uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
+        with:
+          path: ~/.bun/install/cache
+          key: bun-${{ runner.os }}-${{ hashFiles('bun.lock') }}
+          restore-keys: bun-${{ runner.os }}-
+
+      - run: bun install --frozen-lockfile
+
+      - name: typecheck (src, dev, vite.config.ts)
+        run: bun run typecheck
+
+      - name: typecheck (scripts, vite configs)
+        run: bun run typecheck:scripts
+
+      - name: lint
+        run: bun run lint
+
+      - name: format
+        run: bun run format:check
+
+      - name: test with coverage
+        run: bun run test
+
+      - name: per-layer coverage floors
+        run: bun run check:coverage
+
+      # Playwright's browsers are ~150 MB and are pinned to the library
+      # version, so the key is the version and nothing else: a `bun add
+      # @playwright/test` is the only thing that should invalidate it.
+      - name: playwright version
+        id: playwright
+        run: |
+          version=$(bun --print 'require("@playwright/test/package.json").version')
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+
+      - uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
+        id: playwright-cache
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-${{ runner.os }}-${{ steps.playwright.outputs.version }}
+
+      # `--with-deps` only when the cache missed: the browser binaries are what
+      # the cache holds, the system libraries are not.
+      - name: install chromium
+        run: bunx playwright install --with-deps chromium
+        if: steps.playwright-cache.outputs.cache-hit != 'true'
+
+      - name: install chromium (system deps only)
+        run: bunx playwright install-deps chromium
+        if: steps.playwright-cache.outputs.cache-hit == 'true'
+
+      - name: component tests (Vitest browser mode)
+        run: bun run test:component
+
+      - name: DOM-layer coverage floors
+        run: bun run check:coverage:component
+
+      # `--reporter=github` is not passed here: `playwright.config.ts` picks
+      # the GitHub reporter itself when `CI` is set, so a local run and this
+      # one differ in exactly one place rather than two.
+      - name: e2e tests (Playwright)
+        run: bun run test:e2e
+
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        # The traces, the failure screenshots and the axe reports; only when
+        # something failed, because they are large and useless when it did not.
+        if: failure()
+        with:
+          name: playwright-artifacts
+          path: |
+            test-results/
+            playwright-report/
+          retention-days: 7
+
+      - name: console policy (src/)
+        run: bash scripts/console-policy.sh
+
+      - name: listener policy (signal)
+        run: bun run scripts/listener-policy.ts src
+
+      - name: build (demo)
+        run: bun run build
+
+      - name: budget (demo)
+        run: bun run check:budget
+
+      - name: build (library)
+        run: bun run build:lib
+
+      - name: budget (library)
+        run: bun run check:budget:lib
+
+      - name: module size
+        run: bun run scripts/size-check.ts src
+
+      - name: source hygiene (spelling, headers)
+        run: bun run scripts/spelling-check.ts src
+
+      - name: layer policy and cycles
+        run: bun run check:arch
+
+      - name: dead code
+        run: bun run check:dead
+
+      - name: 'schema: generate-to-tmp + check'
+        run: bash scripts/schema-gate.sh
+
+      - name: package (publint, attw)
+        run: bun run check:pkg
+
+      - name: dependency audit
+        run: bun audit

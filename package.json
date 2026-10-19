@@ -1,0 +1,132 @@
+{
+  "name": "jeex-viewer",
+  "version": "0.1.0",
+  "type": "module",
+  "description": "Embeddable 3D apartment viewer for the browser: an ES module, a custom element or an iframe. Three.js inside, no runtime dependencies.",
+  "keywords": [
+    "3d",
+    "apartment",
+    "floor-plan",
+    "viewer",
+    "three",
+    "threejs",
+    "webgl",
+    "embed",
+    "custom-element",
+    "iframe",
+    "virtual-tour",
+    "real-estate"
+  ],
+  "license": "Apache-2.0",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/jeex-org/jeex-player.git"
+  },
+  "bugs": {
+    "url": "https://github.com/jeex-org/jeex-player/issues"
+  },
+  "homepage": "https://github.com/jeex-org/jeex-player#readme",
+  "engines": {
+    "node": ">=22.12.0"
+  },
+  "packageManager": "bun@1.4.2",
+  "publishConfig": {
+    "provenance": true
+  },
+  "sideEffects": [
+    "./dist-lib/jeex-viewer-element.js",
+    "./dist-lib/jeex-viewer-frame.js",
+    "./dist-lib/jeex-viewer.iife.js"
+  ],
+  "files": [
+    "dist-lib",
+    "README.md",
+    "LICENSE",
+    "NOTICE"
+  ],
+  "types": "./dist-lib/embed/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist-lib/embed/index.d.ts",
+      "import": "./dist-lib/jeex-viewer.js",
+      "default": "./dist-lib/jeex-viewer.js"
+    },
+    "./element": {
+      "types": "./dist-lib/embed/element-entry.d.ts",
+      "import": "./dist-lib/jeex-viewer-element.js",
+      "default": "./dist-lib/jeex-viewer-element.js"
+    },
+    "./host": {
+      "types": "./dist-lib/embed/host.d.ts",
+      "import": "./dist-lib/jeex-viewer-host.js",
+      "default": "./dist-lib/jeex-viewer-host.js"
+    },
+    "./ops": {
+      "types": "./dist-lib/embed/ops.d.ts",
+      "import": "./dist-lib/jeex-viewer-ops.js",
+      "default": "./dist-lib/jeex-viewer-ops.js"
+    },
+    "./iife": "./dist-lib/jeex-viewer.iife.js",
+    "./host/iife": "./dist-lib/jeex-viewer-host.iife.js",
+    "./style.css": "./dist-lib/jeex-viewer.css",
+    "./schema/scene.json": "./dist-lib/schema/scene.schema.json",
+    "./schema/viewer-options.json": "./dist-lib/schema/viewer-options.schema.json",
+    "./package.json": "./package.json"
+  },
+  "unpkg": "./dist-lib/jeex-viewer.iife.js",
+  "jsdelivr": "./dist-lib/jeex-viewer.iife.js",
+  "scripts": {
+    "dev": "vite",
+    "dev:gallery": "vite --open /dev/furniture-gallery.html",
+    "dev:scroll": "vite --open /dev/scroll-tour.html",
+    "dev:embed": "vite --open /dev/embed-two.html",
+    "dev:frames": "vite --open /dev/video-frames.html",
+    "build": "tsc --noEmit && vite build && bun run scripts/css-contract-check.ts dist",
+    "build:site": "bun run build && bun run scripts/site-build.ts",
+    "build:lib": "vite build --config vite.lib.config.ts --mode es && vite build --config vite.lib.config.ts --mode iife && vite build --config vite.lib.config.ts --mode host && vite build --config vite.lib.config.ts --mode ops && tsc -p tsconfig.lib.json && bun run scripts/schema-gen.ts --out dist-lib/schema && bun run scripts/css-contract-check.ts dist-lib",
+    "lint": "oxlint --type-aware --deny-warnings src scripts dev tests",
+    "format": "oxfmt src scripts dev tests vite.config.ts vite.css-target.ts vite.lib.config.ts vitest.config.ts playwright.config.ts index.html embed.html",
+    "format:check": "oxfmt --check src scripts dev tests vite.config.ts vite.css-target.ts vite.lib.config.ts vitest.config.ts playwright.config.ts index.html embed.html",
+    "check": "bash scripts/check.sh",
+    "check:budget": "bun run scripts/budget-check.ts",
+    "check:budget:lib": "bun run scripts/budget-check.ts dist-lib --per-file",
+    "check:arch": "depcruise src --config .dependency-cruiser.cjs",
+    "check:dead": "knip",
+    "check:coverage": "bun run scripts/coverage-check.ts",
+    "check:coverage:component": "bun run scripts/coverage-check.ts --component",
+    "preview": "vite preview",
+    "test": "bun test src scripts",
+    "test:component": "bun run scripts/run-component-tests.ts",
+    "test:e2e": "playwright test",
+    "test:browser": "bun run scripts/browser-check.ts",
+    "typecheck": "tsc --noEmit",
+    "typecheck:scripts": "tsc -p tsconfig.scripts.json --noEmit",
+    "check:pkg": "publint && attw --pack .",
+    "audit": "bun audit"
+  },
+  "dependencies": {
+    "@types/three": "0.185.4",
+    "zod": "4.6.2"
+  },
+  "devDependencies": {
+    "@arethetypeswrong/cli": "0.18.5",
+    "@axe-core/playwright": "^4.13.0",
+    "@playwright/test": "^1.63",
+    "@swc/core": "1.16.2",
+    "@types/bun": "1.4.1",
+    "@vitest/browser-playwright": "^5",
+    "@vitest/coverage-v8": "^5",
+    "ajv": "8.20.0",
+    "dependency-cruiser": "18.2.0",
+    "knip": "6.34.0",
+    "oxfmt": "0.72.0",
+    "oxlint": "1.81.0",
+    "oxlint-tsgolint": "7.0.2001",
+    "publint": "0.3.24",
+    "three": "0.185.1",
+    "ts-json-schema-generator": "2.9.0",
+    "typescript": "7.0.2",
+    "vite": "8.2.2",
+    "vitest": "^5"
+  }
+}

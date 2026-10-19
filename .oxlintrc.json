@@ -1,0 +1,127 @@
+{
+  // Type-aware linting is a CLI flag in oxlint 1.81 (`--type-aware`, carried by
+  // the `lint` script), not a config key — the engine is `tsgolint`, which
+  // talks to the Go compiler directly and is versioned against it
+  // (`oxlint-tsgolint` 7.0.2001 <-> typescript 7.0.2).
+  "$schema": "./node_modules/oxlint/configuration_schema.json",
+  "categories": {
+    "correctness": "error",
+    "suspicious": "warn",
+    "pedantic": "warn"
+  },
+  "ignorePatterns": ["dist/**", "dist-lib/**", "coverage/**"],
+  "options": {
+    "reportUnusedDisableDirectives": "error"
+  },
+  // Every entry here is a rule this repository has decided against, with the
+  // reason. Inline `oxlint-disable` comments are not used: a policy belongs in
+  // one file, not scattered through the code (`reportUnusedDisableDirectives`
+  // above makes a stray one an error).
+  "rules": {
+    // `for (const listener of [...this.listeners])` is a deliberate SNAPSHOT:
+    // a listener that unsubscribes while it is being called must not shorten
+    // the list mid-loop, and `dispose()` iterating a map it is emptying must
+    // not skip entries. Removing the spread is a bug, not a simplification.
+    "unicorn/no-useless-spread": "off",
+    // False positive from Bun's own test typings: `expect(p).rejects` is typed
+    // `Matchers<unknown>` whose matchers return `void`, but at runtime they
+    // return a promise that MUST be awaited or the assertion never runs
+    // (`node_modules/bun-types/test.d.ts`).
+    "typescript/await-thenable": "off",
+    // `prefer-readonly-parameter-types` would demand `readonly` on every
+    // parameter, including three.js objects that are mutated by design.
+    // Readonly committed data is expressed by `Committed<T>`/`Draft<T>` instead.
+    "typescript/prefer-readonly-parameter-types": "off",
+    // The repository's documented comment style puts a short invariant at the
+    // end of the line it constrains.
+    "eslint/no-inline-comments": "off",
+    // Module and function size is gated by `scripts/size-check.ts` (path-keyed
+    // limits) and by code-ranker's cognitive-complexity scorecard, both of
+    // which understand which files are data tables. A flat line count here
+    // would only duplicate them, less accurately.
+    "eslint/max-lines": "off",
+    "eslint/max-lines-per-function": "off",
+    "eslint/max-classes-per-file": "off",
+    // `userData` is the documented wire surface between the scene builder and
+    // the picker, and it is `Record<string, unknown>` by construction: every
+    // read of it is "unsafe" to this rule family, and the noise would hide
+    // everything else.
+    "typescript/no-unsafe-assignment": "off",
+    "typescript/no-unsafe-argument": "off",
+    "typescript/no-unsafe-call": "off",
+    "typescript/no-unsafe-member-access": "off",
+    "typescript/no-unsafe-return": "off",
+    "typescript/no-unsafe-type-assertion": "off",
+    // Truthiness on a string or a number is used deliberately here (an empty
+    // id and a missing id mean the same thing to a lookup); demanding an
+    // explicit comparison at every one would add noise, not safety.
+    "typescript/strict-boolean-expressions": "off",
+    // `onClick: () => this.close()` is the idiom this codebase uses for every
+    // handler; the rule wants a block body on each of them.
+    "typescript/no-confusing-void-expression": "off",
+    "typescript/strict-void-return": "off",
+    // `.sort()` mutates in place on arrays this code already owns (a fresh
+    // `map`, a `slice`), which is the point — `toSorted` would allocate a
+    // second array per call in per-frame paths.
+    "unicorn/no-array-sort": "off",
+    "unicorn/no-array-reverse": "off",
+    // With `exactOptionalPropertyTypes` an explicit `undefined` is meaningful:
+    // it is how "present and unset" is spelled, and the rule cannot tell that
+    // from a redundant one.
+    "unicorn/no-useless-undefined": "off",
+    // A named function inside a factory closes over that factory's arguments;
+    // hoisting it out would mean threading them through by hand.
+    "unicorn/consistent-function-scoping": "off",
+    // `__viewerDebug` and `__appReady` are the documented debug contract
+    // (README); the leading underscores are the point.
+    "eslint/no-underscore-dangle": "off",
+    "eslint/max-depth": "off",
+    // Every regex here is an ASCII validator over ids, file paths and CSS
+    // names. `u` mode changes escape and dot semantics, so switching 51
+    // patterns to it would need 51 audits for no gain; revisit the day a
+    // pattern is pointed at user prose.
+    "eslint/require-unicode-regexp": "off",
+    // `async` is part of a CONTRACT here, not a promise that the body awaits:
+    // `SceneRepository.load`, the browser-check probes and the frame bridge's
+    // `perform` all declare a promise so a synchronous fixture and a real
+    // network call are interchangeable.
+    "eslint/require-await": "off",
+    "typescript/require-await": "off",
+    // A discriminated dispatch whose default case is "nothing matched" returns
+    // `undefined` on purpose; `return undefined;` on every arm would say less.
+    "typescript/consistent-return": "off",
+    // `appendChild` takes exactly one Node and returns it, which is what the
+    // shell builder wants and what its DOM test doubles implement; `append`
+    // adds variadic and string arguments this code has no use for.
+    "unicorn/prefer-dom-node-append": "off",
+    // `onclick =` survives in two places the selection panel owns and replaces
+    // wholesale on every open. Listener discipline (`{ signal }` everywhere,
+    // one AbortController per component) is enforced by
+    // `scripts/listener-policy.ts` instead.
+    "unicorn/prefer-add-event-listener": "off",
+    // An object literal default is re-evaluated per call in JavaScript, so the
+    // shared-mutable-default hazard the rule guards against does not exist;
+    // `ends = { start: true, end: true }` reads better than the alternative.
+    "unicorn/no-object-as-default-parameter": "off",
+    // `x | 0` in `texture-noise` is an int32 coercion inside a hash, not a
+    // truncation: `Math.trunc` would not wrap, and the hash must.
+    "unicorn/prefer-math-trunc": "off",
+    // The dev pages call `main().catch(...)` so a boot failure is reported;
+    // a rejected top-level await would leave a blank page and a console
+    // message no one is looking for.
+    "unicorn/prefer-top-level-await": "off",
+    // Directly contradicts `unicorn/no-array-callback-reference`, which is on:
+    // one wants `map(String)`, the other forbids it.
+    "unicorn/prefer-native-coercion-functions": "off",
+    // `describe(path, () => …)` inside a `for` over a table of cases is the
+    // standard way to write a parameterised suite.
+    "eslint/no-loop-func": "off",
+    // `string & {}` in `scene/types.ts` is the documented idiom for "one of
+    // these literals, or any other string", which is exactly what a scene's
+    // material id is; there is no explicit shape to prefer.
+    "typescript/ban-types": "off",
+    // `byName<HTMLButtonElement>('tour-play')` uses its type parameter once by
+    // design: the CALLER chooses the element type it is asking for.
+    "typescript/no-unnecessary-type-parameters": "off"
+  }
+}

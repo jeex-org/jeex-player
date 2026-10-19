@@ -1,0 +1,27 @@
+# Build outputs
+dist/
+dist-lib/
+# The player site's output tree (`scripts/site-build.ts`).
+site-out/
+*.tgz
+
+# Tooling caches and reports
+node_modules/
+.vite/
+coverage/
+# `bun test` writes `coverage/`; the Vitest browser level writes its own,
+# because the two measure different layers against different floors
+# (`scripts/coverage-check.ts`).
+coverage-component/
+test-results/
+playwright-report/
+.code-ranker/
+
+# Local machine
+*.log
+*.local
+.env*
+.DS_Store
+
+# Screenshot baselines generated locally on macOS; only the linux set is tracked.
+tests/e2e/__screenshots__/darwin/

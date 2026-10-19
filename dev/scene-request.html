@@ -1,0 +1,28 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>JEEX dev — scene fetch over a URL</title>
+    <style>
+      /*
+        Only what a viewer needs to boot; the page itself is not under test.
+        `tests/e2e/scene-request.spec.ts` intercepts the scene fetch with
+        `page.route`, so no real scene file has to be committed as a static
+        asset.
+      */
+      body {
+        margin: 0;
+        background: #0d1111;
+      }
+      #stage {
+        position: fixed;
+        inset: 0;
+      }
+    </style>
+  </head>
+  <body>
+    <div id="stage"></div>
+    <script type="module" src="/dev/scene-request.ts"></script>
+  </body>
+</html>

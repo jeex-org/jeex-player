@@ -1,0 +1,40 @@
+/*
+  The FRAME PAGE's box: `embed.html`, the page an iframe points at.
+  Imported after `page.css` by the demo's `src/main-embed.ts` and inlined into
+  the library's `dist-lib/embed.html` by `vite.lib.config.ts`, so both frame
+  pages lay out the same way.
+
+  Two boxes, two jobs:
+
+  - `#app` FILLS the frame, whatever size the embedding page gave it (a fixed
+    `height`, the helper's container, an `aspect-ratio`), so the viewer never
+    letterboxes and never scrolls.
+  - `#jeex-size` is the document's CONTENT: the frame's width at the page's
+    `?ratio=` (16:9 by default, set by `embed/frame-boot.ts`). It is what a
+    responsive iframe (`frame-sizing: content-height`, Chrome behind the
+    `ResponsiveIframes` flag) measures, and what the `size` event reports to
+    the host helper. It depends on the width alone, never on the frame's own
+    height, so sizing the frame to it cannot loop.
+*/
+
+html,
+body {
+  margin: 0;
+  block-size: auto;
+  min-block-size: 0;
+  overflow: clip;
+  background: #0d1111;
+}
+
+#app {
+  position: fixed;
+  inset: 0;
+}
+
+#jeex-size {
+  display: block;
+  inline-size: 100%;
+  aspect-ratio: 16 / 9;
+  visibility: hidden;
+  pointer-events: none;
+}

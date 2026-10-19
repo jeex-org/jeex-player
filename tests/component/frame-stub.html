@@ -1,0 +1,83 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <title>jeex embed protocol stub</title>
+  </head>
+  <body>
+    <!--
+      A frame that speaks the wire and nothing else.
+
+      `tests/component/frame-bridge.test.ts` points the real `embedViewer` at
+      this page to test the HOST side across a real document boundary. It is
+      deliberately NOT the viewer: `embed.html` loads the viewer through the
+      module graph, and under Vitest's Browser Mode that graph is served
+      instrumented, so a dynamic import inside a plain nested frame fails on a
+      helper only the test runner defines. The two REAL sides meet in the
+      Playwright suite (`tests/e2e/embed-iframe.spec.ts`), where the pages come
+      off an ordinary `vite` server.
+
+      A classic inline script on purpose: nothing here is transformed, imported
+      or bundled, so this page behaves the same under Vitest and under `vite`.
+
+      Query control, so one page can play every part the host tests need:
+        ?silent=1         never answer anything (the reply-timeout path)
+        ?readyDelay=<ms>  how long the boot takes before the `ready` event
+    -->
+    <script>
+      (function () {
+        var CHANNEL = 'jeex-embed';
+        var VERSION = 1;
+        var params = new URLSearchParams(location.search);
+        var viewerId = params.get('viewerId') || 'jeex';
+        var hostOrigin = params.get('host') || '*';
+        var silent = params.get('silent') === '1';
+        var readyDelay = Number(params.get('readyDelay') || 0);
+        /** Every command this frame was sent, in order, for the host test to read back. */
+        var received = [];
+        window.jeexReceived = received;
+
+        function post(message) {
+          if (silent) return;
+          parent.postMessage(message, hostOrigin);
+        }
+
+        function envelope(extra) {
+          var message = { channel: CHANNEL, version: VERSION, viewerId: viewerId };
+          for (var key in extra) message[key] = extra[key];
+          return message;
+        }
+
+        /** One canned answer per method; enough to prove the round trip. */
+        function resultFor(command) {
+          if (command.method === 'getMode') return 'orbit';
+          if (command.method === 'progress') return { fraction: 0.25, elapsed: 5, duration: 20, state: 'paused' };
+          if (command.method === 'focusRoom') return true;
+          return undefined;
+        }
+
+        window.addEventListener('message', function (event) {
+          var data = event.data;
+          if (!data || data.channel !== CHANNEL || data.version !== VERSION) return;
+          if (data.kind !== 'command' || data.viewerId !== viewerId) return;
+          received.push({ id: data.id, method: data.method, params: data.params, origin: event.origin });
+          if (data.method === 'focusRoom' && (!data.params || typeof data.params.roomId !== 'string')) {
+            post(envelope({ kind: 'reply', id: data.id, ok: false, error: { code: 'bad-params', message: 'roomId must be a string' } }));
+            return;
+          }
+          post(envelope({ kind: 'reply', id: data.id, ok: true, result: resultFor(data) }));
+        });
+
+        setTimeout(function () {
+          post(
+            envelope({
+              kind: 'event',
+              event: 'ready',
+              payload: { options: { locale: 'en' }, sceneId: '01a12ffa-de51-7028-923d-5dd489ef10bf' },
+            }),
+          );
+        }, readyDelay);
+      })();
+    </script>
+  </body>
+</html>

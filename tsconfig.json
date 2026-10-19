@@ -1,0 +1,55 @@
+{
+  "compilerOptions": {
+    // TypeScript 7 defaults to `es2025`; the shipped bundle targets ES2022
+    // (`vite.config.ts`, `vite.lib.config.ts`), so the checker is held to the
+    // same year rather than being allowed to type-check syntax the bundler
+    // would have to down-level.
+    "target": "ES2022",
+    "useDefineForClassFields": true,
+    // `preserve` is the documented pairing with `moduleResolution: bundler`
+    // for a bundled browser library, and it is what Bun's own docs recommend.
+    "module": "preserve",
+    "moduleResolution": "Bundler",
+    "allowImportingTsExtensions": true,
+    // This project never emits — Vite builds the bundles and
+    // `tsconfig.lib.json` emits the declarations. Saying so explicitly is what
+    // lets `allowImportingTsExtensions` be set, and it is what oxlint's
+    // type-aware engine reads when it loads this config.
+    "noEmit": true,
+    "verbatimModuleSyntax": true,
+    "isolatedModules": true,
+    "resolveJsonModule": true,
+    // `strict` is the TS 7 default; it is spelled out because this file is the
+    // repository's statement of policy, not a diff against the compiler.
+    "strict": true,
+    "types": ["bun"],
+    "noUnusedLocals": true,
+    "noUnusedParameters": true,
+    "noFallthroughCasesInSwitch": true,
+    // Bans enums, namespaces and parameter properties, so every `.ts` file
+    // here survives a plain type-strip (Node, Bun, oxc) without a compiler.
+    "erasableSyntaxOnly": true,
+    "noImplicitOverride": true,
+    // An index signature is a claim about shape, not about a key existing:
+    // `record.foo` is forbidden where `record['foo']` is honest.
+    "noPropertyAccessFromIndexSignature": true,
+    // `{ a?: string }` and `{ a: string | undefined }` stop being the same
+    // type — the protocol layer already hand-rolls that distinction.
+    "exactOptionalPropertyTypes": true,
+    // Every `a[i]` and `record[key]` yields `T | undefined`. On a plan solver
+    // and a geometry pipeline this is the flag that matters most: an index
+    // derived from wire data is a guess until it is checked.
+    "noUncheckedIndexedAccess": true,
+    "skipLibCheck": true,
+    // `DOM.Iterable` and `DOM.AsyncIterable` were folded into `DOM` in TS 6,
+    // so the two-entry list is the whole platform surface now.
+    "lib": ["ESNext", "DOM"]
+  },
+  // `tests` is here so the browser test levels are checked with the SAME
+  // flags as the code they test — in particular `noUncheckedIndexedAccess`,
+  // which decides whether a `!` in a test is necessary or noise. It is also
+  // what oxlint's type-aware engine resolves per file: a `tests/` file outside
+  // every project would be linted against compiler defaults and every honest
+  // non-null assertion in it reported as unnecessary.
+  "include": ["src", "dev", "tests", "vite.config.ts", "vitest.config.ts", "playwright.config.ts"]
+}

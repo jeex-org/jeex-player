@@ -1,0 +1,1532 @@
+/*
+  The component stylesheet.
+
+  Invariant: every rule is scoped to the `.jeex-viewer` root. There is no
+  `:root`, no `html`/`body`, no bare `*` or element selector and no `#id` —
+  a host page that embeds the viewer must get its own document back unchanged,
+  and two viewers on one page must not fight over an id.
+
+  The root is a size container (`container-type: size`), so every breakpoint
+  below is a `@container` query measuring THE VIEWER, not the window, and the
+  proportional sizes are `cqw` rather than `vw`. A 420 px embed on a desktop
+  page therefore gets the compact chrome, which is what it should get.
+
+  Delivery is `viewer-shell.ensureViewerStyles`: this file is imported as text
+  (`?inline`) and adopted once per document or shadow root.
+
+  Cascade layers: every rule below is in `reset` or `component`, declared in
+  that order. Both lose to UNLAYERED rules, which is the point — a host styling
+  `jeex-viewer::part(control-bar)` from its own sheet wins without an
+  `!important` and without counting selectors.
+
+  Theming: the custom properties on `.jeex-viewer` are the supported way to
+  restyle the chrome. Their defaults are exactly the literals they replaced, so
+  a viewer nobody themes looks the way it always did. Colours that genuinely
+  have two schemes are written `light-dark(light, dark)`; the root carries
+  `color-scheme: var(--jeex-color-scheme, dark)`, so they resolve to the dark
+  half until a host writes `light` (or `light dark`) into that one property.
+*/
+
+@layer reset, component;
+
+@layer reset {
+  .jeex-viewer,
+  .jeex-viewer *,
+  .jeex-viewer *::before,
+  .jeex-viewer *::after {
+    box-sizing: border-box;
+  }
+  .jeex-viewer button {
+    font: inherit;
+  }
+}
+
+@layer component {
+  .jeex-viewer {
+    /*
+      The theming surface. Seven properties, every one of them with the value
+      it replaced as its default, so overriding none of them changes nothing.
+      A host sets them on the element (or on any ancestor, since they inherit):
+
+        jeex-viewer { --jeex-accent: #4f8cff; --jeex-radius: 4px; }
+    */
+
+    /* The one colour that says "this control is doing something". */
+    --jeex-accent: light-dark(#a8813a, #dfbd7d);
+    /* Behind every panel, bar and card: a translucent plate over the scene. */
+    --jeex-surface: light-dark(rgb(250 247 240 / 82%), rgb(14 22 21 / 76%));
+    /* Text and icons on that plate. */
+    --jeex-surface-text: light-dark(#1c2523, #f5efe4);
+    /* Corner radius of the panels; the pills and dots derive from it. */
+    --jeex-radius: 16px;
+    /* Every string the chrome writes. */
+    --jeex-font: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    /* The mini-map card's longest side; it still shrinks with the container. */
+    --jeex-minimap-size: 196px;
+    /* The card the map is drawn on: white paper over the scene by default. */
+    --jeex-minimap-paper: light-dark(#fdfcf9, #fdfcf9);
+    /* How solid the chrome is over the scene; the reveal animation scales it. */
+    --jeex-chrome-opacity: 1;
+    /* Behind the canvas: what shows before the first frame paints. */
+    --jeex-backdrop: #c6b8a3;
+    /* The keyboard-focus ring, on every focusable element in the shell. */
+    --jeex-focus: light-dark(#a8813a, #dfbd7d);
+    /* Which half of every `light-dark()` colour above resolves. A host page sets
+       this to `light` from its own stylesheet and the whole chrome follows —
+       one variable, no `::part`, no `!important`. */
+    --jeex-color-scheme: dark;
+    /* How far a corner slot sits from the viewport edge, before
+       `env(safe-area-inset-*)` raises it on a notched screen. */
+    --jeex-slot-inset: 18px;
+
+    /*
+      Derived, and NOT part of the contract: a host themes the seven above and
+      these follow. They exist so one accent override reaches the mode buttons,
+      the tour knob and the focus rings together.
+    */
+    --jeex-accent-strong: light-dark(#8d6b2c, #e9cd8f);
+    --jeex-accent-muted: light-dark(#b08d47, #d5b274);
+    --jeex-on-accent: light-dark(#fffdf7, #19211f);
+    /* One step brighter than the body text: a pressed or hovered control. */
+    --jeex-surface-text-bright: light-dark(#000, #fff);
+    --jeex-surface-strong: light-dark(rgb(252 250 245 / 92%), rgb(14 22 21 / 88%));
+    --jeex-surface-soft: light-dark(rgb(250 247 240 / 66%), rgb(14 22 21 / 66%));
+    --jeex-hairline: light-dark(rgb(20 26 25 / 14%), rgb(255 255 255 / 17%));
+    /* The one warm colour that is NOT the accent: a door that will not open. */
+    --jeex-alert: light-dark(#b0533a, #d4866c);
+
+    position: relative;
+    display: block;
+    inline-size: 100%;
+    block-size: 100%;
+    container-type: size;
+    contain: layout paint style;
+    overflow: clip;
+    isolation: isolate;
+    color-scheme: var(--jeex-color-scheme, dark);
+    font-family: var(--jeex-font);
+    font-synthesis: none;
+    text-rendering: optimizeLegibility;
+    color: var(--jeex-surface-text);
+    background: var(--jeex-backdrop);
+  }
+
+  /*
+    The one focus ring the whole shell shares: 2 px, offset 2 px, in the
+    themeable `--jeex-focus` colour. `:focus-visible` only — never `:focus` —
+    so a mouse click never draws it, and it is declared once here rather than
+    per component so nothing focusable can be missed. The elements below
+    cover every focusable node the shell template and its overlays build:
+    the root itself (the keyboard camera target), every `<button>`, the tour
+    track (`role="slider"`), every explicit `tabindex` (door HUD buttons,
+    swatches) and the finish-scope checkbox.
+  */
+  .jeex-viewer:focus-visible,
+  .jeex-viewer button:focus-visible,
+  .jeex-viewer input:focus-visible,
+  .jeex-viewer a:focus-visible,
+  .jeex-viewer [role='slider']:focus-visible,
+  .jeex-viewer [tabindex]:focus-visible {
+    outline: 2px solid var(--jeex-focus);
+    outline-offset: 2px;
+  }
+
+  .jeex-viewer:fullscreen {
+    inline-size: 100%;
+    block-size: 100%;
+    min-block-size: 100%;
+  }
+  .jeex-viewer .scene-canvas {
+    position: absolute;
+    inset: 0;
+    display: block;
+    inline-size: 100%;
+    block-size: 100%;
+    touch-action: none;
+  }
+
+  .jeex-viewer .is-hidden {
+    display: none !important;
+  }
+  /*
+   * `chrome.*`'s `setChrome()` sets the native `hidden` ATTRIBUTE
+   * on control-bar/brand-lockup/hint-card/mode-switcher/reveal-controls, not
+   * the `.is-hidden` class. `[hidden]` is a normal-priority UA rule, and the
+   * component's own `display: flex/grid` rules for those elements are
+   * higher-priority AUTHOR-origin declarations regardless of layer or
+   * specificity — so the attribute alone never actually hid anything once
+   * `.viewer-ui` itself was shown; only element-property assertions
+   * (`.hidden === true`) caught the DOM state, never a rendered pixel. One
+   * `!important` rule here, matching `.is-hidden`'s own pattern, is what
+   * makes `hidden` REALLY hidden.
+   */
+  .jeex-viewer [hidden] {
+    display: none !important;
+  }
+  .jeex-viewer .loading-state,
+  .jeex-viewer .state-card {
+    position: absolute;
+    inset: 0;
+    z-index: 10;
+    display: grid;
+    place-content: center;
+    justify-items: center;
+    padding: 24px;
+    text-align: center;
+    background: radial-gradient(circle at 50% 40%, rgba(61, 79, 73, 0.92), rgba(13, 19, 19, 0.98) 72%);
+  }
+  .jeex-viewer .loading-state h1,
+  .jeex-viewer .state-card h1 {
+    max-inline-size: 520px;
+    margin: 8px 0 12px;
+    font-size: clamp(28px, 5cqw, 54px);
+    line-height: 0.96;
+    letter-spacing: -0.06em;
+    font-weight: 500;
+  }
+  .jeex-viewer .eyebrow {
+    margin: 0;
+    color: var(--jeex-accent-muted);
+    font-size: 10px;
+    letter-spacing: 0.2em;
+    text-transform: uppercase;
+    font-weight: 700;
+  }
+  .jeex-viewer .loading-label,
+  .jeex-viewer .state-card p:not(.eyebrow) {
+    max-inline-size: 440px;
+    margin: 0;
+    color: rgb(from var(--jeex-surface-text) r g b / 64%);
+    font-size: 13px;
+    line-height: 1.5;
+  }
+  .jeex-viewer .loading-track {
+    inline-size: min(250px, 70cqw);
+    block-size: 3px;
+    margin: 30px 0 13px;
+    overflow: hidden;
+    border-radius: 999px;
+    background: rgba(255, 255, 255, 0.15);
+  }
+  .jeex-viewer .loading-track div {
+    block-size: 100%;
+    inline-size: 0;
+    border-radius: inherit;
+    background: var(--jeex-accent-muted);
+    transition: width 0.32s ease;
+  }
+  .jeex-viewer .loading-mark {
+    display: flex;
+    gap: 5px;
+    margin-block-end: 22px;
+  }
+  .jeex-viewer .loading-mark span {
+    inline-size: 7px;
+    block-size: 7px;
+    border-radius: 50%;
+    background: var(--jeex-accent-muted);
+    animation: jeex-pulse 1.2s ease-in-out infinite;
+  }
+  .jeex-viewer .loading-mark span:nth-child(2) {
+    animation-delay: 0.14s;
+    opacity: 0.7;
+  }
+  .jeex-viewer .loading-mark span:nth-child(3) {
+    animation-delay: 0.28s;
+    opacity: 0.4;
+  }
+  @keyframes jeex-pulse {
+    0%,
+    100% {
+      transform: translateY(0);
+    }
+    50% {
+      transform: translateY(-5px);
+    }
+  }
+
+  .jeex-viewer .button {
+    min-block-size: 42px;
+    padding: 0 18px;
+    margin-block-start: 22px;
+    border: 0;
+    border-radius: 999px;
+    cursor: pointer;
+  }
+  .jeex-viewer .button-primary {
+    background: var(--jeex-accent);
+    color: var(--jeex-on-accent);
+    font-weight: 700;
+  }
+
+  .jeex-viewer .viewer-ui {
+    position: absolute;
+    inset: 0;
+    z-index: 5;
+    pointer-events: none;
+  }
+  .jeex-viewer .control-bar,
+  .jeex-viewer .hint-card,
+  .jeex-viewer .tour-status,
+  .jeex-viewer .degraded-notice,
+  .jeex-viewer .reveal-controls,
+  .jeex-viewer .tour-bar {
+    pointer-events: auto;
+  }
+  .jeex-viewer .control-bar {
+    position: absolute;
+    inset-block-start: max(14px, env(safe-area-inset-top));
+    inset-inline-start: 50%;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    max-inline-size: calc(100% - 24px);
+    padding: 8px 9px 8px 14px;
+    border: 1px solid var(--jeex-hairline);
+    border-radius: var(--jeex-radius);
+    background: var(--jeex-surface);
+    box-shadow:
+      0 14px 44px rgba(6, 12, 11, 0.28),
+      inset 0 1px rgba(255, 255, 255, 0.1);
+    backdrop-filter: blur(18px) saturate(1.15);
+    transform: translateX(-50%);
+    opacity: var(--jeex-chrome-opacity);
+    transition:
+      opacity 0.34s ease,
+      transform 0.34s ease;
+  }
+  .jeex-viewer .control-bar.is-collapsed {
+    opacity: 0;
+    transform: translate(-50%, -18px) scale(0.96);
+    pointer-events: none;
+  }
+  .jeex-viewer .brand-lockup {
+    display: flex;
+    align-items: center;
+    gap: 7px;
+    white-space: nowrap;
+  }
+  .jeex-viewer .brand-dot {
+    inline-size: 7px;
+    block-size: 7px;
+    border-radius: 50%;
+    background: var(--jeex-accent);
+    box-shadow: 0 0 0 4px rgb(from var(--jeex-accent) r g b / 13%);
+  }
+  .jeex-viewer .brand-name {
+    font-size: 12px;
+    font-weight: 800;
+    letter-spacing: 0.16em;
+  }
+  .jeex-viewer .brand-divider {
+    inline-size: 1px;
+    block-size: 17px;
+    background: rgba(255, 255, 255, 0.2);
+  }
+  .jeex-viewer .brand-context {
+    color: rgb(from var(--jeex-surface-text) r g b / 56%);
+    font-size: 9px;
+    letter-spacing: 0.12em;
+  }
+  .jeex-viewer .mode-switcher {
+    display: flex;
+    align-items: center;
+    gap: 2px;
+    padding: 3px;
+    border-radius: calc(var(--jeex-radius) - 6px);
+    background: rgba(255, 255, 255, 0.08);
+  }
+  .jeex-viewer .mode-button,
+  .jeex-viewer .icon-button {
+    border: 0;
+    color: rgb(from var(--jeex-surface-text) r g b / 66%);
+    background: transparent;
+    cursor: pointer;
+    transition:
+      background 0.2s ease,
+      color 0.2s ease,
+      transform 0.2s ease;
+  }
+  .jeex-viewer .mode-button {
+    min-block-size: 27px;
+    padding: 0 11px;
+    border-radius: calc(var(--jeex-radius) - 9px);
+    font-size: 11px;
+  }
+  .jeex-viewer .mode-button:hover,
+  .jeex-viewer .mode-button:focus-visible {
+    color: var(--jeex-surface-text-bright);
+    background: rgba(255, 255, 255, 0.1);
+  }
+  .jeex-viewer .mode-button.is-active {
+    color: var(--jeex-on-accent);
+    background: var(--jeex-accent);
+    box-shadow: 0 4px 12px rgb(from var(--jeex-accent) r g b / 20%);
+  }
+  .jeex-viewer .control-actions {
+    display: flex;
+    gap: 4px;
+  }
+  .jeex-viewer .icon-button {
+    display: grid;
+    place-items: center;
+    inline-size: 28px;
+    block-size: 28px;
+    border-radius: calc(var(--jeex-radius) - 8px);
+  }
+  .jeex-viewer .icon-button:hover,
+  .jeex-viewer .icon-button:focus-visible {
+    color: var(--jeex-surface-text-bright);
+    background: rgba(255, 255, 255, 0.12);
+    transform: translateY(-1px);
+  }
+  .jeex-viewer .icon-button.is-off {
+    color: rgb(from var(--jeex-surface-text) r g b / 38%);
+  }
+  .jeex-viewer .icon-button svg {
+    inline-size: 15px;
+    block-size: 15px;
+    fill: none;
+    stroke: currentColor;
+    stroke-width: 1.7;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+  }
+
+  .jeex-viewer .hint-card {
+    position: absolute;
+    inset-inline-start: max(18px, env(safe-area-inset-left));
+    inset-block-end: max(18px, env(safe-area-inset-bottom));
+    display: flex;
+    align-items: center;
+    gap: 9px;
+    max-inline-size: min(380px, calc(100% - 36px));
+    padding: 10px 13px;
+    border: 1px solid var(--jeex-hairline);
+    border-radius: calc(var(--jeex-radius) - 5px);
+    background: var(--jeex-surface-strong);
+    color: rgb(from var(--jeex-surface-text) r g b / 92%);
+    box-shadow: 0 12px 32px rgba(7, 12, 12, 0.17);
+    backdrop-filter: blur(12px);
+    font-size: 11px;
+    transition:
+      opacity 0.4s ease,
+      transform 0.4s ease;
+  }
+  .jeex-viewer .hint-icon {
+    color: var(--jeex-accent);
+    font-size: 15px;
+    line-height: 1;
+  }
+  .jeex-viewer .tour-status {
+    position: absolute;
+    inset-block-start: max(76px, calc(env(safe-area-inset-top) + 62px));
+    inset-inline-start: 50%;
+    display: flex;
+    align-items: center;
+    gap: 9px;
+    padding: 8px 12px;
+    border: 1px solid var(--jeex-hairline);
+    border-radius: 999px;
+    background: var(--jeex-surface-soft);
+    color: rgb(from var(--jeex-surface-text) r g b / 75%);
+    font-size: 10px;
+    letter-spacing: 0.04em;
+    transform: translateX(-50%);
+    backdrop-filter: blur(10px);
+  }
+  .jeex-viewer .tour-status-dot,
+  .jeex-viewer .notice-dot {
+    inline-size: 6px;
+    block-size: 6px;
+    border-radius: 50%;
+    background: var(--jeex-accent);
+    box-shadow: 0 0 0 4px rgb(from var(--jeex-accent) r g b / 12%);
+  }
+
+  /* Tour progress bar: a thin track on the bottom edge that thickens and grows a
+   knob on hover or while scrubbing. `data-visible` is the mount option plus
+   whether the tour is engaged; the element stays in the DOM either way, so the
+   machine-readable state survives `progressBar: false`. */
+  .jeex-viewer .tour-bar {
+    position: absolute;
+    inset-inline: 0;
+    inset-block-end: 0;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 5px 14px calc(5px + env(safe-area-inset-bottom));
+    background: linear-gradient(to top, rgba(8, 13, 13, 0.58), rgba(8, 13, 13, 0));
+    opacity: var(--jeex-chrome-opacity);
+    transition:
+      opacity 0.34s ease,
+      transform 0.34s ease;
+  }
+  .jeex-viewer .tour-bar[data-visible='false'] {
+    display: none;
+  }
+  /* A host box claimed at `bottom-right` (for example a 56px assistant button)
+     sits at layer 8 in the bar's own corner and would cover the top of the speed
+     button (seen at 1440x900). The bar reserves that corner in
+     its end padding: the slot's inset plus the same 64px (button plus an 8px
+     gap) `.degraded-notice` and `.camera-preview` step by, so the speed button
+     ends 8px left of the box at every width; the track gives up the room. */
+  .jeex-viewer[data-jeex-slot-bottom-right='true'] .tour-bar {
+    padding-inline-end: calc(max(var(--jeex-slot-inset), env(safe-area-inset-right)) + 64px);
+  }
+  .jeex-viewer .tour-bar.is-collapsed {
+    opacity: 0;
+    transform: translateY(14px);
+    pointer-events: none;
+  }
+  .jeex-viewer .tour-bar-play {
+    display: grid;
+    flex: 0 0 auto;
+    place-items: center;
+    inline-size: 26px;
+    block-size: 26px;
+    border: 0;
+    border-radius: 50%;
+    color: rgb(from var(--jeex-surface-text) r g b / 86%);
+    background: rgba(255, 255, 255, 0.12);
+    cursor: pointer;
+    transition:
+      background 0.2s ease,
+      color 0.2s ease;
+  }
+  .jeex-viewer .tour-bar-play:hover,
+  .jeex-viewer .tour-bar-play:focus-visible {
+    color: var(--jeex-surface-text-bright);
+    background: rgba(255, 255, 255, 0.24);
+  }
+  .jeex-viewer .tour-bar-play svg {
+    inline-size: 11px;
+    block-size: 11px;
+    fill: currentColor;
+    stroke: none;
+  }
+  .jeex-viewer .tour-bar-play .icon-pause,
+  .jeex-viewer .tour-bar[data-state='playing'] .tour-bar-play .icon-play {
+    display: none;
+  }
+  .jeex-viewer .tour-bar[data-state='playing'] .tour-bar-play .icon-pause {
+    display: inline;
+  }
+  /* The speed setting: a pill that reads «1x», «2x», «0.5x»;
+   the same surface as the play button, wide enough for the longest label. */
+  .jeex-viewer .tour-bar-speed {
+    flex: 0 0 auto;
+    min-inline-size: 40px;
+    block-size: 26px;
+    padding-inline: 8px;
+    border: 0;
+    border-radius: 999px;
+    color: rgb(from var(--jeex-surface-text) r g b / 86%);
+    background: rgba(255, 255, 255, 0.12);
+    font: inherit;
+    font-size: 12px;
+    font-weight: 600;
+    font-variant-numeric: tabular-nums;
+    cursor: pointer;
+    transition:
+      background 0.2s ease,
+      color 0.2s ease;
+  }
+  .jeex-viewer .tour-bar-speed:hover,
+  .jeex-viewer .tour-bar-speed:focus-visible {
+    color: var(--jeex-surface-text-bright);
+    background: rgba(255, 255, 255, 0.24);
+  }
+  .jeex-viewer .tour-bar-track {
+    position: relative;
+    flex: 1 1 auto;
+    display: flex;
+    align-items: center;
+    /* WCAG 2.2 target size (was 15px) -- the HIT area only. The visual
+     line stays 3-6px (`:before`, `:hover`/`:focus-visible` below): its
+     `inset-inline: 0` with no `top`/`bottom` takes its static cross-axis
+     position from this container's own `align-items: center`, so a taller
+     box centres the same thin line rather than stretching it. */
+    block-size: 24px;
+    cursor: pointer;
+    touch-action: none;
+  }
+  .jeex-viewer .tour-bar-track:before {
+    content: '';
+    position: absolute;
+    inset-inline: 0;
+    block-size: 3px;
+    border-radius: 999px;
+    background: rgb(from var(--jeex-surface-text) r g b / 24%);
+    transition: block-size 0.18s ease;
+  }
+  .jeex-viewer .tour-bar-fill {
+    position: absolute;
+    inset-inline-start: 0;
+    inline-size: calc(var(--tour-progress, 0) * 100%);
+    block-size: 3px;
+    border-radius: 999px;
+    background: var(--jeex-accent);
+    transition: block-size 0.18s ease;
+  }
+  .jeex-viewer .tour-bar-knob {
+    position: absolute;
+    inset-inline-start: calc(var(--tour-progress, 0) * 100%);
+    inline-size: 11px;
+    block-size: 11px;
+    margin-inline-start: -5.5px;
+    border-radius: 50%;
+    opacity: 0;
+    background: var(--jeex-accent-strong);
+    box-shadow: 0 2px 7px rgba(6, 12, 11, 0.5);
+    transform: scale(0.4);
+    transition:
+      opacity 0.18s ease,
+      transform 0.18s ease;
+  }
+  .jeex-viewer .tour-bar-track:hover:before,
+  .jeex-viewer .tour-bar-track:focus-visible:before,
+  .jeex-viewer .tour-bar[data-scrubbing='true'] .tour-bar-track:before,
+  .jeex-viewer .tour-bar-track:hover .tour-bar-fill,
+  .jeex-viewer .tour-bar-track:focus-visible .tour-bar-fill,
+  .jeex-viewer .tour-bar[data-scrubbing='true'] .tour-bar-fill {
+    block-size: 6px;
+  }
+  .jeex-viewer .tour-bar-track:hover .tour-bar-knob,
+  .jeex-viewer .tour-bar-track:focus-visible .tour-bar-knob,
+  .jeex-viewer .tour-bar[data-scrubbing='true'] .tour-bar-knob {
+    opacity: 1;
+    transform: scale(1);
+  }
+  /* The bar claims the bottom edge, so the chrome that otherwise sits there moves
+   up — only while the bar is actually shown. */
+  .jeex-viewer .tour-bar[data-visible='true'] ~ .hint-card {
+    inset-block-end: calc(max(18px, env(safe-area-inset-bottom)) + 24px);
+  }
+  .jeex-viewer .tour-status-progress {
+    color: rgb(from var(--jeex-surface-text) r g b / 46%);
+    font-variant-numeric: tabular-nums;
+  }
+  .jeex-viewer .degraded-notice {
+    position: absolute;
+    inset-inline-end: max(18px, env(safe-area-inset-right));
+    display: flex;
+    align-items: center;
+    gap: 9px;
+    /* In an editor host this card's right edge was seen past the viewport,
+       under an assistant FAB, text clipped mid-word. With only ONE inset
+       set, an absolutely positioned flex row has NO upper bound of its own —
+       its width is whatever the browser's shrink-to-fit gives the un-wrapped
+       text, which depends on the host's own box and font metrics in a way
+       this stylesheet cannot fully control from here. `.hint-card` a few
+       rules up carries the identical risk and was given the identical fix
+       first; the notice gets the SAME cap rather than a second literal to
+       keep in step by hand — an explicit `max-inline-size` is an upper bound
+       this stylesheet CAN guarantee regardless of the host's layout. */
+    max-inline-size: min(380px, calc(100% - 36px));
+    padding: 9px 12px;
+    border: 1px solid var(--jeex-hairline);
+    border-radius: calc(var(--jeex-radius) - 6px);
+    background: var(--jeex-surface);
+    color: rgb(from var(--jeex-surface-text) r g b / 65%);
+    font-size: 10px;
+    backdrop-filter: blur(10px);
+  }
+  /* The notice sits at layer 5, a requested slot at layer 8, ABOVE it: a host
+     box claimed at `bottom-right` — for example a 56px assistant button, the
+     case this was found from — paints OVER the notice's text otherwise,
+     which must not happen (host content must never cover a viewer notice or
+     error card). `host-slots.ts` marks the two flags below once, at
+     construction, so the notice steps to the free `bottom-left` corner
+     instead. 64px below is the 56px button plus an 8px gap — the one concrete
+     size this bug was found with; a host whose own bottom-corner content is
+     taller keeps `--jeex-slot-inset` clear of its OWN box, but may still
+     brush a much taller notice stepping out of ITS way, same as `hint-card`
+     above the tour bar a few rules up. */
+  .jeex-viewer[data-jeex-slot-bottom-right='true'] .degraded-notice {
+    inset-inline-end: auto;
+    inset-inline-start: max(18px, env(safe-area-inset-left));
+  }
+  /* The corner it steps into is not empty: `.hint-card` lives there and is shown
+     from boot (`chrome.hint` defaults to true), so the notice would land ON its
+     text — the same chrome-over-chrome overlap this rule set out to end, only
+     between two pieces of the viewer's own chrome.
+
+     TWO properties summed in one `calc`, not one property enumerating the
+     combinations: the reasons to rise are independent, and an enumeration would
+     have rested on which selector happens to out-specify which. Each rule
+     sets only its own term and the sum is arithmetic.
+
+     The hint term is 62px, not the ~35px a one-line card measures: the card is
+     `max-inline-size: min(380px, …)` at `font-size: 11px` and its text is
+     translated, so German and French wrap it to two lines — a clearance
+     calibrated on English would have been correct only in English. 62px is a
+     two-line card (2 x 15px line + 20px padding + 2px border) plus the 10px gap
+     the chrome keeps between stacked cards. */
+  .jeex-viewer .degraded-notice {
+    --jeex-notice-lift-slot: 0px;
+    --jeex-notice-lift-hint: 0px;
+    inset-block-end: calc(max(18px, env(safe-area-inset-bottom)) + var(--jeex-notice-lift-slot) + var(--jeex-notice-lift-hint));
+  }
+  .jeex-viewer[data-jeex-slot-bottom-right='true'][data-jeex-slot-bottom-left='true'] .degraded-notice {
+    --jeex-notice-lift-slot: 64px;
+  }
+  .jeex-viewer[data-jeex-slot-bottom-right='true']:has(.hint-card:not([hidden])) .degraded-notice {
+    --jeex-notice-lift-hint: 62px;
+  }
+  .jeex-viewer .notice-dot {
+    background: var(--jeex-alert);
+    box-shadow: 0 0 0 4px rgb(from var(--jeex-alert) r g b / 12%);
+  }
+  .jeex-viewer .reveal-controls {
+    position: absolute;
+    inset-block-start: max(16px, env(safe-area-inset-top));
+    inset-inline-start: 50%;
+    display: grid;
+    grid-auto-flow: column;
+    gap: 3px;
+    inline-size: 42px;
+    block-size: 24px;
+    padding: 0 11px;
+    border: 1px solid var(--jeex-hairline);
+    border-radius: 999px;
+    opacity: 0;
+    background: var(--jeex-surface);
+    transform: translateX(-50%) translateY(-12px);
+    transition:
+      opacity 0.3s ease,
+      transform 0.3s ease;
+  }
+  .jeex-viewer .reveal-controls.is-visible {
+    opacity: 1;
+    transform: translateX(-50%) translateY(0);
+  }
+  .jeex-viewer .reveal-controls span {
+    align-self: center;
+    inline-size: 3px;
+    block-size: 3px;
+    border-radius: 50%;
+    background: var(--jeex-accent);
+  }
+  /*
+   * The standalone fullscreen button (`options.fullscreenButton`): the toolbar's own icon button on the bar's
+   * translucent surface, anchored to the root's top-right corner. Physical
+   * `top`/`right` on purpose: the option names the RIGHT edge, in every
+   * writing direction. The offsets come in as custom properties the chrome
+   * sets from the options, so a host stylesheet can still override them.
+   */
+  .jeex-viewer .fullscreen-float {
+    position: absolute;
+    top: var(--jeex-fullscreen-button-top, 32px);
+    right: var(--jeex-fullscreen-button-right, 32px);
+    inline-size: 44px;
+    block-size: 44px;
+    border: 1px solid var(--jeex-hairline);
+    border-radius: calc(var(--jeex-radius) - 2px);
+    color: var(--jeex-surface-text);
+    background: var(--jeex-surface);
+    box-shadow:
+      0 14px 44px rgba(6, 12, 11, 0.28),
+      inset 0 1px rgba(255, 255, 255, 0.1);
+    backdrop-filter: blur(18px) saturate(1.15);
+    opacity: var(--jeex-chrome-opacity);
+    pointer-events: auto;
+  }
+  .jeex-viewer .fullscreen-float:hover,
+  .jeex-viewer .fullscreen-float:focus-visible {
+    background: var(--jeex-surface-strong);
+  }
+  .jeex-viewer .fullscreen-float svg {
+    inline-size: 17px;
+    block-size: 17px;
+  }
+
+  @container (max-width: 740px) {
+    .jeex-viewer .control-bar {
+      gap: 7px;
+      padding: 7px;
+      border-radius: calc(var(--jeex-radius) - 2px);
+    }
+    .jeex-viewer .brand-lockup {
+      padding-inline: 5px;
+    }
+    .jeex-viewer .brand-context,
+    .jeex-viewer .brand-divider {
+      display: none;
+    }
+    .jeex-viewer .mode-button {
+      min-block-size: 30px;
+      padding-inline: 10px;
+    }
+    /* The bar's own buttons only: the floating fullscreen button keeps its
+       44 px touch target at every width. */
+    .jeex-viewer .control-bar .icon-button {
+      inline-size: 30px;
+      block-size: 30px;
+    }
+    .jeex-viewer .hint-card {
+      inset-block-end: max(14px, env(safe-area-inset-bottom));
+      font-size: 10px;
+    }
+    .jeex-viewer .tour-bar[data-visible='true'] ~ .hint-card {
+      inset-block-end: calc(max(14px, env(safe-area-inset-bottom)) + 24px);
+    }
+  }
+
+  @container (max-width: 430px) {
+    .jeex-viewer .control-bar {
+      inset-inline: 10px;
+      max-inline-size: none;
+      transform: none;
+      justify-content: center;
+    }
+    .jeex-viewer .control-bar.is-collapsed {
+      transform: translateY(-18px) scale(0.96);
+    }
+    .jeex-viewer .brand-lockup {
+      display: none;
+    }
+    .jeex-viewer .mode-button {
+      padding-inline: 9px;
+    }
+    .jeex-viewer .hint-card {
+      max-inline-size: calc(100% - 28px);
+      inset-inline-start: 14px;
+    }
+    .jeex-viewer .degraded-notice {
+      max-inline-size: calc(100% - 28px);
+      inset-inline-end: 14px;
+    }
+    .jeex-viewer[data-jeex-slot-bottom-right='true'] .degraded-notice {
+      inset-inline-start: 14px;
+    }
+  }
+
+  /*
+    The `unbranded` overlay preset (`app/viewer-options.ts`
+    `OVERLAY_PRESETS.unbranded`) hides the brand lockup, the mode switcher and
+    the status pill but keeps the control bar — `viewer-shell.applyChromeOverlay`
+    stamps the root `data-overlay="unbranded"` whenever `chrome` is exactly
+    that shape, whatever door it came in through. With those three gone, the
+    bar holds only `.control-actions` (furniture / interiors / reset /
+    fullscreen), so it earns its own compact rule rather than inheriting the
+    general narrow-viewer breakpoints above, which still budget room for the
+    mode switcher they hide here. Every target stays >= 24 CSS px (portal
+    checklist, WCAG 2.5.8 AA) even at the 360 px width the MLS-feed link is
+    proven at (`tests/e2e/unbranded.spec.ts`).
+  */
+  .jeex-viewer[data-overlay='unbranded'] .control-bar {
+    gap: 6px;
+    padding: 6px;
+  }
+  .jeex-viewer[data-overlay='unbranded'] .control-actions {
+    gap: 6px;
+  }
+  .jeex-viewer[data-overlay='unbranded'] .control-bar .icon-button {
+    inline-size: 30px;
+    block-size: 30px;
+  }
+  @container (max-width: 430px) {
+    .jeex-viewer[data-overlay='unbranded'] .control-bar {
+      inset-inline: 12px;
+      max-inline-size: none;
+      transform: none;
+      justify-content: center;
+      flex-wrap: nowrap;
+      gap: 8px;
+      padding: 6px;
+    }
+    .jeex-viewer[data-overlay='unbranded'] .control-bar .icon-button {
+      inline-size: 32px;
+      block-size: 32px;
+    }
+    .jeex-viewer[data-overlay='unbranded'] .control-bar .icon-button svg {
+      inline-size: 17px;
+      block-size: 17px;
+    }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .jeex-viewer,
+    .jeex-viewer *,
+    .jeex-viewer *::before,
+    .jeex-viewer *::after {
+      scroll-behavior: auto !important;
+      transition-duration: 0.01ms !important;
+      animation-duration: 0.01ms !important;
+      animation-iteration-count: 1 !important;
+    }
+  }
+
+  .jeex-viewer .finish-panel {
+    position: absolute;
+    z-index: 7;
+    inline-size: 262px;
+    padding: 10px 10px 11px;
+    border: 1px solid var(--jeex-hairline);
+    border-radius: calc(var(--jeex-radius) - 3px);
+    background: var(--jeex-surface-strong);
+    box-shadow:
+      0 16px 44px rgba(6, 12, 11, 0.32),
+      inset 0 1px rgba(255, 255, 255, 0.1);
+    backdrop-filter: blur(16px) saturate(1.1);
+    pointer-events: auto;
+  }
+  .jeex-viewer .finish-panel.is-hidden {
+    display: none;
+  }
+  .jeex-viewer .finish-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+  }
+  .jeex-viewer .finish-title {
+    color: rgb(from var(--jeex-surface-text) r g b / 92%);
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.04em;
+  }
+  .jeex-viewer .finish-close {
+    border: 0;
+    background: rgba(255, 255, 255, 0.1);
+    color: rgb(from var(--jeex-surface-text) r g b / 75%);
+    /* WCAG 2.2 target size, 24 x 24 CSS px minimum (was 20 x 20). */
+    inline-size: 24px;
+    block-size: 24px;
+    border-radius: calc(var(--jeex-radius) - 8px);
+    cursor: pointer;
+    font-size: 13px;
+    line-height: 1;
+  }
+  .jeex-viewer .finish-close:hover {
+    color: var(--jeex-surface-text-bright);
+    background: rgba(255, 255, 255, 0.18);
+  }
+  .jeex-viewer .finish-swatches {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 6px;
+    margin-block-start: 9px;
+  }
+  .jeex-viewer .finish-swatch {
+    display: grid;
+    border: 1px solid var(--jeex-hairline);
+    border-radius: calc(var(--jeex-radius) - 8px);
+    background: rgba(255, 255, 255, 0.04);
+    padding: 0 0 3px;
+    cursor: pointer;
+    overflow: hidden;
+    transition:
+      border-color 0.15s ease,
+      transform 0.15s ease;
+  }
+  .jeex-viewer .finish-swatch:hover {
+    transform: translateY(-1px);
+    border-color: rgba(255, 255, 255, 0.4);
+  }
+  .jeex-viewer .finish-swatch.is-active {
+    border-color: var(--jeex-accent);
+  }
+
+  /* Preview thumbnails: image/color only, never text. Selection is shown as a ring on the thumb itself. */
+  .jeex-viewer .swatch-thumb,
+  .jeex-viewer .variant-thumb {
+    display: block;
+    inline-size: 100%;
+    block-size: 34px;
+    object-fit: cover;
+    border-radius: calc(var(--jeex-radius) - 12px);
+    box-shadow: inset 0 0 0 0 transparent;
+    transition: box-shadow 0.15s ease;
+  }
+  .jeex-viewer .variant-thumb {
+    block-size: 62px;
+    object-fit: contain;
+    background: linear-gradient(180deg, rgba(255, 252, 244, 0.14), rgba(60, 52, 40, 0.1));
+  }
+  .jeex-viewer .finish-swatch.is-active .swatch-thumb,
+  .jeex-viewer .finish-swatch.is-active .variant-thumb {
+    box-shadow:
+      inset 0 0 0 2px var(--jeex-accent),
+      0 0 8px rgb(from var(--jeex-accent) r g b / 45%);
+  }
+
+  /* Text labels: always a separate element below the thumbnail, never drawn into the preview image. */
+  .jeex-viewer .swatch-label,
+  .jeex-viewer .variant-label {
+    display: -webkit-box;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 2;
+    overflow: hidden;
+    padding: 2px 2px 0;
+    color: rgb(from var(--jeex-surface-text) r g b / 72%);
+    font-size: 8px;
+    line-height: 1.15;
+    text-align: center;
+    overflow-wrap: break-word;
+  }
+
+  /* Interior presets: a two-tone floor/wall chip, taller than a plain finish so
+   the diagonal split is readable at four across, and a busy state while the
+   batch commits. */
+  .jeex-viewer .finish-panel[data-kind='interior'] .swatch-thumb {
+    block-size: 46px;
+  }
+  .jeex-viewer .finish-panel[data-busy='true'] {
+    opacity: 0.62;
+  }
+  .jeex-viewer .finish-panel[data-busy='true'] .finish-swatches {
+    pointer-events: none;
+  }
+
+  .jeex-viewer .finish-all {
+    inline-size: 100%;
+    margin-block-start: 9px;
+    padding: 6px 0;
+    border: 0;
+    border-radius: calc(var(--jeex-radius) - 8px);
+    background: var(--jeex-accent);
+    color: var(--jeex-on-accent);
+    font-size: 10.5px;
+    font-weight: 700;
+    cursor: pointer;
+  }
+  .jeex-viewer .finish-all:hover {
+    background: var(--jeex-accent-strong);
+  }
+  .jeex-viewer .finish-all.is-hidden {
+    display: none;
+  }
+
+  .jeex-viewer .finish-scope {
+    display: flex;
+    align-items: center;
+    gap: 7px;
+    margin-block-start: 9px;
+    color: rgb(from var(--jeex-surface-text) r g b / 78%);
+    font-size: 10px;
+    cursor: pointer;
+  }
+  .jeex-viewer .finish-scope input {
+    accent-color: var(--jeex-accent);
+    margin: 0;
+  }
+  .jeex-viewer .finish-scope.is-hidden {
+    display: none;
+  }
+
+  @container (max-width: 430px) {
+    .jeex-viewer .finish-panel {
+      inline-size: min(262px, calc(100cqw - 24px));
+    }
+    .jeex-viewer .swatch-label,
+    .jeex-viewer .variant-label {
+      font-size: 9px;
+    }
+  }
+
+  /* Door HUD: the icon-only open/close button pinned to a door leaf (`door-hud.ts`). */
+  .jeex-viewer .door-hud {
+    position: absolute;
+    z-index: 6;
+    display: grid;
+    place-items: center;
+    inline-size: 38px;
+    block-size: 38px;
+    padding: 0;
+    border: 1px solid var(--jeex-hairline);
+    border-radius: 50%;
+    color: rgb(from var(--jeex-surface-text) r g b / 96%);
+    background: var(--jeex-surface);
+    box-shadow:
+      0 6px 18px rgba(6, 12, 11, 0.4),
+      inset 0 1px rgba(255, 255, 255, 0.12);
+    backdrop-filter: blur(10px) saturate(1.1);
+    cursor: pointer;
+    transform: translate(-50%, -50%);
+    transition:
+      background 0.16s ease,
+      border-color 0.16s ease,
+      transform 0.16s ease;
+    pointer-events: auto;
+  }
+  .jeex-viewer .door-hud[data-visible='false'] {
+    display: none;
+  }
+  .jeex-viewer .door-hud:hover,
+  .jeex-viewer .door-hud:focus-visible {
+    border-color: rgb(from var(--jeex-accent) r g b / 70%);
+    background: var(--jeex-surface-strong);
+    transform: translate(-50%, -50%) scale(1.06);
+  }
+  .jeex-viewer .door-hud-icon {
+    display: none;
+    line-height: 0;
+  }
+  .jeex-viewer .door-hud-icon svg {
+    inline-size: 19px;
+    block-size: 19px;
+    fill: currentColor;
+  }
+  .jeex-viewer .door-hud[data-state='open'] .door-hud-icon-close {
+    display: block;
+  }
+  .jeex-viewer .door-hud[data-state='closed'] .door-hud-icon-open {
+    display: block;
+  }
+
+  /* 2D plan overlay: the architectural drawing of `plan-modes.ts`, painted over
+   the scene canvas and under the viewer chrome. Opaque, so the last WebGL
+   frame beneath it never shows through; inert, because plan modes take no
+   input at all. */
+  .jeex-viewer .plan-canvas {
+    position: absolute;
+    inset: 0;
+    z-index: 1;
+    display: block;
+    inline-size: 100%;
+    block-size: 100%;
+    background: var(--jeex-minimap-paper);
+    pointer-events: none;
+  }
+  .jeex-viewer .plan-canvas[data-visible='false'] {
+    display: none;
+  }
+
+  /* Present to assistive tech, invisible on screen. The
+   canvas description and the mode/room live region both use it; never
+   `display: none`, which would take them out of the accessibility tree too. */
+  .jeex-viewer .visually-hidden {
+    position: absolute;
+    inline-size: 1px;
+    block-size: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+  }
+
+  /* Mini-map: the plan on a small white card in the corner of the walk and tour
+   modes (`minimap.ts`). White paper on a dark scene, so it reads as a printed
+   plan pinned to the frame rather than another panel of chrome; it sits above
+   the 2D overlay and below the selection panel. */
+  .jeex-viewer .minimap {
+    position: absolute;
+    z-index: 6;
+    inset-inline-end: max(18px, env(safe-area-inset-right));
+    inset-block-end: max(18px, env(safe-area-inset-bottom));
+    inline-size: min(var(--jeex-minimap-size), 42cqw);
+    block-size: min(var(--jeex-minimap-size), 42cqw);
+    padding: 8px;
+    border-radius: calc(var(--jeex-radius) - 2px);
+    background: var(--jeex-minimap-paper);
+    box-shadow:
+      0 14px 38px rgba(6, 12, 11, 0.34),
+      inset 0 0 0 1px rgba(20, 26, 25, 0.07);
+    cursor: pointer;
+    touch-action: manipulation;
+    pointer-events: auto;
+  }
+  .jeex-viewer .minimap[data-visible='false'] {
+    display: none;
+  }
+  /* The tour's progress bar runs along the bottom edge; the card steps over it. */
+  .jeex-viewer .minimap[data-mode='tour'] {
+    inset-block-end: calc(max(18px, env(safe-area-inset-bottom)) + 26px);
+  }
+  .jeex-viewer .minimap-canvas {
+    display: block;
+    inline-size: 100%;
+    block-size: 100%;
+  }
+
+  @container (max-width: 600px) {
+    .jeex-viewer .minimap {
+      inset-inline-end: max(14px, env(safe-area-inset-right));
+      inset-block-end: max(14px, env(safe-area-inset-bottom));
+      padding: 6px;
+      border-radius: calc(var(--jeex-radius) - 4px);
+    }
+    .jeex-viewer .minimap[data-mode='tour'] {
+      inset-block-end: calc(max(14px, env(safe-area-inset-bottom)) + 26px);
+    }
+  }
+
+  /* Camera preview: while ONE tour checkpoint is active, this corner shows
+   what that camera sees (`camera-preview.ts`) — the scene itself, scissored
+   into the window by a post-render hook, with the card as only a frame and a
+   label. It takes the mini-map's place: `data-jeex-preview` on the root is
+   what makes the map step aside for as long as the card is up. The card owns
+   no pixels of its own, so its window is fully transparent. */
+  .jeex-viewer .camera-preview {
+    position: absolute;
+    z-index: 6;
+    --jeex-preview-edge: 18px;
+    --jeex-preview-lift-slot: 0px;
+    --jeex-preview-lift-tour: 0px;
+    inset-inline-end: max(var(--jeex-preview-edge), env(safe-area-inset-right));
+    inset-block-end: calc(
+      max(var(--jeex-preview-edge), env(safe-area-inset-bottom)) + var(--jeex-preview-lift-slot) + var(--jeex-preview-lift-tour)
+    );
+    inline-size: min(var(--jeex-minimap-size), 42cqw);
+    block-size: min(var(--jeex-minimap-size), 42cqw);
+    border-radius: calc(var(--jeex-radius) - 2px);
+    pointer-events: none;
+  }
+  .jeex-viewer .camera-preview[data-visible='false'] {
+    display: none;
+  }
+  .jeex-viewer .camera-preview[data-mode='tour'] {
+    --jeex-preview-lift-tour: 26px;
+  }
+  /* A host box claimed at `bottom-right` (for example a 56px assistant button)
+     sits at layer 8, over this card: the card rises above it by the button
+     plus an 8px gap — the same 64px `.degraded-notice` steps by, for the same
+     reason (host content never covers viewer chrome). */
+  .jeex-viewer[data-jeex-slot-bottom-right='true'] .camera-preview {
+    --jeex-preview-lift-slot: 64px;
+  }
+  .jeex-viewer .camera-preview-window {
+    inline-size: 100%;
+    block-size: 100%;
+    border-radius: calc(var(--jeex-radius) - 4px);
+    box-shadow:
+      inset 0 0 0 2px var(--jeex-accent),
+      0 14px 38px rgba(6, 12, 11, 0.34);
+  }
+  .jeex-viewer .camera-preview::after {
+    content: attr(data-label);
+    position: absolute;
+    inset-block-start: 6px;
+    inset-inline-start: 6px;
+    max-inline-size: calc(100% - 12px);
+    padding: 3px 9px;
+    border-radius: 999px;
+    background: var(--jeex-surface);
+    color: var(--jeex-surface-text);
+    font: 500 11px/1.4 var(--jeex-font);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .jeex-viewer[data-jeex-preview='true'] .minimap {
+    display: none;
+  }
+
+  @container (max-width: 600px) {
+    .jeex-viewer .camera-preview {
+      --jeex-preview-edge: 14px;
+    }
+  }
+
+  /* Host slots: the boxes a host renders its OWN chrome into (`host-slots.ts`).
+   The viewer positions them and never looks inside.
+
+   Layers 8 and 9 sit above the viewer's own selection panel (7), its mini-map
+   and its door HUD (6), and below the loading and error cards (10): a host's
+   chrome may cover the viewer's panels, but never the message that says the
+   viewer could not load a scene.
+
+   The box itself is transparent to the pointer and only its CHILDREN take
+   input, so dragging the scene through the empty part of a slot still turns the
+   camera. `display: flex` is what lets a host's single child fill the box or
+   sit at one end of it without a wrapper.
+
+   Insets repeat the mini-map's `max(Npx, env(safe-area-inset-*))` shape, with
+   the distance itself themeable through `--jeex-slot-inset`, declared on the
+   root above with an 18px default. */
+  .jeex-viewer [data-jeex-slot] {
+    position: absolute;
+    z-index: 8;
+    pointer-events: none;
+    display: flex;
+  }
+  .jeex-viewer [data-jeex-slot] > * {
+    pointer-events: auto;
+  }
+  .jeex-viewer [data-jeex-slot='top-left'],
+  .jeex-viewer [data-jeex-slot='top-center'],
+  .jeex-viewer [data-jeex-slot='top-right'] {
+    inset-block-start: max(var(--jeex-slot-inset), env(safe-area-inset-top));
+  }
+  .jeex-viewer [data-jeex-slot='bottom-left'],
+  .jeex-viewer [data-jeex-slot='bottom-center'],
+  .jeex-viewer [data-jeex-slot='bottom-right'] {
+    inset-block-end: max(var(--jeex-slot-inset), env(safe-area-inset-bottom));
+  }
+  .jeex-viewer [data-jeex-slot='top-left'],
+  .jeex-viewer [data-jeex-slot='bottom-left'] {
+    inset-inline-start: max(var(--jeex-slot-inset), env(safe-area-inset-left));
+  }
+  .jeex-viewer [data-jeex-slot='top-right'],
+  .jeex-viewer [data-jeex-slot='bottom-right'] {
+    inset-inline-end: max(var(--jeex-slot-inset), env(safe-area-inset-right));
+  }
+  /* The two edge slots span the width between the side insets, so a host's bar
+   is centred on the viewport rather than on whatever it happens to contain. */
+  .jeex-viewer [data-jeex-slot='top-center'],
+  .jeex-viewer [data-jeex-slot='bottom-center'] {
+    inset-inline: max(var(--jeex-slot-inset), env(safe-area-inset-left)) max(var(--jeex-slot-inset), env(safe-area-inset-right));
+    justify-content: center;
+  }
+  .jeex-viewer [data-jeex-slot='modal-root'] {
+    inset: 0;
+    z-index: 9;
+  }
+  .jeex-viewer [data-jeex-slot='selection-anchor'] {
+    inset-block-start: 0;
+    inset-inline-start: 0;
+    translate: calc(var(--jeex-anchor-x, 0) * 1px) calc(var(--jeex-anchor-y, 0) * 1px);
+  }
+  .jeex-viewer [data-jeex-slot][data-visible='false'] {
+    display: none;
+  }
+  /* Walk and 360 navigation.
+
+   The canvas cursor says what a drag would do: a grab hand at rest, a closed
+   hand while a pointer is down, the four-way arrow while Space or Shift is held
+   and the next drag would move rather than turn. `camera/camera-input.ts`
+   writes the two data attributes; nothing else does. */
+  .jeex-viewer .scene-canvas {
+    cursor: grab;
+  }
+  .jeex-viewer .scene-canvas[data-jeex-move='true'] {
+    cursor: move;
+  }
+  .jeex-viewer .scene-canvas[data-jeex-drag='true'] {
+    cursor: grabbing;
+  }
+
+  /* «Ctrl + scroll to zoom» (`ui/scroll-hint.ts`): a plain wheel over an
+   embedded viewer that is not engaged scrolls the page, and this plate says
+   how to make the viewer take it. Centred, above the scene and below the
+   viewer's own panels, and never in the pointer's way. */
+  .jeex-viewer .scroll-hint {
+    position: absolute;
+    inset: 50% auto auto 50%;
+    z-index: 5;
+    translate: -50% -50%;
+    max-inline-size: calc(100% - 36px);
+    padding: 10px 16px;
+    border-radius: calc(var(--jeex-radius) - 5px);
+    background: rgba(7, 12, 12, 0.72);
+    color: #fff;
+    font-size: 14px;
+    text-align: center;
+    pointer-events: none;
+    opacity: 0;
+    transition: opacity 0.2s ease;
+  }
+  .jeex-viewer .scroll-hint[data-visible='true'] {
+    opacity: 1;
+  }
+
+  /* The producer's mark (`ui/project-mark.ts`): one small line at
+   the left edge, BELOW the control bar's row (which spans the whole top on a
+   narrow viewer) and the notch, above the host's slots (layer 8) and under
+   the loading and error cards (10). The link is the only thing that takes
+   the pointer. A project's manifest asks for it; no option hides it. */
+  .jeex-viewer .project-mark {
+    position: absolute;
+    inset: max(78px, calc(env(safe-area-inset-top) + 64px)) auto auto max(10px, env(safe-area-inset-left));
+    z-index: 9;
+    padding: 3px 8px;
+    border-radius: 999px;
+    background: rgba(7, 12, 12, 0.7);
+    color: #fff;
+    font-size: 11px;
+    line-height: 1.4;
+    text-decoration: none;
+    white-space: nowrap;
+    pointer-events: auto;
+  }
+  .jeex-viewer .project-mark:hover,
+  .jeex-viewer .project-mark:focus-visible {
+    background: rgba(7, 12, 12, 0.8);
+    text-decoration: underline;
+  }
+
+  /* The tour-camera tool. The preview card is a
+     control now: a drag inside its window turns the camera, so it takes the
+     pointer and says so; the «Look through» button sits in its bottom strip. */
+  .jeex-viewer .camera-preview {
+    pointer-events: auto;
+  }
+  .jeex-viewer .camera-preview-window {
+    cursor: grab;
+    touch-action: none;
+  }
+  .jeex-viewer .camera-preview-window:active {
+    cursor: grabbing;
+  }
+  .jeex-viewer .camera-preview-look {
+    position: absolute;
+    inset-block-end: 6px;
+    inset-inline-end: 6px;
+    min-block-size: 28px;
+    padding: 3px 10px;
+    border: 0;
+    border-radius: 999px;
+    background: var(--jeex-surface);
+    color: var(--jeex-surface-text);
+    font: 500 11px/1.4 var(--jeex-font);
+    cursor: pointer;
+  }
+  /* «Drag to aim»: the card's one-line lesson, gone after the first drag. */
+  .jeex-viewer .camera-preview-caption {
+    position: absolute;
+    inset-block-end: 40px;
+    inset-inline: 0;
+    margin-inline: auto;
+    inline-size: max-content;
+    max-inline-size: calc(100% - 12px);
+    padding: 2px 8px;
+    border-radius: 999px;
+    background: rgb(from var(--jeex-surface) r g b / 82%);
+    color: var(--jeex-surface-text);
+    font: 500 11px/1.4 var(--jeex-font);
+    pointer-events: none;
+    transition: opacity 0.6s ease;
+  }
+  .jeex-viewer .camera-preview[data-taught='true'] .camera-preview-caption {
+    opacity: 0;
+  }
+  .jeex-viewer .camera-preview-look:hover {
+    background: var(--jeex-accent);
+    color: #1c2523;
+  }
+  /* Order badges: screen-space numbers over the cameras, always on top of the
+     picture and transparent to the pointer (the canvas picks the badge). */
+  .jeex-viewer .checkpoint-badges {
+    position: absolute;
+    inset: 0;
+    z-index: 4;
+    overflow: hidden;
+    pointer-events: none;
+  }
+  .jeex-viewer .checkpoint-badges[hidden],
+  .jeex-viewer .checkpoint-badge[hidden] {
+    display: none;
+  }
+  .jeex-viewer .checkpoint-badge {
+    position: absolute;
+    inset-block-start: 0;
+    inset-inline-start: 0;
+    display: grid;
+    place-items: center;
+    min-inline-size: 20px;
+    block-size: 20px;
+    padding-inline: 5px;
+    border-radius: 999px;
+    background: var(--jeex-surface);
+    color: var(--jeex-surface-text);
+    box-shadow: 0 1px 4px rgba(6, 12, 11, 0.3);
+    font: 600 11px/1 var(--jeex-font);
+    font-variant-numeric: tabular-nums;
+  }
+  .jeex-viewer .checkpoint-badge[data-active='true'] {
+    background: var(--jeex-accent);
+    color: #1c2523;
+  }
+  /* The look-through bar: which camera is being piloted, and the way out. */
+  .jeex-viewer .look-through {
+    position: absolute;
+    z-index: 7;
+    inset-block-start: max(18px, env(safe-area-inset-top));
+    inset-inline-start: 50%;
+    translate: -50% 0;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 6px 6px 6px 14px;
+    border-radius: 999px;
+    background: var(--jeex-surface);
+    color: var(--jeex-surface-text);
+    font: 500 13px/1.4 var(--jeex-font);
+    box-shadow: 0 10px 30px rgba(6, 12, 11, 0.3);
+  }
+  .jeex-viewer .look-through[hidden] {
+    display: none;
+  }
+  .jeex-viewer .look-through button {
+    min-block-size: 32px;
+    padding: 4px 14px;
+    border: 1px solid color-mix(in srgb, var(--jeex-surface-text) 30%, transparent);
+    border-radius: 999px;
+    background: transparent;
+    color: inherit;
+    font: inherit;
+    cursor: pointer;
+  }
+  .jeex-viewer .look-through .look-through-done {
+    border-color: transparent;
+    background: var(--jeex-accent);
+    color: #1c2523;
+  }
+
+  /* The walk's camera stepper: previous, «i / n», next, bottom centre. */
+  .jeex-viewer .walk-cameras {
+    position: absolute;
+    z-index: 6;
+    inset-block-end: max(18px, env(safe-area-inset-bottom));
+    inset-inline-start: 50%;
+    translate: -50% 0;
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    padding: 4px;
+    border: 1px solid var(--jeex-hairline);
+    border-radius: 999px;
+    background: var(--jeex-surface);
+    color: var(--jeex-surface-text);
+    font: 600 13px/1 var(--jeex-font);
+    box-shadow: 0 10px 30px rgba(6, 12, 11, 0.24);
+    pointer-events: auto;
+  }
+  .jeex-viewer .walk-cameras[hidden] {
+    display: none;
+  }
+  .jeex-viewer .walk-cameras button {
+    display: grid;
+    place-items: center;
+    inline-size: 32px;
+    block-size: 32px;
+    padding: 0;
+    border: 0;
+    border-radius: 50%;
+    background: transparent;
+    color: inherit;
+    cursor: pointer;
+  }
+  .jeex-viewer .walk-cameras button:hover:not(:disabled),
+  .jeex-viewer .walk-cameras button:focus-visible {
+    background: color-mix(in srgb, var(--jeex-surface-text) 12%, transparent);
+  }
+  .jeex-viewer .walk-cameras button:disabled {
+    opacity: 0.35;
+    cursor: default;
+  }
+  .jeex-viewer .walk-cameras svg {
+    inline-size: 18px;
+    block-size: 18px;
+    fill: none;
+    stroke: currentColor;
+    stroke-width: 2.2;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+  }
+  .jeex-viewer .walk-cameras-index {
+    min-inline-size: 44px;
+    text-align: center;
+    font-variant-numeric: tabular-nums;
+  }
+  /* Narrow: the hint card takes the bottom row, the stepper stands above it.
+     The card grows to 380 px plus its 18 px inset and the walk hints wrap to
+     that cap, so the centred stepper would overlap it in any viewer narrower
+     than about 920 px (2 × (398 + 63)). */
+  @container (max-width: 920px) {
+    .jeex-viewer .walk-cameras {
+      inset-block-end: calc(max(14px, env(safe-area-inset-bottom)) + 64px);
+    }
+  }
+}

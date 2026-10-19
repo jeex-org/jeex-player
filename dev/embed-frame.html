@@ -1,0 +1,30 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>JEEX embed — a frame sized to its content</title>
+    <style>
+      body {
+        margin: 0;
+        padding: 20px;
+        background: #101615;
+        color: #e9e1d4;
+        font-family: Inter, ui-sans-serif, system-ui, sans-serif;
+      }
+      #stage {
+        inline-size: 640px;
+      }
+    </style>
+  </head>
+  <body>
+    <h1>Frame sized to its content</h1>
+    <p>
+      The helper with <code>autoHeight</code>: the frame takes the height <code>embed.html</code> reports for its width at
+      <code>ratio=4:3</code>.
+    </p>
+    <!-- No height on purpose: the frame must size itself. -->
+    <div id="stage"></div>
+    <script type="module" src="./embed-frame.ts"></script>
+  </body>
+</html>

@@ -1,0 +1,96 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>JEEX embed — the custom element</title>
+    <style>
+      /*
+        A host page with its own look, exactly like `embed-two.html`. The point
+        here is the SHADOW ROOT: nothing of this page's CSS reaches inside the
+        element, and nothing of the component sheet reaches out.
+      */
+      body {
+        margin: 0;
+        padding: 20px;
+        background: #101615;
+        color: #e9e1d4;
+        font-family: Inter, ui-sans-serif, system-ui, sans-serif;
+      }
+      h1 {
+        margin: 0 0 4px;
+        font-size: 16px;
+        font-weight: 600;
+        letter-spacing: -0.01em;
+      }
+      p {
+        margin: 0 0 16px;
+        max-inline-size: 720px;
+        color: rgba(233, 225, 212, 0.6);
+        font-size: 12px;
+        line-height: 1.55;
+      }
+      .row {
+        display: flex;
+        gap: 8px;
+        margin-block-end: 12px;
+        flex-wrap: wrap;
+      }
+      button {
+        padding: 7px 12px;
+        border: 1px solid rgba(255, 255, 255, 0.16);
+        border-radius: 8px;
+        background: rgba(255, 255, 255, 0.05);
+        color: inherit;
+        font: inherit;
+        font-size: 12px;
+        cursor: pointer;
+      }
+      jeex-viewer {
+        display: block;
+        block-size: 460px;
+        border-radius: 14px;
+        overflow: hidden;
+        box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.1);
+      }
+      #log {
+        margin-block-start: 12px;
+        font-size: 11px;
+        /* 0.45 measured 3.75:1 on #101615, under the 4.5:1 AA
+         minimum for normal text; 0.6 (the same alpha the page's own `p`
+         already uses) measures 5.71:1. */
+        color: rgba(233, 225, 212, 0.6);
+        font-family: ui-monospace, monospace;
+      }
+    </style>
+  </head>
+  <body>
+    <h1>&lt;jeex-viewer&gt;</h1>
+    <p>
+      Options are attributes, events are <code>CustomEvent</code>s, and the viewer lives in an open shadow root. The buttons below change
+      the two attributes that stay live after the mount — <code>view</code> and <code>src</code> — and the third one takes the element out
+      of the DOM, which disposes it.
+    </p>
+    <p>
+      The compound <code>chrome</code> attribute is <code>all: unset</code> for the five <code>chrome.*</code> flags — <em>this</em> element
+      does not use it (its own chrome stays live for the buttons above), but a host that wants everything hidden except one flag writes it
+      as one attribute plus the override, no <code>:global</code> CSS needed:
+      <code>&lt;jeex-viewer chrome="false" chrome-status="true"&gt;</code>. See the "compound chrome attribute" tests in
+      <code>tests/component/element.test.ts</code> and <code>tests/e2e/embed-element.spec.ts</code> for it exercised end to end.
+    </p>
+
+    <div class="row">
+      <button id="to-walk" type="button">view="walk"</button>
+      <button id="to-orbit" type="button">view="orbit"</button>
+      <button id="swap-scene" type="button">swap src</button>
+      <button id="remove" type="button">remove the element</button>
+    </div>
+
+    <!-- readonly="0": this page exercises the whole chrome, so it opts into editing; a pasted tag is read-only. -->
+    <jeex-viewer id="viewer" view="orbit" tour="off" lang="en" readonly="0"></jeex-viewer>
+
+    <div id="log">events: <span id="events"></span></div>
+
+    <script type="module" src="/dev/embed-element.ts"></script>
+  </body>
+</html>

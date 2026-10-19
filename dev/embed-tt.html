@@ -1,0 +1,116 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>JEEX embed — Trusted Types</title>
+    <!--
+      The point of this page. Under `require-trusted-types-for 'script'` any
+      string assigned to `innerHTML` (or to any other DOM XSS sink) throws a
+      `TypeError`, so a component that builds its shell from an HTML string
+      cannot mount here at all. The viewer builds every node with
+      `createElement` / `createElementNS` / `append` / `textContent` and
+      registers no Trusted Types policy of its own, which is what lets it run
+      under a host policy it has never heard of.
+
+      `style-src 'self'` is the other half: the component stylesheet arrives as
+      a constructed `CSSStyleSheet` through `adoptedStyleSheets`, so the host
+      needs no `'unsafe-inline'`. This page's OWN <style> block is why
+      `'unsafe-inline'` appears below — it is the page's, not the viewer's.
+    -->
+    <meta
+      http-equiv="Content-Security-Policy"
+      content="require-trusted-types-for 'script'; img-src 'self' data:; style-src 'self' 'unsafe-inline'"
+    />
+    <style>
+      /*
+        A host page with its OWN look. Nothing here undoes a viewer style: the
+        component stylesheet is scoped to `.jeex-viewer` and never touches
+        `:root`, `html`, `body` or a bare element selector, so this page keeps
+        its palette, its scrolling and its box model.
+
+        Each stage is just a box with a height. That is the whole contract:
+        "give the container a size and the viewer fills it".
+      */
+      body {
+        margin: 0;
+        padding: 20px;
+        background: #101615;
+        color: #e9e1d4;
+        font-family: Inter, ui-sans-serif, system-ui, sans-serif;
+      }
+      h1 {
+        margin: 0 0 4px;
+        font-size: 16px;
+        font-weight: 600;
+        letter-spacing: -0.01em;
+      }
+      p {
+        margin: 0 0 16px;
+        max-inline-size: 720px;
+        color: rgba(233, 225, 212, 0.6);
+        font-size: 12px;
+        line-height: 1.55;
+      }
+      .stages {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 16px;
+      }
+      .stage {
+        position: relative;
+        block-size: 460px;
+        border-radius: 14px;
+        overflow: hidden;
+        box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.1);
+      }
+      .stage-label {
+        margin: 0 0 6px;
+        font-size: 11px;
+        letter-spacing: 0.1em;
+        text-transform: uppercase;
+        color: rgba(233, 225, 212, 0.45);
+      }
+      .host-input {
+        inline-size: 100%;
+        margin-block-start: 16px;
+        padding: 9px 11px;
+        border: 1px solid rgba(255, 255, 255, 0.16);
+        border-radius: 9px;
+        background: rgba(255, 255, 255, 0.04);
+        color: inherit;
+        font: inherit;
+        font-size: 12px;
+      }
+      @media (max-width: 720px) {
+        .stages {
+          grid-template-columns: 1fr;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <h1>Two viewers under Trusted Types</h1>
+    <p>
+      The same two viewers as <code>embed-two.html</code>, on a page that enforces <code>require-trusted-types-for 'script'</code>. If
+      either of them mounts, no string ever reached a DOM XSS sink: a single <code>innerHTML</code> assignment anywhere in the viewer would
+      throw a <code>TypeError</code> here and leave the stage empty.
+    </p>
+
+    <div class="stages">
+      <div>
+        <p class="stage-label">First · English · owns the page globals</p>
+        <div class="stage" id="stage-a"></div>
+      </div>
+      <div>
+        <p class="stage-label">Second · Russian · walk mode</p>
+        <div class="stage" id="stage-b"></div>
+      </div>
+    </div>
+
+    <!-- A host control: typing here must never walk a camera. -->
+    <input class="host-input" id="host-input" type="text" placeholder="Type here — WASD must stay in this field" />
+
+    <script type="module" src="/dev/embed-two.ts"></script>
+  </body>
+</html>

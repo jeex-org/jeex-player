@@ -1,0 +1,16 @@
+# Bun's configuration for `check.sh fast` only.
+#
+# It is `bunfig.toml` minus the `[test]` section, for one reason: that section
+# turns coverage on for every run and holds a repository-WIDE
+# `coverageThreshold`. The fast tier runs a handful of files selected by the
+# change, so that threshold would measure the selection, not the repository,
+# and fail a perfectly good change for arithmetic. Coverage belongs to the
+# `standard` tier, which runs the whole suite and then checks the per-layer
+# floors in `scripts/coverage-check.ts`.
+#
+# The `[define]` block below is NOT optional and NOT a copy for convenience:
+# `src/shared/version.ts` reads `__JEEX_VIEWER_VERSION__`, so a run without it
+# fails to parse. `scripts/fast-bunfig.test.ts` pins it to the same value
+# `bunfig.toml` uses, so the two cannot drift.
+[define]
+"__JEEX_VIEWER_VERSION__" = "'0.0.0-test'"

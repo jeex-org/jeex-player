@@ -1,0 +1,102 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>JEEX embed — scroll-driven tour</title>
+    <style>
+      /*
+        Nothing here undoes a viewer style any more: the component stylesheet is
+        scoped to `.jeex-viewer` and never touches `html`, `body` or `:root`, so
+        a scroll-driven host page keeps its own scrolling for free.
+      */
+      body {
+        margin: 0;
+        background: #0d1111;
+        color: #f5efe4;
+        font-family: Inter, ui-sans-serif, system-ui, sans-serif;
+      }
+      #stage {
+        position: fixed;
+        inset: 0;
+        z-index: 0;
+      }
+      #scroll-copy {
+        position: relative;
+        z-index: 2;
+        inline-size: min(460px, calc(100% - 40px));
+        margin: 0 auto;
+        padding: 40vh 0 60vh;
+        pointer-events: none;
+      }
+      .beat {
+        margin-block-end: 70vh;
+        padding: 18px 20px;
+        border: 1px solid rgba(255, 255, 255, 0.14);
+        border-radius: 14px;
+        background: rgba(12, 19, 18, 0.74);
+        backdrop-filter: blur(14px);
+      }
+      .beat h2 {
+        margin: 0 0 6px;
+        font-size: 15px;
+        font-weight: 600;
+        letter-spacing: -0.01em;
+      }
+      .beat p {
+        margin: 0;
+        color: rgba(245, 239, 228, 0.62);
+        font-size: 12px;
+        line-height: 1.55;
+      }
+      #scroll-readout {
+        position: fixed;
+        inset-block-start: 14px;
+        inset-inline-end: 14px;
+        z-index: 3;
+        padding: 7px 11px;
+        border: 1px solid rgba(255, 255, 255, 0.16);
+        border-radius: 9px;
+        background: rgba(12, 19, 18, 0.82);
+        font-size: 11px;
+        font-variant-numeric: tabular-nums;
+        pointer-events: none;
+      }
+    </style>
+  </head>
+  <body>
+    <div id="stage"></div>
+
+    <div id="scroll-copy">
+      <section class="beat">
+        <h2>Scroll to walk the apartment</h2>
+        <p>
+          The viewer below is mounted paused, with no progress bar and with input handling off. Nothing on this page presses a button: the
+          scroll offset is written straight into the tour position.
+        </p>
+      </section>
+      <section class="beat">
+        <h2>The page owns the clock</h2>
+        <p>
+          Every scroll event calls <code>handle.tour.seek(scrollY / maxScroll)</code>. The camera pose and the progress readout follow
+          within the same frame.
+        </p>
+      </section>
+      <section class="beat">
+        <h2>The wheel stays with the page</h2>
+        <p>
+          With <code>pauseOnInput: false</code> the viewer ignores pointer and wheel input while the tour is engaged, so it never wrestles
+          the camera away from this page.
+        </p>
+      </section>
+      <section class="beat">
+        <h2>End of the route</h2>
+        <p>At the bottom of the page the tour is at fraction 1. Scroll back up to run it in reverse.</p>
+      </section>
+    </div>
+
+    <div id="scroll-readout">fraction <span id="scroll-fraction">0.000</span> · <span id="scroll-state">ready</span></div>
+
+    <script type="module" src="/dev/scroll-tour.ts"></script>
+  </body>
+</html>

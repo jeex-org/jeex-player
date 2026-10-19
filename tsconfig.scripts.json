@@ -1,0 +1,18 @@
+{
+  // The GATE's own type check. `tsconfig.json` covers `src`, `dev` and
+  // `vite.config.ts`; this config covers the rest of the TypeScript in the
+  // repository (the quality gate under `scripts/` and the library build
+  // config), run as `tsc -p tsconfig.scripts.json --noEmit` in `check.sh` and
+  // in CI.
+  //
+  // Separate from the root config rather than folded into its `include`
+  // because `tsconfig.lib.json` extends the root to emit the published
+  // declarations: `scripts/` has no business in that graph.
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "types": ["bun"]
+  },
+  // `src/assets.d.ts` declares the `?inline` CSS module: `browser-check`
+  // imports the shell names from `src/`, which drags `viewer-shell.ts` in.
+  "include": ["scripts", "vite.config.ts", "vite.lib.config.ts", "src/assets.d.ts"]
+}

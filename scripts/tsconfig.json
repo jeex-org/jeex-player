@@ -1,0 +1,10 @@
+{
+  // A pointer, nothing more. `tsconfig.scripts.json` at the repository root is
+  // the real project (the gate runs `tsc -p tsconfig.scripts.json --noEmit`),
+  // but a type-aware linter discovers the tsconfig for a file by walking up
+  // from it and only looks for this name. Without this file oxlint analyses
+  // `scripts/` with the ROOT config, which does not include it: every type
+  // comes out as an error type, and `no-unnecessary-type-assertion` then
+  // "helpfully" deletes assertions that are load-bearing.
+  "extends": "../tsconfig.scripts.json"
+}

@@ -1,0 +1,20 @@
+# code-ranker config for jeex-viewer: an optional structural lint (dependency
+# cycles, coupling, complexity) that `scripts/check.sh` runs in its full tier
+# when the tool is installed.
+#
+# Only the TypeScript plugin runs against this repo's own source. Build output,
+# npm dependencies and local tool directories are never source and are
+# excluded, so the check reports only real import cycles inside
+# src/scripts/dev.
+version = "5.0"
+
+[plugins]
+enabled = ["ts"]
+
+[plugins.ts.ignore]
+paths = [
+  "node_modules/**",
+  "dist/**",
+  "dist-lib/**",
+  ".code-ranker/**",
+]

@@ -1,0 +1,31 @@
+# Bun's own configuration. Only the test runner is configured here; the
+# package manager takes its defaults (`bun.lock`, `--frozen-lockfile` in CI).
+
+[test]
+# `bun test` is the BASE of the pyramid and owns `src/` and `scripts/` only.
+# The `package.json` script names those two directories explicitly, because
+# Bun's default glob is `**/*.test.ts` and would otherwise also collect
+# `tests/component/**`, which imports `vitest` and needs a browser
+# (`vitest.config.ts`).
+# Coverage on every run, local and CI, so a drop is visible in the same output
+# the failures are, not behind a flag someone has to remember.
+coverage = true
+# `text` for the human reading the run; `lcov` because `scripts/coverage-check.ts`
+# reads `coverage/lcov.info` for the per-layer floors, which Bun's own
+# threshold — one number for the whole repository — cannot express.
+coverageReporter = ["text", "lcov"]
+# A measured value of lines and functions across `src/` and `scripts/`,
+# rounded DOWN. It is a ratchet, not a target —
+# the per-layer floors in `scripts/coverage-check.ts` are where the real
+# policy lives (pure layers at 90 %).
+coverageThreshold = { line = 0.80, function = 0.78 }
+
+# Top-level (not [test]-scoped), so it substitutes `__JEEX_VIEWER_VERSION__`
+# for every `bun` invocation — `bun test` and a bare `bun run scripts/*.ts`
+# alike (Bun's `[define]`: global-identifier substitution, JSON-ish values,
+# single-quoted strings supported). `src/shared/version.ts` is the one module that reads the
+# result; `vite.config.ts`/`vite.lib.config.ts` carry the matching `define`
+# for the real build, from `package.json#version` instead of this fixed
+# string.
+[define]
+"__JEEX_VIEWER_VERSION__" = "'0.0.0-test'"

@@ -1,0 +1,104 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>JEEX dev — video frames</title>
+    <style>
+      body {
+        margin: 0;
+        background: #0d1111;
+        color: #f5efe4;
+        font-family: Inter, ui-sans-serif, system-ui, sans-serif;
+      }
+      #stage {
+        position: fixed;
+        inset: 0;
+        z-index: 0;
+      }
+      #panel {
+        position: fixed;
+        inset-block-start: 14px;
+        inset-inline-start: 14px;
+        z-index: 3;
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+        padding: 12px 14px;
+        border: 1px solid rgba(255, 255, 255, 0.16);
+        border-radius: 10px;
+        background: rgba(12, 19, 18, 0.86);
+        backdrop-filter: blur(14px);
+        font-size: 12px;
+        inline-size: 200px;
+      }
+      #panel label {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        gap: 8px;
+      }
+      #panel select,
+      #panel input {
+        font: inherit;
+        inline-size: 84px;
+      }
+      #run {
+        padding: 6px 10px;
+        border-radius: 8px;
+        border: 1px solid rgba(255, 255, 255, 0.24);
+        background: rgba(255, 255, 255, 0.08);
+        color: inherit;
+        cursor: pointer;
+        font: inherit;
+      }
+      #status {
+        font-variant-numeric: tabular-nums;
+        opacity: 0.8;
+      }
+      #thumbs {
+        position: fixed;
+        inset-block-end: 14px;
+        inset-inline: 14px;
+        z-index: 3;
+        display: flex;
+        gap: 4px;
+        overflow-x: auto;
+      }
+      #thumbs img {
+        block-size: 64px;
+        border-radius: 4px;
+        border: 1px solid rgba(255, 255, 255, 0.2);
+      }
+    </style>
+  </head>
+  <body>
+    <div id="stage"></div>
+
+    <div id="panel">
+      <label
+        >aspect
+        <select id="aspect">
+          <option value="9:16" selected>9:16</option>
+          <option value="16:9">16:9</option>
+          <option value="1:1">1:1</option>
+        </select></label
+      >
+      <label
+        >fps
+        <select id="fps">
+          <option value="24" selected>24</option>
+          <option value="25">25</option>
+          <option value="30">30</option>
+        </select></label
+      >
+      <label>height <input id="height" type="number" value="320" min="16" max="2160" /></label>
+      <label>duration s <input id="duration" type="number" value="2" min="0.1" max="30" step="0.1" /></label>
+      <button id="run" type="button">Capture frames</button>
+      <div id="status">idle</div>
+    </div>
+    <div id="thumbs"></div>
+
+    <script type="module" src="/dev/video-frames.ts"></script>
+  </body>
+</html>

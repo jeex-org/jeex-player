@@ -1,0 +1,41 @@
+# JEEX Player
+
+> JEEX Player is an open-source, Apache-2.0 3D apartment tour player for the browser, built on Three.js. It renders one scene document (walls, openings, rooms, furniture, finishes) in five views: a 2D plan, a 3D top view, a 360 orbit, a walk and a guided tour. A website embeds it as a custom element, an ES module or an iframe. The player's repository is jeex-player; the package and the element are named jeex-viewer.
+
+To put the player on a website, follow [install.md](https://player.jeex.org/install.md): it is the step-by-step instruction for an AI agent, from a source checkout to a verified embed.
+
+Facts an agent needs before it starts:
+
+- Install from source only. The README documents no registry package and no hosted copy of the files: the player is built from source (`bun run build:lib`) and the site serves its own copy of the whole `dist-lib/` directory.
+- The player does not create scenes. It validates, renders and plays a scene document (schema 2.1) or a baked project folder whose root is a `project.json`.
+- The person who owns the website makes their own apartment's scene. `https://player.jeex.org/demo/demo-apartment.json` is the player's own demo apartment, served with CORS for trying the player out; it is not the person's property.
+- A scene URL is fetched without credentials (a scene on another origin needs CORS) and must answer with a `Content-Type` that includes `application/json`, no redirect, within 15 seconds and at most 8 MB.
+- The custom element and the iframe page are read-only for visitors by default.
+
+## Instructions
+
+- [install.md](https://player.jeex.org/install.md): build, copy, embed, supply a scene, size, CSP and the checks in the browser, step by step
+- [Integration guide](https://player.jeex.org/integration.html): the same route for a person, as a web page
+- [README: Paste into any site](https://github.com/jeex-org/jeex-player/blob/main/README.md#paste-into-any-site): the three plain-HTML forms and what each does on its own
+- [README: Install and build](https://github.com/jeex-org/jeex-player/blob/main/README.md#install-and-build): requirements and the files `dist-lib/` holds
+
+## Reference
+
+- [README: Options](https://github.com/jeex-org/jeex-player/blob/main/README.md#options): every option as an object key, a query parameter and an attribute
+- [README: Integration paths](https://github.com/jeex-org/jeex-player/blob/main/README.md#integration-paths): ES module, custom element, iframe with postMessage
+- [README: Scene sources](https://github.com/jeex-org/jeex-player/blob/main/README.md#scene-sources): URL, document, repository, and the fetch rules
+- [README: Events](https://github.com/jeex-org/jeex-player/blob/main/README.md#events): handle and element events
+- [README: Errors](https://github.com/jeex-org/jeex-player/blob/main/README.md#errors): the error codes to branch on
+- [README: Sizing and styling](https://github.com/jeex-org/jeex-player/blob/main/README.md#sizing-and-styling): container height, fullscreen
+- [README: Content Security Policy](https://github.com/jeex-org/jeex-player/blob/main/README.md#content-security-policy): what a strict page needs
+- [README: iframe permissions and origin](https://github.com/jeex-org/jeex-player/blob/main/README.md#iframe-permissions-and-origin): sandbox, title, who may frame `embed.html`
+
+## Optional
+
+- [README: Scene document](https://github.com/jeex-org/jeex-player/blob/main/README.md#scene-document): the schema 2.1 document and its rules
+- [README: Project format](https://github.com/jeex-org/jeex-player/blob/main/README.md#project-format): the baked project folder and its limits
+- [README: Viewer handle API](https://github.com/jeex-org/jeex-player/blob/main/README.md#viewer-handle-api): playback, modes, selection, captures
+- [README: Theming](https://github.com/jeex-org/jeex-player/blob/main/README.md#theming): the documented custom properties and parts
+- [README: Languages](https://github.com/jeex-org/jeex-player/blob/main/README.md#languages): shipped catalogues and `registerLocale`
+- [README (raw Markdown)](https://raw.githubusercontent.com/jeex-org/jeex-player/main/README.md): the whole integration reference in one file
+- [Source](https://github.com/jeex-org/jeex-player): the repository, Apache-2.0

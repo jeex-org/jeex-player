@@ -1,0 +1,33 @@
+{
+  // Type DECLARATIONS for the published package, emitted next to the bundles.
+  // `tsc` rather than a plugin: the declaration compiler is already a
+  // dependency (`npm run build` runs it), and a `vite-plugin-dts` would be a
+  // fifth devDependency for something the compiler does natively.
+  //
+  // `files` (not `include`) is the point: the compiler follows the imports of
+  // the package's entry points and emits declarations for exactly the modules
+  // they reach, so nothing that is not part of the library — the demo page, a
+  // test fixture, a dev page — gets a `.d.ts` in `dist-lib`.
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "declaration": true,
+    // The base config is a checker config (`noEmit`); this one is the emitter.
+    "noEmit": false,
+    "emitDeclarationOnly": true,
+    "outDir": "dist-lib",
+    "rootDir": "src",
+    // Nothing under `src/` is a test here, so the test runner's globals are
+    // not needed and would leak `bun-types` into the published declarations.
+    "types": []
+  },
+  // The base config `include`s `src`, `dev` and `vite.config.ts`; only `files`
+  // may decide here, so the inherited list is cleared rather than merged.
+  "include": [],
+  "files": [
+    "src/assets.d.ts",
+    "src/embed/index.ts",
+    "src/embed/element-entry.ts",
+    "src/embed/host.ts",
+    "src/embed/ops.ts"
+  ]
+}

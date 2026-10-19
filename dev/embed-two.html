@@ -1,0 +1,100 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>JEEX embed — two independent viewers</title>
+    <style>
+      /*
+        A host page with its OWN look. Nothing here undoes a viewer style: the
+        component stylesheet is scoped to `.jeex-viewer` and never touches
+        `:root`, `html`, `body` or a bare element selector, so this page keeps
+        its palette, its scrolling and its box model.
+
+        Each stage is just a box with a height. That is the whole contract:
+        "give the container a size and the viewer fills it".
+      */
+      body {
+        margin: 0;
+        padding: 20px;
+        background: #101615;
+        color: #e9e1d4;
+        font-family: Inter, ui-sans-serif, system-ui, sans-serif;
+      }
+      h1 {
+        margin: 0 0 4px;
+        font-size: 16px;
+        font-weight: 600;
+        letter-spacing: -0.01em;
+      }
+      p {
+        margin: 0 0 16px;
+        max-inline-size: 720px;
+        color: rgba(233, 225, 212, 0.6);
+        font-size: 12px;
+        line-height: 1.55;
+      }
+      .stages {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 16px;
+      }
+      .stage {
+        position: relative;
+        block-size: 460px;
+        border-radius: 14px;
+        overflow: hidden;
+        box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.1);
+      }
+      .stage-label {
+        margin: 0 0 6px;
+        font-size: 11px;
+        letter-spacing: 0.1em;
+        text-transform: uppercase;
+        /* 0.45 measured 3.75:1 on #101615, under the 4.5:1 AA
+         minimum for normal text; 0.6 (the same alpha the page's own `p`
+         already uses) measures 5.71:1. */
+        color: rgba(233, 225, 212, 0.6);
+      }
+      .host-input {
+        inline-size: 100%;
+        margin-block-start: 16px;
+        padding: 9px 11px;
+        border: 1px solid rgba(255, 255, 255, 0.16);
+        border-radius: 9px;
+        background: rgba(255, 255, 255, 0.04);
+        color: inherit;
+        font: inherit;
+        font-size: 12px;
+      }
+      @media (max-width: 720px) {
+        .stages {
+          grid-template-columns: 1fr;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <h1>Two viewers, one page</h1>
+    <p>
+      Independent input (click a scene, then press <code>W</code> — only that one walks), independent locale, and independent teardown. The
+      FIRST viewer owns <code>window.__viewerDebug</code>; disposing it takes the page globals with it and leaves the second one rendering.
+    </p>
+
+    <div class="stages">
+      <div>
+        <p class="stage-label">First · English · owns the page globals</p>
+        <div class="stage" id="stage-a"></div>
+      </div>
+      <div>
+        <p class="stage-label">Second · Russian · walk mode</p>
+        <div class="stage" id="stage-b"></div>
+      </div>
+    </div>
+
+    <!-- A host control: typing here must never walk a camera. -->
+    <input class="host-input" id="host-input" type="text" placeholder="Type here — WASD must stay in this field" />
+
+    <script type="module" src="/dev/embed-two.ts"></script>
+  </body>
+</html>
