@@ -20,6 +20,7 @@
 import { defineConfig } from 'vitest/config';
 import { playwright } from '@vitest/browser-playwright';
 import { headlessWebglLaunch } from './tests/headless-webgl.js';
+import { CostShardSequencer } from './tests/component-shards.js';
 
 export default defineConfig({
   // Pre-bundled up front, not on first import. Vite discovers `three` while
@@ -52,6 +53,9 @@ export default defineConfig({
     // slow every test against its own timeout. Raise it only after measuring
     // both the wall clock and the per-test cost on the target machine.
     maxWorkers: 4,
+    // `--shard=<i>/<n>` (CI splits the tier across runners) places files by
+    // measured cost instead of by count; without `--shard` it changes nothing.
+    sequence: { sequencer: CostShardSequencer },
     // This tier's own server, on the viewer's block port for component tests
     // (3700 dev, 3701 e2e, 3702 here, 3703 browser-check).
     // Vitest's browser default (63315, incremented per instance) is outside

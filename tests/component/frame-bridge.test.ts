@@ -457,8 +457,18 @@ describe('the frame side, wrapping a real viewer', () => {
    *
    * `scene` defaults to the fixture for the reason the table above measures;
    * the one smoke test that needs the demo apartment names it.
+   *
+   * The counterparty window is opened BEFORE the mount, and the bridge is
+   * installed in the same task as `mountViewer`, the order `frame-boot.ts`
+   * uses. The other way round loses the `ready` event: a `srcdoc` frame's
+   * `load` is dispatched only once the page's main thread is free, and on the
+   * software rasteriser that is after the mount's first frame. Measured with
+   * the demo apartment: `ready` fired at 2093 ms, the frame's `load` at
+   * 2095 ms, so a bridge installed after `load` never saw it and the test
+   * waited out its 45 s.
    */
   async function bridged(scene: SceneData = fixtureScene(), options: Record<string, unknown> = {}): Promise<Bridged> {
+    const counterparty = await counterpartyWindow();
     const handle = mountViewer(openContainer(), {
       scene: { repository: new InlineSceneRepository(scene) },
       tour: { mode: 'off' },
@@ -466,7 +476,6 @@ describe('the frame side, wrapping a real viewer', () => {
       ...options,
     });
     handles.push(handle);
-    const counterparty = await counterpartyWindow();
     const posted: JeexMessage[] = [];
     // Everything the bridge posts arrives in the counterparty window; this
     // listener runs there and hands it back. Registered FIRST, so a waiter

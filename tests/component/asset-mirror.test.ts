@@ -12,7 +12,7 @@ import type { AssetEdit } from '../../src/edit/asset-move-tool.js';
 import type { AssetMoveDebug } from '../../src/edit/asset-move-session.js';
 import { DEMO } from '../../src/demo/demo-ids.js';
 import type { SceneOp } from '../../src/scene/types.js';
-import { closeContainers, demoScene, nextFrame, openContainer, until } from './support.js';
+import { ASSET_MOVE_CHUNK_TIMEOUT_MS, closeContainers, demoScene, nextFrame, openContainer, until } from './support.js';
 
 type Debug = {
   mode: () => string | undefined;
@@ -52,7 +52,17 @@ async function reflectedNodes(handle: ViewerHandle): Promise<number> {
   }).length;
 }
 
-describe('mirrorAsset', () => {
+/**
+ * The test below mounts the demo apartment and exports it to GLB twice
+ * (before and after the commit), so it declares its own budget the way the
+ * other export tests do instead of living on the 60 s light-path default. On
+ * SwiftShader one export of the apartment costs 30-40 s: the test measured
+ * 61-62 s inside a full tier run, where the default killed it, and 90-105 s
+ * alone on a busy machine.
+ */
+const MOUNT_PLUS_TWO_EXPORTS_TIMEOUT_MS = 180_000;
+
+describe('mirrorAsset', { timeout: MOUNT_PLUS_TWO_EXPORTS_TIMEOUT_MS }, () => {
   test('emits mirror_object; the committed mirror reaches describeSelection and the glTF export', async () => {
     const container = openContainer();
     const handle = mountViewer(container, {
@@ -70,7 +80,7 @@ describe('mirrorAsset', () => {
     // Not armed yet: nothing happens.
     expect(handle.mirrorAsset(sofa, 'x')).toBe(false);
     handle.setAssetMoveTool(true);
-    await until(() => debug().assetMove().loaded, 'the asset move chunk');
+    await until(() => debug().assetMove().loaded, 'the asset move chunk', ASSET_MOVE_CHUNK_TIMEOUT_MS);
     await nextFrame();
 
     expect(handle.describeSelection({ kind: 'furniture', id: sofa, mode: 'orbit' })?.mirror).toEqual({

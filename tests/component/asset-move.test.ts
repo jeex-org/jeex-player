@@ -20,7 +20,7 @@ import { mask } from '../../src/layout/asset-mask.js';
 import { solvePlan } from '../../src/plan/plan-solver.js';
 import type { SceneData } from '../../src/scene/types.js';
 import type { SlotName } from '../../src/ui/host-slots.js';
-import { closeContainers, demoScene, nextFrame, openContainer, until } from './support.js';
+import { ASSET_MOVE_CHUNK_TIMEOUT_MS, closeContainers, demoScene, nextFrame, openContainer, until } from './support.js';
 
 type Debug = {
   mode: () => string | undefined;
@@ -61,7 +61,7 @@ async function mount(mode: 'orbit' | 'plan3d', assetId: string, slots: readonly 
   await until(() => debug().mode() === mode, mode);
   handle.setSelection({ kind: 'furniture', id: assetId });
   handle.setAssetMoveTool(true);
-  await until(() => debug().assetMove().loaded, 'the asset move chunk');
+  await until(() => debug().assetMove().loaded, 'the asset move chunk', ASSET_MOVE_CHUNK_TIMEOUT_MS);
   await nextFrame();
   const canvas = container.querySelector<HTMLCanvasElement>('[data-jeex="scene-canvas"]');
   if (!canvas) throw new Error('no scene canvas');
@@ -131,7 +131,7 @@ describe('the asset move tool', () => {
     await handle.ready;
     expect(debug().assetMove()).toEqual({ enabled: false, loaded: false, state: null });
     handle.setAssetMoveTool(true);
-    await until(() => debug().assetMove().loaded, 'the asset move chunk');
+    await until(() => debug().assetMove().loaded, 'the asset move chunk', ASSET_MOVE_CHUNK_TIMEOUT_MS);
     expect(debug().assetMove().state?.phase).toBe('idle');
   });
 

@@ -1,0 +1,127 @@
+/**
+ * How `vitest run --shard=<index>/<count>` splits the component tier: by
+ * measured cost, not by file count.
+ *
+ * Vitest's own `BaseSequencer.shard` sorts the files by a hash of their path
+ * and cuts the list into equal COUNTS. On this tier that is badly unbalanced:
+ * the files range from a few milliseconds (a DOM-only shell test) to minutes
+ * (a file that mounts the demo apartment fifty times on the software
+ * rasteriser), so two shards of twenty files each can differ by a factor of
+ * three in wall clock, and the slowest shard decides how long CI takes.
+ *
+ * So the sequencer below hands every shard the same list of files and lets
+ * `assignShards` place them with the longest-processing-time rule: heaviest
+ * file first, each onto the shard with the least cost so far. Every shard
+ * computes the same assignment from the same inputs, so the shards never
+ * overlap and never miss a file.
+ *
+ * `COMPONENT_FILE_COST_S` is a measurement, not a guess: the seconds each
+ * file's tests took on SwiftShader with two Vitest workers on four hardware
+ * threads (the shape of a CI runner, simulated with `taskset`), the larger of
+ * that run and half of a four-worker run on the same four threads. A file
+ * missing from the table (a new one) costs `UNKNOWN_FILE_COST_S`, which is
+ * deliberately above the median, so a new heavy file cannot pile onto an
+ * already full shard unnoticed. The table only steers the balance; a stale
+ * entry makes a shard slower, never skips a test. Re-measure and rewrite it
+ * when the tier changes shape (`scripts/component-shards.test.ts` lists the
+ * files the table misses).
+ *
+ * Without `--shard` Vitest never calls `shard()`, so a local run and the
+ * gate are untouched by this file.
+ */
+
+import { basename } from 'node:path';
+import { BaseSequencer, type TestSpecification } from 'vitest/node';
+
+/** Measured seconds per component test file (module comment). */
+export const COMPONENT_FILE_COST_S: Readonly<Record<string, number>> = {
+  'asset-mirror.test.ts': 62,
+  'asset-move.test.ts': 128,
+  'camera-preview.test.ts': 1,
+  'capture-commands.test.ts': 84,
+  'door-hud.test.ts': 1,
+  'element.test.ts': 228,
+  'export-gltf.test.ts': 41,
+  'export-graph.test.ts': 1,
+  'export-usdz.test.ts': 29,
+  'focus-visible.test.ts': 1,
+  'frame-boot.test.ts': 8,
+  'frame-bridge.test.ts': 197,
+  'fullscreen-controller.test.ts': 1,
+  'gltf-body.test.ts': 1,
+  'gltf-furniture.test.ts': 1,
+  'host-slots.test.ts': 33,
+  'minimap.test.ts': 1,
+  'panorama.test.ts': 14,
+  'plan-modes.test.ts': 28,
+  'plan-raster.test.ts': 1,
+  'project-finishes.test.ts': 1,
+  'project-mark.test.ts': 45,
+  'project-mount.test.ts': 82,
+  'provenance.test.ts': 1,
+  'selection-highlight.test.ts': 1,
+  'selection-panel.test.ts': 1,
+  'selection.test.ts': 30,
+  'still-capture.test.ts': 5,
+  'swatch-preview.test.ts': 31,
+  'target-sizes.test.ts': 1,
+  'tour-bar.test.ts': 1,
+  'tour-cameras.test.ts': 237,
+  'video-frames.test.ts': 93,
+  'viewer-api.test.ts': 281,
+  'viewer-chrome.test.ts': 3,
+  'viewer-edits.test.ts': 89,
+  'viewer-shell.test.ts': 1,
+  'viewer-ui.test.ts': 1,
+  'walk-keys.test.ts': 26,
+  'wheel-ownership.test.ts': 1,
+};
+
+/** What a file the table does not name is assumed to cost (module comment). */
+export const UNKNOWN_FILE_COST_S = 60;
+
+/** The cost `assignShards` uses for one file, by its base name. */
+export function fileCost(file: string, costs: Readonly<Record<string, number>> = COMPONENT_FILE_COST_S): number {
+  return costs[basename(file)] ?? UNKNOWN_FILE_COST_S;
+}
+
+/**
+ * The files of shard `index` (1-based, as `--shard` spells it) out of `count`.
+ *
+ * Longest processing time first: sort by cost, heaviest first, ties by path
+ * so the order never depends on the order the files were found in; then put
+ * each file on the shard with the smallest total so far, ties to the lowest
+ * shard number. Deterministic, so every shard derives the same split.
+ */
+export function assignShards<T>(
+  files: readonly T[],
+  index: number,
+  count: number,
+  pathOf: (file: T) => string,
+  costOf: (path: string) => number = fileCost,
+): T[] {
+  if (!Number.isInteger(count) || count < 1) throw new Error(`shard count must be a positive integer, got ${count}`);
+  if (!Number.isInteger(index) || index < 1 || index > count) throw new Error(`shard index must be 1..${count}, got ${index}`);
+  const ordered = files
+    .map((file) => ({ file, path: pathOf(file), cost: costOf(pathOf(file)) }))
+    .sort((a, b) => b.cost - a.cost || (a.path < b.path ? -1 : a.path > b.path ? 1 : 0));
+  const totals = Array.from({ length: count }, () => 0);
+  const picked: T[] = [];
+  for (const entry of ordered) {
+    let target = 0;
+    for (let shard = 1; shard < count; shard += 1) {
+      if (totals[shard]! < totals[target]!) target = shard;
+    }
+    totals[target] = totals[target]! + entry.cost;
+    if (target === index - 1) picked.push(entry.file);
+  }
+  return picked;
+}
+
+/** Vitest's sequencer with `shard()` replaced by `assignShards`; sorting is Vitest's own. */
+export class CostShardSequencer extends BaseSequencer {
+  override async shard(files: TestSpecification[]): Promise<TestSpecification[]> {
+    const { index, count } = this.ctx.config.shard!;
+    return assignShards(files, index, count, (spec) => spec.moduleId);
+  }
+}

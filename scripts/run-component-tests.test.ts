@@ -19,6 +19,7 @@ import {
   reparentedOrphans,
   resolveTimeoutMs,
   watchdogTimeoutMessage,
+  shardOf,
 } from './run-component-tests.js';
 
 describe('lockPathFor', () => {
@@ -130,6 +131,13 @@ describe('watchdogTimeoutMessage', () => {
     expect(360_000).toBeLessThan(MEASURED_TIER_COST_MS);
   });
 
+  test('a sharded run does not hold its elapsed time against the whole tier’s cost', () => {
+    const message = watchdogTimeoutMessage(900_000, 2, 385_000, '3/4');
+    expect(message).toContain('shard 3/4');
+    expect(message).not.toContain('raise the default in this file');
+    expect(message).toContain('JEEX_COMPONENT_TIMEOUT_MS the caller sets');
+  });
+
   test('names the observable boot lines rather than a vague "no test output"', () => {
     const message = watchdogTimeoutMessage(600_000, 0);
     expect(message).toContain('the two boot lines');
@@ -158,5 +166,13 @@ describe('resolveTimeoutMs', () => {
     ['infinite', 'Infinity'],
   ])('a %s value falls back to the default instead of firing at launch', (_label, raw) => {
     expect(resolveTimeoutMs(raw)).toBe(DEFAULT_COMPONENT_TIMEOUT_MS);
+  });
+});
+
+describe('shardOf', () => {
+  test('reads both spellings of --shard and nothing else', () => {
+    expect(shardOf(['--shard=2/4', '--maxWorkers=2'])).toBe('2/4');
+    expect(shardOf(['--maxWorkers=2', '--shard', '1/4'])).toBe('1/4');
+    expect(shardOf(['--maxWorkers=2', 'tests/component/element.test.ts'])).toBeUndefined();
   });
 });
