@@ -33,7 +33,7 @@
 #    a 16-thread developer machine, and the software rasteriser is the
 #    bottleneck: more Vitest workers on the same 4 vCPUs do not shorten the
 #    run, they only slow every test against its own timeout. Four runners
-#    with two workers each bring a shard to a few minutes.
+#    with two workers each bring the slowest shard to about 9 minutes.
 #    `tests/component-shards.ts` balances the shards by measured cost.
 #  - `component-coverage` merges the four shards' blob reports, coverage
 #    included, into the `coverage-component/lcov.info` one local run writes,

@@ -119,7 +119,15 @@ function placement(scene: SceneData, id: string) {
   return found;
 }
 
-describe('the asset move tool', () => {
+/**
+ * Every test here mounts the demo apartment, waits up to 15 s for the mode and
+ * then up to `ASSET_MOVE_CHUNK_TIMEOUT_MS` for the tool before it drags
+ * anything, so the 60 s light-path default could fire before the chunk wait
+ * gives its own, clearer, error. The budget covers the three waits in series.
+ */
+const MOUNT_PLUS_CHUNK_TIMEOUT_MS = 120_000;
+
+describe('the asset move tool', { timeout: MOUNT_PLUS_CHUNK_TIMEOUT_MS }, () => {
   test('loads only when armed, and stays idle for a press off the selected object', async () => {
     const container = openContainer();
     const handle = mountViewer(container, {
