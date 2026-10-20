@@ -5,8 +5,7 @@
  * Pure data - no `three`, no DOM. The manifest itself lives in
  * `asset-library.ts` and the shape both of them agree on lives in
  * `asset-types.ts`; this module owns everything the rest of the app asks of
- * the bank — the indexes, the legacy type bridge, `library:asset` refs and the
- * walk footprints.
+ * the bank — the indexes, the legacy type bridge and the walk footprints.
  *
  * The catalogue types are re-exported here because that is where every caller
  * already asks for them; the definitions themselves stay in `asset-types.ts`
@@ -20,14 +19,17 @@
 
 import { interiorLibrary } from './asset-library.js';
 import { ARCHETYPE } from './catalogue-ids.js';
-import { splitAssetRef } from '../scene/registries.js';
 import type { AssetDims, CatalogueObject, CatalogueVariant } from './asset-types.js';
 
 export type { AssetDims, AssetOptions, AssetPricing, CatalogueObject, CatalogueVariant } from './asset-types.js';
 
 export { interiorLibrary };
 
-/** Library every bare asset UUID resolves against when a scene names no other. */
+/**
+ * The built-in bank's library id: what a placement belongs to when neither it
+ * nor its scene names a library. Code vocabulary, not a record id — it is
+ * never written into a document, where a library is always a UUID.
+ */
 export const DEFAULT_LIBRARY = interiorLibrary.id;
 
 const OBJECT_INDEX = new Map(interiorLibrary.objects.map((object) => [object.id, object]));
@@ -102,24 +104,6 @@ export const LEGACY_TYPE_ALIASES: Readonly<Record<string, LegacyTypeAlias>> = {
 
 export function legacyAlias(type: string): LegacyTypeAlias | undefined {
   return LEGACY_TYPE_ALIASES[type];
-}
-
-/* ------------------------------------------------------------- asset refs */
-
-export type AssetRef = { readonly library: string; readonly assetId: string };
-
-/**
- * Parses a `library:asset_uuid` reference under the SHIPPED library's
- * default. The grammar itself belongs to the scene document, so it lives one
- * layer down in `scene/registries.splitAssetRef` and this is the bound form
- * every caller in the bank already asks for.
- */
-export function parseAssetRef(ref: string, defaultLibrary = DEFAULT_LIBRARY): AssetRef {
-  return splitAssetRef(ref, defaultLibrary);
-}
-
-export function formatAssetRef(library: string, assetId: string): string {
-  return `${library}:${assetId}`;
 }
 
 function aliasEntry(assetId: string): { object: CatalogueObject; variantId?: string | undefined; yaw?: number | undefined } | undefined {

@@ -666,7 +666,8 @@ describe('the editor scenario', () => {
     {
       op: 'place_object',
       id: NEW.sofa,
-      asset: `${EDITOR.library.project}:${EDITOR.library.object.sofaLib}`,
+      asset: EDITOR.library.object.sofaLib,
+      library: EDITOR.library.project,
       variant: EDITOR.library.variant.sofaLibWool,
       room: EDITOR.room.space,
       position: { x: 2, y: 0, z: 2 },
@@ -710,7 +711,8 @@ describe('the editor scenario', () => {
     expect(scene.assets[0]).toMatchObject({
       id: NEW.sofa,
       type: EDITOR.library.object.sofaLib,
-      asset: `${EDITOR.library.project}:${EDITOR.library.object.sofaLib}`,
+      asset: EDITOR.library.object.sofaLib,
+      library: EDITOR.library.project,
       variant: EDITOR.library.variant.sofaLibWool,
       room: EDITOR.room.space,
       position: { x: 2.2, y: 0, z: 2.4 },

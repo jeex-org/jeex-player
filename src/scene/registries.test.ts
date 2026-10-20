@@ -12,7 +12,7 @@ import { CATALOGUE_REGISTRIES } from '../assets/catalogue-registries.js';
 import { interiorLibrary } from '../assets/asset-catalogue.js';
 import { lShapePlan } from '../fixtures/plan-l-shape.js';
 import { draftOf, type Draft } from '../shared/committed.js';
-import { findArchetype, registriesFromLibrary, type ProjectLibrary } from './registries.js';
+import { assetRefOf, findArchetype, registriesFromLibrary, type ProjectLibrary } from './registries.js';
 import { validateScene } from './scene-validator.js';
 import type { SceneData } from './types.js';
 import { ARCHETYPE, OPENING_VARIANT } from '../assets/catalogue-ids.js';
@@ -41,6 +41,7 @@ const ID = {
   sofa3sOwn: '01a12ff6-24f5-7dc5-84a8-29ddd2c5e2e2',
   unobtanium: '01a12ff6-24f6-7c5a-9a20-596b3f9767b8',
   placement: '01a12ff6-24f7-7d35-abd1-c79f9407db4b',
+  nowhere: '01a12ff6-24f8-7a3c-9e51-c6d0b84f2a17',
 } as const;
 
 /** A project library in the shape of a library manifest plus its own finishes. */
@@ -62,7 +63,7 @@ const showroom: ProjectLibrary = {
 };
 
 /** `lShapePlan` with one placement, from whichever library the test is about. */
-function sceneWith(library: string | undefined, asset: string, variant?: string): Draft<SceneData> {
+function sceneWith(library: string | undefined, asset: string, variant?: string, own?: string): Draft<SceneData> {
   const scene = draftOf(lShapePlan);
   if (library === undefined) delete scene.assetLibrary;
   else scene.assetLibrary = library;
@@ -71,6 +72,7 @@ function sceneWith(library: string | undefined, asset: string, variant?: string)
       id: L_SHAPE.asset.sofa,
       type: 'sofa',
       asset,
+      ...(own === undefined ? {} : { library: own }),
       ...(variant === undefined ? {} : { variant }),
       position: { x: 2, z: 6, y: 0 },
       rotationY: 0,
@@ -216,17 +218,38 @@ describe('registriesFromLibrary', () => {
   });
 });
 
+describe('assetRefOf', () => {
+  test('builds a reference from the fields: the placement library, else the default it is handed', () => {
+    const sofa = ARCHETYPE.sofa_3s;
+    expect(assetRefOf({ type: sofa, asset: sofa, library: ID.showroom }, ID.nowhere)).toEqual({ library: ID.showroom, assetId: sofa });
+    expect(assetRefOf({ type: sofa, asset: sofa }, ID.nowhere)).toEqual({ library: ID.nowhere, assetId: sofa });
+    // A legacy type word is the id when the placement names no asset.
+    expect(assetRefOf({ type: 'sofa' }, interiorLibrary.id)).toEqual({ library: interiorLibrary.id, assetId: 'sofa' });
+    // Nothing is parsed: a composite string stays one (unresolvable) id.
+    expect(assetRefOf({ type: sofa, asset: `x:${sofa}` }, ID.nowhere)).toEqual({ library: ID.nowhere, assetId: `x:${sofa}` });
+  });
+});
+
 describe('validateScene against several libraries', () => {
   test('accepts a document whose assetLibrary is declared by the registries', () => {
-    const scene = sceneWith(ID.showroom, `${ID.showroom}:${ID.sofaShow}`, ID.sofaShowLinen);
+    const scene = sceneWith(ID.showroom, ID.sofaShow, ID.sofaShowLinen);
 
     expect(() => validateScene(scene, registriesFromLibrary(showroom, CATALOGUE_REGISTRIES))).not.toThrow();
   });
 
-  test('accepts a bare asset id read against the document library', () => {
-    const scene = sceneWith(ID.showroom, ID.sofaShow);
+  test('accepts a placement that names its own library in a document that names none', () => {
+    const scene = sceneWith(undefined, ID.sofaShow, ID.sofaShowLinen, ID.showroom);
 
     expect(() => validateScene(scene, registriesFromLibrary(showroom, CATALOGUE_REGISTRIES))).not.toThrow();
+  });
+
+  test('a placement library wins over the document one', () => {
+    // The document's library is declared; the placement's own is not, and it is the one read.
+    const scene = sceneWith(ID.showroom, ID.sofaShow, undefined, ID.nowhere);
+
+    expect(() => validateScene(scene, registriesFromLibrary(showroom, CATALOGUE_REGISTRIES))).toThrow(
+      new RegExp(`unknown asset library ${ID.nowhere}`),
+    );
   });
 
   test('accepts a legacy `type` placement in a document that names the project library', () => {
@@ -237,15 +260,15 @@ describe('validateScene against several libraries', () => {
   });
 
   test('refuses a document whose assetLibrary nobody declared', () => {
-    const scene = sceneWith('remote:nope', ARCHETYPE.sofa_3s);
+    const scene = sceneWith(ID.nowhere, ARCHETYPE.sofa_3s);
 
-    expect(() => validateScene(scene, CATALOGUE_REGISTRIES)).toThrow(/unknown asset library remote:nope/);
+    expect(() => validateScene(scene, CATALOGUE_REGISTRIES)).toThrow(new RegExp(`unknown asset library ${ID.nowhere}`));
   });
 
   test('refuses a placement reaching into a library the registries do not carry', () => {
-    const scene = sceneWith(undefined, `remote:nope:${ARCHETYPE.sofa_3s}`);
+    const scene = sceneWith(undefined, ARCHETYPE.sofa_3s, undefined, ID.nowhere);
 
-    expect(() => validateScene(scene, CATALOGUE_REGISTRIES)).toThrow(/unknown asset library remote:nope/);
+    expect(() => validateScene(scene, CATALOGUE_REGISTRIES)).toThrow(new RegExp(`unknown asset library ${ID.nowhere}`));
   });
 
   test('refuses an archetype the named library does not have', () => {

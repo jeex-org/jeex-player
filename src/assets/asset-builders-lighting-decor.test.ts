@@ -22,7 +22,6 @@ function mirrorAsset(shape: 'round' | 'rect'): ResolvedAsset {
   const dims: [number, number, number] = shape === 'round' ? [0.76, 0.76, 0.06] : [0.68, 1.06, 0.06];
   return {
     placementId: '01a12ff0-fed0-7bf1-82f0-7054b04d2c83',
-    ref: `starter:${ARCHETYPE.mirror_round}`,
     library: 'starter',
     archetypeId: ARCHETYPE.mirror_round,
     variantId: shape === 'round' ? VARIANT.mirror_round_brass : VARIANT.mirror_rect_walnut,

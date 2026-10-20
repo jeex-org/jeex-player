@@ -68,7 +68,7 @@ export const fixtureProjectLibrary: ProjectLibrary = {
  * a tour that says nothing lets the assertion at the end be about the op.
  */
 export const emptyShell: SceneData = {
-  schemaVersion: '2.1',
+  schemaVersion: '2.2',
   units: 'm',
   id: EDITOR.scene,
   name: 'Empty shell',

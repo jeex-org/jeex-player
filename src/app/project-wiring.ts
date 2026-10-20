@@ -131,6 +131,7 @@ export function projectContext(info: ProjectInfo, log: Logger): LoadedProjectCon
     builderOptions: {
       modelUrl: (asset) => bank.modelUrl(asset),
       catalogue: bank.catalogue,
+      catalogueLibrary: bank.defaultLibrary,
       resolveFinish: bank.resolveFinish,
       projectMaterials: materials,
       // The project's surfaces first, the bundled catalogue behind them: a

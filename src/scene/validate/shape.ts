@@ -15,7 +15,7 @@ import { fail } from './context.js';
 import { isUuidV7, SCHEMA_VERSIONS } from '../types.js';
 import type { SceneData } from '../types.js';
 
-/** The document versions this build reads: 2.0 and 2.1 (2.1 adds `mirror`, otherwise 2.0). */
+/** The document versions this build reads: 2.2 alone (`SCHEMA_VERSIONS`). */
 const READABLE_VERSIONS: ReadonlySet<unknown> = new Set(SCHEMA_VERSIONS);
 
 /**
@@ -66,7 +66,7 @@ function checkStorey(scene: Partial<SceneData>): void {
 }
 
 /**
- * Refuses anything that is not a schema-2.0 or 2.1 document with every required field
+ * Refuses anything that is not a schema-2.2 document with every required field
  * present and of the right container kind, and narrows it to `SceneData`.
  */
 export function assertSceneShape(input: unknown): asserts input is SceneData {

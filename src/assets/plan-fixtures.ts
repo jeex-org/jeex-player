@@ -16,7 +16,7 @@
  * Pure module: no `three`, no DOM.
  */
 
-import { findCatalogueEntry, parseAssetRef } from './asset-catalogue.js';
+import { findCatalogueEntry } from './asset-catalogue.js';
 import { footprintOf } from './asset-footprint.js';
 import { openingFrameWidth } from './opening-frame.js';
 import { obbQuad } from '../plan/plan-geometry.js';
@@ -24,9 +24,8 @@ import { isPlanFixtureCategory, type PlanDrawingOptions, type PlanFixture } from
 import { effectiveAsset, type DemoAsset, type SceneData } from '../scene/types.js';
 
 /** Category of a placement, or `null` when the object bank does not know it. */
-function categoryOf(scene: SceneData, asset: DemoAsset): { category: string; onFloor: boolean } | null {
-  const reference = parseAssetRef(asset.asset ?? asset.type, scene.assetLibrary);
-  const entry = findCatalogueEntry(reference.assetId);
+function categoryOf(asset: DemoAsset): { category: string; onFloor: boolean } | null {
+  const entry = findCatalogueEntry(asset.asset ?? asset.type);
   if (!entry) return null;
   return { category: entry.object.category, onFloor: entry.object.anchor === 'floor' };
 }
@@ -35,7 +34,7 @@ function categoryOf(scene: SceneData, asset: DemoAsset): { category: string; onF
 export function planFixtures(scene: SceneData): PlanFixture[] {
   const fixtures: PlanFixture[] = [];
   for (const placement of scene.assets) {
-    const facts = categoryOf(scene, placement);
+    const facts = categoryOf(placement);
     if (!facts || !facts.onFloor || !isPlanFixtureCategory(facts.category)) continue;
     const footprint = footprintOf(placement);
     if (!footprint) continue;

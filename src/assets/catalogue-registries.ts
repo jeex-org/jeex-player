@@ -15,7 +15,7 @@
  * Pure module: no `three`, no DOM.
  */
 
-import { DEFAULT_LIBRARY, findCatalogueEntry, listCatalogueObjects, parseAssetRef } from './asset-catalogue.js';
+import { DEFAULT_LIBRARY, findCatalogueEntry, listCatalogueObjects } from './asset-catalogue.js';
 import { variantsForPlacement } from './asset-variants.js';
 import { findOpeningVariant, variantFamily, variantsForOpening } from './opening-variants.js';
 import { DEFAULT_FLOOR_FINISH, findFinish, finishKind } from '../materials/finish-catalogue.js';
@@ -25,8 +25,9 @@ import { placementIn, type CatalogueArchetype, type LibraryCatalogue, type Scene
 /**
  * The shipped library as one entry of `SceneRegistries.libraries`.
  *
- * A document that names this library explicitly (`assetLibrary`) resolves
- * exactly like one that names none — the entry is the same bank, indexed by
+ * It is keyed by the bank's vocabulary id (`DEFAULT_LIBRARY`), which a
+ * document never names — a document library is a UUID — so a placement reaches
+ * it by naming no library at all. The entry is the same bank, indexed by
  * archetype id. The bank's own extras (a variant id standing for its
  * archetype, a legacy `DemoAsset.type` alias) stay behind `findCatalogueEntry`,
  * which is where `findArchetype` reads the default library from.
@@ -45,7 +46,6 @@ export const CATALOGUE_REGISTRIES: SceneRegistries = {
   libraries: new Map([[DEFAULT_LIBRARY, STARTER_LIBRARY]]),
   defaultLibrary: DEFAULT_LIBRARY,
   resolvePlacement: (asset) => placementIn(CATALOGUE_REGISTRIES, asset),
-  parseAssetRef,
   findCatalogueEntry,
   findOpeningVariant,
   variantFamily,

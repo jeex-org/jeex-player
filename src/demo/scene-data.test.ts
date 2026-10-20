@@ -64,8 +64,8 @@ function isInDoorway(point: Vec3 | Vec2, margin = 0.35): boolean {
 }
 
 describe('apartmentScene plan', () => {
-  test('is schema 2.1 in metres with a 2.65 m ceiling', () => {
-    expect(apartmentScene.schemaVersion).toBe('2.1');
+  test('is schema 2.2 in metres with a 2.65 m ceiling', () => {
+    expect(apartmentScene.schemaVersion).toBe('2.2');
     expect(apartmentScene.units).toBe('m');
     expect(apartmentScene.ceilingHeight).toBe(2.65);
     expect(apartmentScene.id).toBe(DEMO.scene);

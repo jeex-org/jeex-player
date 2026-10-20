@@ -3,7 +3,7 @@ import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import * as THREE from 'three';
 import { AssetLoader, PENDING_MODEL } from './asset-loader.js';
-import { formatAssetRef, listCatalogueObjects } from '../assets/asset-catalogue.js';
+import { listCatalogueObjects } from '../assets/asset-catalogue.js';
 import { ARCHETYPE, VARIANT } from '../assets/catalogue-ids.js';
 import { projectBank } from '../assets/project-catalogue.js';
 import { parseProjectManifest } from '../assets/project-manifest.schema.js';
@@ -70,7 +70,8 @@ describe('object bank instantiation', () => {
     expect(group.userData['assetId']).toBe(PLACEMENT.sofaMain);
     expect(group.userData['archetypeId']).toBe(ARCHETYPE.sofa_3s);
     expect(group.userData['variantId']).toBe(VARIANT.sofa_3s_linen);
-    expect(group.userData['assetRef']).toBe(`starter:interior-v1:${ARCHETYPE.sofa_3s}`);
+    // The built-in bank has no UUID, and its vocabulary id never leaves the player.
+    expect('assetLibrary' in group.userData).toBe(false);
     expect(group.userData['collision']).toEqual({ hx: 1.12, hz: 0.475 });
     loader.dispose();
   });
@@ -127,11 +128,14 @@ function fixtureManifest(): BakedProjectManifest {
   return parseProjectManifest(JSON.parse(readFileSync(join(FIXTURE_DIR, 'project.json'), 'utf8')) as unknown);
 }
 
+/** A library UUID no bank declares. */
+const OTHER_LIBRARY = '01a12fed-dda2-7f13-a6c4-0d58b2e9c731';
+
 /** The placement the fixture scene holds, as the loader receives it. */
 const SOFA: DemoAsset = {
   id: PROJECT_FIXTURE.placement.sofa,
   type: PROJECT_FIXTURE.asset.boxSofa,
-  asset: formatAssetRef(PROJECT_FIXTURE.projectId, PROJECT_FIXTURE.asset.boxSofa),
+  asset: PROJECT_FIXTURE.asset.boxSofa,
   variant: PROJECT_FIXTURE.variant.boxSofa,
   room: PROJECT_FIXTURE.room.living,
   position: { x: 2, y: 0, z: 4.2 },
@@ -167,6 +171,12 @@ describe('a project object, which has no builder', () => {
     expect(asset?.library).toBe(PROJECT_FIXTURE.projectId);
     expect(asset?.builder).toBeUndefined();
     expect(asset?.dims).toEqual(manifest.library.objects[0]!.dims);
+    loader.dispose();
+  });
+
+  test('tags the placement with the library UUID the document names for it', () => {
+    const { loader } = projectLoader();
+    expect(loader.load(SOFA).group.userData['assetLibrary']).toBe(PROJECT_FIXTURE.projectId);
     loader.dispose();
   });
 
@@ -215,7 +225,7 @@ describe('a project object, which has no builder', () => {
 
   test('a placement naming a library the project is not still degrades', () => {
     const { loader } = projectLoader();
-    const result = loader.load({ ...SOFA, id: PLACEMENT.ghost, asset: `catalogue:jeex:${ARCHETYPE.sofa_3s}` });
+    const result = loader.load({ ...SOFA, id: PLACEMENT.ghost, asset: ARCHETYPE.sofa_3s, library: OTHER_LIBRARY });
     expect(result.degraded).toBe(true);
     expect(result.group.userData['degraded']).toBe('unknown-library');
     loader.dispose();

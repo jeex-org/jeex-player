@@ -23,6 +23,7 @@
 import { ifcGuid } from '../shared/uuid.js';
 import { faceGuid } from './guid.js';
 import { FaceMap } from './types.js';
+import { documentLibraryOf } from './registries.js';
 import type { SceneData, WallSide } from './types.js';
 import type { SolvedPlan } from '../plan/plan-solver.js';
 
@@ -48,8 +49,14 @@ export type ElementRow = {
   /** Wall face only: which side of `wallId` the face is. */
   readonly side?: WallSide;
   readonly openingType?: string;
-  /** Furniture only: the catalogue reference (`DemoAsset.asset`, `library:id`). */
+  /** Furniture only: the catalogue reference (`DemoAsset.asset`, a bare UUID). */
   readonly assetId?: string;
+  /**
+   * Furniture only: the UUID of the library `assetId` belongs to — the
+   * placement's `library`, else the document's `assetLibrary`. Absent for the
+   * built-in bank, which has no UUID to write.
+   */
+  readonly libraryId?: string;
   /** Furniture: `DemoAsset.variant`. Opening: `Opening.variant`. */
   readonly variantId?: string;
   /** The resolved finish id, when this element carries an explicit override. */
@@ -105,10 +112,12 @@ export function metadataTable(scene: SceneData, plan: SolvedPlan): ElementRow[] 
   }
 
   for (const asset of scene.assets) {
+    const libraryId = documentLibraryOf(asset, scene.assetLibrary);
     rows.push(
       row('furniture', asset.id, {
         ...(asset.room === undefined ? {} : { roomId: asset.room }),
         ...(asset.asset === undefined ? {} : { assetId: asset.asset }),
+        ...(libraryId === undefined ? {} : { libraryId }),
         ...(asset.variant === undefined ? {} : { variantId: asset.variant }),
       }),
     );
@@ -147,6 +156,7 @@ export function structuralMetadataExtension(rows: readonly ElementRow[]): Record
             side: { type: 'STRING', required: false },
             openingType: { type: 'STRING', required: false },
             assetId: { type: 'STRING', required: false },
+            libraryId: { type: 'STRING', required: false },
             variantId: { type: 'STRING', required: false },
             finish: { type: 'STRING', required: false },
           },
@@ -168,6 +178,7 @@ export function structuralMetadataExtension(rows: readonly ElementRow[]): Record
           side: column('side'),
           openingType: column('openingType'),
           assetId: column('assetId'),
+          libraryId: column('libraryId'),
           variantId: column('variantId'),
           finish: column('finish'),
         },

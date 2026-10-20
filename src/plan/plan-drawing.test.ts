@@ -29,7 +29,7 @@ import { signedArea } from './plan-geometry.js';
 import { L_SHAPE } from '../fixtures/plan-l-shape-ids.js';
 import { lShapePlan, bayPlan } from '../fixtures/plan-l-shape.js';
 import { apartmentScene } from '../demo/scene-data.js';
-import { findCatalogueEntry, parseAssetRef } from '../assets/asset-catalogue.js';
+import { findCatalogueEntry } from '../assets/asset-catalogue.js';
 import type { SceneData, Vec2 } from '../scene/types.js';
 
 function drawingOf(scene: SceneData): PlanDrawing {
@@ -164,7 +164,7 @@ describe('buildPlanDrawing: fixtures', () => {
     // Every floor-standing bath/kitchen placement of the demo is there, and
     // nothing else: a sofa never reaches the drawing.
     const expected = apartmentScene.assets.filter((asset) => {
-      const entry = findCatalogueEntry(parseAssetRef(asset.asset ?? asset.type).assetId);
+      const entry = findCatalogueEntry(asset.asset ?? asset.type);
       return Boolean(entry) && entry!.object.anchor === 'floor' && isPlanFixtureCategory(entry!.object.category);
     });
     expect(fixtures.length).toBe(expected.length);

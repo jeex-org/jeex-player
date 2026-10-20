@@ -7,7 +7,7 @@ To put the player on a website, follow [install.md](https://player.jeex.org/inst
 Facts an agent needs before it starts:
 
 - Install from source only. The README documents no registry package and no hosted copy of the files: the player is built from source (`bun run build:lib`) and the site serves its own copy of the whole `dist-lib/` directory.
-- The player does not create scenes. It validates, renders and plays a scene document (schema 2.1) or a baked project folder whose root is a `project.json`.
+- The player does not create scenes. It validates, renders and plays a scene document (schema 2.2) or a baked project folder whose root is a `project.json`.
 - The person who owns the website makes their own apartment's scene. `https://player.jeex.org/demo/demo-apartment.json` is the player's own demo apartment, served with CORS for trying the player out; it is not the person's property.
 - A scene URL is fetched without credentials (a scene on another origin needs CORS) and must answer with a `Content-Type` that includes `application/json`, no redirect, within 15 seconds and at most 8 MB.
 - The custom element and the iframe page are read-only for visitors by default.
@@ -32,7 +32,7 @@ Facts an agent needs before it starts:
 
 ## Optional
 
-- [README: Scene document](https://github.com/jeex-org/jeex-player/blob/main/README.md#scene-document): the schema 2.1 document and its rules
+- [README: Scene document](https://github.com/jeex-org/jeex-player/blob/main/README.md#scene-document): the schema 2.2 document and its rules
 - [README: Project format](https://github.com/jeex-org/jeex-player/blob/main/README.md#project-format): the baked project folder and its limits
 - [README: Viewer handle API](https://github.com/jeex-org/jeex-player/blob/main/README.md#viewer-handle-api): playback, modes, selection, captures
 - [README: Theming](https://github.com/jeex-org/jeex-player/blob/main/README.md#theming): the documented custom properties and parts

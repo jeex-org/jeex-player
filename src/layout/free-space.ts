@@ -63,8 +63,10 @@ const PROBE_ID = '__free-space-probe';
 export type PlacementRequest = {
   scene: SceneData;
   plan: SolvedPlan;
-  /** Catalogue reference, `library:asset_uuid` or a bare archetype / variant UUID. */
+  /** Catalogue reference: a bare archetype or variant UUID (`DemoAsset.asset`). */
   asset: string;
+  /** UUID of the library `asset` belongs to, as `place_object.library`; absent: the document's `assetLibrary`, then the built-in bank. */
+  library?: string | undefined;
   /** Room to place into; absent (or unknown to the plan) means the largest room. */
   roomId?: string | undefined;
   /** Catalogue variant chosen before the placement: a size variant changes the footprint. */
@@ -147,6 +149,7 @@ function probeOf(request: PlacementRequest, id: string, position: Vec3, rotation
     id,
     type: request.asset,
     asset: request.asset,
+    ...(request.library === undefined ? {} : { library: request.library }),
     position,
     rotationY,
     ...(request.variant === undefined ? {} : { variant: request.variant }),

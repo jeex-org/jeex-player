@@ -36,6 +36,7 @@ const EXTRA = {
   ghostAsset: '01a12ff3-28c9-7705-9e25-3038a16efdec',
   ghostOpening: '01a12ff3-28ca-778c-8b58-854caab279f2',
   material: '01a12ff3-28cb-7b9f-9985-3490d4b70495',
+  ghostLibrary: '01a12ff3-28cc-7d41-a8e3-5f0c2b9d4e17',
 } as const;
 
 /** A well-formed UUID of the wrong version (v4): the grammar refuses it. */
@@ -130,11 +131,18 @@ describe('scene validator — schema version', () => {
   });
 
   test('rejects a version this build does not know', () => {
-    const invalid = { ...draftOf(lShapePlan), schemaVersion: '2.2' };
+    const invalid = { ...draftOf(lShapePlan), schemaVersion: '2.3' };
     const error = errorOf(() => validateScene(invalid, CATALOGUE_REGISTRIES));
     expect(error.rule).toBe('schema-version-unsupported');
-    expect(error.message).toContain("expected '2.0' or '2.1'");
-    expect(error.detail).toEqual({ schemaVersion: '2.2' });
+    expect(error.message).toContain("expected '2.2'");
+    expect(error.detail).toEqual({ schemaVersion: '2.3' });
+  });
+
+  test.each(['2.0', '2.1'])('refuses a %s document: its asset references are composite strings, and nothing converts them', (version) => {
+    const invalid = { ...draftOf(lShapePlan), schemaVersion: version };
+    const error = errorOf(() => validateScene(invalid, CATALOGUE_REGISTRIES));
+    expect(error.rule).toBe('schema-version-unsupported');
+    expect(error.detail).toEqual({ schemaVersion: version });
   });
 
   test('accepts a document that declares neither units nor storey', () => {
@@ -588,24 +596,61 @@ describe('asset references are checked against the object bank', () => {
     );
   });
 
-  test('accepts a qualified catalogue reference', () => {
+  test('accepts a bare catalogue reference', () => {
+    const scene = draftOf(lShapePlan);
+    scene.assets[0]!.asset = ARCHETYPE.sofa_3s;
+    expect(() => validateScene(scene, CATALOGUE_REGISTRIES)).not.toThrow();
+  });
+
+  test('refuses a composite library:asset reference: schema 2.2 names the library in its own field', () => {
     const scene = draftOf(lShapePlan);
     scene.assets[0]!.asset = `starter:interior-v1:${ARCHETYPE.sofa_3s}`;
-    expect(() => validateScene(scene, CATALOGUE_REGISTRIES)).not.toThrow();
+    const error = errorOf(() => validateScene(scene, CATALOGUE_REGISTRIES));
+    expect(error.rule).toBe('asset-reference-invalid');
+    expect(error.path).toBe('assets[0].asset');
   });
 
   test('rejects a catalogue reference to a nonexistent asset', () => {
     const scene = draftOf(lShapePlan);
-    scene.assets[0]!.asset = `starter:interior-v1:${EXTRA.ghostAsset}`;
+    scene.assets[0]!.asset = EXTRA.ghostAsset;
     expect(() => validateScene(scene, CATALOGUE_REGISTRIES)).toThrow(
       `Asset ${ASSET.sofa} references unknown catalogue asset ${EXTRA.ghostAsset}`,
     );
   });
 
-  test('rejects a catalogue reference to an unknown library', () => {
+  test("refuses a library that is not a UUID, the built-in bank's own id included", () => {
     const scene = draftOf(lShapePlan);
-    scene.assets[0]!.asset = `pirate-bay:${ARCHETYPE.sofa_3s}`;
-    expect(() => validateScene(scene, CATALOGUE_REGISTRIES)).toThrow(`Asset ${ASSET.sofa} references unknown asset library pirate-bay`);
+    scene.assets[0]!.asset = ARCHETYPE.sofa_3s;
+    scene.assets[0]!.library = 'starter:interior-v1';
+    const error = errorOf(() => validateScene(scene, CATALOGUE_REGISTRIES));
+    expect(error.rule).toBe('asset-library-invalid');
+    expect(error.path).toBe('assets[0].library');
+  });
+
+  test('refuses a library on a placement that names no asset', () => {
+    const scene = draftOf(lShapePlan);
+    delete scene.assets[0]!.asset;
+    scene.assets[0]!.library = EXTRA.ghostLibrary;
+    const error = errorOf(() => validateScene(scene, CATALOGUE_REGISTRIES));
+    expect(error.rule).toBe('asset-library-without-asset');
+    expect(error.path).toBe('assets[0].library');
+  });
+
+  test('refuses a library UUID the registries do not declare', () => {
+    const scene = draftOf(lShapePlan);
+    scene.assets[0]!.asset = ARCHETYPE.sofa_3s;
+    scene.assets[0]!.library = EXTRA.ghostLibrary;
+    const error = errorOf(() => validateScene(scene, CATALOGUE_REGISTRIES));
+    expect(error.rule).toBe('asset-unknown-library');
+    expect(error.message).toContain(`Asset ${ASSET.sofa} references unknown asset library ${EXTRA.ghostLibrary}`);
+    expect(error.detail).toEqual({ library: EXTRA.ghostLibrary });
+  });
+
+  test('refuses a scene assetLibrary that is not a UUID', () => {
+    const scene = { ...draftOf(lShapePlan), assetLibrary: 'starter:interior-v1' };
+    const error = errorOf(() => validateScene(scene, CATALOGUE_REGISTRIES));
+    expect(error.rule).toBe('scene-asset-library-invalid');
+    expect(error.path).toBe('assetLibrary');
   });
 
   test('accepts a variant of the resolved archetype', () => {

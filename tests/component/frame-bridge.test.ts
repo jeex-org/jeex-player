@@ -704,7 +704,7 @@ describe('the frame side, wrapping a real viewer', () => {
     await arrived(isReply('a9'), 'the reply to getScene');
     const reply = replyTo(posted, 'a9')!;
     expect(reply.ok).toBe(true);
-    expect(reply.result).toMatchObject({ schemaVersion: '2.1', id: fixtureScene().id });
+    expect(reply.result).toMatchObject({ schemaVersion: '2.2', id: fixtureScene().id });
   });
 
   test('exportGlb crosses the real boundary as an ArrayBuffer', async () => {

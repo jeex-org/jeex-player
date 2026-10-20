@@ -67,6 +67,8 @@ export type SceneBuilderOptions = {
   modelSource?: AsyncModelSource | undefined;
   /** The object bank placements resolve against; the shipped catalogue when absent. */
   catalogue?: CatalogueLookup | undefined;
+  /** The library id `catalogue` answers for: a baked project's `library.id`. */
+  catalogueLibrary?: string | undefined;
   /** How a finish id is canonicalised on a furniture slot. */
   resolveFinish?: FinishIdResolver | undefined;
   /** The project's `library.materials`: furniture finishes AND, through `findFinish`, room surfaces. */
@@ -159,6 +161,7 @@ export class SceneBuilder {
       modelUrl: this.options.modelUrl,
       modelSource: this.options.modelSource,
       catalogue: this.options.catalogue,
+      catalogueLibrary: this.options.catalogueLibrary,
       resolveFinish: this.options.resolveFinish,
       projectMaterials: this.options.projectMaterials,
       credentials: this.options.credentials,

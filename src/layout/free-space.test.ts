@@ -10,7 +10,7 @@ import { distanceToPolygon, dot, pointInPolygon, signedArea } from '../plan/plan
 import { solvePlan, type RoomFace, type SolvedPlan, type WallFace } from '../plan/plan-solver.js';
 import { SceneModel, isApplyOk } from '../scene/scene-model.js';
 import { nearestFace } from './rules/context.js';
-import { lintContext, lintLayout, type LayoutIssue } from './layout-lint.js';
+import { lintContext, lintLayout, shippedFacts, type LayoutCatalogue, type LayoutIssue } from './layout-lint.js';
 import { suggestPlacement } from './free-space.js';
 import type { SceneData, Vec2 } from '../scene/types.js';
 
@@ -78,6 +78,18 @@ describe('suggestPlacement', () => {
     // `sofa_3s` is 2.24 x 0.95, so its reach is 1.12 m; the margin is 0.40 m.
     expect(distanceToPolygon(planPoint(pose.position), room.polygon).distance).toBeGreaterThanOrEqual(1.12 + 0.4 - 1e-9);
     expect(pose.position.y).toBe(0);
+  });
+
+  test('the library a request names reaches the catalogue on the probe, as place_object will write it', () => {
+    const library = '01a12ff9-0b12-7a3d-8e47-c5f1d2b9a063';
+    const seen: (string | undefined)[] = [];
+    const catalogue: LayoutCatalogue = (placement) => {
+      if (placement.asset === ARCHETYPE.sofa_3s) seen.push(placement.library);
+      return shippedFacts(placement);
+    };
+    suggestPlacement({ scene: lShapePlan, plan: lShape, asset: ARCHETYPE.sofa_3s, library, catalogue });
+    expect(seen.length).toBeGreaterThan(0);
+    expect(seen.every((named) => named === library)).toBe(true);
   });
 
   test('a sampled pose is a pose SceneModel.apply accepts with lint: strict', () => {

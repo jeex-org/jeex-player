@@ -1,5 +1,5 @@
 /**
- * Real two-bedroom apartment, schema 2.0.
+ * Real two-bedroom apartment, schema 2.2.
  *
  * Reproduced from a surveyed floor plan (≈46 px per metre) and 18 interior
  * photos of the apartment. Three offset blocks: the left column
@@ -70,7 +70,7 @@ import { DEMO } from './demo-ids.js';
 const { node: NODE, wall: WALL, opening: OPENING, room: ROOM } = DEMO;
 
 const baseApartment: SceneData = {
-  schemaVersion: '2.1',
+  schemaVersion: '2.2',
   units: 'm',
   id: DEMO.scene,
   name: 'Two-bedroom apartment, real plan',

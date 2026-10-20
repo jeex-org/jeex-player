@@ -167,7 +167,7 @@ export function boundDocumentOptions(options: ViewerLibErrorOptions | undefined)
 }
 
 /**
- * A document that was read but does not satisfy the scene schema (2.0).
+ * A document that was read but does not satisfy the scene schema (2.2).
  *
  * Its message, `path` and `detail` are bounded (`boundDocumentText`): the
  * validator names what it refused, and the refused value came from a document.

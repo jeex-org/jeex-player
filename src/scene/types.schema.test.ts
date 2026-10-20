@@ -29,6 +29,7 @@ const EXTRA = {
   missingRoom: '01a12ff4-f1be-7722-ba5a-0ab789ff69cd',
   missingWall: '01a12ff4-f1bf-7ff9-b257-f5bceb40c79e',
   missingAsset: '01a12ff4-f1c0-7416-b25c-bd288002a814',
+  missingLibrary: '01a12ff3-28cd-7a6e-9c2b-8d71e4f0a35c',
   preset: '01a12ff4-f1c1-74bc-88b4-5f039b23fe21',
   checkpoint: '01a12ff4-f1c2-7cf0-81ae-b2c127076dd9',
   farNodeA: '01a12ff4-f1c3-7794-b2a5-1a3c0ec2aab2',
@@ -389,7 +390,7 @@ const RULE_CASES: readonly RuleCase[] = [
   // ---- validate/shape.ts: the thirteen the shape gate already proves
   { rule: 'scene-not-object', kind: 'structural', document: () => null },
   { rule: 'schema-version-1x', kind: 'structural', document: () => brokenScene((scene) => put(scene, 'schemaVersion', '1.2')) },
-  { rule: 'schema-version-unsupported', kind: 'structural', document: () => brokenScene((scene) => put(scene, 'schemaVersion', '2.2')) },
+  { rule: 'schema-version-unsupported', kind: 'structural', document: () => brokenScene((scene) => put(scene, 'schemaVersion', '2.1')) },
   { rule: 'units-unsupported', kind: 'structural', document: () => brokenScene((scene) => put(scene, 'units', 'ft')) },
   { rule: 'storey-invalid', kind: 'structural', document: () => brokenScene((scene) => put(scene, 'storey', { name: '' })) },
   { rule: 'scene-identity-missing', kind: 'structural', document: () => brokenScene((scene) => put(scene, 'id', '')) },
@@ -644,13 +645,13 @@ const RULE_CASES: readonly RuleCase[] = [
   // ---- validate/assets.ts: placements
   {
     rule: 'scene-asset-library-invalid',
-    kind: 'semantic',
-    document: () => brokenScene((scene) => put(scene, 'assetLibrary', '')),
+    kind: 'structural',
+    document: () => brokenScene((scene) => put(scene, 'assetLibrary', 'starter:interior-v1')),
   },
   {
     rule: 'scene-unknown-asset-library',
     kind: 'semantic',
-    document: () => brokenScene((scene) => put(scene, 'assetLibrary', 'remote:nope')),
+    document: () => brokenScene((scene) => put(scene, 'assetLibrary', EXTRA.missingLibrary)),
   },
   { rule: 'asset-not-object', kind: 'structural', document: () => brokenScene((scene) => put(scene.assets, '0', 5)) },
   { rule: 'asset-type-missing', kind: 'structural', document: () => brokenScene((scene) => put(scene.assets[0]!, 'type', '')) },
@@ -675,12 +676,34 @@ const RULE_CASES: readonly RuleCase[] = [
     kind: 'semantic',
     document: () => brokenScene((scene) => put(scene.assets[0]!, 'room', EXTRA.missingRoom)),
   },
-  { rule: 'asset-reference-invalid', kind: 'structural', document: () => brokenScene((scene) => put(scene.assets[0]!, 'asset', '')) },
+  {
+    rule: 'asset-reference-invalid',
+    kind: 'structural',
+    document: () => brokenScene((scene) => put(scene.assets[0]!, 'asset', `starter:interior-v1:${ARCHETYPE.sofa_3s}`)),
+  },
+  {
+    rule: 'asset-library-invalid',
+    kind: 'structural',
+    document: () => brokenScene((scene) => put(scene.assets[0]!, 'library', 'starter:interior-v1')),
+  },
   { rule: 'asset-variant-invalid', kind: 'structural', document: () => brokenScene((scene) => put(scene.assets[0]!, 'variant', '')) },
+  {
+    rule: 'asset-library-without-asset',
+    kind: 'semantic',
+    document: () =>
+      brokenScene((scene) => {
+        put(scene.assets[0]!, 'asset', undefined);
+        put(scene.assets[0]!, 'library', EXTRA.missingLibrary);
+      }),
+  },
   {
     rule: 'asset-unknown-library',
     kind: 'semantic',
-    document: () => brokenScene((scene) => put(scene.assets[0]!, 'asset', `elsewhere:${ARCHETYPE.sofa_3s}`)),
+    document: () =>
+      brokenScene((scene) => {
+        put(scene.assets[0]!, 'asset', ARCHETYPE.sofa_3s);
+        put(scene.assets[0]!, 'library', EXTRA.missingLibrary);
+      }),
   },
   {
     rule: 'asset-unknown-catalogue-entry',

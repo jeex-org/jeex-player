@@ -1,5 +1,5 @@
 /**
- * Validates a scene against schema 2.0: a shape gate, then a TABLE of sections
+ * Validates a scene against schema 2.2: a shape gate, then a TABLE of sections
  * over one `ValidationContext`, with the plan solved in the middle.
  *
  * Invariant: `validateScene` either returns the very object it was handed

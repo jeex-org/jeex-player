@@ -5,6 +5,43 @@ format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 the project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html)
 as described under [Versioning](#versioning).
 
+## [Unreleased]
+
+### Changed (breaking)
+
+- **Scene schema `2.2`: a placement's catalogue reference is two fields.**
+  `DemoAsset.asset` and the `place_object` operation's `asset` are a bare
+  archetype or variant UUID; the new optional `library` is the UUID of the
+  library that holds it. A placement without `library` belongs to the
+  document's `assetLibrary`, and when that is absent too, to the built-in
+  bank. `asset`, `library` and `assetLibrary` must be UUID v7: the composite
+  `library:asset_uuid` string is refused (`asset-reference-invalid`), a
+  non-UUID library as `asset-library-invalid` or
+  `scene-asset-library-invalid`, a `library` without an `asset` as
+  `asset-library-without-asset`, and the built-in bank's own id
+  (`starter:interior-v1`) is never written into a document — a placement
+  from the built-in bank names no library. `place_object` writes `library`
+  into the placement exactly when the operation names one.
+- **Only `schemaVersion: '2.2'` is read.** A `2.0` or `2.1` document is
+  refused with `schema-version-unsupported`; the player converts nothing, so
+  a producer rewrites its documents: keep the UUID after the last colon of
+  `asset` as `asset`, move the part before it into `library` (or
+  `assetLibrary`) — or drop it when it is the built-in `starter:interior-v1`,
+  which is never written — rewrite `assetLibrary` the same way, and set
+  `schemaVersion` to `2.2`. The published JSON Schema carries the UUID
+  pattern on `asset`, `library` and `assetLibrary`.
+- **`jeex-viewer/ops`:** `SceneRegistries` no longer has a `parseAssetRef`
+  member; the new export `assetRefOf(fields, defaultLibrary)` (type
+  `AssetRefFields`) is the one rule a reference is read by. `mirror_object`
+  no longer rewrites `schemaVersion`. `suggestPlacement`'s
+  `PlacementRequest.asset` is a bare UUID too (a `library:asset` string no
+  longer resolves) and takes an optional `library`, as `place_object` does.
+- **Rendered and exported furniture:** `userData.assetRef` (the composite
+  string) is replaced by `userData.assetLibrary`, and the GLB element
+  metadata table gains a `libraryId` column next to `assetId`. Both carry the
+  library UUID the document names for the placement (its `library`, else
+  `assetLibrary`) and are absent for the built-in bank.
+
 ## [0.1.0] — 2026-10-19
 
 The first public release of JEEX Player (the package name is `jeex-viewer`;

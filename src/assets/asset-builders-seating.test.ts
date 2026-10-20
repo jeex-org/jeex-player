@@ -17,7 +17,6 @@ import { FinishRegistry } from './asset-finishes.js';
 function sofaAsset(dims: [number, number, number], seats: number): ResolvedAsset {
   return {
     placementId: '01a12ff0-fecf-7faf-9a83-b97dba8a9328',
-    ref: `starter:${ARCHETYPE.sofa_3s}`,
     library: 'starter',
     archetypeId: ARCHETYPE.sofa_3s,
     variantId: VARIANT.sofa_3s_linen,

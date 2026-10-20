@@ -86,7 +86,7 @@ Keep `allow="fullscreen"` (without it the viewer's fullscreen button reports tha
 
 ## Step 4. Supply a scene
 
-Replace the demo URL with the person's own scene once they give it to you. The player loads a scene document (schema 2.1; a 2.0 document is read too) or a baked project folder whose root is a `project.json` (README: [Scene sources](https://github.com/jeex-org/jeex-player/blob/main/README.md#scene-sources), [Scene document](https://github.com/jeex-org/jeex-player/blob/main/README.md#scene-document), [Project format](https://github.com/jeex-org/jeex-player/blob/main/README.md#project-format)). The URL must hold to these rules:
+Replace the demo URL with the person's own scene once they give it to you. The player loads a scene document (schema 2.2; older documents are refused) or a baked project folder whose root is a `project.json` (README: [Scene sources](https://github.com/jeex-org/jeex-player/blob/main/README.md#scene-sources), [Scene document](https://github.com/jeex-org/jeex-player/blob/main/README.md#scene-document), [Project format](https://github.com/jeex-org/jeex-player/blob/main/README.md#project-format)). The URL must hold to these rules:
 
 - It is fetched **without credentials**. A scene on another origin than the page needs CORS (`Access-Control-Allow-Origin`) from that origin.
 - The response `Content-Type` includes `application/json`.

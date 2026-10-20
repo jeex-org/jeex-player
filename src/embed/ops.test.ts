@@ -154,6 +154,7 @@ describe('jeex-viewer/ops entry', () => {
       'parseSceneDocument',
       'parseProjectManifest',
       'projectLibraryOf',
+      'assetRefOf',
       'registriesFromLibrary',
       'solvePlan',
       'lintLayout',

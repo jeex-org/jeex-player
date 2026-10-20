@@ -24,6 +24,7 @@ const LOCAL = {
   passageAb: '01a12ff8-a80f-7124-987c-e0879645cb9d',
   rug: '01a12ff8-a810-792a-9522-beee8a381683',
   placed: '01a12ff8-a811-71c5-9ea4-3d2668286705',
+  library: '01a12ff8-a812-7d3b-8a64-f19e2c07b5d6',
 } as const;
 
 const lShape = solvePlan(lShapePlan);
@@ -212,23 +213,15 @@ describe('asset footprints follow the catalogue reference', () => {
     ...extra,
   });
 
-  test('a qualified reference is split at the LAST colon, like parseAssetRef', () => {
-    // `starter:interior-v1` is the library id, the sofa's UUID the asset: splitting
-    // at the first colon looked up `interior-v1:<uuid>`, found nothing and silently
-    // collided as a dining chair.
-    const qualified = footprintOf(placement(`starter:interior-v1:${ARCHETYPE.sofa_3s}`));
+  test('the bare asset UUID decides the footprint, whichever library it names', () => {
     const bare = footprintOf(placement(ARCHETYPE.sofa_3s));
     expect(bare).not.toBeNull();
-    expect(qualified).toEqual(bare);
-    expect(qualified).not.toEqual(footprintOf(placement(undefined))!);
-  });
-
-  test('a bare reference with no colon still resolves', () => {
-    expect(footprintOf(placement(ARCHETYPE.table_dining))).toEqual(footprintOf(placement(`starter:interior-v1:${ARCHETYPE.table_dining}`)));
+    expect(bare).not.toEqual(footprintOf(placement(undefined))!);
+    expect(footprintOf(placement(ARCHETYPE.sofa_3s, { library: LOCAL.library }))).toEqual(bare);
   });
 
   test('an explicit collision box still wins over the catalogue', () => {
-    const explicit = footprintOf(placement(`starter:interior-v1:${ARCHETYPE.sofa_3s}`, { collision: { hx: 2, hz: 3 } }));
+    const explicit = footprintOf(placement(ARCHETYPE.sofa_3s, { collision: { hx: 2, hz: 3 } }));
     expect(explicit).toEqual({ hx: 2, hz: 3 });
   });
 });

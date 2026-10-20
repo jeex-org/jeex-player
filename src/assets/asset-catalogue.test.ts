@@ -5,12 +5,10 @@ import {
   assetCard,
   findCatalogueEntry,
   footprintFor,
-  formatAssetRef,
   interiorLibrary,
   legacyAlias,
   listCatalogueObjects,
   listVariants,
-  parseAssetRef,
 } from './asset-catalogue.js';
 import { finishById } from './asset-finishes.js';
 import { BUILDERS } from './asset-builders.js';
@@ -142,14 +140,6 @@ describe('object bank manifest', () => {
 });
 
 describe('asset references', () => {
-  test('parses `library:asset_uuid` and falls back to the default library for bare ids', () => {
-    const sofa = ARCHETYPE.sofa_3s;
-    expect(parseAssetRef(`remote:interior-v1:${sofa}`)).toEqual({ library: 'remote:interior-v1', assetId: sofa });
-    expect(parseAssetRef(sofa)).toEqual({ library: 'starter:interior-v1', assetId: sofa });
-    expect(parseAssetRef(sofa, 'custom:lib')).toEqual({ library: 'custom:lib', assetId: sofa });
-    expect(formatAssetRef('starter:interior-v1', sofa)).toBe(`starter:interior-v1:${sofa}`);
-  });
-
   test('resolves an archetype id, a variant id and a legacy type', () => {
     expect(findCatalogueEntry(ARCHETYPE.sofa_3s)?.object.id).toBe(ARCHETYPE.sofa_3s);
     expect(findCatalogueEntry(VARIANT.sofa_3s_boucle)?.variantId).toBe(VARIANT.sofa_3s_boucle);

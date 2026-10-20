@@ -20,7 +20,8 @@
  * Format 2: every id the manifest carries — the project, the bake, the publisher, the
  * workspace, every object, variant and material — is a UUID v7, checked by the
  * same `isUuidV7` as every id of the scene. The library IS the project
- * (`library.id === projectId`), so a placement names `<projectId>:<assetId>`.
+ * (`library.id === projectId`), so the scene names it as its `assetLibrary` (or
+ * a placement as its `library`) and a placement's `asset` is the bare asset UUID.
  * Any other format version is refused, never converted. File NAMES
  * inside the folder are whatever the bake wrote and carry no identity.
  *
@@ -114,7 +115,7 @@ export type ProjectObject = Omit<
  */
 export type ProjectLibraryManifest = {
   readonly manifestVersion: '1.0';
-  /** The project's UUID: `BakedProjectManifest.projectId`, and what a placement's `library:` part names. */
+  /** The project's UUID: `BakedProjectManifest.projectId`, and what the scene's `assetLibrary` (or a placement's `library`) names. */
   readonly id: string;
   /** Human name of the library; the catalogue export writes one, the viewer never reads it. */
   readonly name?: string;
@@ -182,7 +183,7 @@ export type BakedProjectManifest = {
   /** ISO-8601. */
   readonly bakedAt: string;
   readonly title?: string;
-  /** Relative path of the scene document (schema 2.0). */
+  /** Relative path of the scene document (schema 2.2). */
   readonly scene: string;
   /** The project's asset library: library-manifest shape, `baseUrl` omitted (it IS the manifest folder). */
   readonly library: ProjectLibraryManifest;

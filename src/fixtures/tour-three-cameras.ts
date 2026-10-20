@@ -19,7 +19,7 @@ import { THREE_CAMERAS } from './tour-three-cameras-ids.js';
 const { node: NODE, wall: WALL, opening: OPENING, room: ROOM, asset: ASSET, checkpoint: CHECKPOINT } = THREE_CAMERAS;
 
 export const threeCameraTour: SceneData = {
-  schemaVersion: '2.1',
+  schemaVersion: '2.2',
   units: 'm',
   id: THREE_CAMERAS.scene,
   name: 'Three-camera tour',
@@ -187,7 +187,7 @@ export const threeCameraTour: SceneData = {
     {
       id: ASSET.armchair1,
       type: 'armchair',
-      asset: `catalogue:jeex:${ARCHETYPE.armchair}`,
+      asset: ARCHETYPE.armchair,
       position: {
         x: 2,
         y: 0,
@@ -200,7 +200,7 @@ export const threeCameraTour: SceneData = {
     {
       id: ASSET.bedDouble1,
       type: ARCHETYPE.bed_double,
-      asset: `catalogue:jeex:${ARCHETYPE.bed_double}`,
+      asset: ARCHETYPE.bed_double,
       position: {
         x: 6,
         y: 0,

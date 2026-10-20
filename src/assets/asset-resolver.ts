@@ -15,7 +15,8 @@
 import { effectiveAsset } from '../scene/types.js';
 import type { DemoAsset, MirrorFacts } from '../scene/types.js';
 import type { AssetDims, AssetOptions, AssetPricing, CatalogueObject, CatalogueVariant } from './asset-catalogue.js';
-import { DEFAULT_LIBRARY, findCatalogueEntry, formatAssetRef, parseAssetRef } from './asset-catalogue.js';
+import { DEFAULT_LIBRARY, findCatalogueEntry } from './asset-catalogue.js';
+import { assetRefOf } from '../scene/registries.js';
 import { resolveFinishId } from './asset-finishes.js';
 import { surfacesAt, type SlotFinishes, type SlotName, type SurfaceFacts, type VariantAccess } from './asset-types.js';
 
@@ -91,8 +92,7 @@ export type FinishIdResolver = (id: string | undefined) => string | undefined;
 export type ResolvedAsset = {
   /** Placement id from the scene. */
   placementId: string;
-  /** Full `library:asset_uuid` reference of the archetype. */
-  ref: string;
+  /** The library the archetype was resolved in: the built-in bank's id, or a library UUID. */
   library: string;
   archetypeId: string;
   variantId: string;
@@ -239,9 +239,16 @@ export type ResolveOptions = {
    * it the shipped library id: a reference naming any other library is
    * `unknown-library`, exactly as before. Present, the accepted library is
    * `defaultLibrary` — the document's own `assetLibrary`, which is what a
-   * baked project's placements name.
+   * baked project's placements belong to.
    */
   catalogue?: CatalogueLookup | undefined;
+  /**
+   * The library id the injected `catalogue` answers for — a baked project's
+   * `library.id`. A placement that names it in its own `library` is accepted
+   * next to `defaultLibrary`, as the validator's registries accept it
+   * (`registriesFromLibrary`), whether or not the document says `assetLibrary`.
+   */
+  catalogueLibrary?: string | undefined;
   /** Which finish UUIDs survive; the shipped bank's own resolver when absent. */
   resolveFinish?: FinishIdResolver | undefined;
 };
@@ -249,8 +256,8 @@ export type ResolveOptions = {
 /**
  * Resolves one scene placement against the object bank.
  *
- * A placement names either `asset` (`library:asset_uuid`, the bank form) or the
- * legacy `type`. Legacy placements pick up the alias' facing compensation and
+ * A placement names either `asset` (a bare UUID, with its `library` when it
+ * names one) or the legacy `type`. Legacy placements pick up the alias' facing compensation and
  * deliberately ignore `material`: the pre-bank loader never read it, so
  * honouring it now would repaint scenes that look correct today.
  */
@@ -258,12 +265,12 @@ export function resolveAsset(placement: DemoAsset, options: ResolveOptions = {})
   const defaultLibrary = options.defaultLibrary ?? DEFAULT_LIBRARY;
   const ceilingHeight = options.ceilingHeight ?? DEFAULT_CEILING_HEIGHT;
   const legacy = !placement.asset;
-  const ref = parseAssetRef(placement.asset ?? placement.type, defaultLibrary);
+  const ref = assetRefOf(placement, defaultLibrary);
   const lookup = options.catalogue ?? findCatalogueEntry;
   // With an injected bank the library a reference may name is the document's
-  // own; without one it is the shipped library, as it always was.
-  const accepted = options.catalogue ? defaultLibrary : DEFAULT_LIBRARY;
-  if (ref.library !== accepted) {
+  // own or the bank's; without one it is the shipped library, as it always was.
+  const accepted = options.catalogue ? [defaultLibrary, options.catalogueLibrary] : [DEFAULT_LIBRARY];
+  if (!accepted.includes(ref.library)) {
     return { failure: { placementId: placement.id, reason: 'unknown-library', detail: ref.library } };
   }
   const entry = lookup(ref.assetId);
@@ -280,7 +287,6 @@ export function resolveAsset(placement: DemoAsset, options: ResolveOptions = {})
   return {
     asset: {
       placementId: placement.id,
-      ref: formatAssetRef(ref.library, object.id),
       library: ref.library,
       archetypeId: object.id,
       variantId: variant.id,
