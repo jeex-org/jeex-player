@@ -1,5 +1,5 @@
 /**
- * Schema 2.0 test plans used by the solver, validator and navigation tests.
+ * Schema 2.2 test plans used by the solver, validator and navigation tests.
  *
  * `lShapePlan` is the reference L-shape plan of the wall system: two rooms sharing a
  * 0.10 partition whose centreline continues into a 0.30 outer wall, so room A

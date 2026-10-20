@@ -23,6 +23,7 @@
 import { ifcGuid } from '../shared/uuid.js';
 import { faceGuid } from './guid.js';
 import { FaceMap } from './types.js';
+import { documentLibraryOf } from './registries.js';
 import type { SceneData, WallSide } from './types.js';
 import type { SolvedPlan } from '../plan/plan-solver.js';
 
@@ -111,7 +112,7 @@ export function metadataTable(scene: SceneData, plan: SolvedPlan): ElementRow[] 
   }
 
   for (const asset of scene.assets) {
-    const libraryId = asset.asset === undefined ? undefined : (asset.library ?? scene.assetLibrary);
+    const libraryId = documentLibraryOf(asset, scene.assetLibrary);
     rows.push(
       row('furniture', asset.id, {
         ...(asset.room === undefined ? {} : { roomId: asset.room }),

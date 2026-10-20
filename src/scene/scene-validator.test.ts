@@ -627,6 +627,15 @@ describe('asset references are checked against the object bank', () => {
     expect(error.path).toBe('assets[0].library');
   });
 
+  test('refuses a library on a placement that names no asset', () => {
+    const scene = draftOf(lShapePlan);
+    delete scene.assets[0]!.asset;
+    scene.assets[0]!.library = EXTRA.ghostLibrary;
+    const error = errorOf(() => validateScene(scene, CATALOGUE_REGISTRIES));
+    expect(error.rule).toBe('asset-library-without-asset');
+    expect(error.path).toBe('assets[0].library');
+  });
+
   test('refuses a library UUID the registries do not declare', () => {
     const scene = draftOf(lShapePlan);
     scene.assets[0]!.asset = ARCHETYPE.sofa_3s;

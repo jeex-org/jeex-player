@@ -3,7 +3,7 @@ import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import * as THREE from 'three';
 import { AssetLoader, PENDING_MODEL } from './asset-loader.js';
-import { DEFAULT_LIBRARY, listCatalogueObjects } from '../assets/asset-catalogue.js';
+import { listCatalogueObjects } from '../assets/asset-catalogue.js';
 import { ARCHETYPE, VARIANT } from '../assets/catalogue-ids.js';
 import { projectBank } from '../assets/project-catalogue.js';
 import { parseProjectManifest } from '../assets/project-manifest.schema.js';
@@ -70,7 +70,8 @@ describe('object bank instantiation', () => {
     expect(group.userData['assetId']).toBe(PLACEMENT.sofaMain);
     expect(group.userData['archetypeId']).toBe(ARCHETYPE.sofa_3s);
     expect(group.userData['variantId']).toBe(VARIANT.sofa_3s_linen);
-    expect(group.userData['assetLibrary']).toBe(DEFAULT_LIBRARY);
+    // The built-in bank has no UUID, and its vocabulary id never leaves the player.
+    expect('assetLibrary' in group.userData).toBe(false);
     expect(group.userData['collision']).toEqual({ hx: 1.12, hz: 0.475 });
     loader.dispose();
   });
@@ -170,6 +171,12 @@ describe('a project object, which has no builder', () => {
     expect(asset?.library).toBe(PROJECT_FIXTURE.projectId);
     expect(asset?.builder).toBeUndefined();
     expect(asset?.dims).toEqual(manifest.library.objects[0]!.dims);
+    loader.dispose();
+  });
+
+  test('tags the placement with the library UUID the document names for it', () => {
+    const { loader } = projectLoader();
+    expect(loader.load(SOFA).group.userData['assetLibrary']).toBe(PROJECT_FIXTURE.projectId);
     loader.dispose();
   });
 

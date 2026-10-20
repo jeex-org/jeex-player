@@ -180,6 +180,20 @@ export function assetRefOf(fields: AssetRefFields, defaultLibrary: string): Asse
 }
 
 /**
+ * The library UUID a placement's `asset` belongs to AS THE DOCUMENT SAYS IT:
+ * its own `library`, else the document's `assetLibrary`; `undefined` for a
+ * placement of the built-in bank (which has no UUID) and for one that names no
+ * `asset`. What an export or a renderer tag may write — never the built-in
+ * bank's vocabulary id.
+ */
+export function documentLibraryOf(
+  placement: { readonly asset?: string | undefined; readonly library?: string | undefined },
+  sceneLibrary: string | undefined,
+): string | undefined {
+  return placement.asset === undefined ? undefined : (placement.library ?? sceneLibrary);
+}
+
+/**
  * The archetype a parsed reference names, or `undefined`.
  *
  * A named library answers first, from `libraries`, where an entry is exactly

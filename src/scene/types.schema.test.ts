@@ -688,9 +688,22 @@ const RULE_CASES: readonly RuleCase[] = [
   },
   { rule: 'asset-variant-invalid', kind: 'structural', document: () => brokenScene((scene) => put(scene.assets[0]!, 'variant', '')) },
   {
+    rule: 'asset-library-without-asset',
+    kind: 'semantic',
+    document: () =>
+      brokenScene((scene) => {
+        put(scene.assets[0]!, 'asset', undefined);
+        put(scene.assets[0]!, 'library', EXTRA.missingLibrary);
+      }),
+  },
+  {
     rule: 'asset-unknown-library',
     kind: 'semantic',
-    document: () => brokenScene((scene) => put(scene.assets[0]!, 'library', EXTRA.missingLibrary)),
+    document: () =>
+      brokenScene((scene) => {
+        put(scene.assets[0]!, 'asset', ARCHETYPE.sofa_3s);
+        put(scene.assets[0]!, 'library', EXTRA.missingLibrary);
+      }),
   },
   {
     rule: 'asset-unknown-catalogue-entry',

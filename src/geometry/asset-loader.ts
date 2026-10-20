@@ -17,6 +17,7 @@
 
 import * as THREE from 'three';
 import { effectiveAsset } from '../scene/types.js';
+import { documentLibraryOf } from '../scene/registries.js';
 import type { DemoAsset, MaterialDefinition } from '../scene/types.js';
 import { DEFAULT_LIBRARY, interiorLibrary } from '../assets/asset-catalogue.js';
 import {
@@ -138,6 +139,8 @@ export class AssetLoader {
   private readonly finishes: FinishRegistry;
   private readonly geometries = new GeometryCache();
   private readonly defaultLibrary: string;
+  /** The document's own `assetLibrary`, as given: what `userData.assetLibrary` may say. */
+  private readonly sceneLibrary: string | undefined;
   private readonly ceilingHeight: number;
   private readonly modelUrl: ModelUrlResolver;
   private readonly modelSource?: AsyncModelSource | undefined;
@@ -155,6 +158,7 @@ export class AssetLoader {
   constructor(sceneMaterials: readonly MaterialDefinition[] = [], options: AssetLoaderOptions = {}) {
     this.finishes = new FinishRegistry(sceneMaterials, options.projectMaterials ?? [], options.log ?? defaultLogger);
     this.defaultLibrary = options.defaultLibrary ?? DEFAULT_LIBRARY;
+    this.sceneLibrary = options.defaultLibrary;
     this.ceilingHeight = options.ceilingHeight ?? DEFAULT_CEILING_HEIGHT;
     this.modelUrl = options.modelUrl ?? libraryModelUrl;
     this.modelSource = options.modelSource;
@@ -313,11 +317,14 @@ export class AssetLoader {
   /**
    * Selection contract: `userData.assetId` stays the placement id. Catalogue
    * metadata rides alongside it so a picker can say what a variant is without
-   * another lookup.
+   * another lookup. `assetLibrary` is the library UUID the document names for
+   * the placement (`documentLibraryOf`, the export's `libraryId` rule) and is
+   * absent for the built-in bank, whose vocabulary id never leaves the player.
    */
   private tagUserData(group: THREE.Group, placement: DemoAsset, asset: ResolvedAsset): void {
     group.userData['assetId'] = placement.id;
-    group.userData['assetLibrary'] = asset.library;
+    const library = documentLibraryOf(placement, this.sceneLibrary);
+    if (library !== undefined) group.userData['assetLibrary'] = library;
     group.userData['archetypeId'] = asset.archetypeId;
     group.userData['variantId'] = asset.variantId;
     group.userData['variantName'] = asset.variantName;

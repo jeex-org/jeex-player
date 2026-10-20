@@ -1,5 +1,5 @@
 /**
- * Real two-bedroom apartment, schema 2.0.
+ * Real two-bedroom apartment, schema 2.2.
  *
  * Reproduced from a surveyed floor plan (≈46 px per metre) and 18 interior
  * photos of the apartment. Three offset blocks: the left column

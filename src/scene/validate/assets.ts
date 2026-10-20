@@ -177,6 +177,12 @@ export function checkAssets(ctx: ValidationContext): void {
         library: asset.library,
       });
     }
+    if (asset.library !== undefined && asset.asset === undefined) {
+      // A library qualifies an asset; a `type` word belongs to no library.
+      ctx.fail('asset-library-without-asset', `${path}.library`, `Asset ${assetId} names a library but no asset`, {
+        library: asset.library,
+      });
+    }
     if (asset.variant !== undefined && (typeof asset.variant !== 'string' || !asset.variant)) {
       ctx.fail('asset-variant-invalid', `${path}.variant`, `Asset ${assetId} has an invalid variant`);
     }
