@@ -70,7 +70,7 @@ describe('generateSchema', () => {
   test('a JSDoc block on a field becomes its `description`', () => {
     const schema = generateSchema(SCENE_TARGET, FIXED_VERSION);
     const definitions = schema['definitions'] as Record<string, { properties?: Record<string, { description?: string }> }>;
-    expect(definitions['SceneData']?.properties?.['assetLibrary']?.description).toContain('Default object-bank library');
+    expect(definitions['SceneData']?.properties?.['assetLibrary']?.description).toContain('UUID of the library of a placement');
   });
 });
 
@@ -123,8 +123,8 @@ describe('the UUID v7 grammar in the scene schema', () => {
     }
   });
 
-  test('a document may declare 2.0 or 2.1 and nothing else', () => {
-    expect(definitions()['SchemaVersion']?.enum).toEqual(['2.0', '2.1']);
+  test('a document may declare 2.2 and nothing else', () => {
+    expect(definitions()['SchemaVersion']?.const).toBe('2.2');
   });
 });
 

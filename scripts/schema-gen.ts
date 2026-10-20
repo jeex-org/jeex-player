@@ -170,20 +170,22 @@ function allowPublishedSchemaKey(schema: Record<string, unknown>, typeName: stri
  * Where a scene document carries a UUID v7, by definition: `value` lists the
  * properties whose value is one (a nullable or optional one included), `keys`
  * the records whose KEYS are room UUIDs, `items` the tuples of UUIDs. Every
- * entity id and every reference to an entity of the document is here;
- * catalogue references (finishes, variants, a placement's asset) are not —
- * the validator resolves those against its registries (`types.schema.ts`).
+ * entity id and every reference to an entity of the document is here, and so
+ * are a placement's `asset` and `library` and the document's `assetLibrary`
+ * (schema 2.2: bare UUIDs); other catalogue references (finishes, variants)
+ * are not — the validator resolves those against its registries
+ * (`types.schema.ts`).
  */
 export const UUID_FIELDS: Readonly<
   Record<string, { readonly value?: readonly string[]; readonly keys?: readonly string[]; readonly items?: readonly string[] }>
 > = {
-  SceneData: { value: ['id'], keys: ['roomCameras'] },
+  SceneData: { value: ['id', 'assetLibrary'], keys: ['roomCameras'] },
   PlanNode: { value: ['id'] },
   Wall: { value: ['id', 'a', 'b'] },
   Opening: { value: ['id'] },
   Room: { value: ['id'] },
   MaterialDefinition: { value: ['id'] },
-  DemoAsset: { value: ['id', 'room'] },
+  DemoAsset: { value: ['id', 'asset', 'library', 'room'] },
   TourCheckpoint: { value: ['id'] },
   InteriorPreset: { value: ['id'] },
   SceneFinishes: { keys: ['rooms'] },
@@ -199,7 +201,7 @@ export const UUID_FIELDS: Readonly<
   AddRoomOp: { value: ['id'] },
   SetRoomOp: { value: ['roomId'] },
   RemoveRoomOp: { value: ['roomId'] },
-  PlaceObjectOp: { value: ['id', 'room'] },
+  PlaceObjectOp: { value: ['id', 'asset', 'library', 'room'] },
   MoveObjectOp: { value: ['assetId', 'room'] },
   RotateObjectOp: { value: ['assetId'] },
   SetObjectOp: { value: ['assetId'] },

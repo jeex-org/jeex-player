@@ -1,5 +1,5 @@
 {
-  "schemaVersion": "2.1",
+  "schemaVersion": "2.2",
   "units": "m",
   "id": "01a12fec-9d2f-7954-b38b-84e17fceebc7",
   "name": "Fixture project",
@@ -83,7 +83,7 @@
     {
       "id": "01a12fec-9d40-78fa-a0bc-26c346f637ed",
       "type": "01a12fec-9d2b-7b29-a1f8-52f300eb0d8b",
-      "asset": "01a12fec-9d28-71d3-9f13-24f36f8cb88c:01a12fec-9d2b-7b29-a1f8-52f300eb0d8b",
+      "asset": "01a12fec-9d2b-7b29-a1f8-52f300eb0d8b",
       "variant": "01a12fec-9d2c-7a6d-8966-e2c9fce179df",
       "room": "01a12fec-9d3e-7347-8cc4-be2db319e364",
       "position": { "x": 2, "y": 0, "z": 4.2 },

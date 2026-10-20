@@ -7,6 +7,7 @@ import { ifcGuid } from '../shared/uuid.js';
 import { faceGuid } from './guid.js';
 import { metadataTable, structuralMetadataExtension, type ElementRow } from './metadata-table.js';
 import type { SceneData } from './types.js';
+import { ARCHETYPE } from '../assets/catalogue-ids.js';
 
 const plan = solvePlan(lShapePlan);
 
@@ -99,6 +100,28 @@ describe('metadataTable', () => {
 
     const furniture = rows.find((row) => row.class === 'furniture' && row.id === L_SHAPE.asset.table)!;
     expect(furniture.variantId).toBeUndefined();
+  });
+
+  test('a furniture row names its bare asset and the library it belongs to: its own, else the document one, never the built-in bank', () => {
+    const own = '01a12ff9-0b10-7c4e-8a2d-5e1f3b6c9d07';
+    const shared = '01a12ff9-0b11-7f58-9c3b-2d4e6a8f0b19';
+    const scene: SceneData = {
+      ...lShapePlan,
+      assets: [
+        { ...lShapePlan.assets[0]!, asset: ARCHETYPE.sofa_3s, library: own },
+        { ...lShapePlan.assets[1]!, asset: ARCHETYPE.table_dining },
+      ],
+    };
+    const furniture = (id: string): ElementRow | undefined =>
+      metadataTable(scene, plan).find((row) => row.class === 'furniture' && row.id === id);
+
+    expect(furniture(L_SHAPE.asset.sofa)).toMatchObject({ assetId: ARCHETYPE.sofa_3s, libraryId: own });
+    expect(furniture(L_SHAPE.asset.table)).toMatchObject({ assetId: ARCHETYPE.table_dining });
+    expect(furniture(L_SHAPE.asset.table)?.libraryId).toBeUndefined();
+
+    const inLibrary = metadataTable({ ...scene, assetLibrary: shared }, plan);
+    expect(inLibrary.find((row) => row.id === L_SHAPE.asset.table)?.libraryId).toBe(shared);
+    expect(inLibrary.find((row) => row.id === L_SHAPE.asset.sofa)?.libraryId).toBe(own);
   });
 });
 

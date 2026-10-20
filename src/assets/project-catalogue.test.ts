@@ -90,7 +90,7 @@ describe('a document mixing a project object and a legacy placement', () => {
     const sofa = resolve({
       id: SOFA,
       type: FIXTURE.asset.boxSofa,
-      asset: `${FIXTURE.projectId}:${FIXTURE.asset.boxSofa}`,
+      asset: FIXTURE.asset.boxSofa,
       variant: FIXTURE.variant.boxSofa,
       position: { x: 0, y: 0, z: 0 },
     });

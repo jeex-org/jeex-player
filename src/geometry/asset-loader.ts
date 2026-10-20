@@ -312,7 +312,7 @@ export class AssetLoader {
    */
   private tagUserData(group: THREE.Group, placement: DemoAsset, asset: ResolvedAsset): void {
     group.userData['assetId'] = placement.id;
-    group.userData['assetRef'] = asset.ref;
+    group.userData['assetLibrary'] = asset.library;
     group.userData['archetypeId'] = asset.archetypeId;
     group.userData['variantId'] = asset.variantId;
     group.userData['variantName'] = asset.variantName;

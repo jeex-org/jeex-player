@@ -297,8 +297,9 @@ const FORMAT_VERSION_MESSAGE = 'expected 2 (every id a UUID v7)';
  * version, older or from the future, is refused by the same literal with a
  * message that names the accepted one, rather than half-read.
  *
- * `library.id` must be `projectId`: the library IS the project's, and a
- * placement names it as `<projectId>:<assetId>`. A manifest whose two
+ * `library.id` must be `projectId`: the library IS the project's, and the scene
+ * names it as `assetLibrary` (a placement as `library`), next to the bare
+ * `asset` UUID. A manifest whose two
  * disagree would validate its scene against one id and file it under another.
  */
 export const projectManifestSchema = z

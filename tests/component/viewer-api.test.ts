@@ -361,7 +361,7 @@ describe('the handle’s commands', () => {
     expect(handle.getScene()).toBeNull();
     await handle.ready;
     const scene = handle.getScene();
-    expect(scene?.schemaVersion).toBe('2.1');
+    expect(scene?.schemaVersion).toBe('2.2');
     expect(scene?.id).toBe(handle.getState().sceneId);
   });
 

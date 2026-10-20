@@ -341,12 +341,10 @@ export type DemoAsset = {
    * by the catalogue) or an object-bank archetype / variant UUID.
    */
   readonly type: DemoAssetType;
-  /**
-   * Catalogue reference in `library:asset_uuid` form. A bare
-   * UUID resolves against the scene's `assetLibrary`. It may name an archetype
-   * or a concrete variant.
-   */
+  /** Catalogue reference: a bare archetype or variant UUID (schema 2.2), never `library:asset`. */
   readonly asset?: string | undefined;
+  /** UUID of the library `asset` belongs to; absent: the scene's `assetLibrary`, then the built-in bank. */
+  readonly library?: string | undefined;
   /** Catalogue variant UUID: the concrete variant of the archetype to place. */
   readonly variant?: string;
   /** Room the object belongs to, mirroring the `place_object` operation parameter. */
@@ -635,12 +633,10 @@ export type PlaceObjectOp = {
   readonly op: 'place_object';
   /** The new placement's UUID, minted by the caller. */
   readonly id: string;
-  /**
-   * Catalogue reference: `library:asset_uuid`, or a bare asset UUID read
-   * against the registries' default library — the same grammar
-   * `DemoAsset.asset` uses.
-   */
+  /** Catalogue reference: a bare archetype or variant UUID, as `DemoAsset.asset`. */
   readonly asset: string;
+  /** UUID of the library `asset` belongs to, written as given; absent as for `DemoAsset.library`. */
+  readonly library?: string;
   readonly variant?: string;
   readonly room?: string;
   readonly position: Vec3;
@@ -781,18 +777,17 @@ export type InteriorPreset = {
 
 /**
  * The document versions this build reads. 2.0 made every entity id a UUID v7;
- * a 1.x document is refused, never guessed at.
  * 2.1 added `DemoAsset.mirror` and made `scale` positive (a negative scale is
- * refused with «use mirror»); it is otherwise 2.0, so both are read and 2.1
- * is what this build writes (`SCHEMA_VERSION_CURRENT`).
+ * refused with «use mirror»). 2.2 split a placement's catalogue reference into
+ * fields — `asset` is a bare UUID and `library` names its library — so the
+ * composite `library:asset` string of 2.0 and 2.1 is gone. That changes what
+ * an existing field means, so 2.2 is the ONLY version read: an older document
+ * is refused, never reinterpreted, and its producer converts it.
  */
-export type SchemaVersion = '2.0' | '2.1';
+export type SchemaVersion = '2.2';
 
-/** The versions a reader accepts, oldest first; the last is what a writer writes. */
-export const SCHEMA_VERSIONS = ['2.0', '2.1'] as const satisfies readonly SchemaVersion[];
-
-/** The version this build writes. */
-export const SCHEMA_VERSION_CURRENT: SchemaVersion = '2.1';
+/** The versions a reader accepts, oldest first; the last is what a writer writes (a document is never re-versioned by an op). */
+export const SCHEMA_VERSIONS = ['2.2'] as const satisfies readonly SchemaVersion[];
 
 /**
  * The only length unit this schema speaks. Explicit on the document, so an
@@ -828,7 +823,7 @@ export type SceneData = {
    * only lists what neither of them already knows.
    */
   readonly materials?: readonly MaterialDefinition[];
-  /** Default object-bank library for bare asset ids; mirrors `materials.library`. */
+  /** UUID of the library of a placement that names no `library`; absent: the built-in bank. */
   readonly assetLibrary?: string;
   readonly assets: readonly DemoAsset[];
   readonly presentationCamera: CameraPose;

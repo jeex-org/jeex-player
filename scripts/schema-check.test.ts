@@ -137,7 +137,7 @@ describe('the Zod schema and the published JSON Schema accept the same documents
       },
     ],
     ['a 1.x document, whose ids are not UUIDs', () => ({ ...draftOf(lShapePlan), schemaVersion: '1.2' })],
-    ['a version this build does not read', () => ({ ...draftOf(lShapePlan), schemaVersion: '2.2' })],
+    ['a version this build does not read', () => ({ ...draftOf(lShapePlan), schemaVersion: '2.1' })],
     [
       'a wall id that is not a UUID v7',
       () => {

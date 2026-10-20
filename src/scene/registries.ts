@@ -69,7 +69,7 @@ export type CatalogueArchetype = {
   readonly mirror?: MirrorFacts | undefined;
 };
 
-/** One object bank, keyed the way a reference reaches it: `library:asset_uuid`. */
+/** One object bank, keyed the way a reference reaches it: by its library id, then by the bare asset UUID. */
 export type LibraryCatalogue = {
   readonly id: string;
   /** Archetypes by their own id. A variant id is resolved by the owning registries. */
@@ -79,8 +79,14 @@ export type LibraryCatalogue = {
 /** What a placement resolves to: the archetype it names and the variant it shows. */
 export type CataloguePlacement = { readonly object: CatalogueArchetype; readonly variant: CatalogueVariantRef };
 
-/** A catalogue reference split into the library that owns it and the bare id. */
+/** A catalogue reference: the library that owns it and the bare id inside that library. */
 export type AssetRef = { readonly library: string; readonly assetId: string };
+
+/**
+ * The fields of a placement a reference is built from. A `place_object`
+ * operation, which has no legacy `type`, passes its `asset` as the type.
+ */
+export type AssetRefFields = { readonly type: string; readonly asset?: string | undefined; readonly library?: string | undefined };
 
 export type SceneRegistries = {
   /** True when the id names a finish that can be painted on a room surface. */
@@ -103,25 +109,27 @@ export type SceneRegistries = {
   /**
    * Every object bank these registries can resolve a reference against, by id.
    *
-   * A document's `assetLibrary` has to be one of these: the validator
-   * checks a placement against the bank that owns it, so a library nobody
-   * declared is a reference nothing can prove. `CATALOGUE_REGISTRIES` carries
+   * A document's `assetLibrary`, and a placement's `library`, has to be one of
+   * these: the validator checks a placement against the bank that owns it, so
+   * a library nobody declared is a reference nothing can prove. `CATALOGUE_REGISTRIES` carries
    * the shipped library alone; `registriesFromLibrary` adds a project's own.
    */
   readonly libraries: ReadonlyMap<string, LibraryCatalogue>;
-  /** The library a bare asset reference belongs to when the document names none. */
+  /**
+   * The library a reference belongs to when neither the placement nor the
+   * document names one. For the shipped registries it is the built-in bank's
+   * own id, which is code vocabulary and never written into a document.
+   */
   readonly defaultLibrary: string;
   /**
    * The archetype and the concrete variant a placement shows, or `undefined`.
    *
-   * A bare `type` / `asset` is read against `defaultLibrary`, which is what the
-   * scene layer can know from a placement alone — the document's own
+   * A placement without `library` is read against `defaultLibrary`, which is
+   * what the scene layer can know from a placement alone — the document's own
    * `assetLibrary` is the validator's business, and the validator resolves
    * references itself.
    */
   readonly resolvePlacement: (asset: DemoAsset) => CataloguePlacement | undefined;
-  /** `library:asset_uuid` split at the LAST colon; a library id may contain one. */
-  readonly parseAssetRef: (ref: string, defaultLibrary: string) => AssetRef;
   /**
    * The catalogue entry for a bare asset UUID, or a furniture type word through
    * the alias table, or `null`. The two never collide: a UUID is not a word.
@@ -157,17 +165,18 @@ export type SceneRegistries = {
 /* ------------------------------------------------- reading a reference --- */
 
 /**
- * `library:asset_uuid` split at the LAST colon, so a library id may contain one
- * (`remote:interior-v1:<asset UUID>`). A bare UUID belongs to `defaultLibrary`.
+ * The reference a placement names, built from its FIELDS: `asset` (else the
+ * legacy `type` word) is the id, `library` the library, and a placement that
+ * names no library belongs to `defaultLibrary` — the document's
+ * `assetLibrary` when the caller knows the document, the registries' own
+ * default otherwise.
  *
- * The grammar is the SCENE document's, which is why it lives here
- * rather than in the object bank: `assets/asset-catalogue.parseAssetRef` is
- * this function under the shipped library's default.
+ * Nothing is parsed out of a string: since schema 2.2 a reference is two
+ * fields and an id is never composed from another id. The rule lives here
+ * rather than in the object bank because it is the SCENE document's.
  */
-export function splitAssetRef(ref: string, defaultLibrary: string): AssetRef {
-  const separator = ref.lastIndexOf(':');
-  if (separator < 0) return { library: defaultLibrary, assetId: ref };
-  return { library: ref.slice(0, separator), assetId: ref.slice(separator + 1) };
+export function assetRefOf(fields: AssetRefFields, defaultLibrary: string): AssetRef {
+  return { library: fields.library ?? defaultLibrary, assetId: fields.asset ?? fields.type };
 }
 
 /**
@@ -201,8 +210,7 @@ export function findArchetype(registries: SceneRegistries, ref: AssetRef): Catal
  * answered in a single place.
  */
 export function placementIn(registries: SceneRegistries, asset: DemoAsset): CataloguePlacement | undefined {
-  const ref = splitAssetRef(asset.asset ?? asset.type, registries.defaultLibrary);
-  const object = findArchetype(registries, ref);
+  const object = findArchetype(registries, assetRefOf(asset, registries.defaultLibrary));
   if (!object) return undefined;
   const wanted = asset.variant ?? object.defaultVariant;
   const named = wanted === undefined ? undefined : object.variants.find((candidate) => candidate.id === wanted);
@@ -308,7 +316,6 @@ export function registriesFromLibrary(library: ProjectLibrary, base?: SceneRegis
     libraries,
     defaultLibrary: base?.defaultLibrary ?? library.id,
     resolvePlacement: (asset) => placementIn(registries, asset),
-    parseAssetRef: splitAssetRef,
     // The manifest first, the base behind it: a project entry with the same id
     // as a bank entry wins, and an id the project never declared still reaches
     // the shipped bank and its alias table.

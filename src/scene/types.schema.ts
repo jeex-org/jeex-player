@@ -1,5 +1,5 @@
 /**
- * The scene document of schema 2.1 (2.0 is read too) as a `zod/mini` schema: the whole thing —
+ * The scene document of schema 2.2 as a `zod/mini` schema: the whole thing —
  * every entity `types.ts` declares, in the order it declares them — plus the
  * cheap SHAPE gate that only proves the containers.
  *
@@ -29,10 +29,12 @@
  * catalogue entry, a finish), uniqueness of ids, the solved plan. It does
  * decide that every entity id, and every reference to an entity of the
  * document, is a UUID v7 — the grammar is structural; WHICH entity a UUID
- * names is not. Catalogue references (finishes, variants, the asset of a
- * placement) stay plain strings here: the validator resolves them against the
- * registries it is handed, and a project library is judged there, not by a
- * grammar written into this file. The split is
+ * names is not. A placement's `asset` and `library` and the document's
+ * `assetLibrary` are UUIDs too (schema 2.2), which is grammar; whether the
+ * library is declared and holds that asset is not. Other catalogue references
+ * (finishes, variants) stay plain strings here: the validator resolves them
+ * against the registries it is handed, and a project library is judged there,
+ * not by a grammar written into this file. The split is
  * a table, `types.schema.test.ts`'s «rule → structural/semantic», derived from
  * the validator's own sources so a new rule cannot land unclassified.
  *
@@ -212,7 +214,8 @@ const mirrorSchema = z.strictObject({ x: z.optional(z.literal(true)), y: z.optio
 const demoAssetSchema = z.object({
   id: uuidSchema,
   type: nonEmptySchema,
-  asset: z.optional(nonEmptySchema),
+  asset: z.optional(uuidSchema),
+  library: z.optional(uuidSchema),
   variant: z.optional(nonEmptySchema),
   room: z.optional(uuidSchema),
   position: vec3Schema,
@@ -337,7 +340,8 @@ export const sceneOpSchema = z.discriminatedUnion('op', [
   z.object({
     op: z.literal('place_object'),
     id: uuidSchema,
-    asset: nonEmptySchema,
+    asset: uuidSchema,
+    library: z.optional(uuidSchema),
     variant: z.optional(nonEmptySchema),
     room: z.optional(uuidSchema),
     position: vec3Schema,
@@ -458,7 +462,7 @@ const sceneShapeSchema = z.object({
 });
 
 /**
- * The whole document of schema 2.0, key for key in `SceneData`'s own
+ * The whole document of schema 2.2, key for key in `SceneData`'s own
  * declaration order (`types.ts:477-522`) — which is also the order
  * `validate/shape.ts` walks, so the FIRST issue of a document broken in
  * several places is the one the hand-written gate would have reported.
@@ -478,7 +482,7 @@ export const sceneSchema = z.object({
   walls: z.array(wallSchema).check(z.minLength(4)),
   rooms: z.array(roomSchema).check(z.minLength(1)),
   materials: z.optional(z.array(materialDefinitionSchema)),
-  assetLibrary: z.optional(z.string()),
+  assetLibrary: z.optional(uuidSchema),
   assets: z.array(demoAssetSchema),
   presentationCamera: cameraPoseSchema,
   roomCameras: z.record(uuidSchema, cameraPoseSchema),

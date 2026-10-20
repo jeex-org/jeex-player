@@ -2,9 +2,9 @@
  * Painted overrides and asset placements — the two sections that can only run
  * once the plan is solved or the object bank consulted.
  *
- * Catalogue invariant: `DemoAsset.type`, `DemoAsset.asset` and
- * `DemoAsset.variant` are resolved against the object bank HERE, through the
- * same `parseAssetRef` / `findCatalogueEntry` the renderer uses. A reference the
+ * Catalogue invariant: `DemoAsset.type`, `DemoAsset.asset`, `DemoAsset.library`
+ * and `DemoAsset.variant` are resolved against the object bank HERE, through
+ * the same `assetRefOf` / `findCatalogueEntry` the renderer uses. A reference the
  * bank cannot resolve would render as a placeholder and collide with a footprint
  * belonging to something else, so it is a hard error, not a silent degradation.
  *
@@ -13,8 +13,8 @@
 
 import type { SolvedPlan } from '../../plan/plan-solver.js';
 import { isFiniteVec3, ownKeys, requireFinishFamily, type ValidationContext } from './context.js';
-import { findArchetype, type CatalogueArchetype } from '../registries.js';
-import { FaceMap, faceKey, isFaceKey, type FaceFinish, type FaceKey, type SceneFinishes } from '../types.js';
+import { assetRefOf, findArchetype, type CatalogueArchetype } from '../registries.js';
+import { isUuidV7, FaceMap, faceKey, isFaceKey, type FaceFinish, type FaceKey, type SceneFinishes } from '../types.js';
 import { isMirrorState } from '../mirror.js';
 
 /**
@@ -85,18 +85,19 @@ function faceOf(entry: unknown): FaceKey | null {
 /**
  * Resolves a placement against the object bank and fails when it cannot.
  *
- * A placement names EITHER `asset` (`library:asset_uuid`, the bank form) or a
- * furniture `type` word; `resolveAsset` reads them in that order, and so does
- * this. The returned archetype is what a `variant` has to belong to.
+ * A placement names EITHER `asset` (a bare UUID, in `library`, else in the
+ * document's `assetLibrary`) or a furniture `type` word; `resolveAsset` reads
+ * them in that order, and so does this. The returned archetype is what a
+ * `variant` has to belong to.
  */
 function resolveCatalogueObject(
   ctx: ValidationContext,
-  asset: { type: string; asset?: string | undefined },
+  asset: { type: string; asset?: string | undefined; library?: string | undefined },
   assetId: string,
   path: string,
 ): CatalogueArchetype {
-  const { defaultLibrary, parseAssetRef, libraries } = ctx.registries;
-  const ref = parseAssetRef(asset.asset ?? asset.type, ctx.scene.assetLibrary ?? defaultLibrary);
+  const { defaultLibrary, libraries } = ctx.registries;
+  const ref = assetRefOf(asset, ctx.scene.assetLibrary ?? defaultLibrary);
   if (!libraries.has(ref.library)) {
     ctx.fail('asset-unknown-library', path, `Asset ${assetId} references unknown asset library ${ref.library}`, { library: ref.library });
   }
@@ -110,18 +111,19 @@ function resolveCatalogueObject(
 }
 
 /**
- * The library a bare reference belongs to.
+ * The library a placement without its own `library` belongs to.
  *
  * A document may name any library the registries were built with; it may not
  * name one they were not, because then no placement in it could be checked
- * against anything. An absent field means `defaultLibrary`, which is how every
- * document authored before libraries existed keeps validating.
+ * against anything. The name is a UUID: the built-in bank is never named, an
+ * absent field means `defaultLibrary`, and that is how a document of the
+ * built-in bank alone validates.
  */
 function checkAssetLibrary(ctx: ValidationContext): void {
   const named = ctx.scene.assetLibrary;
   if (named === undefined) return;
-  if (typeof named !== 'string' || !named) {
-    ctx.fail('scene-asset-library-invalid', 'assetLibrary', 'Scene assetLibrary must be a non-empty string');
+  if (!isUuidV7(named)) {
+    ctx.fail('scene-asset-library-invalid', 'assetLibrary', 'Scene assetLibrary must be a library UUID v7', { library: named });
   }
   if (!ctx.registries.libraries.has(named)) {
     ctx.fail('scene-unknown-asset-library', 'assetLibrary', `Scene references unknown asset library ${named}`, { library: named });
@@ -159,8 +161,21 @@ export function checkAssets(ctx: ValidationContext): void {
     if (asset.room !== undefined && !ctx.roomIds.has(asset.room)) {
       ctx.fail('asset-unknown-room', `${path}.room`, `Asset ${assetId} references unknown room ${asset.room}`, { room: asset.room });
     }
-    if (asset.asset !== undefined && (typeof asset.asset !== 'string' || !asset.asset)) {
-      ctx.fail('asset-reference-invalid', `${path}.asset`, `Asset ${assetId} has an invalid catalogue reference`);
+    if (asset.asset !== undefined && !isUuidV7(asset.asset)) {
+      // Schema 2.2: a bare UUID; a `library:asset` string is no longer read.
+      ctx.fail(
+        'asset-reference-invalid',
+        `${path}.asset`,
+        `Asset ${assetId} has an invalid catalogue reference; expected a bare asset UUID v7`,
+        {
+          asset: asset.asset,
+        },
+      );
+    }
+    if (asset.library !== undefined && !isUuidV7(asset.library)) {
+      ctx.fail('asset-library-invalid', `${path}.library`, `Asset ${assetId} has an invalid library; expected a library UUID v7`, {
+        library: asset.library,
+      });
     }
     if (asset.variant !== undefined && (typeof asset.variant !== 'string' || !asset.variant)) {
       ctx.fail('asset-variant-invalid', `${path}.variant`, `Asset ${assetId} has an invalid variant`);

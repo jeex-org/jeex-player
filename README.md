@@ -448,7 +448,7 @@ type CaptureCommands = {
 };
 
 type Provenance = {
-  generator: 'jeex-viewer'; version: string; sceneId: string; rev: number; schemaVersion: '2.0' | '2.1';
+  generator: 'jeex-viewer'; version: string; sceneId: string; rev: number; schemaVersion: '2.2';
   state: 'current' | 'default'; kind: 'still' | 'panorama' | 'plan' | 'frame';
   createdAt: string;                  // ISO 8601
   disclosure: 'rendered-3d';          // a JEEX artefact is a rendering, never a photograph
@@ -714,11 +714,11 @@ The repository ships no server, so the header is a deployment fact, not a runtim
 
 ## Scene document
 
-Schema `2.1` (a `2.0` document is read too; 2.1 adds a placement's `mirror` and makes `scale` positive). The full shape is the published JSON Schema (`dist-lib/schema/scene.schema.json`, written by `bun run build:lib`, imported as `jeex-viewer/schema/scene.json`, see below); the rules it cannot express are listed under it. Minimal shape:
+Schema `2.2`, and only 2.2: a `2.0` or `2.1` document is refused, never converted (2.1 added a placement's `mirror` and made `scale` positive; 2.2 split a placement's catalogue reference into the fields `asset` and `library`, so the earlier `library:asset` string means nothing to this build and its producer rewrites it). The full shape is the published JSON Schema (`dist-lib/schema/scene.schema.json`, written by `bun run build:lib`, imported as `jeex-viewer/schema/scene.json`, see below); the rules it cannot express are listed under it. Minimal shape:
 
 ```ts
 type SceneData = {
-  schemaVersion: '2.0' | '2.1';
+  schemaVersion: '2.2';
   id: string;                          // every id in the document is a UUID v7
   name: string;                        // shown as the brand context line
   ceilingHeight: number;               // metres
@@ -728,7 +728,8 @@ type SceneData = {
            openings?: { id: string; type: 'door' | 'window' | 'passage'; center: number; width: number;
                         sill?: number; head?: number; entrance?: boolean; hinge?: 'a' | 'b'; swing?: 'in' | 'out' }[] }[];
   rooms: { id: string; name: string; anchor: { x: number; z: number }; floorMaterial: string; kind?: 'loggia' }[];
-  assets: DemoAsset[];                 // furniture placements: { id, type, asset?, variant?, room?, position, rotationY?, scale?, mirror? }
+  assetLibrary?: string;               // library UUID a placement without `library` belongs to; absent = the built-in bank
+  assets: DemoAsset[];                 // furniture placements: { id, type, asset?, library?, variant?, room?, position, rotationY?, scale?, mirror? }
   presentationCamera: { position: Vec3; target: Vec3 };
   roomCameras: Record<string, { position: Vec3; target: Vec3 }>;   // keyed by room UUID
   navigation: { points: Vec3[] };
@@ -751,9 +752,10 @@ Rules the validator enforces:
 - Room polygons are derived from the wall graph; a room is a name plus an `anchor` point strictly inside it.
 - Every entity id — the scene, nodes, walls, openings, rooms, placements, tour checkpoints, interior presets and scene-local materials — is a lowercase canonical UUID v7 (`UUID_V7_PATTERN`: version nibble `7`, variant `10xx`) and is unique across all kinds. Every reference carries the UUID: wall nodes, room keys, a placement's `room`, catalogue finishes and variants. Names are fields (`name`), never ids.
 - The viewer validates ids and never mints one: whoever creates an entity — the author, an editor host, a host command — brings its UUID.
+- A placement's catalogue reference is two fields, never one string: `asset` is the bare archetype or variant UUID, `library` the UUID of the library that holds it. A placement without `library` belongs to the document's `assetLibrary`, and when that is absent too, to the player's built-in bank, which a document never names (a placement from the built-in bank carries no `library`). `asset`, `library` and `assetLibrary` are UUID v7; a `library:asset` string is refused as `asset-reference-invalid`, a library the registries do not declare as `asset-unknown-library` (`scene-unknown-asset-library` for `assetLibrary`). `type` stays the furniture type word or archetype UUID it always was, and is what a placement without `asset` resolves.
 - A placement's `scale` is positive; a reflection is `mirror: { x?: true, y?: true, z?: true }` (schema 2.1), never a negative scale, which is refused with «use mirror». Which axes an asset may be mirrored on is a catalogue fact (`CatalogueObject.mirror`), judged by `mirror_object`, not by the document validator.
 - A wall face is not an entity: it is addressed by the structured key `{ room?, wallId, side }` everywhere (`finishes.faces`, a `set_material` target, the `select` event, exports).
-- Words stay words: `set_material` aliases (`floors`, `walls`, `facade`), furniture `type` words (`'sofa'`), slot names, kinds, library ids such as `starter:interior-v1`.
+- Words stay words: `set_material` aliases (`floors`, `walls`, `facade`), furniture `type` words (`'sofa'`), slot names, kinds. The built-in bank's own library id (`starter:interior-v1`) is code vocabulary and never appears in a document.
 - `Opening.center` is measured along the wall centreline from node `a`. Omitted `sill`/`head` mean the defaults for the kind (window 0.9 / 2.2, door 0 / 2.1); `head` must stay 0.05 m under the ceiling.
 - Finish UUIDs resolve through the built-in catalogue; `materials` only adds or overrides.
 - An interior preset dresses what exists: it may not carry an operation that creates an entity (`add_node`, `add_wall`, `split_wall`, `add_room`, `add_opening`, `place_object`).
@@ -775,7 +777,7 @@ A **baked project** is a folder whose root is a `project.json`. It carries the s
 
 ```
 project.json                       the manifest: scene, library, materials, rights
-scene.json                         the scene document (schema 2.0)
+scene.json                         the scene document (schema 2.2)
 obj/<variant>@<version>.glb        one file per placed variant
 tex/<material>_<map>.ktx2          pbr materials only
 prev/<id>.webp                     variant and finish previews
@@ -803,7 +805,7 @@ type BakedProjectManifest = {
 
 type ProjectLibraryManifest = {
   manifestVersion: '1.0';
-  id: string;                        // equals `projectId`; the scene's `assetLibrary`
+  id: string;                        // equals `projectId`; the scene's `assetLibrary` (or a placement's `library`)
   name?: string;
   publisher: string;                 // UUID v7 of the publishing workspace
   license: string;                   // SPDX id or a URL
@@ -960,7 +962,7 @@ The full export list:
 | `set_room` | Changes a room's `name`, `kind`, `anchor` or `accent`; a name is non-empty and at most `ROOM_NAME_MAX` characters. |
 | `remove_room` | Removes a room, unbinds its furniture, drops its camera and its finishes, all in `touched`. |
 | `set_material` | Paints a finish onto one room (its UUID), one face (`{ room?, wallId, side }`), every floor, every wall or the facade (the words `floors`, `walls`, `facade`). |
-| `place_object` | Puts catalogue object `id` down — `library:asset_uuid` or a bare asset UUID — with an optional variant, room, yaw and finishes; a floor-standing object's `y` is pinned to 0. |
+| `place_object` | Puts catalogue object `id` down — `asset` is a bare archetype or variant UUID, the optional `library` the UUID of its library (absent: the document's `assetLibrary`, then the built-in bank), written into the placement as given — with an optional variant, room, yaw and finishes; a floor-standing object's `y` is pinned to 0. |
 | `move_object` | Moves a placement (`position` or `dposition`) and binds or unbinds it from a room (`room: null`). |
 | `rotate_object` | Turns a placement (`rotationY` or `drotation`), normalised into (−π, π]. |
 | `set_object` | Sets a placement's `scale` (clamped into `OBJECT_SCALE`), its `material` and its slot `finishes`. |
@@ -978,7 +980,7 @@ Every operation is atomic inside its batch: `applyOp` mutates a draft and answer
 - **Typed parsing** — `parseSceneOps(input)` and `parseSceneDocument(input)` judge an unknown value against the `zod/mini` schemas and return **the value they were handed**, typed with the hand-written types. A consumer compiling with `exactOptionalPropertyTypes: true` gets `x?: T` optionals and needs no cast; a refusal is a `ViewerLibError('scene-invalid')` whose `path` names the first bad field and whose `detail.issues` carries the list.
 - **The revision model** — `SceneModel`, `isApplyOk` (types: `ApplyBatch`, `ApplyOk`, `ApplyFailure`, `ApplyResult`, `AppliedOp`, `LintMode`, `RevisionListener`, `SceneModelOptions`). A batch may ask for the furniture layout to be reviewed before it commits: `lint: 'report'` returns `issues` on the result, `lint: 'strict'` refuses a candidate carrying a hard issue with `error: 'layout_failed'` and leaves the revision alone. The linter is injected — `new SceneModel(document, registries, { lint: lintLayout })` — so a viewer that never lints does not carry it.
 - **Validation** — `validateScene`.
-- **The registries interface and the shipped catalogues** — types `SceneRegistries`, `CatalogueArchetype`, `CataloguePlacement`, `CatalogueVariantRef`, `LibraryCatalogue`, `LibraryFinish`, `ProjectLibrary`, `AssetRef`, `OpeningVariantFamily`, `OpeningVariantOption`; the value `CATALOGUE_REGISTRIES`, ready to hand a `SceneModel` without wiring the catalogues by hand, and `registriesFromLibrary(library, base?)`, which builds registries from an object-bank manifest (its objects, their variants, and its materials as finishes). Registries declare every library they can resolve, so a document whose `assetLibrary` names a project's own bank validates against it: `registriesFromLibrary(projectLibrary, CATALOGUE_REGISTRIES)` accepts both. They also answer the two questions an editor asks before it edits: `registries.openingVariantsOf(type, { entrance? })` lists what a variant `<select>` may offer (id and label, no canvas), and `registries.defaultFloorFinish` says what `add_room` writes when the user names no floor — the oak floor's UUID for the shipped bank, a project library's own first floor material otherwise.
+- **The registries interface and the shipped catalogues** — types `SceneRegistries`, `CatalogueArchetype`, `CataloguePlacement`, `CatalogueVariantRef`, `LibraryCatalogue`, `LibraryFinish`, `ProjectLibrary`, `AssetRef`, `AssetRefFields`, `OpeningVariantFamily`, `OpeningVariantOption`; the function `assetRefOf(fields, defaultLibrary)`, the one rule a reference is read by (`{ library: fields.library ?? defaultLibrary, assetId: fields.asset ?? fields.type }`, nothing parsed out of a string); the value `CATALOGUE_REGISTRIES`, ready to hand a `SceneModel` without wiring the catalogues by hand, and `registriesFromLibrary(library, base?)`, which builds registries from an object-bank manifest (its objects, their variants, and its materials as finishes). Registries declare every library they can resolve, so a document whose `assetLibrary` names a project's own bank validates against it: `registriesFromLibrary(projectLibrary, CATALOGUE_REGISTRIES)` accepts both. They also answer the two questions an editor asks before it edits: `registries.openingVariantsOf(type, { entrance? })` lists what a variant `<select>` may offer (id and label, no canvas), and `registries.defaultFloorFinish` says what `add_room` writes when the user names no floor — the oak floor's UUID for the shipped bank, a project library's own first floor material otherwise.
 - **Scene document types** — `SceneData`, `Vec2`, `Vec3`, `DemoAsset`, `Wall`, `Room`, `Opening`, `PlanNode`, `WallArc`, `WallRole`, `RoomKind`, `OpeningType`, `OpeningShape`, `OpeningHinge`, `OpeningSwing`, `MaterialDefinition`, `CameraPose`, `TourGazeKey`, `TourSpeedZone`, `SchemaVersion`, `LengthUnit`.
 - **The plan solver** — `solvePlan` (type `SolvedPlan`).
 - **Layout linting** — `lintLayout`, `countIssues`, `describeIssues` (types `LayoutIssue`, `LayoutRule`, `LayoutIssueCounts`, `LayoutLinter`).

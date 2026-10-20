@@ -20,6 +20,7 @@ import { L_SHAPE } from '../../fixtures/plan-l-shape-ids.js';
 import { ARCHETYPE, VARIANT } from '../../assets/catalogue-ids.js';
 import { FINISH } from '../../materials/finish-ids.js';
 import { OpError } from './context.js';
+import { registriesFromLibrary } from '../registries.js';
 
 const SOFA = L_SHAPE.asset.sofa;
 const TABLE = L_SHAPE.asset.table;
@@ -33,7 +34,16 @@ const NEW = {
   turned: '01a12ff3-0a4a-7fe7-b479-bdd74f577abd',
   preset: '01a12ff3-0a4b-72ab-8f71-b496274bdde0',
   ghost: '01a12ff3-0a4c-7cdc-b9b0-42fd93866f55',
+  library: '01a12ff3-0a4d-7b52-8d1e-6c39f0a4b2d8',
+  libraryObject: '01a12ff3-0a4e-7e86-9f03-1b7d5c2a9e64',
+  libraryVariant: '01a12ff3-0a4f-7a19-b2c7-48e60d3f1b95',
 } as const;
+
+/** The shipped registries with one project library layered on them. */
+const PROJECT_REGISTRIES = registriesFromLibrary(
+  { id: NEW.library, objects: [{ id: NEW.libraryObject, variants: [{ id: NEW.libraryVariant }] }] },
+  CATALOGUE_REGISTRIES,
+);
 
 /** A well-formed UUID of version 4: the right shape, the wrong version. */
 const UUID_V4 = '3b241101-e2bb-4255-8caf-4136c566a962';
@@ -86,17 +96,54 @@ describe('place_object', () => {
     expect(outcome.touched).toEqual([touchedAsset(NEW.sofa)]);
   });
 
-  test('accepts the qualified `library:asset_uuid` form and keeps it on the placement', () => {
+  test('refuses the composite `library:asset_uuid` form: since schema 2.2 the library is its own field', () => {
+    const scene = opDraft();
+    const asset = `starter:interior-v1:${ARCHETYPE.sofa_3s}`;
+    expect(rejectsOp(scene, { op: 'place_object', id: NEW.sofa, asset, position: { x: 1, y: 0, z: 2 } })).toContain(
+      `Unknown asset ${asset}`,
+    );
+  });
+
+  test('a placement from the built-in bank writes no library', () => {
     const scene = opDraft();
 
-    apply(scene, { op: 'place_object', id: NEW.sofa, asset: `starter:interior-v1:${ARCHETYPE.sofa_3s}`, position: { x: 1, y: 0, z: 2 } });
+    apply(scene, { op: 'place_object', id: NEW.sofa, asset: ARCHETYPE.sofa_3s, position: { x: 1, y: 0, z: 2 } });
 
     const placed = scene.assets.at(-1)!;
-    expect(placed.asset).toBe(`starter:interior-v1:${ARCHETYPE.sofa_3s}`);
+    expect(placed.asset).toBe(ARCHETYPE.sofa_3s);
     expect(placed.type).toBe(ARCHETYPE.sofa_3s);
-    // No variant was named, so the placement stays on the archetype's default
-    // and the summary says which one that is.
+    expect('library' in placed).toBe(false);
+    // No variant was named, so the placement stays on the archetype's default.
     expect(placed.variant).toBeUndefined();
+  });
+
+  test('writes the library the operation names, and resolves the asset in it', () => {
+    const scene = opDraft();
+
+    applyOp(
+      scene,
+      { op: 'place_object', id: NEW.sofa, asset: NEW.libraryObject, library: NEW.library, position: { x: 1, y: 0, z: 2 } },
+      PROJECT_REGISTRIES,
+    );
+
+    const placed = scene.assets.at(-1)!;
+    expect(placed.asset).toBe(NEW.libraryObject);
+    expect(placed.library).toBe(NEW.library);
+    expect(PROJECT_REGISTRIES.resolvePlacement(placed)?.variant.id).toBe(NEW.libraryVariant);
+  });
+
+  test('an operation without a library is read in the document assetLibrary', () => {
+    const scene = { ...opDraft(), assetLibrary: NEW.library };
+
+    applyOp(scene, { op: 'place_object', id: NEW.sofa, asset: NEW.libraryObject, position: { x: 1, y: 0, z: 2 } }, PROJECT_REGISTRIES);
+
+    expect('library' in scene.assets.at(-1)!).toBe(false);
+  });
+
+  test('refuses a library nobody declared', () => {
+    const scene = opDraft();
+    const op: SceneOp = { op: 'place_object', id: NEW.sofa, asset: ARCHETYPE.sofa_3s, library: NEW.ghost, position: { x: 1, y: 0, z: 2 } };
+    expect(rejectsOp(scene, op)).toContain(`Unknown asset ${ARCHETYPE.sofa_3s} in library ${NEW.ghost}`);
   });
 
   test('a floor-standing archetype is forced onto the floor; a wall-hung one keeps the height it was given', () => {

@@ -11,7 +11,7 @@ import {
   optionNumber,
   resolveAsset,
 } from './asset-resolver.js';
-import { findObject, listCatalogueObjects } from './asset-catalogue.js';
+import { DEFAULT_LIBRARY, findObject, listCatalogueObjects } from './asset-catalogue.js';
 import { apartmentScene } from '../demo/scene-data.js';
 import { DEMO } from '../demo/demo-ids.js';
 import { FINISH } from '../materials/finish-ids.js';
@@ -48,7 +48,7 @@ describe('placement resolution', () => {
     if (!isResolved(result)) return;
     expect(result.asset.archetypeId).toBe(ARCHETYPE.sofa_3s);
     expect(result.asset.variantId).toBe(VARIANT.sofa_3s_linen);
-    expect(result.asset.ref).toBe(`starter:interior-v1:${ARCHETYPE.sofa_3s}`);
+    expect(result.asset.library).toBe(DEFAULT_LIBRARY);
   });
 
   test('legacy placements ignore the material shortcut, catalogue placements honour it', () => {
@@ -84,7 +84,7 @@ describe('placement resolution', () => {
   });
 
   test('unknown libraries, assets and variants degrade to typed failures', () => {
-    const library = resolveAsset(placement({ type: 'sofa', asset: `remote:other:${ARCHETYPE.sofa_3s}` }));
+    const library = resolveAsset(placement({ type: 'sofa', asset: ARCHETYPE.sofa_3s, library: OTHER_LIBRARY }));
     const asset = resolveAsset(placement({ type: 'flying-carpet' }));
     const variant = resolveAsset(placement({ type: ARCHETYPE.sofa_3s, asset: ARCHETYPE.sofa_3s, variant: UNKNOWN_VARIANT }));
     expect(isResolved(library)).toBe(false);

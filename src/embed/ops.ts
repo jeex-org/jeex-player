@@ -20,7 +20,11 @@
  * `exactOptionalPropertyTypes` needs no cast and never touches Zod's own
  * inference; `registriesFromLibrary` builds `SceneRegistries` from a library
  * manifest, so a document may name a project's own `assetLibrary` instead of
- * the host substituting registries behind the validator's back.
+ * the host substituting registries behind the validator's back. `assetRefOf`
+ * is the one rule a reference is read by (schema 2.2): a placement's bare
+ * `asset` UUID in its `library`, else in the document's `assetLibrary`, else in
+ * the registries' default — a host asking which library a placement belongs to
+ * asks it rather than restating the fallback.
  *
  * Every member of the `SceneOp` union is exported by name, because an editor
  * types one panel to one operation. Two more names serve those panels, and
@@ -113,7 +117,7 @@ export { validateScene } from '../scene/scene-validator.js';
 
 export { parseSceneOps, parseSceneDocument } from '../scene/scene-parse.js';
 
-export { registriesFromLibrary } from '../scene/registries.js';
+export { assetRefOf, registriesFromLibrary } from '../scene/registries.js';
 export type {
   SceneRegistries,
   CatalogueArchetype,
@@ -123,6 +127,7 @@ export type {
   LibraryFinish,
   ProjectLibrary,
   AssetRef,
+  AssetRefFields,
   OpeningVariantFamily,
   OpeningVariantOption,
 } from '../scene/registries.js';

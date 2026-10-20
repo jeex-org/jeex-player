@@ -82,7 +82,7 @@ describe('progressive GLB upgrade', () => {
       // Everything the selection and layout contracts read is untouched.
       for (const key of [
         'assetId',
-        'assetRef',
+        'assetLibrary',
         'archetypeId',
         'variantId',
         'variantName',

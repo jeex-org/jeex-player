@@ -22,7 +22,6 @@ const HOOD_DIMS: [number, number, number] = [0.9, 0.8, 0.52];
 function hoodAsset(dims: [number, number, number]): ResolvedAsset {
   return {
     placementId: '01a12ff0-fece-749d-92d8-2bb96829f878',
-    ref: `starter:${ARCHETYPE.hood_extractor}`,
     library: 'starter',
     archetypeId: ARCHETYPE.hood_extractor,
     variantId: VARIANT.hood_extractor_steel,

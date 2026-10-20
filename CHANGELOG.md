@@ -5,6 +5,36 @@ format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 the project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html)
 as described under [Versioning](#versioning).
 
+## [Unreleased]
+
+### Changed (breaking)
+
+- **Scene schema `2.2`: a placement's catalogue reference is two fields.**
+  `DemoAsset.asset` and the `place_object` operation's `asset` are a bare
+  archetype or variant UUID; the new optional `library` is the UUID of the
+  library that holds it. A placement without `library` belongs to the
+  document's `assetLibrary`, and when that is absent too, to the built-in
+  bank. `asset`, `library` and `assetLibrary` must be UUID v7: the composite
+  `library:asset_uuid` string is refused (`asset-reference-invalid`), a
+  non-UUID library as `asset-library-invalid` or
+  `scene-asset-library-invalid`, and the built-in bank's own id
+  (`starter:interior-v1`) is never written into a document — a placement
+  from the built-in bank names no library. `place_object` writes `library`
+  into the placement exactly when the operation names one.
+- **Only `schemaVersion: '2.2'` is read.** A `2.0` or `2.1` document is
+  refused with `schema-version-unsupported`; the player converts nothing, so
+  a producer rewrites its documents (move the part before the last colon of
+  `asset` into `library` or `assetLibrary`, keep the UUID after it, set
+  `schemaVersion` to `2.2`). The published JSON Schema carries the UUID
+  pattern on `asset`, `library` and `assetLibrary`.
+- **`jeex-viewer/ops`:** `SceneRegistries` no longer has a `parseAssetRef`
+  member; the new export `assetRefOf(fields, defaultLibrary)` (type
+  `AssetRefFields`) is the one rule a reference is read by. `mirror_object`
+  no longer rewrites `schemaVersion`.
+- **Rendered and exported furniture:** `userData.assetRef` (the composite
+  string) is replaced by `userData.assetLibrary`, and the GLB element
+  metadata table gains a `libraryId` column next to `assetId`.
+
 ## [0.1.0] — 2026-10-19
 
 The first public release of JEEX Player (the package name is `jeex-viewer`;

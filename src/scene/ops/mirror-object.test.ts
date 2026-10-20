@@ -38,8 +38,7 @@ describe('mirror_object', () => {
     const outcome = apply(scene, { op: 'mirror_object', assetId: SOFA, mirror: { x: true } });
     expect(scene.assets.find((asset) => asset.id === SOFA)!.mirror).toEqual({ x: true });
     expect(outcome.summary).toContain('mirrored on x');
-    // A document that says `mirror` is written as 2.1, and validates.
-    expect(scene.schemaVersion).toBe('2.1');
+    // The mirrored document still validates.
     expect(() => validateScene(scene as SceneData, CATALOGUE_REGISTRIES)).not.toThrow();
     apply(scene, { op: 'mirror_object', assetId: SOFA, mirror: {} });
     expect('mirror' in scene.assets.find((asset) => asset.id === SOFA)!).toBe(false);

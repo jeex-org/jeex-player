@@ -15,7 +15,7 @@
  * Pure module: no `three`, no DOM.
  */
 
-import { footprintFor, parseAssetRef } from './asset-catalogue.js';
+import { footprintFor } from './asset-catalogue.js';
 import { effectiveAsset, footprintScaleOf } from '../scene/types.js';
 import type { Obstacle } from '../navigation/navigation.js';
 import type { DemoAsset, DemoAssetType, SceneData } from '../scene/types.js';
@@ -61,24 +61,11 @@ export function footprintOf(asset: DemoAsset): { hx: number; hz: number } | null
   const scale = footprintScaleOf(asset);
   const explicit = asset.collision;
   if (explicit) return { hx: explicit.hx * scale, hz: explicit.hz * scale };
-  const ref = asset.variant ?? bareAssetRef(asset.asset) ?? asset.type;
+  const ref = asset.variant ?? asset.asset ?? asset.type;
   const catalogue = footprintFor(ref) ?? (ref === asset.type ? null : footprintFor(asset.type));
   const footprint = catalogue ?? DEFAULT_FOOTPRINTS[asset.type];
   if (!footprint) return null;
   return { hx: footprint.hx * scale, hz: footprint.hz * scale };
-}
-
-/**
- * `library:asset_uuid` -> `asset_uuid`; the catalogue indexes bare ids.
- *
- * Delegated to `parseAssetRef`, which splits at the LAST colon: a library id
- * may contain one itself (`starter:interior-v1`), and splitting at the first
- * one turned `starter:interior-v1:<uuid>` into a lookup that never resolved,
- * so the placement silently fell back to its legacy type footprint.
- */
-function bareAssetRef(ref: string | undefined): string | undefined {
-  if (!ref) return undefined;
-  return parseAssetRef(ref).assetId;
 }
 
 /**

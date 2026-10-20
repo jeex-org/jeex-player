@@ -63,7 +63,7 @@ const PROBE_ID = '__free-space-probe';
 export type PlacementRequest = {
   scene: SceneData;
   plan: SolvedPlan;
-  /** Catalogue reference, `library:asset_uuid` or a bare archetype / variant UUID. */
+  /** Catalogue reference: a bare archetype or variant UUID (`DemoAsset.asset`). */
   asset: string;
   /** Room to place into; absent (or unknown to the plan) means the largest room. */
   roomId?: string | undefined;

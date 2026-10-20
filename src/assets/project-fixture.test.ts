@@ -78,7 +78,7 @@ describe('tests/fixtures/project', () => {
   test('the scene validates against registries built from the manifest library', () => {
     const registries = registriesFromLibrary(projectLibraryOf(manifest), CATALOGUE_REGISTRIES);
     const scene: SceneData = validateScene(read('scene.json'), registries);
-    expect(scene.schemaVersion).toBe('2.1');
+    expect(scene.schemaVersion).toBe('2.2');
     expect(scene.id).toBe(FIXTURE.scene);
     expect(scene.assetLibrary).toBe(FIXTURE.projectId);
     expect(scene.nodes.map((node) => node.id)).toEqual(Object.values(FIXTURE.node));
@@ -92,7 +92,7 @@ describe('tests/fixtures/project', () => {
       {
         id: FIXTURE.placement.sofa,
         type: FIXTURE.asset.boxSofa,
-        asset: `${FIXTURE.projectId}:${FIXTURE.asset.boxSofa}`,
+        asset: FIXTURE.asset.boxSofa,
         variant: FIXTURE.variant.boxSofa,
         room: FIXTURE.room.living,
         position: { x: 2, y: 0, z: 4.2 },

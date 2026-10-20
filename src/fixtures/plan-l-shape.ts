@@ -41,7 +41,7 @@ const MATERIALS: MaterialDefinition[] = [
 ];
 
 export const lShapePlan: SceneData = {
-  schemaVersion: '2.1',
+  schemaVersion: '2.2',
   units: 'm',
   id: L_SHAPE.scene,
   name: 'L-shape test plan',
@@ -149,7 +149,7 @@ export const spawnlessLShapePlan: SceneData = (() => {
  * bulging to -z. Room offset radius is 1.85, facade offset radius 2.15.
  */
 export const bayPlan: SceneData = {
-  schemaVersion: '2.1',
+  schemaVersion: '2.2',
   units: 'm',
   id: BAY.scene,
   name: 'Semicircular bay test plan',

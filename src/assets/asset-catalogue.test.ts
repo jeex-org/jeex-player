@@ -5,12 +5,11 @@ import {
   assetCard,
   findCatalogueEntry,
   footprintFor,
-  formatAssetRef,
   interiorLibrary,
   legacyAlias,
   listCatalogueObjects,
   listVariants,
-  parseAssetRef,
+  placementRef,
 } from './asset-catalogue.js';
 import { finishById } from './asset-finishes.js';
 import { BUILDERS } from './asset-builders.js';
@@ -142,12 +141,17 @@ describe('object bank manifest', () => {
 });
 
 describe('asset references', () => {
-  test('parses `library:asset_uuid` and falls back to the default library for bare ids', () => {
+  test('builds a reference from the fields: the placement library, then the scene one, then the built-in bank', () => {
     const sofa = ARCHETYPE.sofa_3s;
-    expect(parseAssetRef(`remote:interior-v1:${sofa}`)).toEqual({ library: 'remote:interior-v1', assetId: sofa });
-    expect(parseAssetRef(sofa)).toEqual({ library: 'starter:interior-v1', assetId: sofa });
-    expect(parseAssetRef(sofa, 'custom:lib')).toEqual({ library: 'custom:lib', assetId: sofa });
-    expect(formatAssetRef('starter:interior-v1', sofa)).toBe(`starter:interior-v1:${sofa}`);
+    const own = '01a12fed-dda0-7c3e-9b41-2f8e6d1a7c05';
+    const scene = '01a12fed-dda1-7a58-8e02-6b9c3f4d2e17';
+    expect(placementRef({ type: sofa, asset: sofa, library: own }, scene)).toEqual({ library: own, assetId: sofa });
+    expect(placementRef({ type: sofa, asset: sofa }, scene)).toEqual({ library: scene, assetId: sofa });
+    expect(placementRef({ type: sofa, asset: sofa })).toEqual({ library: 'starter:interior-v1', assetId: sofa });
+    // A legacy type word is the id when the placement names no asset.
+    expect(placementRef({ type: 'sofa' })).toEqual({ library: 'starter:interior-v1', assetId: 'sofa' });
+    // Nothing is parsed: a composite string stays one (unresolvable) id.
+    expect(placementRef({ type: sofa, asset: `x:${sofa}` }).assetId).toBe(`x:${sofa}`);
   });
 
   test('resolves an archetype id, a variant id and a legacy type', () => {

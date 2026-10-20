@@ -23,7 +23,7 @@ import { polylineSlabs } from './layout-geometry.js';
 import { obbQuad, polylineSlice, type Obb } from '../plan/plan-geometry.js';
 import { resolveDoorSwing } from '../plan/door-swing.js';
 import { openingFrameWidth } from '../assets/opening-frame.js';
-import { findCatalogueEntry, parseAssetRef } from '../assets/asset-catalogue.js';
+import { findCatalogueEntry } from '../assets/asset-catalogue.js';
 import {
   scaleSurfaces,
   surfacesAt,
@@ -121,8 +121,7 @@ export type LayoutCatalogue = (placement: DemoAsset) => LayoutFacts | null;
  * uses instead of reaching into `assets/` from the `layout` layer.
  */
 export function shippedFacts(placement: DemoAsset): LayoutFacts | null {
-  const ref = parseAssetRef(placement.asset ?? placement.type);
-  const entry = findCatalogueEntry(ref.assetId);
+  const entry = findCatalogueEntry(placement.asset ?? placement.type);
   if (!entry) return null;
   const wanted = placement.variant ?? entry.variantId;
   const variant = entry.object.variants.find((candidate) => candidate.id === wanted);
@@ -178,8 +177,7 @@ export function projectLayoutCatalogue(library: {
     for (const variant of object.variants) byId.set(variant.id, object);
   }
   return (placement) => {
-    const ref = parseAssetRef(placement.asset ?? placement.type);
-    const object = byId.get(ref.assetId);
+    const object = byId.get(placement.asset ?? placement.type);
     if (!object) return shippedFacts(placement);
     const wanted = placement.variant ?? object.defaultVariant;
     const variant = object.variants.find((candidate) => candidate.id === wanted);

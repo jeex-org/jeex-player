@@ -5,11 +5,12 @@
  *
  * What they all have in common is the REGISTRIES: whether an archetype, a
  * variant or a finish exists is a question for the bank the caller injected,
- * never for an import (`scene/registries.ts`). A reference is read in the
- * scene document's own grammar — `library:asset_uuid` or a bare UUID
- * (`splitAssetRef`) — and a catalogue's `publisher/asset@variant` form is
- * refused by simply not resolving: the catalogue service translates into the
- * document's form in one place, and that place is not here.
+ * never for an import (`scene/registries.ts`). A reference is read the way
+ * the scene document spells it — a bare `asset` UUID plus an optional
+ * `library` UUID (`assetRefOf`) — and any other form (a `library:asset`
+ * string, a catalogue's `publisher/asset@variant`) is refused by simply not
+ * resolving: the catalogue service translates into the document's form in one
+ * place, and that place is not here.
  *
  * What the appliers do NOT decide is whether the furniture FITS. Clearances,
  * door swings and circulation are the layout linter's answer, asked for per
@@ -20,8 +21,8 @@
  */
 
 import type { Draft } from '../../shared/committed.js';
-import { findArchetype, splitAssetRef, type CatalogueArchetype, type SceneRegistries } from '../registries.js';
-import { effectiveAsset, SCHEMA_VERSION_CURRENT } from '../types.js';
+import { assetRefOf, findArchetype, type CatalogueArchetype, type SceneRegistries } from '../registries.js';
+import { effectiveAsset } from '../types.js';
 import { disallowedMirrorAxes, isMirrorState, mirroredAxes, mirrorOf } from '../mirror.js';
 import type {
   DemoAsset,
@@ -64,10 +65,17 @@ function findAsset(scene: Draft<SceneData>, assetId: string): Draft<DemoAsset> {
   return asset;
 }
 
-/** The archetype a `place_object` reference names, or an `OpError` saying what did not resolve. */
-function requireArchetype(registries: SceneRegistries, reference: string): CatalogueArchetype {
-  const object = findArchetype(registries, splitAssetRef(reference, registries.defaultLibrary));
-  if (!object) throw new OpError(`Unknown asset ${reference}`);
+/**
+ * The archetype a `place_object` reference names, or an `OpError` saying what
+ * did not resolve. An operation without `library` is read in the document's
+ * `assetLibrary`, then in the registries' default — exactly as the validator
+ * will read the placement it writes.
+ */
+function requireArchetype(scene: Draft<SceneData>, registries: SceneRegistries, op: PlaceObjectOp): CatalogueArchetype {
+  const ref = assetRefOf({ type: op.asset, library: op.library }, scene.assetLibrary ?? registries.defaultLibrary);
+  const object = findArchetype(registries, ref);
+  if (!object)
+    throw new OpError(op.library === undefined ? `Unknown asset ${op.asset}` : `Unknown asset ${op.asset} in library ${op.library}`);
   return object;
 }
 
@@ -96,7 +104,7 @@ function seatedY(object: CatalogueArchetype, y: number): number {
 
 export function applyPlaceObject(scene: Draft<SceneData>, op: PlaceObjectOp, registries: SceneRegistries): OpOutcome {
   const id = requireNewId(scene, op.id, 'place_object');
-  const object = requireArchetype(registries, op.asset);
+  const object = requireArchetype(scene, registries, op);
   if (op.variant !== undefined && !object.variants.some((variant) => variant.id === op.variant)) {
     throw new OpError(`Variant ${op.variant} is not offered for asset ${op.asset}`);
   }
@@ -110,10 +118,11 @@ export function applyPlaceObject(scene: Draft<SceneData>, op: PlaceObjectOp, reg
   const asset: Draft<DemoAsset> = {
     id,
     // `type` is the archetype the reference resolved to, `asset` the reference
-    // itself: the document keeps the library the caller named, and every reader
-    // that only knows legacy types still sees one it can act on.
+    // itself: the document keeps the asset and the library the caller named,
+    // and every reader that only knows legacy types still sees one it can act on.
     type: object.id,
     asset: op.asset,
+    ...(op.library === undefined ? {} : { library: op.library }),
     position: { x: op.position.x, y: seatedY(object, op.position.y), z: op.position.z },
   };
   if (op.variant !== undefined) asset.variant = op.variant;
@@ -252,11 +261,7 @@ export function applyMirrorObject(scene: Draft<SceneData>, op: MirrorObjectOp, r
     }
   }
   if (wanted.length === 0) delete asset.mirror;
-  else {
-    asset.mirror = mirror;
-    // A document that says `mirror` is a 2.1 document (2.0 has no such field).
-    scene.schemaVersion = SCHEMA_VERSION_CURRENT;
-  }
+  else asset.mirror = mirror;
   const summary = wanted.length === 0 ? 'mirror cleared' : `mirrored on ${wanted.join(', ')}`;
   return { summary: `Object ${op.assetId}: ${summary}`, touched: [touchedAsset(op.assetId)] };
 }
