@@ -11,7 +11,7 @@
 #  2. The Chromium the two browser levels drive is already on a developer's
 #     machine (`bunx playwright install chromium`, once), so `check.sh` just
 #     runs the tests. Here it has to be fetched and cached first, which is the
-#     three `playwright` steps of `.github/actions/setup` (`browser: 'true'`)
+#     four `playwright` steps of `.github/actions/setup` (`browser: 'true'`)
 #     — they install nothing the gate itself checks.
 #
 # Every other step — both type checks, lint, format, the three test levels
