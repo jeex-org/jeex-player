@@ -83,6 +83,18 @@ describe('placement resolution', () => {
     expect(optionNumber(small.asset.options, 'seats', 3)).toBe(2);
   });
 
+  test('with an injected bank, a placement naming the bank library resolves whatever the document default is', () => {
+    const object = findObject(ARCHETYPE.sofa_3s)!;
+    const catalogue = (id: string) => (id === object.id ? { object } : null);
+    const own = placement({ type: ARCHETYPE.sofa_3s, asset: ARCHETYPE.sofa_3s, library: OTHER_LIBRARY });
+
+    const named = resolveAsset(own, { catalogue, catalogueLibrary: OTHER_LIBRARY });
+    expect(isResolved(named) && named.asset.library).toBe(OTHER_LIBRARY);
+    // Without saying which library the bank answers for, only the document default is accepted.
+    const unnamed = resolveAsset(own, { catalogue });
+    expect(!isResolved(unnamed) && unnamed.failure.reason).toBe('unknown-library');
+  });
+
   test('unknown libraries, assets and variants degrade to typed failures', () => {
     const library = resolveAsset(placement({ type: 'sofa', asset: ARCHETYPE.sofa_3s, library: OTHER_LIBRARY }));
     const asset = resolveAsset(placement({ type: 'flying-carpet' }));

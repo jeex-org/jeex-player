@@ -89,6 +89,8 @@ export type AssetLoaderOptions = {
   modelSource?: AsyncModelSource | undefined;
   /** The object bank placements resolve against; the shipped catalogue when absent. */
   catalogue?: CatalogueLookup | undefined;
+  /** The library id `catalogue` answers for (`ResolveOptions.catalogueLibrary`). */
+  catalogueLibrary?: string | undefined;
   /** How a finish id is canonicalised; wider than the bundled bank for a project. */
   resolveFinish?: FinishIdResolver | undefined;
   /** The loaded project's `library.materials`: the first source the finish registry asks. */
@@ -145,6 +147,7 @@ export class AssetLoader {
   private readonly disposables: Array<() => void> = [];
 
   private readonly catalogue?: CatalogueLookup | undefined;
+  private readonly catalogueLibrary?: string | undefined;
   private readonly resolveFinish?: FinishIdResolver | undefined;
   /** What the loader's OWN source is built with; an injected source is configured by its maker. */
   private readonly sourceOptions: ModelSourceOptions;
@@ -156,6 +159,7 @@ export class AssetLoader {
     this.modelUrl = options.modelUrl ?? libraryModelUrl;
     this.modelSource = options.modelSource;
     this.catalogue = options.catalogue;
+    this.catalogueLibrary = options.catalogueLibrary;
     this.resolveFinish = options.resolveFinish;
     this.sourceOptions = options.credentials === undefined ? {} : { credentials: options.credentials };
   }
@@ -167,6 +171,7 @@ export class AssetLoader {
       defaultLibrary: this.defaultLibrary,
       ceilingHeight: this.ceilingHeight,
       catalogue: this.catalogue,
+      catalogueLibrary: this.catalogueLibrary,
       resolveFinish: this.resolveFinish,
     });
   }

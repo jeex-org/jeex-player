@@ -15,7 +15,8 @@
 import { effectiveAsset } from '../scene/types.js';
 import type { DemoAsset, MirrorFacts } from '../scene/types.js';
 import type { AssetDims, AssetOptions, AssetPricing, CatalogueObject, CatalogueVariant } from './asset-catalogue.js';
-import { DEFAULT_LIBRARY, findCatalogueEntry, placementRef } from './asset-catalogue.js';
+import { DEFAULT_LIBRARY, findCatalogueEntry } from './asset-catalogue.js';
+import { assetRefOf } from '../scene/registries.js';
 import { resolveFinishId } from './asset-finishes.js';
 import { surfacesAt, type SlotFinishes, type SlotName, type SurfaceFacts, type VariantAccess } from './asset-types.js';
 
@@ -241,6 +242,13 @@ export type ResolveOptions = {
    * baked project's placements belong to.
    */
   catalogue?: CatalogueLookup | undefined;
+  /**
+   * The library id the injected `catalogue` answers for — a baked project's
+   * `library.id`. A placement that names it in its own `library` is accepted
+   * next to `defaultLibrary`, as the validator's registries accept it
+   * (`registriesFromLibrary`), whether or not the document says `assetLibrary`.
+   */
+  catalogueLibrary?: string | undefined;
   /** Which finish UUIDs survive; the shipped bank's own resolver when absent. */
   resolveFinish?: FinishIdResolver | undefined;
 };
@@ -257,12 +265,12 @@ export function resolveAsset(placement: DemoAsset, options: ResolveOptions = {})
   const defaultLibrary = options.defaultLibrary ?? DEFAULT_LIBRARY;
   const ceilingHeight = options.ceilingHeight ?? DEFAULT_CEILING_HEIGHT;
   const legacy = !placement.asset;
-  const ref = placementRef(placement, defaultLibrary);
+  const ref = assetRefOf(placement, defaultLibrary);
   const lookup = options.catalogue ?? findCatalogueEntry;
   // With an injected bank the library a reference may name is the document's
-  // own; without one it is the shipped library, as it always was.
-  const accepted = options.catalogue ? defaultLibrary : DEFAULT_LIBRARY;
-  if (ref.library !== accepted) {
+  // own or the bank's; without one it is the shipped library, as it always was.
+  const accepted = options.catalogue ? [defaultLibrary, options.catalogueLibrary] : [DEFAULT_LIBRARY];
+  if (!accepted.includes(ref.library)) {
     return { failure: { placementId: placement.id, reason: 'unknown-library', detail: ref.library } };
   }
   const entry = lookup(ref.assetId);

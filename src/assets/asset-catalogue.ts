@@ -5,8 +5,7 @@
  * Pure data - no `three`, no DOM. The manifest itself lives in
  * `asset-library.ts` and the shape both of them agree on lives in
  * `asset-types.ts`; this module owns everything the rest of the app asks of
- * the bank — the indexes, the legacy type bridge, placement refs and the walk
- * footprints.
+ * the bank — the indexes, the legacy type bridge and the walk footprints.
  *
  * The catalogue types are re-exported here because that is where every caller
  * already asks for them; the definitions themselves stay in `asset-types.ts`
@@ -20,7 +19,6 @@
 
 import { interiorLibrary } from './asset-library.js';
 import { ARCHETYPE } from './catalogue-ids.js';
-import { assetRefOf, type AssetRef, type AssetRefFields } from '../scene/registries.js';
 import type { AssetDims, CatalogueObject, CatalogueVariant } from './asset-types.js';
 
 export type { AssetDims, AssetOptions, AssetPricing, CatalogueObject, CatalogueVariant } from './asset-types.js';
@@ -106,19 +104,6 @@ export const LEGACY_TYPE_ALIASES: Readonly<Record<string, LegacyTypeAlias>> = {
 
 export function legacyAlias(type: string): LegacyTypeAlias | undefined {
   return LEGACY_TYPE_ALIASES[type];
-}
-
-/* ------------------------------------------------------------- asset refs */
-
-/**
- * The reference a placement names, with the SHIPPED library as the last
- * default: `library`, else `sceneLibrary` (the document's `assetLibrary`),
- * else `DEFAULT_LIBRARY`. The rule itself belongs to the scene document, so it
- * lives one layer down in `scene/registries.assetRefOf` and this is the bound
- * form every caller in the bank asks for.
- */
-export function placementRef(placement: AssetRefFields, sceneLibrary?: string): AssetRef {
-  return assetRefOf(placement, sceneLibrary ?? DEFAULT_LIBRARY);
 }
 
 function aliasEntry(assetId: string): { object: CatalogueObject; variantId?: string | undefined; yaw?: number | undefined } | undefined {

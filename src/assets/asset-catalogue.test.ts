@@ -9,7 +9,6 @@ import {
   legacyAlias,
   listCatalogueObjects,
   listVariants,
-  placementRef,
 } from './asset-catalogue.js';
 import { finishById } from './asset-finishes.js';
 import { BUILDERS } from './asset-builders.js';
@@ -141,19 +140,6 @@ describe('object bank manifest', () => {
 });
 
 describe('asset references', () => {
-  test('builds a reference from the fields: the placement library, then the scene one, then the built-in bank', () => {
-    const sofa = ARCHETYPE.sofa_3s;
-    const own = '01a12fed-dda0-7c3e-9b41-2f8e6d1a7c05';
-    const scene = '01a12fed-dda1-7a58-8e02-6b9c3f4d2e17';
-    expect(placementRef({ type: sofa, asset: sofa, library: own }, scene)).toEqual({ library: own, assetId: sofa });
-    expect(placementRef({ type: sofa, asset: sofa }, scene)).toEqual({ library: scene, assetId: sofa });
-    expect(placementRef({ type: sofa, asset: sofa })).toEqual({ library: 'starter:interior-v1', assetId: sofa });
-    // A legacy type word is the id when the placement names no asset.
-    expect(placementRef({ type: 'sofa' })).toEqual({ library: 'starter:interior-v1', assetId: 'sofa' });
-    // Nothing is parsed: a composite string stays one (unresolvable) id.
-    expect(placementRef({ type: sofa, asset: `x:${sofa}` }).assetId).toBe(`x:${sofa}`);
-  });
-
   test('resolves an archetype id, a variant id and a legacy type', () => {
     expect(findCatalogueEntry(ARCHETYPE.sofa_3s)?.object.id).toBe(ARCHETYPE.sofa_3s);
     expect(findCatalogueEntry(VARIANT.sofa_3s_boucle)?.variantId).toBe(VARIANT.sofa_3s_boucle);

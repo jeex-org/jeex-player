@@ -12,7 +12,7 @@ import { CATALOGUE_REGISTRIES } from '../assets/catalogue-registries.js';
 import { interiorLibrary } from '../assets/asset-catalogue.js';
 import { lShapePlan } from '../fixtures/plan-l-shape.js';
 import { draftOf, type Draft } from '../shared/committed.js';
-import { findArchetype, registriesFromLibrary, type ProjectLibrary } from './registries.js';
+import { assetRefOf, findArchetype, registriesFromLibrary, type ProjectLibrary } from './registries.js';
 import { validateScene } from './scene-validator.js';
 import type { SceneData } from './types.js';
 import { ARCHETYPE, OPENING_VARIANT } from '../assets/catalogue-ids.js';
@@ -215,6 +215,18 @@ describe('registriesFromLibrary', () => {
 
     expect(catalogue?.id).toBe(interiorLibrary.id);
     expect(catalogue?.objects.get(ARCHETYPE.sofa_3s)?.id).toBe(ARCHETYPE.sofa_3s);
+  });
+});
+
+describe('assetRefOf', () => {
+  test('builds a reference from the fields: the placement library, else the default it is handed', () => {
+    const sofa = ARCHETYPE.sofa_3s;
+    expect(assetRefOf({ type: sofa, asset: sofa, library: ID.showroom }, ID.nowhere)).toEqual({ library: ID.showroom, assetId: sofa });
+    expect(assetRefOf({ type: sofa, asset: sofa }, ID.nowhere)).toEqual({ library: ID.nowhere, assetId: sofa });
+    // A legacy type word is the id when the placement names no asset.
+    expect(assetRefOf({ type: 'sofa' }, interiorLibrary.id)).toEqual({ library: interiorLibrary.id, assetId: 'sofa' });
+    // Nothing is parsed: a composite string stays one (unresolvable) id.
+    expect(assetRefOf({ type: sofa, asset: `x:${sofa}` }, ID.nowhere)).toEqual({ library: ID.nowhere, assetId: `x:${sofa}` });
   });
 });
 
