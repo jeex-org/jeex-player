@@ -17,22 +17,42 @@ import { InlineSceneRepository, mountViewer, optionsFromQuery } from '../../src/
 import { TYPING_SELECTOR } from '../../src/camera/camera-input.js';
 import type { ViewerHandle } from '../../src/app/viewer-handle.js';
 import { userEvent } from 'vitest/browser';
-import { closeContainers, demoScene, nextFrame, openContainer, openShell, until, type Shell } from './support.js';
+import type { SceneData } from '../../src/scene/types.js';
+import { lShapePlan } from '../../src/fixtures/plan-l-shape.js';
+import {
+  SETTLE_FRAMES,
+  closeContainers,
+  demoScene,
+  nextFrame,
+  openContainer,
+  openShell,
+  until,
+  untilFrames,
+  type Shell,
+} from './support.js';
 
 let shell: Shell;
 const handles: ViewerHandle[] = [];
 
+/** What a case may shrink: the scene and the container it renders into. */
+type MountFixture = { readonly scene?: SceneData; readonly width?: number; readonly height?: number };
+
 /**
- * A mounted viewer over the demo apartment, with whatever slots the case wants.
+ * A mounted viewer over the demo apartment, with whatever slots the case
+ * wants; a case that only needs SOME room to render may name a smaller scene
+ * and container (see the typing case below for why that matters).
  *
  * `tour.mode: 'off'` and `debug: false` for the reasons `viewer-api.test.ts`
  * gives: an autoplaying clip moves the camera under every assertion, and the
  * debug globals are one per page.
  */
-function mount(slots: readonly SlotName[]): { container: HTMLElement; handle: ViewerHandle } {
-  const container = openContainer();
+function mount(
+  slots: readonly SlotName[],
+  { scene = demoScene(), width, height }: MountFixture = {},
+): { container: HTMLElement; handle: ViewerHandle } {
+  const container = openContainer(width, height);
   const handle = mountViewer(container, {
-    scene: { repository: new InlineSceneRepository(demoScene()) },
+    scene: { repository: new InlineSceneRepository(scene) },
     tour: { mode: 'off' },
     debug: false,
     slots,
@@ -44,6 +64,29 @@ function mount(slots: readonly SlotName[]): { container: HTMLElement; handle: Vi
 /** Every slot box inside a mounted container. */
 function boxesIn(container: HTMLElement): HTMLElement[] {
   return [...container.querySelectorAll<HTMLElement>(`[${SLOT_ATTRIBUTE}]`)];
+}
+
+/**
+ * Waits until the anchor's projection holds for five consecutive rendered
+ * frames, within `SETTLE_FRAMES`, and returns it: the anchor-side twin of
+ * `untilCameraStill`, for a file whose several viewers rule out the debug
+ * camera.
+ */
+async function untilAnchorStill(handle: ViewerHandle, what: string): Promise<{ x: number; y: number }> {
+  let last: { x: number; y: number } | null = null;
+  let held = 0;
+  await untilFrames(
+    () => {
+      const now = handle.slots.anchorPoint();
+      if (now === null) return false;
+      held = last !== null && Math.hypot(now.x - last.x, now.y - last.y) < 1e-3 ? held + 1 : 0;
+      last = { x: now.x, y: now.y };
+      return held >= 5;
+    },
+    what,
+    SETTLE_FRAMES,
+  );
+  return last!;
 }
 
 /**
@@ -645,19 +688,39 @@ describe('through the public surface', () => {
    * The camera is probed through the ANCHOR rather than the debug globals:
    * those are one per page (`viewer-globals.ts`) and this file mounts several
    * viewers. A still camera projects a fixed world point to the same pixel.
+   *
+   * What makes it cheap enough for a CPU-rendered runner: the viewer draws
+   * every frame in 3D, and Playwright's input (each key of `userEvent`, and
+   * the actionability checks of a click) waits on rendered frames, so the
+   * cost of the test is frames times the cost of one, and on a software
+   * rasteriser that cost is the scene and the pixel count. Hence
+   * `lShapePlan`, the smallest scene that has a room to walk in, instead of
+   * the demo apartment, in a 360 x 240 container (the default's aspect, so
+   * the same probe stays in view); and `focus()` instead of a click, because
+   * how the field got focus is not the subject. Measured on SwiftShader: 14 s
+   * before, under 3 s after, against the 60 s budget of a CI runner several
+   * times slower that shares the rasteriser with three other files.
+   *
+   * The walk entry eases on the frame clock, so the probe is read only once
+   * it holds still: a reading taken mid-glide would fail the test for a
+   * reason that has nothing to do with typing.
    */
   test('wwww typed in a field inside a slot: the camera is still and the field keeps it', async () => {
-    const { container, handle } = mount(['bottom-center', 'selection-anchor']);
+    const { container, handle } = mount(['bottom-center', 'selection-anchor'], { scene: lShapePlan, width: 360, height: 240 });
     await handle.ready;
     handle.setMode('walk');
-    handle.slots.anchorTo({ x: 0, y: 1.2, z: 0 });
-    await until(() => handle.slots.anchorPoint() !== null, 'the camera probe to be projected');
+    // A point in room A in front of the walk camera, off the centre line so
+    // a step forward moves it on both axes. It must be ON screen: a point
+    // behind the camera keeps its last numbers, and would hold still even
+    // while the camera walked.
+    handle.slots.anchorTo({ x: 4, y: 1.2, z: 1 });
+    const before = await untilAnchorStill(handle, 'the walk entry to settle');
+    expect(handle.slots.anchorPoint()!.visible).toBe(true);
     const field = document.createElement('input');
     field.type = 'text';
     handle.slots.get('bottom-center').append(field);
-    await userEvent.click(field);
+    field.focus();
     expect(container.ownerDocument.activeElement).toBe(field);
-    const before = { ...handle.slots.anchorPoint()! };
     await userEvent.keyboard('wwww');
     await nextFrame();
     await nextFrame();
