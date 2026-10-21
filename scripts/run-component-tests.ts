@@ -57,6 +57,7 @@ import { createHash } from 'node:crypto';
 import { existsSync, readFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { resolve } from 'node:path';
+import { z } from 'zod';
 
 /** Mirrors `ReportsDirectoryLock`'s own hashing exactly (16 hex chars of a sha256 of the resolved directory). */
 export function lockPathFor(reportsDirectoryAbs: string, tmpBase: string = tmpdir()): string {
@@ -66,24 +67,20 @@ export function lockPathFor(reportsDirectoryAbs: string, tmpBase: string = tmpdi
 
 export type LockOwner = { readonly pid: number; readonly reportsDirectory: string };
 
+/** The payload `ReportsDirectoryLock.tryWrite` writes; any other key is dropped. */
+const lockOwnerSchema = z.object({ pid: z.number().int().positive(), reportsDirectory: z.string() });
+
 /** Parses the JSON payload `ReportsDirectoryLock.tryWrite` writes; `undefined` for anything else (stale format, corrupt file). */
 export function parseLockOwner(raw: string): LockOwner | undefined {
+  let parsed: unknown;
   try {
-    const parsed: unknown = JSON.parse(raw);
-    if (
-      typeof parsed === 'object' &&
-      parsed !== null &&
-      'pid' in parsed &&
-      'reportsDirectory' in parsed &&
-      typeof (parsed as { pid: unknown }).pid === 'number' &&
-      typeof (parsed as { reportsDirectory: unknown }).reportsDirectory === 'string'
-    ) {
-      return { pid: (parsed as LockOwner).pid, reportsDirectory: (parsed as LockOwner).reportsDirectory };
-    }
+    parsed = JSON.parse(raw);
   } catch {
     // Not a lock file this script understands; treat as absent rather than fail the guard on it.
+    return undefined;
   }
-  return undefined;
+  const result = lockOwnerSchema.safeParse(parsed);
+  return result.success ? result.data : undefined;
 }
 
 /** The message printed (and the process exited on) when a live, foreign process already owns the coverage directory. */

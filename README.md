@@ -778,7 +778,7 @@ A **baked project** is a folder whose root is a `project.json`. It carries the s
 ```
 project.json                       the manifest: scene, library, materials, rights
 scene.json                         the scene document (schema 2.2)
-obj/<variant>@<version>.glb        one file per placed variant
+obj/<versionId>.glb                one file per placed variant version
 tex/<material>_<map>.ktx2          pbr materials only
 prev/<id>.webp                     variant and finish previews
 poster.webp                        a still for cards and OpenGraph
@@ -832,7 +832,7 @@ type ProjectVariant = {               // the unit of geometry and of the Replace
   id: string; name: string; version: string; tags?: string[];
   dims?: [number, number, number]; finishes?: Partial<Record<SlotName, string>>; options?: AssetOptions;
   pricing: AssetPricing;             // see below; validated and passed through, never acted on
-  model?: string;                    // relative; `obj/<variant>@<version>.glb`
+  model?: string;                    // relative; `obj/<versionId>.glb`
   preview?: string;                  // relative path OR an absolute http(s) URL — what the picker shows
   access?: 'free' | 'pro' | 'exclusive';   // carried to `SelectionOption.access`; the viewer judges nothing
   allowed?: boolean;                 // carried to `SelectionOption.allowed`; the host writes it, the host decides

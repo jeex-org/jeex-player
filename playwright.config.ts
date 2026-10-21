@@ -15,17 +15,17 @@
 import { defineConfig, devices } from '@playwright/test';
 import { headlessWebglLaunch } from './tests/headless-webgl.js';
 import { scaled } from './tests/e2e/time-scale.js';
+import { portEnv, positiveIntEnv } from './scripts/config-input.js';
 
 /**
- * The e2e server's port, from the viewer's own 3700–3709 port block
- * (3700 is the dev server's).
- * Overridable with `JEEX_E2E_PORT`: two gate runs on one machine at once
- * (for example in two worktrees) otherwise share one port, and `reuseExistingServer` lets each run
- * silently reuse — and then tear down — the other's `vite`, which reads as a
- * storm of `ERR_CONNECTION_REFUSED` failures that have nothing to do with
- * the code either run touched.
+ * The e2e server's port: default 3701 (the dev server is on 3700), override
+ * with `JEEX_E2E_PORT`. The override exists because two gate runs on one
+ * machine at once (for example in two worktrees) otherwise share one port, and
+ * `reuseExistingServer` lets each run silently reuse — and then tear down —
+ * the other's `vite`, which reads as a storm of `ERR_CONNECTION_REFUSED`
+ * failures that have nothing to do with the code either run touched.
  */
-export const E2E_PORT = Number(process.env['JEEX_E2E_PORT'] ?? 3701);
+export const E2E_PORT = portEnv('JEEX_E2E_PORT', 3701);
 export const E2E_BASE_URL = `http://127.0.0.1:${E2E_PORT}`;
 
 /**
@@ -52,7 +52,7 @@ export default defineConfig({
   // developer machine. `JEEX_E2E_WORKERS` overrides it per machine; a small
   // 2-core CI runner sets it to 1. The 20-cycle mount/dispose canary is marked
   // `test.slow()` so it fits under this default.
-  workers: Number(process.env['JEEX_E2E_WORKERS'] ?? 2),
+  workers: positiveIntEnv('JEEX_E2E_WORKERS', 2),
   reporter: process.env['CI'] ? [['github'], ['list']] : [['list']],
   /**
    * Baselines live under `__screenshots__/<platform>/`, because they are not

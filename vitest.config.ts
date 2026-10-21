@@ -21,6 +21,7 @@ import { defineConfig } from 'vitest/config';
 import { playwright } from '@vitest/browser-playwright';
 import { headlessWebglLaunch } from './tests/headless-webgl.js';
 import { CostShardSequencer } from './tests/component-shards.js';
+import { portEnv } from './scripts/config-input.js';
 
 export default defineConfig({
   // Pre-bundled up front, not on first import. Vite discovers `three` while
@@ -56,14 +57,13 @@ export default defineConfig({
     // `--shard=<i>/<n>` (CI splits the tier across runners) places files by
     // measured cost instead of by count; without `--shard` it changes nothing.
     sequence: { sequencer: CostShardSequencer },
-    // This tier's own server, on the viewer's block port for component tests
-    // (3700 dev, 3701 e2e, 3702 here, 3703 browser-check).
-    // Vitest's browser default (63315, incremented per instance) is outside
-    // the block, and a busy port must fail rather than quietly move: the
-    // browser would then be driven against whatever else answers there.
-    // `JEEX_COMPONENT_PORT` moves it inside the block (like `JEEX_E2E_PORT`),
-    // for a machine where 3702 is taken; 3708 is the spare.
-    api: { port: Number(process.env['JEEX_COMPONENT_PORT'] ?? 3702), strictPort: true },
+    // This tier's own server: default 3702, override with
+    // `JEEX_COMPONENT_PORT` (like `JEEX_E2E_PORT` for e2e) on a machine where
+    // 3702 is taken. A fixed port instead of Vitest's browser default (63315,
+    // incremented per instance), and a busy port must fail rather than quietly
+    // move: the browser would then be driven against whatever else answers
+    // there.
+    api: { port: portEnv('JEEX_COMPONENT_PORT', 3702), strictPort: true },
     browser: {
       enabled: true,
       // `timeout` is Playwright's own launch handshake ceiling (its default,

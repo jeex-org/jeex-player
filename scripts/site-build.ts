@@ -33,6 +33,7 @@
 import { spawnSync } from 'node:child_process';
 import { cpSync, existsSync, mkdirSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
 import { dirname, join, relative, sep } from 'node:path';
+import { z } from 'zod';
 import { apartmentScene } from '../src/demo/scene-data.js';
 
 /** Where the demo apartment's scene document lands, relative to the output root. */
@@ -128,6 +129,9 @@ export function schemaGenIn(root: string): SchemaWriter {
   };
 }
 
+/** A generated JSON Schema file, as far as publishing it reads it: its `$id`. */
+const schemaFileSchema = z.object({ $id: z.string().min(1) });
+
 /**
  * Writes the schemas into `out/schema/` with `write`, then copies each one to
  * the path its `$id` names. Returns those paths, relative to `out`.
@@ -141,9 +145,9 @@ export function publishSchemas(out: string, write: SchemaWriter): readonly strin
   if (files.length === 0) throw new Error(`site-build: schema-gen wrote no *.schema.json into ${dir}`);
   return files.map((name) => {
     const text = readFileSync(join(dir, name), 'utf8');
-    const id = (JSON.parse(text) as { $id?: unknown }).$id;
-    if (typeof id !== 'string') throw new Error(`site-build: ${name} has no $id`);
-    const path = schemaSitePath(id);
+    const schema = schemaFileSchema.safeParse(JSON.parse(text));
+    if (!schema.success) throw new Error(`site-build: ${name} has no $id`);
+    const path = schemaSitePath(schema.data.$id);
     mkdirSync(dirname(join(out, path)), { recursive: true });
     writeFileSync(join(out, path), text);
     return path;

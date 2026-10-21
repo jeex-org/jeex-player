@@ -18,13 +18,16 @@
  * header with the `glTF` magic and version 2, a total length equal to the bytes
  * that arrived, chunks that fit inside it, exactly one `JSON` chunk and it
  * first, a `BIN` chunk only in second place, and chunks of any other type
- * after those — ignored, as the specification requires of a client.
+ * after those — ignored, as the specification requires of a client. The JSON
+ * chunk must parse to an object whose `images`/`buffers` are what the
+ * resource scan reads (`glb-container.schema.ts`).
  *
  * The message names the model URL (host-supplied, like every fetch URL in the
  * library's errors) and never a value read out of the bytes.
  */
 
 import { ViewerLibError } from '../shared/errors.js';
+import { isGlbDocumentShape } from './glb-container.schema.js';
 
 /** Why a container was refused; `detail.reason` of the `scene-load` error. */
 export type GlbReason =
@@ -37,8 +40,18 @@ export type GlbReason =
   | 'glb-chunk-order'
   | 'glb-json';
 
-/** The two fields of the JSON document that name a network fetch (`model-source.ts`). */
-export type GlbDocument = { images?: unknown; buffers?: unknown };
+/** One `images[]` or `buffers[]` entry, as far as the resource scan reads it. */
+export type GlbResource = { readonly uri?: string | undefined };
+
+/**
+ * The two fields of the JSON document that name a network fetch
+ * (`model-source.ts`); `glb-container.schema.ts` proves the shape, and
+ * `glb-container.schema.test.ts` proves the two agree.
+ */
+export type GlbDocument = {
+  readonly images?: readonly GlbResource[] | undefined;
+  readonly buffers?: readonly GlbResource[] | undefined;
+};
 
 const HEADER_BYTES = 12;
 const CHUNK_HEADER_BYTES = 8;
@@ -99,7 +112,8 @@ export function readGlbContainer(bytes: ArrayBuffer, url: string): GlbDocument {
   } catch (cause) {
     refuse(url, 'glb-json', cause);
   }
-  if (typeof document !== 'object' || document === null || Array.isArray(document)) refuse(url, 'glb-json');
-  const shaped: GlbDocument = document;
-  return shaped;
+  // A judgement, never a transform: the document handed on is the one the
+  // bytes held (the loader parses the same bytes), not `result.data`.
+  if (!isGlbDocumentShape(document)) refuse(url, 'glb-json');
+  return document as GlbDocument;
 }

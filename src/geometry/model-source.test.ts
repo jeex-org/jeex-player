@@ -354,6 +354,18 @@ function brokenContainers(): Array<[string, Uint8Array, string]> {
     ['a first chunk that is not JSON', packGlb([binChunk(bin), jsonChunk(json)]), 'glb-json-first'],
     ['a JSON chunk that is not JSON', packGlb([{ type: CHUNK_JSON, bytes: new TextEncoder().encode('{not') }]), 'glb-json'],
     ['a JSON chunk that is an array', packGlb([jsonChunk([json])]), 'glb-json'],
+    // The resource scan reads `images[].uri` and `buffers[].uri`: a document
+    // whose shape there is not glTF's is refused before any URI is resolved.
+    [
+      'images that are not an array',
+      packGlb([jsonChunk({ ...json, images: { uri: 'https://evil.example/t.png' } }), binChunk(bin)]),
+      'glb-json',
+    ],
+    [
+      'a buffer uri that is not a string',
+      packGlb([jsonChunk({ ...json, buffers: [{ uri: 7, byteLength: 8 }] }), binChunk(bin)]),
+      'glb-json',
+    ],
     // The loader keeps the LAST JSON chunk and the scan reads the first: a
     // second one would smuggle a document past the scan.
     ['a second JSON chunk', packGlb([jsonChunk(json), binChunk(bin), jsonChunk(external)]), 'glb-chunk-order'],

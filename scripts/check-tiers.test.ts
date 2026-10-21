@@ -40,6 +40,7 @@ const FAST_LABELS = [
   'schema: generate-to-tmp + check',
   'console policy (src/)',
   'listener policy (signal)',
+  'no-docs-refs',
   'bun test ($DIR, tier=$TIER)',
 ];
 
@@ -167,6 +168,7 @@ describe('check.sh step order', () => {
     'schema: generate-to-tmp',
     'console policy',
     'listener policy',
+    'no-docs-refs',
   ];
   const EXPENSIVE_SUBSTRINGS = [
     'bun test',

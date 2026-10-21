@@ -25,7 +25,7 @@ import { surfacesAt, type SlotFinishes, type SlotName, type SurfaceFacts, type V
  * GLB of its own. The bank's display-only `slug` is not part of it: a baked
  * project's variants have none and the resolver reads no name.
  *
- * A baked project writes `obj/<variant>@<version>.glb` per variant, because
+ * A baked project writes `obj/<versionId>.glb` per variant version, because
  * the unit of geometry is the variant (`assets/project-manifest.ts`), and the
  * shipped bank writes none — so the field is optional here and the archetype's
  * own `model` is the fallback.

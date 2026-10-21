@@ -9,10 +9,11 @@
  * frames `embed.html` itself, controls it just as well.
  *
  * - `hostOriginFrom` decides whether the postMessage bridge is installed at
- *   all. It refuses `?host=*`, which would make the frame broadcast every
- *   event to whatever framed it — an origin check the party it constrains could
- *   switch off — and `?host=notanorigin`, which would make `postMessage` throw
- *   inside a tour listener on every frame.
+ *   all (`frame-page.schema.ts` judges the value). It refuses `?host=*`,
+ *   which would make the frame broadcast every event to whatever framed it —
+ *   an origin check the party it constrains could switch off — and
+ *   `?host=notanorigin`, which would make `postMessage` throw inside a tour
+ *   listener on every frame.
  * - `embedPageOptions` takes `debug` away. An embed page has no legitimate
  *   authoring capability, and with `allow-same-origin` the parent page reads
  *   `frame.contentWindow.__viewerDebug` straight out of the frame — past the
@@ -21,28 +22,10 @@
 
 import { optionsFromQuery, type DeepPartial, type ViewerOptions } from '../app/viewer-api.js';
 import { DEFAULT_RATIO, parseRatio, type Ratio } from './ratio.js';
+import { isHostOriginParam, isRatioParam } from './frame-page.schema.js';
 
 /** The frame page's own parameter for the aspect ratio of its content box. */
 export const RATIO_PARAM = 'ratio';
-
-/** The two schemes a browser can postMessage between; nothing else is an origin. */
-const ORIGIN_PROTOCOLS: ReadonlySet<string> = new Set(['http:', 'https:']);
-
-/**
- * True when `raw` is EXACTLY an origin: `new URL(raw).origin === raw` rejects a
- * trailing slash, a path, a query, credentials and the literal `null`, and the
- * scheme check rejects `file:`, `data:` and every opaque one — those serialise
- * their origin as `"null"`, which is not a target any two pages can agree on.
- * `*` is rejected by both.
- */
-export function isExactOrigin(raw: string): boolean {
-  try {
-    const url = new URL(raw);
-    return url.origin === raw && ORIGIN_PROTOCOLS.has(url.protocol);
-  } catch {
-    return false;
-  }
-}
 
 /**
  * The origin the frame will answer to, or `null` when it must answer nobody.
@@ -54,7 +37,7 @@ export function isExactOrigin(raw: string): boolean {
 export function hostOriginFrom(query: URLSearchParams, param: string, onInvalid?: (raw: string) => void): string | null {
   const raw = query.get(param);
   if (raw === null || raw === '') return null;
-  if (isExactOrigin(raw)) return raw;
+  if (isHostOriginParam(raw)) return raw;
   onInvalid?.(raw);
   return null;
 }
@@ -83,7 +66,7 @@ export function framePageRatio(query: URLSearchParams, onInvalid?: (raw: string)
   const raw = query.get(RATIO_PARAM);
   if (raw === null || raw === '') return DEFAULT_RATIO;
   const ratio = parseRatio(raw);
-  if (ratio !== null) return ratio;
+  if (ratio !== null && isRatioParam(ratio)) return ratio;
   onInvalid?.(raw);
   return DEFAULT_RATIO;
 }

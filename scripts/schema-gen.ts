@@ -72,9 +72,10 @@
  */
 
 import { createGenerator } from 'ts-json-schema-generator';
-import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { mkdirSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { UUID_V7_PATTERN } from '../src/scene/types.js';
+import { readPackageVersion } from './config-input.js';
 
 /** JSON Schema draft this repository publishes. */
 const SCHEMA_DRAFT = 'https://json-schema.org/draft/2020-12/schema';
@@ -107,8 +108,7 @@ export const VIEWER_OPTIONS_SCHEMA_TARGET: SchemaTarget = {
 export const SCHEMA_TARGETS: readonly SchemaTarget[] = [SCENE_SCHEMA_TARGET, VIEWER_OPTIONS_SCHEMA_TARGET];
 
 function packageVersion(): string {
-  const pkg = JSON.parse(readFileSync(new URL('../package.json', import.meta.url), 'utf8')) as { version: string };
-  return pkg.version;
+  return readPackageVersion(new URL('../package.json', import.meta.url));
 }
 
 /**
