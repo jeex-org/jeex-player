@@ -106,10 +106,14 @@ test('the host page and the framed chrome look as they did', async ({ page }) =>
   // parked on the stage only woke it, and the baseline then depended on the
   // frame rate: a fast machine captured two identical frames inside the 4.2 s
   // idle and got the open bar, a software-rendering one at ~3 fps could not and got
-  // the collapsed pill. `hover` itself wakes the bar first — the move reaches
-  // the viewer root — and retries until the lockup is the hit target.
+  // the collapsed pill. The move itself wakes the bar — it reaches the viewer
+  // root — so the pointer is put on the lockup with `force`, without
+  // Playwright's hit-target check: at under one frame per second (SwiftShader
+  // on a hosted runner) each retry of that check outlasted the idle timer, the
+  // bar collapsed under it again, the canvas took the hit, and the hover
+  // retried until the test timed out.
   const frame = page.frameLocator('#stage iframe');
-  await frame.locator('[data-jeex="brand-lockup"]').hover();
+  await frame.locator('[data-jeex="brand-lockup"]').hover({ force: true });
   await expect(frame.locator('[data-jeex="control-bar"]')).toHaveAttribute('data-collapsed', 'false');
   await expectChromeScreenshot(page, 'embed-iframe-chrome.png');
 });

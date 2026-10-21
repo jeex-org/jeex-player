@@ -34,12 +34,28 @@ export const E2E_BASE_URL = `http://127.0.0.1:${E2E_PORT}`;
  */
 const HEADLESS_WEBGL_LAUNCH = headlessWebglLaunch();
 
+/**
+ * How many times longer than on a developer machine a test and an `expect`
+ * may take here. Unset means 1; a hosted CI runner sets it in `ci.yml`.
+ *
+ * On SwiftShader one frame of the demo apartment costs about 1.2 s on four
+ * hardware threads (0.82 fps, one page, 1280 x 720), and every Playwright
+ * round trip (`evaluate`, `hover`, `click`) waits behind the frame in flight:
+ * in a 10 s CPU profile of the page the main thread spends 99% in native GL
+ * calls and under 1% in script. A spec that switches modes five times, or
+ * scrolls, clicks and waits for the camera, needs minutes there, where a GPU
+ * draws the same frame in milliseconds. The explicit budgets inside the specs
+ * are not scaled: they bound one wait, not the whole test.
+ */
+const TIME_SCALE = Number(process.env['JEEX_E2E_TIME_SCALE'] ?? 1);
+if (!Number.isFinite(TIME_SCALE) || TIME_SCALE < 1) throw new Error(`JEEX_E2E_TIME_SCALE must be a number >= 1, got ${String(TIME_SCALE)}`);
+
 export default defineConfig({
   testDir: 'tests/e2e',
   // A scene builds on a software rasteriser; 30 s is the boot budget, not the
   // target (`READY_BUDGET_MS` in the browser check is 5 s on a real GPU).
-  timeout: 60_000,
-  expect: { timeout: 15_000 },
+  timeout: 60_000 * TIME_SCALE,
+  expect: { timeout: 15_000 * TIME_SCALE },
   fullyParallel: true,
   // A `.only` left in a spec is a suite that silently stopped testing things.
   forbidOnly: !!process.env['CI'],

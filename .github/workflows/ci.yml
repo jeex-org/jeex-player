@@ -27,21 +27,23 @@
 # step list still matches):
 #
 #  - `check` runs every step that needs no browser, in one job.
-#  - `component` runs the Vitest browser level split across four runners
-#    (`--shard=<i>/4`). On a hosted runner (4 vCPUs, no GPU, SwiftShader) the
+#  - `component` runs the Vitest browser level split across eight runners
+#    (`--shard=<i>/8`). On a hosted runner (4 vCPUs, no GPU, SwiftShader) the
 #    whole tier costs about 20 minutes in one job, against about 6 minutes on
 #    a 16-thread developer machine, and the software rasteriser is the
 #    bottleneck: more Vitest workers on the same 4 vCPUs do not shorten the
-#    run, they only slow every test against its own timeout. Four runners
-#    with two workers each bring the slowest shard to about 9 minutes.
+#    run, they only slow every test against its own timeout. Eight runners
+#    with one worker each keep every test near its developer-machine pace.
 #    `tests/component-shards.ts` balances the shards by measured cost.
-#  - `component-coverage` merges the four shards' blob reports, coverage
+#  - `component-coverage` merges the eight shards' blob reports, coverage
 #    included, into the `coverage-component/lcov.info` one local run writes,
 #    and runs the DOM-layer floors on it: a floor checked per shard would
-#    measure a quarter of the tests.
-#  - `e2e` runs Playwright split the same way (`--shard=<i>/4`): on
-#    SwiftShader the suite costs about 20 minutes even on the developer
-#    machine, which a single hosted job cannot hold.
+#    measure an eighth of the tests.
+#  - `e2e` runs Playwright split the same way (`--shard=<i>/8`), one worker
+#    per runner and three times the developer machine's budgets
+#    (`JEEX_E2E_TIME_SCALE`, `playwright.config.ts`): a frame of the demo
+#    apartment costs about a second on SwiftShader, and every Playwright
+#    round trip waits for it.
 #
 # Screenshot comparisons in the e2e level run only locally; with `CI` set they
 # are skipped, because the baselines are rendered on the maintainers' machines.
@@ -138,7 +140,7 @@ jobs:
       # Every shard reports, so one red file does not hide a second one.
       fail-fast: false
       matrix:
-        shard: [1, 2, 3, 4]
+        shard: [1, 2, 3, 4, 5, 6, 7, 8]
     steps:
       - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.1.0
 
@@ -146,26 +148,27 @@ jobs:
         with:
           browser: 'true'
 
-      # Two workers, not the four `vitest.config.ts` pins for a developer
-      # machine: on 4 vCPUs the shared software rasteriser is saturated by
-      # two pages, and a third and fourth only stretch each test (measured on
-      # four hardware threads: 759 s with four workers, 817 s with two, but
-      # the slowest test of a file halves).
+      # One worker, not the four `vitest.config.ts` pins for a developer
+      # machine: on 4 vCPUs the shared software rasteriser is the bottleneck,
+      # and every further page only stretches each test (measured on four
+      # hardware threads: 759 s with four workers, 817 s with two, but the
+      # slowest test of a file halves). With two workers on four shards, two
+      # tests that sit near their budgets (a click in 360 that opens no panel,
+      # the glide to the first tour camera) ran 5 s past them on the runner;
+      # one worker gives each test the whole runner.
       #
       # The ceiling replaces the watchdog's 10-minute default
       # (`scripts/run-component-tests.ts`), which is sized for the whole tier
-      # on a developer machine. Measured on four hardware threads with two
-      # workers, the four shards cost 256, 219, 185 and 265-359 s (the last
-      # with other work on the same cores); the hosted runner ran the same
-      # files about 1.5 times slower than those threads, so the slowest shard
-      # should land near 9 minutes, and 15 leaves room for a slow runner.
-      - name: component tests (Vitest browser mode) shard ${{ matrix.shard }}/4
+      # on a developer machine. With two workers the four shards took 6 to 10
+      # minutes on the runner; eight shards with one worker each should take
+      # about as long, and 15 leaves room for a slow runner.
+      - name: component tests (Vitest browser mode) shard ${{ matrix.shard }}/8
         env:
           JEEX_COMPONENT_TIMEOUT_MS: '900000'
         run: >-
           bun run test:component
-          --shard=${{ matrix.shard }}/4
-          --maxWorkers=2
+          --shard=${{ matrix.shard }}/8
+          --maxWorkers=1
           --reporter=default
           --reporter=blob
           --outputFile.blob=component-blobs/blob-${{ matrix.shard }}.json
@@ -191,7 +194,7 @@ jobs:
           path: component-blobs
           merge-multiple: true
 
-      # Runs no test and launches no browser: it replays the four blobs and
+      # Runs no test and launches no browser: it replays the eight blobs and
       # writes the merged `coverage-component/lcov.info` the floors read.
       - name: merge the component shards (coverage included)
         run: bunx vitest run --config vitest.config.ts --merge-reports=component-blobs
@@ -205,7 +208,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        shard: [1, 2, 3, 4]
+        shard: [1, 2, 3, 4, 5, 6, 7, 8]
     steps:
       - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.1.0
 
@@ -216,8 +219,18 @@ jobs:
       # `--reporter=github` is not passed here: `playwright.config.ts` picks
       # the GitHub reporter itself when `CI` is set, so a local run and this
       # one differ in exactly one place rather than two.
-      - name: e2e tests (Playwright) shard ${{ matrix.shard }}/4
-        run: bun run test:e2e --shard=${{ matrix.shard }}/4
+      # One worker and three times the budgets (`playwright.config.ts`,
+      # `JEEX_E2E_TIME_SCALE`). Measured on three hardware threads (about a
+      # hosted runner's pace) over one quarter of the suite: two workers and
+      # the plain budgets failed 15 of 21 specs on the runner; one worker and
+      # three times the budgets passed 20 of 21 in 23 minutes, and the 21st
+      # (a hover that raced the control bar's idle timer) is fixed in its
+      # spec. Eight shards keep each job near 12 minutes.
+      - name: e2e tests (Playwright) shard ${{ matrix.shard }}/8
+        env:
+          JEEX_E2E_WORKERS: '1'
+          JEEX_E2E_TIME_SCALE: '3'
+        run: bun run test:e2e --shard=${{ matrix.shard }}/8
 
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         # The traces, the failure screenshots and the axe reports; only when
