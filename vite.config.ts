@@ -44,8 +44,14 @@ export default defineConfig({
       // it a chunk (this function replaces the WHOLE default, not just the
       // dynamic-import case) would land at the root of `dist/`, outside the
       // directory `scripts/budget-check.ts` measures.
+      // Every file is named `jeex-viewer-…` (`lazy-jeex-viewer-…`), the shape of
+      // a published player file: the hosted frame page and the demo are the
+      // player's own, and its telemetry reports exceptions only from files of
+      // that shape (`src/telemetry/own-files.ts`).
       output: {
-        chunkFileNames: (chunk) => (chunk.isDynamicEntry ? 'assets/lazy-[name]-[hash].js' : 'assets/[name]-[hash].js'),
+        entryFileNames: 'assets/jeex-viewer-[name]-[hash].js',
+        chunkFileNames: (chunk) =>
+          chunk.isDynamicEntry ? 'assets/lazy-jeex-viewer-[name]-[hash].js' : 'assets/jeex-viewer-[name]-[hash].js',
       },
     },
   },

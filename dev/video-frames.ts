@@ -42,6 +42,8 @@ async function main(): Promise<void> {
   if (!stage) throw new Error('video-frames: no #stage container');
 
   const handle = mountViewer(stage, {
+    // Development pages never send telemetry; `/dev/telemetry.html` is the one that tests it.
+    analytics: 'off',
     scene: { repository: new LocalFixtureRepository() },
     view: { mode: 'tour' },
     tour: { mode: 'paused', progressBar: false },

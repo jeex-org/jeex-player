@@ -1,6 +1,6 @@
 import { describe, expect, test } from 'bun:test';
 
-import { createSession, withViewerOptions } from './session.js';
+import { createSession, resolveViewerUrl, withViewerOptions } from './session.js';
 
 /**
  * `assert` is the one failure path in the browser-check runner that needs no
@@ -71,5 +71,14 @@ describe('withViewerOptions', () => {
     expect(() => withViewerOptions('127.0.0.1:3708', { view: 'tour' })).toThrow(
       'browser-check: VIEWER_URL is not a usable URL: "127.0.0.1:3708"',
     );
+  });
+});
+
+describe('no telemetry from the check', () => {
+  test('a scenario query keeps analytics=off, and the default page carries it', () => {
+    const session = createSession('http://example.invalid/');
+    expect(new URL(session.withQuery('?view=tour')).searchParams.get('analytics')).toBe('off');
+    expect(new URL(session.withQuery('?view=tour')).searchParams.get('view')).toBe('tour');
+    expect(new URL(resolveViewerUrl()).searchParams.get('analytics')).toBe('off');
   });
 });

@@ -16,6 +16,7 @@
  * from `ViewerRoots.byName`, scoped to this instance's shell.
  */
 
+import type { UsageSink } from '../shared/usage.js';
 import { ProjectMark } from './project-mark.js';
 import type { ViewerMode } from '../scene/types.js';
 import { isPlanMode } from '../scene/types.js';
@@ -62,6 +63,8 @@ type ViewerUIOptions = {
   onRetry?: () => void;
   /** The mounted viewer's lifetime; every listener under the UI carries it. */
   signal?: AbortSignal | undefined;
+  /** Hears a selection panel the visitor opened (`shared/usage.ts`). */
+  usage?: UsageSink | undefined;
 };
 
 /**
@@ -71,6 +74,7 @@ type ViewerUIOptions = {
  */
 export class ViewerUI implements DirectorChrome {
   private readonly commands: ViewerCommands;
+  private readonly usage: UsageSink | undefined;
   private readonly chrome: ViewerChrome;
   private readonly panel: SelectionPanel;
   private readonly tourBar: TourBar;
@@ -81,6 +85,7 @@ export class ViewerUI implements DirectorChrome {
 
   constructor(options: ViewerUIOptions) {
     this.commands = options.commands;
+    this.usage = options.usage;
     this.mark = new ProjectMark({ container: options.roots.viewport, messages: options.messages });
     this.chrome = new ViewerChrome({
       roots: options.roots,
@@ -245,6 +250,7 @@ export class ViewerUI implements DirectorChrome {
 
   openPanel(request: PanelRequest): void {
     this.panel.open(request);
+    this.usage?.('panel');
   }
   closePanel(): void {
     this.panel.close();

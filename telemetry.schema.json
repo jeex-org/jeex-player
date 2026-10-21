@@ -1,0 +1,1183 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://player.jeex.org/schema/telemetry/1.0.0.json",
+  "title": "JEEX player telemetry send",
+  "description": "One anonymous telemetry request body of the JEEX player. TELEMETRY.md explains every field.",
+  "oneOf": [
+    {
+      "oneOf": [
+        {
+          "type": "object",
+          "properties": {
+            "schema": {
+              "type": "string",
+              "pattern": "^\\d+\\.\\d+\\.\\d+(?:-[0-9A-Za-z.-]{1,32})?$"
+            },
+            "player": {
+              "type": "string",
+              "pattern": "^\\d+\\.\\d+\\.\\d+(?:-[0-9A-Za-z.-]{1,32})?$"
+            },
+            "embed": {
+              "type": "string",
+              "enum": [
+                "element",
+                "iframe",
+                "script"
+              ]
+            },
+            "site": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "maxLength": 253,
+                  "pattern": "^https?:\\/\\/[a-z0-9.-]+(?::\\d{1,5})?$"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "page": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "maxLength": 200,
+                  "pattern": "^\\/[^?#\\s]*$"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "subject": {
+              "type": "object",
+              "properties": {
+                "project": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "bake": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "scene": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                }
+              },
+              "required": [
+                "project",
+                "bake",
+                "scene"
+              ],
+              "additionalProperties": false
+            },
+            "lang": {
+              "type": "string",
+              "enum": [
+                "en",
+                "de",
+                "fr",
+                "it",
+                "es",
+                "sr-Latn",
+                "ru",
+                "other"
+              ]
+            },
+            "group": {
+              "type": "string",
+              "const": "lifecycle"
+            },
+            "event": {
+              "type": "string",
+              "const": "view"
+            }
+          },
+          "required": [
+            "schema",
+            "player",
+            "embed",
+            "site",
+            "page",
+            "subject",
+            "lang",
+            "group",
+            "event"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "schema": {
+              "type": "string",
+              "pattern": "^\\d+\\.\\d+\\.\\d+(?:-[0-9A-Za-z.-]{1,32})?$"
+            },
+            "player": {
+              "type": "string",
+              "pattern": "^\\d+\\.\\d+\\.\\d+(?:-[0-9A-Za-z.-]{1,32})?$"
+            },
+            "embed": {
+              "type": "string",
+              "enum": [
+                "element",
+                "iframe",
+                "script"
+              ]
+            },
+            "site": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "maxLength": 253,
+                  "pattern": "^https?:\\/\\/[a-z0-9.-]+(?::\\d{1,5})?$"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "page": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "maxLength": 200,
+                  "pattern": "^\\/[^?#\\s]*$"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "subject": {
+              "type": "object",
+              "properties": {
+                "project": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "bake": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "scene": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                }
+              },
+              "required": [
+                "project",
+                "bake",
+                "scene"
+              ],
+              "additionalProperties": false
+            },
+            "lang": {
+              "type": "string",
+              "enum": [
+                "en",
+                "de",
+                "fr",
+                "it",
+                "es",
+                "sr-Latn",
+                "ru",
+                "other"
+              ]
+            },
+            "group": {
+              "type": "string",
+              "const": "lifecycle"
+            },
+            "event": {
+              "type": "string",
+              "const": "ready"
+            },
+            "load": {
+              "type": "string",
+              "enum": [
+                "<1s",
+                "1-3s",
+                "3-10s",
+                "10-30s",
+                ">30s"
+              ]
+            }
+          },
+          "required": [
+            "schema",
+            "player",
+            "embed",
+            "site",
+            "page",
+            "subject",
+            "lang",
+            "group",
+            "event",
+            "load"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "schema": {
+              "type": "string",
+              "pattern": "^\\d+\\.\\d+\\.\\d+(?:-[0-9A-Za-z.-]{1,32})?$"
+            },
+            "player": {
+              "type": "string",
+              "pattern": "^\\d+\\.\\d+\\.\\d+(?:-[0-9A-Za-z.-]{1,32})?$"
+            },
+            "embed": {
+              "type": "string",
+              "enum": [
+                "element",
+                "iframe",
+                "script"
+              ]
+            },
+            "site": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "maxLength": 253,
+                  "pattern": "^https?:\\/\\/[a-z0-9.-]+(?::\\d{1,5})?$"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "page": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "maxLength": 200,
+                  "pattern": "^\\/[^?#\\s]*$"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "subject": {
+              "type": "object",
+              "properties": {
+                "project": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "bake": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "scene": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                }
+              },
+              "required": [
+                "project",
+                "bake",
+                "scene"
+              ],
+              "additionalProperties": false
+            },
+            "lang": {
+              "type": "string",
+              "enum": [
+                "en",
+                "de",
+                "fr",
+                "it",
+                "es",
+                "sr-Latn",
+                "ru",
+                "other"
+              ]
+            },
+            "group": {
+              "type": "string",
+              "const": "lifecycle"
+            },
+            "event": {
+              "type": "string",
+              "const": "models_loaded"
+            },
+            "load": {
+              "type": "string",
+              "enum": [
+                "<1s",
+                "1-3s",
+                "3-10s",
+                "10-30s",
+                ">30s"
+              ]
+            },
+            "outcome": {
+              "type": "string",
+              "enum": [
+                "complete",
+                "partial",
+                "budget",
+                "none"
+              ]
+            },
+            "failed": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 50
+            },
+            "assets": {
+              "maxItems": 50,
+              "type": "array",
+              "items": {
+                "type": "string",
+                "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+              }
+            }
+          },
+          "required": [
+            "schema",
+            "player",
+            "embed",
+            "site",
+            "page",
+            "subject",
+            "lang",
+            "group",
+            "event",
+            "load",
+            "outcome",
+            "failed",
+            "assets"
+          ],
+          "additionalProperties": false
+        }
+      ]
+    },
+    {
+      "type": "object",
+      "properties": {
+        "schema": {
+          "type": "string",
+          "pattern": "^\\d+\\.\\d+\\.\\d+(?:-[0-9A-Za-z.-]{1,32})?$"
+        },
+        "player": {
+          "type": "string",
+          "pattern": "^\\d+\\.\\d+\\.\\d+(?:-[0-9A-Za-z.-]{1,32})?$"
+        },
+        "embed": {
+          "type": "string",
+          "enum": [
+            "element",
+            "iframe",
+            "script"
+          ]
+        },
+        "site": {
+          "anyOf": [
+            {
+              "type": "string",
+              "maxLength": 253,
+              "pattern": "^https?:\\/\\/[a-z0-9.-]+(?::\\d{1,5})?$"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "page": {
+          "anyOf": [
+            {
+              "type": "string",
+              "maxLength": 200,
+              "pattern": "^\\/[^?#\\s]*$"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "subject": {
+          "type": "object",
+          "properties": {
+            "project": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "bake": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "scene": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            }
+          },
+          "required": [
+            "project",
+            "bake",
+            "scene"
+          ],
+          "additionalProperties": false
+        },
+        "lang": {
+          "type": "string",
+          "enum": [
+            "en",
+            "de",
+            "fr",
+            "it",
+            "es",
+            "sr-Latn",
+            "ru",
+            "other"
+          ]
+        },
+        "group": {
+          "type": "string",
+          "const": "actions"
+        },
+        "counts": {
+          "type": "object",
+          "properties": {
+            "mode": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 50
+            },
+            "interior": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 50
+            },
+            "select_furniture": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 50
+            },
+            "select_opening": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 50
+            },
+            "select_wall": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 50
+            },
+            "select_room": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 50
+            },
+            "panel": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 50
+            },
+            "door": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 50
+            },
+            "fullscreen": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 50
+            },
+            "minimap": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 50
+            },
+            "camera_step": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 50
+            },
+            "tour_start": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 50
+            },
+            "tour_complete": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 50
+            }
+          },
+          "required": [
+            "mode",
+            "interior",
+            "select_furniture",
+            "select_opening",
+            "select_wall",
+            "select_room",
+            "panel",
+            "door",
+            "fullscreen",
+            "minimap",
+            "camera_step",
+            "tour_start",
+            "tour_complete"
+          ],
+          "additionalProperties": false
+        }
+      },
+      "required": [
+        "schema",
+        "player",
+        "embed",
+        "site",
+        "page",
+        "subject",
+        "lang",
+        "group",
+        "counts"
+      ],
+      "additionalProperties": false
+    },
+    {
+      "type": "object",
+      "properties": {
+        "schema": {
+          "type": "string",
+          "pattern": "^\\d+\\.\\d+\\.\\d+(?:-[0-9A-Za-z.-]{1,32})?$"
+        },
+        "player": {
+          "type": "string",
+          "pattern": "^\\d+\\.\\d+\\.\\d+(?:-[0-9A-Za-z.-]{1,32})?$"
+        },
+        "embed": {
+          "type": "string",
+          "enum": [
+            "element",
+            "iframe",
+            "script"
+          ]
+        },
+        "site": {
+          "anyOf": [
+            {
+              "type": "string",
+              "maxLength": 253,
+              "pattern": "^https?:\\/\\/[a-z0-9.-]+(?::\\d{1,5})?$"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "page": {
+          "anyOf": [
+            {
+              "type": "string",
+              "maxLength": 200,
+              "pattern": "^\\/[^?#\\s]*$"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "subject": {
+          "type": "object",
+          "properties": {
+            "project": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "bake": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "scene": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            }
+          },
+          "required": [
+            "project",
+            "bake",
+            "scene"
+          ],
+          "additionalProperties": false
+        },
+        "lang": {
+          "type": "string",
+          "enum": [
+            "en",
+            "de",
+            "fr",
+            "it",
+            "es",
+            "sr-Latn",
+            "ru",
+            "other"
+          ]
+        },
+        "group": {
+          "type": "string",
+          "const": "rooms"
+        },
+        "rooms": {
+          "minItems": 1,
+          "maxItems": 100,
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "room": {
+                "type": "string",
+                "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+              },
+              "dwell": {
+                "type": "string",
+                "enum": [
+                  "<5s",
+                  "5-30s",
+                  "30s-2m",
+                  "2-10m",
+                  ">10m"
+                ]
+              }
+            },
+            "required": [
+              "room",
+              "dwell"
+            ],
+            "additionalProperties": false
+          }
+        }
+      },
+      "required": [
+        "schema",
+        "player",
+        "embed",
+        "site",
+        "page",
+        "subject",
+        "lang",
+        "group",
+        "rooms"
+      ],
+      "additionalProperties": false
+    },
+    {
+      "type": "object",
+      "properties": {
+        "schema": {
+          "type": "string",
+          "pattern": "^\\d+\\.\\d+\\.\\d+(?:-[0-9A-Za-z.-]{1,32})?$"
+        },
+        "player": {
+          "type": "string",
+          "pattern": "^\\d+\\.\\d+\\.\\d+(?:-[0-9A-Za-z.-]{1,32})?$"
+        },
+        "embed": {
+          "type": "string",
+          "enum": [
+            "element",
+            "iframe",
+            "script"
+          ]
+        },
+        "site": {
+          "anyOf": [
+            {
+              "type": "string",
+              "maxLength": 253,
+              "pattern": "^https?:\\/\\/[a-z0-9.-]+(?::\\d{1,5})?$"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "page": {
+          "anyOf": [
+            {
+              "type": "string",
+              "maxLength": 200,
+              "pattern": "^\\/[^?#\\s]*$"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "subject": {
+          "type": "object",
+          "properties": {
+            "project": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "bake": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "scene": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            }
+          },
+          "required": [
+            "project",
+            "bake",
+            "scene"
+          ],
+          "additionalProperties": false
+        },
+        "lang": {
+          "type": "string",
+          "enum": [
+            "en",
+            "de",
+            "fr",
+            "it",
+            "es",
+            "sr-Latn",
+            "ru",
+            "other"
+          ]
+        },
+        "group": {
+          "type": "string",
+          "const": "device"
+        },
+        "fps": {
+          "type": "object",
+          "properties": {
+            "<20": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 100,
+              "multipleOf": 10
+            },
+            "20-30": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 100,
+              "multipleOf": 10
+            },
+            "30-50": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 100,
+              "multipleOf": 10
+            },
+            ">50": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 100,
+              "multipleOf": 10
+            }
+          },
+          "required": [
+            "<20",
+            "20-30",
+            "30-50",
+            ">50"
+          ],
+          "additionalProperties": false
+        },
+        "gpu": {
+          "type": "string",
+          "enum": [
+            "low",
+            "mid",
+            "high",
+            "none"
+          ]
+        },
+        "width": {
+          "type": "string",
+          "enum": [
+            "<480",
+            "480-1024",
+            "1024-1600",
+            ">1600"
+          ]
+        },
+        "input": {
+          "type": "string",
+          "enum": [
+            "touch",
+            "pointer"
+          ]
+        },
+        "fullscreen": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 100,
+          "multipleOf": 10
+        }
+      },
+      "required": [
+        "schema",
+        "player",
+        "embed",
+        "site",
+        "page",
+        "subject",
+        "lang",
+        "group",
+        "fps",
+        "gpu",
+        "width",
+        "input",
+        "fullscreen"
+      ],
+      "additionalProperties": false
+    },
+    {
+      "type": "object",
+      "properties": {
+        "schema": {
+          "type": "string",
+          "pattern": "^\\d+\\.\\d+\\.\\d+(?:-[0-9A-Za-z.-]{1,32})?$"
+        },
+        "player": {
+          "type": "string",
+          "pattern": "^\\d+\\.\\d+\\.\\d+(?:-[0-9A-Za-z.-]{1,32})?$"
+        },
+        "embed": {
+          "type": "string",
+          "enum": [
+            "element",
+            "iframe",
+            "script"
+          ]
+        },
+        "site": {
+          "anyOf": [
+            {
+              "type": "string",
+              "maxLength": 253,
+              "pattern": "^https?:\\/\\/[a-z0-9.-]+(?::\\d{1,5})?$"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "page": {
+          "anyOf": [
+            {
+              "type": "string",
+              "maxLength": 200,
+              "pattern": "^\\/[^?#\\s]*$"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "subject": {
+          "type": "object",
+          "properties": {
+            "project": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "bake": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "scene": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            }
+          },
+          "required": [
+            "project",
+            "bake",
+            "scene"
+          ],
+          "additionalProperties": false
+        },
+        "lang": {
+          "type": "string",
+          "enum": [
+            "en",
+            "de",
+            "fr",
+            "it",
+            "es",
+            "sr-Latn",
+            "ru",
+            "other"
+          ]
+        },
+        "group": {
+          "type": "string",
+          "const": "error"
+        },
+        "code": {
+          "type": "string",
+          "enum": [
+            "network",
+            "scene_format",
+            "manifest_format",
+            "model_format",
+            "webgl_unavailable",
+            "context_lost",
+            "size_limit",
+            "exception",
+            "rejection",
+            "other"
+          ]
+        },
+        "stage": {
+          "type": "string",
+          "enum": [
+            "scene_load",
+            "model_load",
+            "capture",
+            "mode",
+            "tour",
+            "embed",
+            "bridge",
+            "runtime"
+          ]
+        },
+        "name": {
+          "type": "string",
+          "enum": [
+            "Error",
+            "TypeError",
+            "RangeError",
+            "ReferenceError",
+            "SyntaxError",
+            "EvalError",
+            "URIError",
+            "AggregateError",
+            "InternalError",
+            "ViewerLibError",
+            "SceneValidationError",
+            "AbortError",
+            "NetworkError",
+            "NotSupportedError",
+            "NotAllowedError",
+            "InvalidStateError",
+            "SecurityError",
+            "QuotaExceededError",
+            "DataCloneError",
+            "EncodingError",
+            "TimeoutError",
+            "OperationError",
+            "UnknownError"
+          ]
+        },
+        "frames": {
+          "maxItems": 5,
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "file": {
+                "type": "string",
+                "maxLength": 120,
+                "pattern": "^(?:lazy-)?jeex-viewer[\\w.-]*\\.js$"
+              },
+              "line": {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 10000000
+              },
+              "column": {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 10000000
+              }
+            },
+            "required": [
+              "file",
+              "line",
+              "column"
+            ],
+            "additionalProperties": false
+          }
+        },
+        "browser": {
+          "type": "string",
+          "pattern": "^(?:chromium-\\d{1,3}x|firefox-\\d{1,3}x|safari-\\d{1,3}|other)$"
+        },
+        "count": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 50
+        }
+      },
+      "required": [
+        "schema",
+        "player",
+        "embed",
+        "site",
+        "page",
+        "subject",
+        "lang",
+        "group",
+        "code",
+        "stage",
+        "name",
+        "frames",
+        "browser",
+        "count"
+      ],
+      "additionalProperties": false
+    }
+  ]
+}

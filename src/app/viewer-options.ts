@@ -19,7 +19,7 @@ import type { ViewerMode } from '../scene/types.js';
 // TYPE only, and it must be: `ui/host-slots.ts` touches the DOM. The runtime
 // copy of `SLOT_NAMES` this table validates against lives in `option-sets.ts`.
 import type { SlotName } from '../ui/host-slots.js';
-import { SLOT_VALUES } from './option-sets.js';
+import { SLOT_VALUES, closedSet } from './option-sets.js';
 import type { Locale } from '../ui/messages.js';
 import type { SceneSource } from '../scene/scene-repository.js';
 import { createLogger, type Logger, type LogSink } from '../shared/logger.js';
@@ -215,6 +215,17 @@ export type ViewerOptions = {
    * through verbatim.
    */
   onLog?: LogSink | undefined;
+  /**
+   * Anonymous player telemetry (`TELEMETRY.md`). It FAILS CLOSED: only an
+   * absent `mode` or exactly `'on'` sends; `'off'` and every other value
+   * (`false`, `null`, `'OFF'`, `'none'`, an empty attribute) send nothing at
+   * all. Global Privacy Control does the same whatever this says.
+   * `analytics: 'off'` is shorthand for `{ mode: 'off' }`. `endpoint`
+   * replaces where the sends go: an `https:` URL, or `http:` on this machine;
+   * any other value turns sending off (it resolves to `''`). Default `on`, to
+   * the default endpoint.
+   */
+  analytics: { mode: 'on' | 'off'; endpoint?: string | undefined };
 };
 
 /**
@@ -242,12 +253,13 @@ export type DeepPartial<T> = {
           : T[K];
 };
 
-/** What `mountViewer` takes: `DeepPartial<ViewerOptions>`, plus `fullscreenButton: true | false` for `{ show }`. */
-export type ViewerOptionsInput = Omit<DeepPartial<ViewerOptions>, 'fullscreenButton'> & {
+/** What `mountViewer` takes: `DeepPartial<ViewerOptions>`, plus `fullscreenButton: true | false` for `{ show }` and `analytics: 'on' | 'off'` for `{ mode }`. */
+export type ViewerOptionsInput = Omit<DeepPartial<ViewerOptions>, 'fullscreenButton' | 'analytics'> & {
   fullscreenButton?: DeepPartial<ViewerOptions['fullscreenButton']> | boolean;
+  analytics?: DeepPartial<ViewerOptions['analytics']> | ViewerOptions['analytics']['mode'];
 };
 /** `ViewerOptionsInput`'s boolean sections and the field each sets; `satisfies` keeps the field a real one. */
-const SECTION_SHORTHANDS = { fullscreenButton: 'show' } as const satisfies SectionShorthands & {
+const SECTION_SHORTHANDS = { fullscreenButton: 'show', analytics: 'mode' } as const satisfies SectionShorthands & {
   [K in keyof ViewerOptions]?: keyof ViewerOptions[K];
 };
 
@@ -273,6 +285,7 @@ export const DEFAULT_VIEWER_OPTIONS: ViewerOptions = {
   // No default apartment: `resolveSceneSource` throws on an empty source, and
   // the demo page is the one that passes the fixture (`main.ts`).
   scene: {},
+  analytics: { mode: 'on' },
 };
 
 /**
@@ -284,37 +297,14 @@ export const DEFAULT_VIEWER_OPTIONS: ViewerOptions = {
  */
 const OPAQUE_PATHS: readonly string[] = ['scene.document', 'scene.repository', 'scene.library', 'onLog'];
 
-const TOUR_MODES = ['play', 'paused', 'off'] as const satisfies readonly TourStartMode[];
-/**
- * Exhaustiveness: fails to compile if `TOUR_MODES` is missing a member of
- * `TourStartMode` — `satisfies` above only checks the array has no INVALID
- * member, not that it is COMPLETE. An immediately-invoked function typed by
- * the conditional (never called for its value) keeps the check without a
- * `noUnusedLocals` violation.
- */
-type _MissingTourMode = Exclude<TourStartMode, (typeof TOUR_MODES)[number]>;
-((): _MissingTourMode extends never ? true : ['TOUR_MODES missing', _MissingTourMode] => true)();
-
+// Each closed set is proved complete against its union (`closedSet`, `option-sets.ts`).
+const TOUR_MODES = closedSet<TourStartMode>()(['play', 'paused', 'off']);
 /** In mode-bar order, which is also the documented order of `?view=`. */
-const VIEW_MODES = ['plan2d', 'plan3d', 'orbit', 'walk', 'tour'] as const satisfies readonly ViewerMode[];
-/** Exhaustiveness: fails to compile if `VIEW_MODES` is missing a member of `ViewerMode`. */
-type _MissingViewMode = Exclude<ViewerMode, (typeof VIEW_MODES)[number]>;
-((): _MissingViewMode extends never ? true : ['VIEW_MODES missing', _MissingViewMode] => true)();
-
-const MOTION_MODES = ['auto', 'full', 'reduced'] as const satisfies readonly ViewerOptions['motion'][];
-/** Exhaustiveness: fails to compile if `MOTION_MODES` is missing a member of `ViewerOptions['motion']`. */
-type _MissingMotionMode = Exclude<ViewerOptions['motion'], (typeof MOTION_MODES)[number]>;
-((): _MissingMotionMode extends never ? true : ['MOTION_MODES missing', _MissingMotionMode] => true)();
-
-const INTERACTION_MODES = ['full', 'none', 'passive'] as const satisfies readonly ViewerOptions['interaction'][];
-/** Exhaustiveness: fails to compile if `INTERACTION_MODES` is missing a member of `ViewerOptions['interaction']`. */
-type _MissingInteraction = Exclude<ViewerOptions['interaction'], (typeof INTERACTION_MODES)[number]>;
-((): _MissingInteraction extends never ? true : ['INTERACTION_MODES missing', _MissingInteraction] => true)();
-
-const EDITS_MODES = ['local', 'emit', 'off'] as const satisfies readonly ViewerOptions['edits'][];
-/** Exhaustiveness: fails to compile if `EDITS_MODES` is missing a member of `ViewerOptions['edits']`. */
-type _MissingEditsMode = Exclude<ViewerOptions['edits'], (typeof EDITS_MODES)[number]>;
-((): _MissingEditsMode extends never ? true : ['EDITS_MODES missing', _MissingEditsMode] => true)();
+const VIEW_MODES = closedSet<ViewerMode>()(['plan2d', 'plan3d', 'orbit', 'walk', 'tour']);
+const MOTION_MODES = closedSet<ViewerOptions['motion']>()(['auto', 'full', 'reduced']);
+const INTERACTION_MODES = closedSet<ViewerOptions['interaction']>()(['full', 'none', 'passive']);
+const EDITS_MODES = closedSet<ViewerOptions['edits']>()(['local', 'emit', 'off']);
+const ANALYTICS_MODES = closedSet<ViewerOptions['analytics']['mode']>()(['on', 'off']);
 
 /** Every dotted (or top-level) path `OPTION_SCHEMA` declares a row for. */
 export type OptionPath =
@@ -349,7 +339,9 @@ export type OptionPath =
   | 'slots'
   | 'edits'
   | 'debug'
-  | 'scene.url';
+  | 'scene.url'
+  | 'analytics.mode'
+  | 'analytics.endpoint';
 
 /**
  * The single source of every mount option: what it is, its default, and how
@@ -429,6 +421,8 @@ export const OPTION_SCHEMA = {
   edits: { kind: 'enum', values: EDITS_MODES, default: DEFAULT_VIEWER_OPTIONS.edits, query: 'edits', attr: 'edits' },
   debug: { kind: 'flag', default: DEFAULT_VIEWER_OPTIONS.debug, query: 'debug', attr: 'debug' },
   'scene.url': { kind: 'string', default: undefined, query: 'scene', attr: 'src' },
+  'analytics.mode': { kind: 'switch', values: ANALYTICS_MODES, default: 'on', query: 'analytics', attr: 'analytics' },
+  'analytics.endpoint': { kind: 'endpoint', default: undefined, query: 'analyticsEndpoint', attr: 'analytics-endpoint' },
 } as const satisfies Record<OptionPath, OptionSpec>;
 
 /** `overlay="kiosk"`/`"embed"`/`"unbranded"`: sugar over other options, not itself a `ViewerOptions` field. */
@@ -637,6 +631,8 @@ function convertRaw(kind: OptionKind, raw: string): unknown {
     case 'enum':
     case 'locale':
     case 'string':
+    case 'endpoint':
+    case 'switch':
       return raw;
   }
 }

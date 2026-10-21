@@ -36,6 +36,7 @@ export const LAYER_FLOORS: Readonly<Record<string, number>> = {
   'src/plan': 0.9,
   'src/scene': 0.9,
   'src/shared': 0.9,
+  'src/telemetry': 0.9,
 };
 
 /**

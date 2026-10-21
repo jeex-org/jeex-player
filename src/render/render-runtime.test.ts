@@ -189,6 +189,22 @@ describe('drawing switched off (plan2d) keeps the scene warm', () => {
   });
 });
 
+describe('lastDrawnAt', () => {
+  test('a post-render hook can tell a drawn frame from a skipped one', () => {
+    const { runtime, tick } = harness();
+    const drawn: boolean[] = [];
+    runtime.addPostRenderHook((_delta, now) => drawn.push(runtime.lastDrawnAt === now));
+    expect(runtime.lastDrawnAt).toBe(Number.NEGATIVE_INFINITY);
+    runtime.setCamera(new THREE.PerspectiveCamera());
+    runtime.start();
+    tick(16);
+    runtime.setRenderEnabled(false);
+    tick(16);
+    expect(drawn).toEqual([true, false]);
+    runtime.dispose();
+  });
+});
+
 describe('loop lifecycle', () => {
   test('start is idempotent and stop cancels the pending frame', () => {
     const { runtime, tick, scheduled, cancelled, pending } = harness();

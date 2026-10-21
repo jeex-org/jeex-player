@@ -13,6 +13,7 @@
  * nothing blocking a walk.
  */
 
+import type { UsageSink } from '../shared/usage.js';
 import * as THREE from 'three';
 import { DoorStates, type DoorCentre, type DoorPhase, type DoorRecord } from '../doors/door-state.js';
 import type { OpeningListEntry } from '../geometry/opening-builder.js';
@@ -52,6 +53,8 @@ type DoorControllerDeps = {
   travelling: () => boolean;
   /** The mounted viewer's lifetime; the HUD's listeners carry it. */
   signal?: AbortSignal | undefined;
+  /** Hears a door the visitor opened or shut (`shared/usage.ts`). */
+  usage?: UsageSink | undefined;
 };
 
 /** The modes whose camera stands at door height; the plan cameras hang above. */
@@ -200,7 +203,7 @@ export class DoorController {
       screenPoint: (openingId) => this.screenPoint(openingId),
       phase: (openingId) => this.phase(openingId),
       toggle: (openingId) => {
-        this.toggle(openingId);
+        if (this.toggle(openingId)) this.deps.usage?.('door');
       },
       panelOpen: () => this.deps.panelOpen(),
       enabled: () => HUD_MODES.has(this.deps.mode() ?? 'orbit') && this.deps.mode() !== undefined,

@@ -110,6 +110,10 @@ test('a bake and a bare scene on one page do not share catalogue state', async (
 });
 
 test('a manifest that fails the schema is refused with `project-invalid`', async ({ page }) => {
+  // The dev server serves every source module as a request of its own, and
+  // the browser's default resource-timing buffer holds 250 entries: past it the
+  // manifest's own entry is dropped and the check below would see nothing.
+  await page.addInitScript(() => performance.setResourceTimingBufferSize(10_000));
   await page.goto(`/dev/project.html?project=${encodeURIComponent(INVALID_PROJECT)}`);
 
   await page.waitForFunction('window.__projectError !== undefined');

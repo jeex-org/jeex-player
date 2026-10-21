@@ -13,7 +13,14 @@ import { embedViewer } from '../src/embed/host.js';
 const stage = document.querySelector<HTMLElement>('#stage');
 if (!stage) throw new Error('embed-frame: no #stage container');
 
-const embed = embedViewer(stage, { src: '/embed.html', viewerId: 'dev-auto', autoHeight: true, ratio: '4:3', tour: 'off' });
+const embed = embedViewer(stage, {
+  src: '/embed.html',
+  viewerId: 'dev-auto',
+  autoHeight: true,
+  ratio: '4:3',
+  tour: 'off',
+  analytics: 'off',
+});
 const sizes: Array<{ width: number; height: number }> = [];
 embed.on('size', (size) => sizes.push(size));
 

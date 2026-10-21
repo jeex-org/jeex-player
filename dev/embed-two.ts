@@ -29,8 +29,8 @@ async function main(): Promise<void> {
   // One repository per viewer on purpose: a host normally has its own source
   // for each, and sharing one would prove nothing about independence.
   const scene = () => ({ repository: new LocalFixtureRepository() });
-  const first = mountViewer(stage('stage-a'), { scene: scene(), view: { mode: 'walk' }, tour: { mode: 'off' } });
-  const second = mountViewer(stage('stage-b'), { scene: scene(), view: { mode: 'walk' }, tour: { mode: 'off' } });
+  const first = mountViewer(stage('stage-a'), { scene: scene(), view: { mode: 'walk' }, tour: { mode: 'off' }, analytics: 'off' });
+  const second = mountViewer(stage('stage-b'), { scene: scene(), view: { mode: 'walk' }, tour: { mode: 'off' }, analytics: 'off' });
 
   window.jeexPair = {
     first,
@@ -81,6 +81,7 @@ async function mountCycle(times: number): Promise<CycleReport> {
   let maxChildren = 0;
   for (let index = 0; index < times; index += 1) {
     const handle = mountViewer(host, {
+      analytics: 'off',
       scene: { repository: new LocalFixtureRepository() },
       view: { mode: 'orbit' },
       tour: { mode: 'off' },

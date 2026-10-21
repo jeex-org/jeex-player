@@ -12,6 +12,7 @@
  * a collaborator handed in or a late-bound read of one.
  */
 
+import type { UsageSink } from '../shared/usage.js';
 import type { ViewerStageDeps } from './viewer-stage.js';
 import type { ViewerOptions } from './viewer-options.js';
 import type { ViewerRoots } from '../ui/viewer-shell.js';
@@ -29,6 +30,8 @@ import { directorWiring } from './director-wiring.js';
 import { checkpointsWiring } from './checkpoints-wiring.js';
 
 type StageWiringDeps = {
+  /** Hears accepted map and camera use (`shared/usage.ts`). */
+  usage?: UsageSink | undefined;
   roots: ViewerRoots;
   viewport: FullscreenController;
   messages: Messages;
@@ -66,7 +69,10 @@ export function stageWiring(deps: StageWiringDeps): ViewerStageDeps {
     // walk's camera buttons with it.
     walkCamerasEnabled: () => deps.options.chrome.controls || deps.viewport.isFullscreen(),
     planOptions: () => deps.options.plan,
-    onRoomPicked: (roomId) => deps.stage()?.director?.travelToRoom(roomId),
+    onRoomPicked: (roomId) => {
+      if (deps.stage()?.director?.travelToRoom(roomId) === true) deps.usage?.('minimap');
+    },
+    usage: deps.usage,
     onContextLost: deps.onContextLost,
     onContextRestored: deps.onContextRestored,
     signal: deps.signal,

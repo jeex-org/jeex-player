@@ -12,6 +12,7 @@
  * module for anything.
  */
 
+import type { UsageSink } from '../shared/usage.js';
 import * as THREE from 'three';
 import { createRenderRuntime, type FrameHook, type RenderRuntime } from '../render/render-runtime.js';
 import { mountCameraDirector, type CameraDirector, type CameraStackDeps } from '../camera/camera-director.js';
@@ -79,6 +80,8 @@ export type ViewerStageDeps = {
   signal?: AbortSignal | undefined;
   /** A frame hook threw; the frame went on and the application reports it. */
   onFrameError?: ((error: unknown) => void) | undefined;
+  /** Hears accepted camera steps and map use (`shared/usage.ts`). */
+  usage?: UsageSink | undefined;
   /**
    * `options.select` and the sink for the `select` event (`app/selection.ts`).
    * `listen: false` attaches no pointer listener at all; the controller is
@@ -238,14 +241,20 @@ export class ViewerStage {
       onRoomPicked: deps.onRoomPicked,
       // The tour cameras as dots in walk and tour; a click steps there.
       cameras: () => ({ points: this.cameraDots(), current: this.cameraDirector?.walkCamera().index ?? null }),
-      onCameraPicked: (index) => this.cameraDirector?.stepCamera(index),
+      onCameraPicked: (index) => {
+        if (this.cameraDirector?.stepCamera(index) !== true) return;
+        deps.usage?.('minimap');
+        deps.usage?.('camera_step');
+      },
       signal: deps.signal,
     });
     this.walkCameras = new WalkCameraBar({
       container: deps.roots.viewport,
       messages: deps.messages,
       enabled: deps.walkCamerasEnabled,
-      onStep: (to) => this.cameraDirector?.stepCamera(to),
+      onStep: (to) => {
+        if (this.cameraDirector?.stepCamera(to) === true) deps.usage?.('camera_step');
+      },
       signal: deps.signal,
     });
     const checkpoints = deps.checkpoints;
@@ -392,6 +401,7 @@ export class ViewerStage {
       dollhouse: this.deps.dollhouse,
       planModes: this.planModes,
       signal: this.deps.signal,
+      usage: this.deps.usage,
       onScrollThrough: () => this.scrollHint.show(),
       onWalkCamera: (camera) => {
         this.walkCameras.setCamera(camera);

@@ -113,6 +113,30 @@ function resolveString(path: string, value: unknown, spec: OptionSpec): string |
  * keeps mutating the array it passed cannot change a viewer that is already
  * running.
  */
+/**
+ * The telemetry endpoint override. An invalid value — a string the endpoint
+ * check refuses, or no string at all — resolves to `''`, which telemetry reads
+ * as OFF; it must never fall back to `undefined`, which means the DEFAULT
+ * endpoint, or a typo would send where the host asked it not to.
+ */
+function resolveEndpoint(path: string, value: unknown, spec: OptionSpec): string | undefined {
+  if (value === undefined) return spec.default as undefined;
+  if (judgeOption(spec, value).ok) return value as string;
+  warn(path, value, 'telemetry off');
+  return '';
+}
+
+/**
+ * An on/off switch that FAILS CLOSED (`analytics.mode`): absent or exactly
+ * `'on'` is on; `'off'` and `false` are off; ANY other value is off too, with
+ * the usual warning — a typo must never switch telemetry on.
+ */
+function resolveSwitch(path: string, value: unknown): 'on' | 'off' {
+  if (value === undefined || value === 'on') return 'on';
+  if (value !== 'off' && value !== false) warn(path, value, 'off');
+  return 'off';
+}
+
 function resolveList(path: string, value: unknown, spec: OptionSpec): readonly string[] {
   const fallback = spec.default as readonly string[];
   if (value === undefined) return [...fallback];
@@ -157,6 +181,10 @@ export function resolveBySpec(path: string, value: unknown, spec: OptionSpec): u
       return resolveNumber(path, value, spec);
     case 'string':
       return resolveString(path, value, spec);
+    case 'endpoint':
+      return resolveEndpoint(path, value, spec);
+    case 'switch':
+      return resolveSwitch(path, value);
     case 'list':
       return resolveList(path, value, spec);
   }

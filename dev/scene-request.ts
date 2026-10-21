@@ -17,4 +17,4 @@ const SCENE_URL = '/e2e-fixtures/scene-request.json';
 const stage = document.querySelector<HTMLElement>('#stage');
 if (!stage) throw new Error('scene-request: no #stage container');
 
-mountViewer(stage, { scene: { url: SCENE_URL } });
+mountViewer(stage, { scene: { url: SCENE_URL }, analytics: 'off' });

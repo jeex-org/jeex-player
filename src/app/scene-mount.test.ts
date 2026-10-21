@@ -73,6 +73,8 @@ type Rig = {
   downloads: string[];
   /** Documents re-seeded, in order. */
   seeded: SceneModel[];
+  /** Model passes reported as settled: the document and its outcome. */
+  settled: Array<{ model: SceneModel; upgraded: number; failed: number }>;
   /** How many times the whole document was built. */
   builds: () => number;
   load: (document: SceneData, key?: string) => LoadedDocument;
@@ -82,6 +84,7 @@ function rig(): Rig {
   const scene = new THREE.Scene();
   const downloads: string[] = [];
   const seeded: SceneModel[] = [];
+  const settled: Rig['settled'] = [];
   const buildsBefore = builds.mock.calls.length;
   const ui = {
     showDegradedNotice: () => {},
@@ -103,6 +106,7 @@ function rig(): Rig {
     edits: editsWiring(resolveViewerOptions({}), () => {}),
     onDocument: (model) => seeded.push(model),
     onAssetsChanged: () => {},
+    onModelsSettled: (model, result) => settled.push({ model, upgraded: result.upgraded, failed: result.failed }),
     onError: (error) => {
       throw new Error(error.message);
     },
@@ -127,7 +131,7 @@ function rig(): Rig {
       },
     };
   };
-  return { mount, scene, downloads, seeded, builds: () => builds.mock.calls.length - buildsBefore, load };
+  return { mount, scene, downloads, seeded, settled, builds: () => builds.mock.calls.length - buildsBefore, load };
 }
 
 /** Lets the frame-paced GLB upgrade pass run to its end. */
@@ -328,5 +332,31 @@ describe('what is not a revision of the document on screen is mounted from scrat
     subject.mount.present(subject.load({ ...lShapePlan, ceilingHeight: lShapePlan.ceilingHeight + 0.2 }));
     expect(subject.mount.model).toBe(model);
     expect(subject.mount.sceneRoot).not.toBe(subject.root);
+  });
+});
+
+describe('the model pass outcome', () => {
+  test('the first pass of a mounted document is reported once; an edit is not', async () => {
+    const subject = await mounted();
+    expect(subject.settled.map((entry) => [entry.upgraded, entry.failed])).toEqual([[2, 0]]);
+    subject.mount.present(
+      subject.load(
+        edited((draft) => {
+          draft.assets.find((asset) => asset.id === SOFA)!.rotationY = Math.PI / 6;
+        }),
+      ),
+    );
+    await settle();
+    expect(subject.settled).toHaveLength(1);
+  });
+
+  test('a pass cut short by another document is not reported', async () => {
+    const subject = rig();
+    const first = subject.load(lShapePlan);
+    subject.mount.mountDocument(first);
+    subject.mount.present(subject.load(lShapePlan, 'another-library'));
+    await settle();
+    expect(subject.settled.map((entry) => entry.model)).not.toContain(first.model);
+    expect(subject.settled).toHaveLength(1);
   });
 });

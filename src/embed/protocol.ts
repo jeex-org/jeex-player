@@ -90,6 +90,13 @@ export type CommandMethod =
   | 'exportUsdz'
   /** Highlights one wall, opening, room or asset in the frame, or clears it with `null`. */
   | 'setSelection'
+  /**
+   * One-way, host to frame: the host page's path, `{ page }`, for the frame's
+   * anonymous telemetry (`TELEMETRY.md`), sanitised in the frame. Answered with
+   * an empty success, before `ready` too. It travels by `postMessage` only, so
+   * the path never appears in the frame's URL or a server log.
+   */
+  | 'context'
   | 'dispose';
 
 /**
@@ -255,6 +262,7 @@ export const METHOD_LIST = [
   'exportGlb',
   'exportUsdz',
   'setSelection',
+  'context',
   'dispose',
 ] as const satisfies readonly CommandMethod[];
 /** Exhaustiveness: fails to compile if `METHOD_LIST` is missing a `CommandMethod`. */

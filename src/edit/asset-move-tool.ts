@@ -26,7 +26,8 @@
  */
 
 import * as THREE from 'three';
-import { roomOf, type LayoutCatalogue } from '../layout/layout-lint.js';
+import type { LayoutCatalogue } from '../layout/layout-lint.js';
+import { roomOf } from '../plan/plan-rooms.js';
 import { dragCatalogue, type BodyFacts } from './asset-move-catalogue.js';
 import {
   dragContext,

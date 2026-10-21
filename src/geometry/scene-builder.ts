@@ -51,7 +51,15 @@ type ApplyRevisionResult = { unhandled: TouchedEntity[]; failed: TouchedEntity[]
 export const FURNITURE_GROUP_NAME = 'demo-assets';
 
 /** What one `upgradeModels` pass did. Placements with no model to load count as neither. */
-export type UpgradeResult = { upgraded: number; failed: number };
+/**
+ * How one upgrade pass ended: models swapped in, models that failed, whether
+ * the byte budget stopped the pass, and the first few errors the failed loads raised (for the anonymous
+ * error counts; never shown to anyone).
+ */
+export type UpgradeResult = { upgraded: number; failed: number; budget: boolean; failures: unknown[] };
+
+/** The most load errors one pass keeps in `UpgradeResult.failures`. */
+const MAX_KEPT_FAILURES = 10;
 
 /**
  * What the builder needs BEYOND a document and its plan.
@@ -261,7 +269,7 @@ export class SceneBuilder {
    */
   async upgradeModels(signal: AbortSignal, yieldFrame?: YieldFrame, onSwapped?: BodySwapped): Promise<UpgradeResult> {
     const furniture = this.root?.getObjectByName(FURNITURE_GROUP_NAME);
-    const result: UpgradeResult = { upgraded: 0, failed: 0 };
+    const result: UpgradeResult = { upgraded: 0, failed: 0, budget: false, failures: [] };
     if (!furniture) return result;
     const queue = this.upgradeQueue(furniture);
     let next = 0;
@@ -271,13 +279,16 @@ export class SceneBuilder {
         if (signal.aborted || stopped) return;
         const entry = queue[next++];
         if (!entry) return;
-        const swapped = await this.upgradeOne(entry.placement, entry.group, signal, onSwapped);
+        const swapped = await this.upgradeOne(entry.placement, entry.group, signal, onSwapped, (error) => {
+          if (result.failures.length < MAX_KEPT_FAILURES) result.failures.push(error);
+        });
         if (swapped === 'upgraded') result.upgraded += 1;
         else if (swapped === 'failed') result.failed += 1;
         if (this.modelBytes > MAX_PROJECT_BYTES) {
           // Every worker stops, not just this one: the budget is the
           // document's, and the remaining placements keep their stand-ins.
           stopped = true;
+          result.budget = true;
           this.log.warn('project-budget', `project models stopped after ${this.modelBytes} bytes`, {
             bytes: this.modelBytes,
             limit: MAX_PROJECT_BYTES,
@@ -336,11 +347,13 @@ export class SceneBuilder {
     group: THREE.Group,
     signal: AbortSignal,
     onSwapped?: BodySwapped,
+    onFailed?: (error: unknown) => void,
   ): Promise<'upgraded' | 'failed' | 'absent'> {
     let upgrade;
     try {
       upgrade = await this.assetLoader.upgrade(placement, signal);
-    } catch {
+    } catch (error) {
+      if (!signal.aborted) onFailed?.(error);
       // Every reason a model can fail — offline, 404, a corrupt container, a
       // dispose mid-flight — ends the same way: the body that is already on
       // screen stays on screen.

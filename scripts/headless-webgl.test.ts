@@ -5,9 +5,9 @@
  */
 
 import { describe, expect, test } from 'bun:test';
-import { headlessWebglLaunch } from '../tests/headless-webgl.js';
+import { TELEMETRY_HOST_RULE, headlessWebglLaunch } from '../tests/headless-webgl.js';
 
-const SWIFTSHADER = ['--use-gl=angle', '--use-angle=swiftshader-webgl', '--enable-unsafe-swiftshader'];
+const SWIFTSHADER = ['--use-gl=angle', '--use-angle=swiftshader-webgl', '--enable-unsafe-swiftshader', TELEMETRY_HOST_RULE];
 const present = (): boolean => true;
 const absent = (): boolean => false;
 
@@ -19,7 +19,7 @@ describe('headlessWebglLaunch', () => {
   test('nvidia with the driver present is ANGLE gl-egl on surfaceless EGL pinned to the NVIDIA vendor, still in the headless shell', () => {
     const launch = headlessWebglLaunch({ JEEX_BROWSER_GPU: 'nvidia', HOME: '/home/someone' }, present);
     expect(launch.channel).toBeUndefined();
-    expect(launch.args).toEqual(['--use-gl=angle', '--use-angle=gl-egl', '--ignore-gpu-blocklist']);
+    expect(launch.args).toEqual(['--use-gl=angle', '--use-angle=gl-egl', '--ignore-gpu-blocklist', TELEMETRY_HOST_RULE]);
     expect(launch.env).toMatchObject({
       HOME: '/home/someone',
       EGL_PLATFORM: 'surfaceless',
@@ -29,7 +29,7 @@ describe('headlessWebglLaunch', () => {
 
   test('nvidia without the driver falls back to SwiftShader rather than a path that draws nothing', () => {
     expect(headlessWebglLaunch({ JEEX_BROWSER_GPU: 'nvidia', JEEX_E2E_ANGLE: 'swiftshader' }, absent)).toEqual({
-      args: ['--use-gl=angle', '--use-angle=swiftshader', '--enable-unsafe-swiftshader'],
+      args: ['--use-gl=angle', '--use-angle=swiftshader', '--enable-unsafe-swiftshader', TELEMETRY_HOST_RULE],
     });
   });
 

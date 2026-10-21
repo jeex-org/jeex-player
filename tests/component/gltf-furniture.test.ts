@@ -72,7 +72,7 @@ describe('progressive GLB upgrade', () => {
       const model = new SceneModel(scene, CATALOGUE_REGISTRIES);
       builder.bindModel(model, () => undefined);
       const result = await builder.upgradeModels(new AbortController().signal);
-      expect(result).toEqual({ upgraded: 1, failed: 0 });
+      expect(result).toMatchObject({ upgraded: 1, failed: 0, budget: false, failures: [] });
       // The upgrade is geometry, never a document edit: no revision, no op.
       expect(model.rev).toBe(0);
 
@@ -128,7 +128,8 @@ describe('progressive GLB upgrade', () => {
     try {
       const built = builder.build();
       const result = await builder.upgradeModels(new AbortController().signal);
-      expect(result).toEqual({ upgraded: 0, failed: 1 });
+      expect(result).toMatchObject({ upgraded: 0, failed: 1, budget: false });
+      expect(result.failures).toHaveLength(1);
       const group = furnitureGroup(built.root);
       expect(group.userData['modelState']).toBe('failed');
       expect(bodyName(group)).toBe(`${VARIANT.bed_double_linen}-procedural`);
@@ -147,7 +148,7 @@ describe('progressive GLB upgrade', () => {
     try {
       const built = builder.build();
       const result = await builder.upgradeModels(new AbortController().signal);
-      expect({ asked, result }).toEqual({ asked: 0, result: { upgraded: 0, failed: 0 } });
+      expect({ asked, result }).toEqual({ asked: 0, result: { upgraded: 0, failed: 0, budget: false, failures: [] } });
       expect(furnitureGroup(built.root).userData['modelState']).toBe('procedural');
     } finally {
       builder.dispose();
@@ -161,7 +162,7 @@ describe('progressive GLB upgrade', () => {
       const built = builder.build();
       controller.abort();
       const result = await builder.upgradeModels(controller.signal);
-      expect(result).toEqual({ upgraded: 0, failed: 0 });
+      expect(result).toMatchObject({ upgraded: 0, failed: 0, failures: [] });
       expect(furnitureGroup(built.root).userData['modelState']).toBe('procedural');
     } finally {
       builder.dispose();

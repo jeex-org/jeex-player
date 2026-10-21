@@ -7,7 +7,7 @@
  * Pure module: no `three`, no DOM.
  */
 
-import { roomOf } from '../layout/layout-lint.js';
+import { roomOf } from '../plan/plan-rooms.js';
 import { judge, poseItem, type DragContext, type DragPose } from '../layout/asset-legality.js';
 import { proposePose, type PoseRequest } from '../layout/asset-pose.js';
 import type { LayoutIssue } from '../layout/layout-issue.js';

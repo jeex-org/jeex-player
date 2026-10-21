@@ -29,6 +29,8 @@ async function main(): Promise<void> {
   // `view.mode: 'tour'` is what engages the tour at start; `tour.mode` then
   // says it should wait on the route rather than play.
   const handle = mountViewer(stage, {
+    // Development pages never send telemetry; `/dev/telemetry.html` is the one that tests it.
+    analytics: 'off',
     scene: { repository: new LocalFixtureRepository() },
     view: { mode: 'tour' },
     tour: { mode: 'paused', progressBar: false, pauseOnInput: false },

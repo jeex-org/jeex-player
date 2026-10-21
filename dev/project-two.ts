@@ -29,11 +29,15 @@ function stage(id: string): HTMLElement {
 }
 
 async function main(): Promise<void> {
-  const project = mountViewer(stage('stage-project'), { scene: { url: PROJECT_URL }, tour: { mode: 'off' } });
+  const project = mountViewer(stage('stage-project'), { scene: { url: PROJECT_URL }, tour: { mode: 'off' }, analytics: 'off' });
   // A structured clone so the two viewers cannot even in principle be looking
   // at one object: `getScene()` hands back a copy, and this is the other side
   // of the same guarantee.
-  const bare = mountViewer(stage('stage-bare'), { scene: { document: structuredClone(apartmentScene) }, tour: { mode: 'off' } });
+  const bare = mountViewer(stage('stage-bare'), {
+    scene: { document: structuredClone(apartmentScene) },
+    tour: { mode: 'off' },
+    analytics: 'off',
+  });
 
   window.jeexProjectPair = { project, bare };
 

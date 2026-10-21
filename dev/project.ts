@@ -37,6 +37,8 @@ const entries: LogEntry[] = [];
 window.__projectLog = entries;
 
 const handle = mountViewer(stage, {
+  // Development pages never send telemetry; `/dev/telemetry.html` is the one that tests it.
+  analytics: 'off',
   scene: { url },
   tour: { mode: 'off' },
   onLog: (entry) => {

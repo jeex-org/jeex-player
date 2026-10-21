@@ -7,6 +7,26 @@ as described under [Versioning](#versioning).
 
 ## [Unreleased]
 
+### Added
+
+- **Anonymous telemetry, on by default.** The player sends anonymous usage
+  and error counts to `https://telemetry.jeex.org/v1/player`: lifecycle
+  (`view`, `ready`, `models_loaded`), capped action counters, room time
+  buckets, coarse device buckets and player errors, each group as its own
+  `POST` without credentials or referrer. Payload schema `1.0.0`
+  ([TELEMETRY.md](TELEMETRY.md), `telemetry.schema.json`, also exported as
+  `jeex-viewer/schema/telemetry.json`). No cookies or storage, no
+  identifiers, no fingerprint, no error messages. Turn it off with the new
+  option `analytics` (`analytics="off"`, `?analytics=off`,
+  `{ analytics: { mode: 'off' } }`); Global Privacy Control turns it off
+  too; `analytics-endpoint` sends elsewhere. A site with a Content Security
+  Policy adds the endpoint to `connect-src`.
+- **Embed protocol: `context` command.** The host helper hands the frame
+  its page path after the frame loads, by `postMessage` only, so the
+  frame's telemetry can name the page without the path appearing in any
+  URL. A hand-written host may send `{ method: 'context', params: { page } }`
+  itself; the frame answers it before `ready` too.
+
 ### Changed
 
 - **The demo apartment is a new, invented flat.** The scene the demo pages

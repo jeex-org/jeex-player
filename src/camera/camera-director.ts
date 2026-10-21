@@ -23,6 +23,7 @@
  * tour's own player, state and public events are never touched by a walk.
  */
 
+import type { UsageSink } from '../shared/usage.js';
 import * as THREE from 'three';
 import { CameraController } from './camera-controller.js';
 import { buildRoomGraph, routeToRoom as planRouteToRoom, type RoomGraph, type RouteWaypoint } from '../navigation/room-graph.js';
@@ -151,6 +152,8 @@ export type CameraStackDeps = {
   onWalkCamera?: ((camera: WalkCamera) => void) | undefined;
   /** The mounted viewer's lifetime; the pointer/key listeners carry it. */
   signal?: AbortSignal | undefined;
+  /** Hears accepted camera steps and a tour played to its end (`shared/usage.ts`). */
+  usage?: UsageSink | undefined;
 };
 
 /**
@@ -163,7 +166,11 @@ export function mountCameraDirector(deps: CameraStackDeps): CameraDirector {
   const controller = new CameraController(deps.camera, deps.canvas, deps.scene(), deps.plan(), deps.picker, {
     keys: deps.keys,
     onManualInput: () => director?.handleManualInput(),
-    onCameraStep: (to) => director?.stepCamera(to) ?? false,
+    onCameraStep: (to) => {
+      const stepped = director?.stepCamera(to) ?? false;
+      if (stepped) deps.usage?.('camera_step');
+      return stepped;
+    },
     // The rigs raise a hint by KEY; the director turns it into words with this
     // instance's own catalogue. It exists before any input can reach a rig —
     // the controller is not wired to a canvas until this function returns.
@@ -192,6 +199,7 @@ export function mountCameraDirector(deps: CameraStackDeps): CameraDirector {
         deps.onTourProgress?.(progress);
       },
       pose: () => controller.getPose(),
+      onComplete: () => deps.usage?.('tour_complete'),
     },
     tourNavigation(deps.plan(), deps.scene()),
   );

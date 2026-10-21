@@ -25,6 +25,10 @@
  * (`ApplyBatch.lint`), while the linter that produces one reads the object bank
  * and stays in `layout`, three layers above `scene`. The function itself is
  * injected, never imported — the same move registries make.
+ *
+ * `telemetry` sits right below `app`: it builds, judges and sends the
+ * anonymous usage reports, and must never know the viewer's own events —
+ * `app/telemetry-wiring.ts` projects those into plain calls.
  */
 const LAYERS = [
   'shared',
@@ -42,6 +46,7 @@ const LAYERS = [
   'camera',
   'doors',
   'ui',
+  'telemetry',
   'app',
   'embed',
 ];
