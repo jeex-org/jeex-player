@@ -8,7 +8,8 @@
  */
 
 import { describe, expect, test } from 'bun:test';
-import { embedPageOptions, framePageRatio, hostOriginFrom, isExactOrigin } from './frame-page.js';
+import { embedPageOptions, framePageRatio, hostOriginFrom } from './frame-page.js';
+import { isExactOrigin } from './frame-page.schema.js';
 
 describe('isExactOrigin', () => {
   test('accepts an exact http(s) origin, with and without a port', () => {

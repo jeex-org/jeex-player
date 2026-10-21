@@ -283,9 +283,15 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 /**
  * Whether an arbitrary `MessageEvent.data` is one of ours.
  *
- * Checked before ANY field is read, on both sides: a page may carry other
- * postMessage traffic, and a foreign message that happens to have an `id` must
- * never be answered as if it were a command.
+ * Checked before ANY field is read: a page may carry other postMessage
+ * traffic, and a foreign message that happens to have an `id` must never be
+ * answered as if it were a command.
+ *
+ * Hand-written on purpose, for the HOST side: `embed/host.ts` has a 4 KB gzip
+ * budget and cannot carry `zod/mini` (4.4 KB on its own). The frame reads its
+ * traffic through the schema twin, `isJeexEnvelope` in `protocol.schema.ts`,
+ * and `protocol.schema.test.ts` runs both over the same fixtures so the two
+ * cannot drift.
  */
 export function isJeexMessage(data: unknown): data is JeexMessage {
   if (!isRecord(data)) return false;

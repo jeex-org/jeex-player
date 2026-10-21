@@ -204,11 +204,13 @@ type EmbedReady = EmbedEventMap['ready'];
  * The `ready` payload, proved by hand.
  *
  * The host helper carries no Zod — one `zod/mini` is 4.39 KB gzip and this
- * whole helper's budget is 4 KB (`scripts/budget-check.ts`) — so this is the
- * one place where a protocol check is written out by hand. Its contract is
- * `embed/protocol.schema.readyPayloadSchema`, and `host.test.ts` runs the two
- * over one set of fixtures so they cannot drift; `src/purity.test.ts` proves
- * this module reaches no Zod at all.
+ * whole helper's budget is 4 KB (`scripts/budget-check.ts`) — so the host
+ * side writes its protocol checks out by hand, and this is one of three: the
+ * envelope (`protocol.ts` `isJeexMessage`, run against `isJeexEnvelope` in
+ * `protocol.schema.test.ts`), this payload, and the `size` height below. This
+ * one's contract is `embed/protocol.schema.readyPayloadSchema`, and
+ * `host.test.ts` runs the two over one set of fixtures so they cannot drift;
+ * `src/purity.test.ts` proves this module reaches no Zod at all.
  *
  * `sceneId` is the whole of it: `options` is `unknown` on the wire, so there is
  * nothing about it a check could prove, and a `ready` that names only its
@@ -509,7 +511,10 @@ export function embedViewer(container: HTMLElement, options: EmbedOptions): Jeex
       }
     }
     if (autoHeight && data.event === 'size') {
-      // Proved by hand like `readyPayload`: no Zod in this 4 KB helper.
+      // Proved by hand like `readyPayload`: no Zod in this 4 KB helper. The
+      // contract is the `size` branch of `eventSchema` (a finite `height`);
+      // only a positive one is applied, an empty frame never collapses the
+      // iframe to nothing.
       const height = (data.payload as { height?: unknown } | null)?.height;
       if (typeof height === 'number' && Number.isFinite(height) && height > 0) {
         iframe.style.setProperty('aspect-ratio', 'auto');

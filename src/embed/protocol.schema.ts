@@ -39,7 +39,7 @@ import { cameraPoseSchema } from '../scene/types.schema.js';
 import { isUuidV7 } from '../scene/types.js';
 import type { ViewerErrorCode } from '../shared/errors.js';
 import type { SchemaIssue } from '../shared/schema-issues.js';
-import type { CommandMethod, TourSpeed, TourState } from './protocol.js';
+import { CHANNEL, PROTOCOL_VERSION, type CommandMethod, type JeexMessage, type TourSpeed, type TourState } from './protocol.js';
 import type { ViewerSelectionKind } from '../app/selection.js';
 
 // ------------------------------------------------------- the error vocabulary
@@ -380,3 +380,29 @@ export type EmbedEvent = z.infer<typeof eventSchema>;
 
 /** The payload the schema accepts for one event name; `protocol.schema.test.ts` proves it covers `EmbedEventMap`. */
 export type PayloadOf<E extends EmbedEvent['event']> = Extract<EmbedEvent, { event: E }>['payload'];
+
+// --------------------------------------------------------------- the envelope
+
+/** The three fields every message of this channel carries (`Envelope` in `protocol.ts`). */
+const envelopeShape = { channel: z.literal(CHANNEL), version: z.literal(PROTOCOL_VERSION), viewerId: z.string() };
+
+/**
+ * Whether a `MessageEvent.data` is one of ours, as a schema: this channel, this
+ * protocol version, a string `viewerId`, and the correlation fields its `kind`
+ * needs. The FRAME reads its traffic through `isJeexEnvelope`; the host helper
+ * keeps `protocol.ts`'s hand-written `isJeexMessage` for its 4 KB budget, and
+ * `protocol.schema.test.ts` runs the two over the same fixtures.
+ *
+ * Only the envelope is judged here: a command's `params` are `readCommand`'s,
+ * and `method` is resolved against the method list by `resolveMethod`.
+ */
+export const jeexMessageSchema = z.discriminatedUnion('kind', [
+  z.object({ ...envelopeShape, kind: z.literal('command'), id: z.string(), method: z.string() }),
+  z.object({ ...envelopeShape, kind: z.literal('reply'), id: z.string(), ok: z.boolean() }),
+  z.object({ ...envelopeShape, kind: z.literal('event'), event: z.string() }),
+]);
+
+/** `jeexMessageSchema` as a guard; the message itself flows on untouched, never `result.data`. */
+export function isJeexEnvelope(data: unknown): data is JeexMessage {
+  return z.safeParse(jeexMessageSchema, data).success;
+}

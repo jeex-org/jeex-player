@@ -42,6 +42,8 @@ const SCHEMA_MODULES: readonly string[] = [
   'app/viewer-options.schema',
   'embed/protocol.schema',
   'assets/project-manifest.schema',
+  'geometry/glb-container.schema',
+  'embed/frame-page.schema',
 ];
 
 /** Modules the architecture declares pure: no `three`, no DOM. */

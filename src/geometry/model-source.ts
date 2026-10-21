@@ -322,13 +322,8 @@ export function createGltfModelSource(options: ModelSourceOptions = {}): Disposa
     // the refusal deterministic for every URI the document names; the manager
     // below stays as the enforcement at the fetch site itself, for anything a
     // future loader version resolves another way.
-    for (const group of [container.images, container.buffers]) {
-      if (!Array.isArray(group)) continue;
-      for (const entry of group) {
-        if (typeof entry !== 'object' || entry === null) continue;
-        const uri = (entry as { uri?: unknown }).uri;
-        if (typeof uri === 'string') resolveModelResource(uri, folder);
-      }
+    for (const entry of [...(container.images ?? []), ...(container.buffers ?? [])]) {
+      if (entry.uri !== undefined) resolveModelResource(entry.uri, folder);
     }
     // One manager per parse: it exists to hold THIS model's gate (`factory`
     // exists to build one loader per manager — see `LoaderFactory`).

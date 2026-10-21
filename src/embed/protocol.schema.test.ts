@@ -9,8 +9,21 @@
 
 import { describe, expect, test } from 'bun:test';
 import { z } from 'zod/mini';
-import { METHOD_LIST, type CommandMethod, type EmbedEventMap, type ErrorCode, type EventName } from './protocol.js';
 import {
+  CHANNEL,
+  METHOD_LIST,
+  PROTOCOL_VERSION,
+  commandMessage,
+  commandReply,
+  eventMessage,
+  isJeexMessage,
+  type CommandMethod,
+  type EmbedEventMap,
+  type ErrorCode,
+  type EventName,
+} from './protocol.js';
+import {
+  isJeexEnvelope,
   commandSchema,
   errorCodeSchema,
   eventSchema,
@@ -333,5 +346,44 @@ describe('readyPayloadSchema', () => {
     expect(z.safeParse(readyPayloadSchema, {}).success).toBe(false);
     expect(z.safeParse(readyPayloadSchema, null).success).toBe(false);
     expect(z.safeParse(readyPayloadSchema, 'ready').success).toBe(false);
+  });
+});
+
+describe('isJeexEnvelope, the frame side of isJeexMessage', () => {
+  const command = { channel: CHANNEL, version: PROTOCOL_VERSION, viewerId: 'v1', kind: 'command', id: 'c1', method: 'play' };
+  const event = { channel: CHANNEL, version: PROTOCOL_VERSION, viewerId: 'v1', kind: 'event', event: 'ready' };
+  const bare = Object.assign(Object.create(null) as Record<string, unknown>, event);
+
+  /** Every message the hand-written host guard is tested against, ours and not. */
+  const FIXTURES: ReadonlyArray<readonly [string, unknown, boolean]> = [
+    ['a command', command, true],
+    ['a reply', { ...command, kind: 'reply', ok: true }, true],
+    ['an event', event, true],
+    ['a built command', commandMessage('v1', 'c1', 'play'), true],
+    ['a built reply', commandReply('v1', 'c1', { ok: true }), true],
+    ['a built event', eventMessage('v1', 'ready', {}), true],
+    ['a null-prototype event', bare, true],
+    ['another channel', { ...command, channel: 'other-widget' }, false],
+    ['another version', { ...command, version: 2 }, false],
+    ['a string version', { ...command, version: '1' }, false],
+    ['a NaN version', { ...command, version: Number.NaN }, false],
+    ['no viewer', { ...command, viewerId: undefined }, false],
+    ['a numeric viewer', { ...command, viewerId: 1 }, false],
+    ['an unknown kind', { ...command, kind: 'shout' }, false],
+    ['no kind', { channel: CHANNEL, version: PROTOCOL_VERSION, viewerId: 'v1' }, false],
+    ['a numeric id', { ...command, id: 7 }, false],
+    ['no id', { ...command, id: undefined }, false],
+    ['a numeric method', { ...command, method: 7 }, false],
+    ['a reply whose ok is a string', { ...command, kind: 'reply', ok: 'yes' }, false],
+    ['null', null, false],
+    ['undefined', undefined, false],
+    ['a bare string', 'jeex-embed', false],
+    ['a number', 7, false],
+    ['an array', [], false],
+    ['a function', () => undefined, false],
+  ];
+
+  test.each(FIXTURES)('%s: the schema and the hand-written guard agree', (_name, value, expected) => {
+    expect([isJeexEnvelope(value), isJeexMessage(value)]).toEqual([expected, expected]);
   });
 });

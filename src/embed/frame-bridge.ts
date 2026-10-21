@@ -35,7 +35,6 @@ import {
   DEFAULT_VIEWER_ID,
   commandReply,
   eventMessage,
-  isJeexMessage,
   resolveMethod,
   type CommandMethod,
   type CommandOutcome,
@@ -44,7 +43,7 @@ import {
   type EventName,
   type JeexCommand,
 } from './protocol.js';
-import { readCommand, type Command, type ParamsOf } from './protocol.schema.js';
+import { isJeexEnvelope, readCommand, type Command, type ParamsOf } from './protocol.schema.js';
 import { badParams } from '../shared/schema-issues.js';
 import { MAX_SCENE_BYTES, inlineDocumentBytes } from '../shared/limits.js';
 import type { CaptureResult, CaptureStillRequest, CapturePanoramaRequest } from '../app/capture-commands.js';
@@ -52,7 +51,7 @@ import type { ViewerError } from '../app/viewer-events.js';
 import type { ViewerHandle } from '../app/viewer-handle.js';
 import type { ExportGlbOptions } from '../app/export-gltf.js';
 import type { ExportUsdzOptions } from '../app/export-usdz.js';
-import { isExactOrigin } from './frame-page.js';
+import { isExactOrigin } from './frame-page.schema.js';
 import { ViewerLibError } from '../shared/errors.js';
 
 type FrameBridgeOptions = {
@@ -334,7 +333,7 @@ export function installFrameBridge(handle: ViewerHandle, options: FrameBridgeOpt
     // even looked at, and only then is its shape read.
     if (event.source !== target || event.origin !== hostOrigin) return;
     const data: unknown = event.data;
-    if (!isJeexMessage(data) || data.kind !== 'command' || data.viewerId !== viewerId) return;
+    if (!isJeexEnvelope(data) || data.kind !== 'command' || data.viewerId !== viewerId) return;
     // A `dispose` uninstalls the bridge inside `perform`, and its own reply is
     // still owed: posting does not go through the listener, so the last answer
     // gets out after the frame has stopped listening for the next one.
