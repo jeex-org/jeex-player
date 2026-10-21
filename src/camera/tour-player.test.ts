@@ -148,9 +148,9 @@ describe('tour player', () => {
       const pose = recorder.pose;
       if (!pose) break;
       if (Math.abs(pose.position.y - 1.6) < 0.01) sawEyeLevel = true;
-      // Waypoint 35 of the demo tour: the centre of the bedroom door.
+      // Waypoints 41 and 53 of the demo tour: the centre of the bedroom door.
       if (pose.position.distanceTo(new THREE.Vector3(7.7, 1.6, 5.2)) < 0.45) passedBedroomDoor = true;
-      // Gaze key at waypoint 5: the media unit on the living room's west wall.
+      // Gaze key at waypoint 7: the media unit on the living room's west wall.
       if (pose.target.distanceTo(new THREE.Vector3(0.36, 1.0, 6.0)) < 1.2) gazedAtTvWall = true;
       const settling = player.getDuration() - player.getElapsed() < 0.5;
       if (previous && pose.position.y < 3 && previous.y < 3 && guard > 15 && !settling) {

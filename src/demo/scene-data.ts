@@ -238,7 +238,7 @@ const baseApartment: SceneData = {
       thickness: 0.24,
       role: 'bearing',
       // Kitchen ↔ living door, centre at (3.80, 3.60).
-      openings: [{ id: OPENING.doorKitchenLiving, type: 'door', center: 3.8, width: 0.8, sill: 0, head: 2.1, hinge: 'b', swing: 'in' }],
+      openings: [{ id: OPENING.doorKitchenLiving, type: 'door', center: 3.8, width: 0.8, sill: 0, head: 2.1, hinge: 'b', swing: 'out' }],
     },
     {
       id: WALL.spineBath,
@@ -247,7 +247,7 @@ const baseApartment: SceneData = {
       thickness: 0.24,
       role: 'bearing',
       // Bathroom door, centre at (6.00, 3.60).
-      openings: [{ id: OPENING.doorBathroom, type: 'door', center: 1.6, width: 0.8, sill: 0, head: 2.1, hinge: 'b', swing: 'in' }],
+      openings: [{ id: OPENING.doorBathroom, type: 'door', center: 1.6, width: 0.8, sill: 0, head: 2.1, hinge: 'a', swing: 'in' }],
     },
     {
       id: WALL.spineWc,
@@ -265,7 +265,7 @@ const baseApartment: SceneData = {
       thickness: 0.24,
       role: 'bearing',
       // Guest room door, centre at (9.00, 3.60).
-      openings: [{ id: OPENING.doorGuestRoom, type: 'door', center: 0.8, width: 0.8, sill: 0, head: 2.1, hinge: 'a', swing: 'in' }],
+      openings: [{ id: OPENING.doorGuestRoom, type: 'door', center: 0.8, width: 0.8, sill: 0, head: 2.1, hinge: 'a', swing: 'out' }],
     },
 
     // ---- Partitions, 0.10 ----
@@ -385,95 +385,136 @@ const baseApartment: SceneData = {
     // Every wall crossing happens at the centre of a door, and every leg
     // keeps clear of the furniture (`scene-data.test.ts` holds each leg to
     // `canTraverse` and `pathBlockedByFurniture`).
+    //
+    // Doors are walked straight through: a waypoint at the door centre,
+    // approached and left along the door's axis, so the corner fillets turn
+    // in the rooms, never in the reveal, and the hall is walked on the side
+    // clear of the open door leaves. The gaze holds a target behind each
+    // door on its axis while the camera passes it, and every look at an
+    // object hands over to the next look before the camera leaves the room,
+    // so the view never swings across a wall at arm's length. The played run
+    // is held to the walls by `autotour-walls.test.ts`.
     speed: 1.1,
     path: [
       { x: 12.4, y: 1.6, z: 4.4 }, // 0  hall, just inside the entrance
-      { x: 11.0, y: 1.6, z: 4.45 }, // 1  hall, past the console
-      { x: 7.0, y: 1.6, z: 4.45 }, // 2  hall
-      { x: 5.2, y: 1.6, z: 4.45 }, // 3  hall, west end
-      { x: 4.4, y: 1.6, z: 4.4 }, // 4  door-living-hall
-      { x: 3.95, y: 1.6, z: 5.0 }, // 5  living, north end of the aisle
-      { x: 3.95, y: 1.6, z: 7.6 }, // 6  living, aisle between sofa and table
-      { x: 4.0, y: 1.6, z: 8.45 }, // 7  living, south of the dining table
-      { x: 1.8, y: 1.6, z: 8.55 }, // 8  living, behind the lounge
-      { x: 1.75, y: 1.6, z: 9.3 }, // 9  living, inside the bay
-      { x: 1.8, y: 1.6, z: 8.55 }, // 10 living
-      { x: 3.95, y: 1.6, z: 7.6 }, // 11 living, aisle
-      { x: 3.95, y: 1.6, z: 5.0 }, // 12 living
-      { x: 3.85, y: 1.6, z: 4.3 }, // 13 living, by the kitchen door
-      { x: 3.8, y: 1.6, z: 3.6 }, // 14 door-kitchen-living
-      { x: 3.6, y: 1.6, z: 2.9 }, // 15 kitchen
-      { x: 3.6, y: 1.6, z: 1.2 }, // 16 kitchen, east of the island
-      { x: 1.2, y: 1.6, z: 1.2 }, // 17 kitchen, at the worktop
-      { x: 3.6, y: 1.6, z: 1.2 }, // 18 kitchen
-      { x: 3.6, y: 1.6, z: 2.9 }, // 19 kitchen
-      { x: 3.8, y: 1.6, z: 3.6 }, // 20 door-kitchen-living
-      { x: 3.9, y: 1.6, z: 4.3 }, // 21 living
-      { x: 4.4, y: 1.6, z: 4.4 }, // 22 door-living-hall
-      { x: 6.0, y: 1.6, z: 4.45 }, // 23 hall
-      { x: 6.0, y: 1.6, z: 3.6 }, // 24 door-bathroom
-      { x: 5.6, y: 1.6, z: 2.6 }, // 25 bathroom
-      { x: 6.0, y: 1.6, z: 3.6 }, // 26 door-bathroom
-      { x: 7.0, y: 1.6, z: 4.45 }, // 27 hall
-      { x: 9.0, y: 1.6, z: 4.45 }, // 28 hall
-      { x: 9.0, y: 1.6, z: 3.6 }, // 29 door-guest-room
-      { x: 9.6, y: 1.6, z: 2.5 }, // 30 guest bedroom
-      { x: 10.2, y: 1.6, z: 1.0 }, // 31 guest bedroom, by the window
-      { x: 9.6, y: 1.6, z: 2.5 }, // 32 guest bedroom
-      { x: 9.0, y: 1.6, z: 3.6 }, // 33 door-guest-room
-      { x: 8.0, y: 1.6, z: 4.6 }, // 34 hall
-      { x: 7.7, y: 1.6, z: 5.2 }, // 35 door-bedroom
-      { x: 8.1, y: 1.6, z: 6.3 }, // 36 bedroom
-      { x: 8.2, y: 1.6, z: 8.4 }, // 37 bedroom, past the foot of the bed
-      { x: 8.4, y: 1.6, z: 9.2 }, // 38 door-bedroom-loggia
-      { x: 8.4, y: 1.6, z: 9.75 }, // 39 loggia
-      { x: 6.4, y: 1.6, z: 9.75 }, // 40 loggia, west end
-      { x: 8.4, y: 1.6, z: 9.75 }, // 41 loggia
-      { x: 8.4, y: 1.6, z: 9.2 }, // 42 door-bedroom-loggia
-      { x: 8.2, y: 1.6, z: 8.4 }, // 43 bedroom
-      { x: 8.1, y: 1.6, z: 6.3 }, // 44 bedroom
-      { x: 7.7, y: 1.6, z: 5.2 }, // 45 door-bedroom
-      { x: 7.7, y: 1.6, z: 4.6 }, // 46 hall
-      { x: 11.6, y: 1.6, z: 4.6 }, // 47 hall
-      { x: 11.6, y: 1.6, z: 5.2 }, // 48 door-study
-      { x: 11.6, y: 1.6, z: 6.3 }, // 49 study
-      { x: 12.4, y: 1.6, z: 7.4 }, // 50 study, behind the desk chair
+      { x: 12.1, y: 1.6, z: 4.7 }, // 1  hall, the console and its mirror ahead
+      { x: 10.6, y: 1.6, z: 4.7 }, // 2  hall, past the console
+      { x: 7.0, y: 1.6, z: 4.7 }, // 3  hall
+      { x: 5.2, y: 1.6, z: 4.7 }, // 4  hall, west end
+      { x: 4.4, y: 1.6, z: 4.4 }, // 5  door-living-hall
+      { x: 3.9, y: 1.6, z: 4.4 }, // 6  living, straight through the door
+      { x: 3.95, y: 1.6, z: 5.0 }, // 7  living, north end of the aisle
+      { x: 3.95, y: 1.6, z: 7.6 }, // 8  living, aisle between sofa and table
+      { x: 4.0, y: 1.6, z: 8.45 }, // 9  living, south of the dining table
+      { x: 1.8, y: 1.6, z: 8.55 }, // 10 living, behind the lounge
+      { x: 1.75, y: 1.6, z: 9.3 }, // 11 living, inside the bay
+      { x: 1.8, y: 1.6, z: 8.55 }, // 12 living
+      { x: 3.95, y: 1.6, z: 7.6 }, // 13 living, aisle
+      { x: 3.95, y: 1.6, z: 5.0 }, // 14 living
+      { x: 3.8, y: 1.6, z: 4.3 }, // 15 living, by the kitchen door
+      { x: 3.8, y: 1.6, z: 3.6 }, // 16 door-kitchen-living
+      { x: 3.8, y: 1.6, z: 2.9 }, // 17 kitchen, straight through the door
+      { x: 3.6, y: 1.6, z: 1.3 }, // 18 kitchen, east of the island
+      { x: 1.2, y: 1.6, z: 1.3 }, // 19 kitchen, at the worktop
+      { x: 3.6, y: 1.6, z: 1.3 }, // 20 kitchen
+      { x: 3.8, y: 1.6, z: 2.9 }, // 21 kitchen
+      { x: 3.8, y: 1.6, z: 3.6 }, // 22 door-kitchen-living
+      { x: 3.8, y: 1.6, z: 4.4 }, // 23 living, straight through the door
+      { x: 4.4, y: 1.6, z: 4.4 }, // 24 door-living-hall
+      { x: 5.75, y: 1.6, z: 4.7 }, // 25 hall, by the bathroom door
+      { x: 6.0, y: 1.6, z: 4.7 }, // 26 hall, facing the bathroom door
+      { x: 6.0, y: 1.6, z: 3.6 }, // 27 door-bathroom
+      { x: 6.0, y: 1.6, z: 3.0 }, // 28 bathroom, straight through the door
+      { x: 5.4, y: 1.6, z: 2.4 }, // 29 bathroom, past the door
+      { x: 6.0, y: 1.6, z: 3.0 }, // 30 bathroom, facing the door
+      { x: 6.0, y: 1.6, z: 3.6 }, // 31 door-bathroom
+      { x: 6.0, y: 1.6, z: 4.7 }, // 32 hall, straight out of the door
+      { x: 9.0, y: 1.6, z: 4.7 }, // 33 hall
+      { x: 9.0, y: 1.6, z: 3.6 }, // 34 door-guest-room
+      { x: 9.0, y: 1.6, z: 2.5 }, // 35 guest bedroom, straight through the door
+      { x: 10.2, y: 1.6, z: 1.0 }, // 36 guest bedroom, by the window
+      { x: 9.0, y: 1.6, z: 2.5 }, // 37 guest bedroom, facing the door
+      { x: 9.0, y: 1.6, z: 3.6 }, // 38 door-guest-room
+      { x: 9.0, y: 1.6, z: 4.7 }, // 39 hall, straight out of the door
+      { x: 7.7, y: 1.6, z: 4.7 }, // 40 hall, facing the bedroom door
+      { x: 7.7, y: 1.6, z: 5.2 }, // 41 door-bedroom
+      { x: 8.1, y: 1.6, z: 6.3 }, // 42 bedroom
+      { x: 8.15, y: 1.6, z: 7.4 }, // 43 bedroom, by the foot of the bed
+      { x: 8.2, y: 1.6, z: 8.4 }, // 44 bedroom, past the foot of the bed
+      { x: 8.45, y: 1.6, z: 9.2 }, // 45 door-bedroom-loggia
+      { x: 8.45, y: 1.6, z: 10.2 }, // 46 loggia
+      { x: 6.4, y: 1.6, z: 10.2 }, // 47 loggia, west end
+      { x: 7.9, y: 1.6, z: 10.2 }, // 48 loggia
+      { x: 8.45, y: 1.6, z: 10.2 }, // 49 loggia, facing the door
+      { x: 8.45, y: 1.6, z: 9.2 }, // 50 door-bedroom-loggia
+      { x: 8.2, y: 1.6, z: 8.4 }, // 51 bedroom
+      { x: 8.0, y: 1.6, z: 6.0 }, // 52 bedroom, facing the door
+      { x: 7.7, y: 1.6, z: 5.2 }, // 53 door-bedroom
+      { x: 7.7, y: 1.6, z: 4.7 }, // 54 hall, straight out of the door
+      { x: 11.45, y: 1.6, z: 4.45 }, // 55 hall, by the study door
+      { x: 11.6, y: 1.6, z: 4.45 }, // 56 hall, facing the study door
+      { x: 11.6, y: 1.6, z: 5.2 }, // 57 door-study
+      { x: 11.6, y: 1.6, z: 6.3 }, // 58 study
+      { x: 12.4, y: 1.6, z: 7.4 }, // 59 study, behind the desk chair
     ],
     gaze: [
       { at: 0, target: { x: 5.0, y: 1.4, z: 4.4 } }, // down the corridor
       { at: 1, target: { x: 11.2, y: 1.6, z: 3.75 } }, // hall mirror over the console
-      { at: 5, target: { x: 0.36, y: 1.0, z: 6.0 } }, // media unit
-      { at: 6, target: { x: 5.5, y: 1.0, z: 7.06 } }, // dining table under the pendant
-      { at: 8, target: { x: 2.6, y: 1.4, z: 9.85 } }, // bay window
-      { at: 9, target: { x: 2.6, y: 1.4, z: 9.9 } },
-      { at: 12, target: { x: 1.6, y: 1.5, z: 3.745 } }, // art over the lounge
-      { at: 15, target: { x: 1.35, y: 1.0, z: 0.5 } }, // kitchen worktop
-      { at: 17, target: { x: 2.91, y: 1.2, z: 0.45 } }, // hob
-      { at: 19, target: { x: 2.0, y: 0.9, z: 2.15 } }, // island
-      { at: 25, target: { x: 6.5, y: 1.0, z: 1.6 } }, // bathroom vanity
-      { at: 30, target: { x: 11.93, y: 0.6, z: 1.75 } }, // guest bed
-      { at: 31, target: { x: 10.6, y: 1.5, z: 0.0 } }, // guest bedroom window
-      { at: 36, target: { x: 9.83, y: 0.6, z: 7.15 } }, // bed
-      { at: 37, target: { x: 10.0, y: 1.5, z: 9.2 } }, // bedroom window
-      { at: 39, target: { x: 8.3, y: 1.4, z: 10.7 } }, // loggia window
-      { at: 43, target: { x: 10.925, y: 1.5, z: 7.15 } }, // art over the bed head
-      { at: 49, target: { x: 12.05, y: 0.9, z: 8.74 } }, // desk
-      { at: 50, target: { x: 12.1, y: 1.5, z: 9.2 } }, // study window
+      { at: 2, target: { x: 2.0, y: 1.4, z: 4.4 } }, // down the corridor, through the living-room door
+      { at: 7, target: { x: 0.36, y: 1.0, z: 6.0 } }, // media unit
+      { at: 8, target: { x: 5.5, y: 1.0, z: 7.06 } }, // dining table under the pendant
+      { at: 10, target: { x: 2.4, y: 0.8, z: 7.2 } }, // the lounge
+      { at: 11, target: { x: 2.6, y: 1.4, z: 9.9 } }, // bay window
+      { at: 12, target: { x: 5.5, y: 1.0, z: 7.06 } }, // back towards the dining table
+      { at: 13, target: { x: 1.6, y: 1.5, z: 3.745 } }, // art over the lounge
+      { at: 16, target: { x: 3.8, y: 1.4, z: 1.5 } }, // straight through the kitchen door
+      { at: 18, target: { x: 1.35, y: 1.0, z: 0.5 } }, // kitchen worktop
+      { at: 19, target: { x: 2.91, y: 1.2, z: 0.45 } }, // hob
+      { at: 20, target: { x: 2.0, y: 0.9, z: 2.15 } }, // island
+      { at: 21, target: { x: 3.8, y: 1.4, z: 5.5 } }, // straight back to the kitchen door
+      { at: 24, target: { x: 7.0, y: 1.5, z: 4.45 } }, // down the hall
+      { at: 25, target: { x: 7.0, y: 1.5, z: 4.7 } }, // held down the hall
+      { at: 27, target: { x: 6.0, y: 1.4, z: 1.8 } }, // straight through the bathroom door
+      { at: 29, target: { x: 6.5, y: 1.0, z: 1.6 } }, // bathroom vanity
+      { at: 30, target: { x: 6.4, y: 1.4, z: 5.0 } }, // out of the bathroom door, towards the hall
+      { at: 32, target: { x: 13.0, y: 1.5, z: 4.45 } }, // down the hall
+      { at: 34, target: { x: 9.0, y: 1.4, z: 1.8 } }, // straight through the guest-room door
+      { at: 35, target: { x: 11.93, y: 0.6, z: 1.75 } }, // guest bed
+      { at: 36, target: { x: 10.6, y: 1.5, z: 0.0 } }, // guest bedroom window
+      { at: 37, target: { x: 8.4, y: 1.4, z: 5.0 } }, // out of the guest-room door, towards the hall
+      { at: 38, target: { x: 8.4, y: 1.4, z: 5.0 } }, // held through the door
+      { at: 39, target: { x: 4.6, y: 1.4, z: 4.45 } }, // down the hall
+      { at: 40, target: { x: 7.7, y: 1.4, z: 7.0 } }, // straight through the bedroom door
+      { at: 42, target: { x: 9.83, y: 0.6, z: 7.15 } }, // bed
+      { at: 43, target: { x: 9.6, y: 1.5, z: 9.2 } }, // bedroom window
+      { at: 44, target: { x: 8.45, y: 1.4, z: 10.7 } }, // straight through the loggia door
+      { at: 46, target: { x: 8.3, y: 1.4, z: 10.7 } }, // loggia window
+      { at: 47, target: { x: 10.6, y: 1.5, z: 10.2 } }, // along the loggia
+      { at: 48, target: { x: 10.6, y: 1.5, z: 10.2 } }, // held until the door
+      { at: 49, target: { x: 8.45, y: 1.4, z: 7.0 } }, // straight back through the loggia door
+      { at: 51, target: { x: 10.925, y: 1.5, z: 7.15 } }, // art over the bed head
+      { at: 52, target: { x: 7.7, y: 1.4, z: 3.9 } }, // straight out of the bedroom door
+      { at: 53, target: { x: 7.7, y: 1.4, z: 3.9 } }, // held through the door
+      { at: 54, target: { x: 13.0, y: 1.5, z: 4.45 } }, // down the hall
+      { at: 55, target: { x: 13.0, y: 1.5, z: 4.45 } }, // down the hall
+      { at: 57, target: { x: 11.6, y: 1.4, z: 7.5 } }, // straight through the study door
+      { at: 58, target: { x: 12.05, y: 0.9, z: 8.74 } }, // desk
+      { at: 59, target: { x: 12.1, y: 1.5, z: 9.2 } }, // study window
     ],
     zones: [
       { at: 0, speed: 0.9 }, // hall is a corridor
-      { at: 5, speed: 1.2 }, // living room
-      { at: 8, speed: 0.8 }, // the bay
-      { at: 11, speed: 1.2 }, // back across the living room
-      { at: 15, speed: 0.75 }, // kitchen, around the island
-      { at: 21, speed: 1.0 }, // hall
-      { at: 25, speed: 0.7 }, // bathroom
-      { at: 27, speed: 1.0 }, // hall
-      { at: 30, speed: 0.95 }, // guest bedroom
-      { at: 36, speed: 1.05 }, // bedroom
-      { at: 39, speed: 0.75 }, // loggia
-      { at: 46, speed: 1.0 }, // hall
-      { at: 49, speed: 0.9 }, // study
+      { at: 7, speed: 1.2 }, // living room
+      { at: 10, speed: 0.8 }, // the bay
+      { at: 13, speed: 1.2 }, // back across the living room
+      { at: 17, speed: 0.75 }, // kitchen, around the island
+      { at: 23, speed: 1.0 }, // back to the hall
+      { at: 29, speed: 0.7 }, // bathroom
+      { at: 32, speed: 1.0 }, // hall
+      { at: 35, speed: 0.95 }, // guest bedroom
+      { at: 42, speed: 1.05 }, // bedroom
+      { at: 46, speed: 0.75 }, // loggia
+      { at: 54, speed: 1.0 }, // hall
+      { at: 58, speed: 0.9 }, // study
     ],
   },
 };
