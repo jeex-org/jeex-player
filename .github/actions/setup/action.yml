@@ -1,6 +1,6 @@
-# What every job of `ci.yml` does before its own steps: Bun at the pinned
-# version, the package cache, a frozen install and, for the jobs that drive a
-# browser, the Chromium Playwright pins.
+# What every job of `ci.yml` and `browser.yml` does before its own steps: Bun
+# at the pinned version, the package cache, a frozen install and, for the
+# `browser.yml` jobs that drive a browser, the Chromium Playwright pins.
 name: setup
 description: Bun, the dependencies and (optionally) Playwright's Chromium.
 

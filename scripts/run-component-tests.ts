@@ -44,7 +44,7 @@
  *      diagnoses nothing — instead of hanging "indefinitely" the way the
  *      standalone command did.
  *
- * `check.sh` and `.github/workflows/ci.yml` both still just run
+ * `check.sh` and `.github/workflows/browser.yml` both still just run
  * `bun run test:component` — this script IS that npm script now (was
  * `vitest run --config vitest.config.ts` directly), so both the gate and CI
  * get the same protection with no change to either file, and the standalone

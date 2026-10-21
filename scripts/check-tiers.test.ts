@@ -58,6 +58,7 @@ const FULL_ONLY_LABELS = [
   'npm run build:lib',
   'npm run check:budget:lib',
   'check:pkg',
+  'site build',
   'bun audit',
   'code-ranker check',
 ];
