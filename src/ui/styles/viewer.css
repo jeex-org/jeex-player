@@ -1140,8 +1140,9 @@
     --jeex-minimap-lift-tour: 26px;
   }
   /* A host box claimed at `bottom-right` (for example a 56px assistant button)
-     sits at layer 8, over this card's lower-right corner: the card rises above
-     it by the button plus an 8px gap, the same 64px `.camera-preview` (which
+     sits at layer 8, over this card's lower-right corner: the card rises 64px,
+     the button plus an 8px gap at desktop width, 4px in viewers 600px and
+     narrower (edge 14px, slot inset 18px); the same 64px `.camera-preview` (which
      takes this corner while a checkpoint is focused), `.degraded-notice` and
      the tour bar's end padding step by. Like theirs, the 64px is calibrated
      on a 56px box at the default `--jeex-slot-inset`; a taller box or a larger

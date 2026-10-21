@@ -255,7 +255,8 @@ describe('the tour cameras on the card', () => {
 /**
  * A host may claim the `bottom-right` box (the studio puts its 56px assistant
  * button there); the box sits at layer 8, above the card's 6, so it covered
- * the map's lower-right corner in walk and tour (56 x 30 px at 1280 wide). The
+ * the map's lower-right corner in walk and tour (at 1280 wide: 56 x 56 px in
+ * walk, 56 x 30 px in tour). The
  * card rises out of the box's way like the camera preview that takes its place,
  * and a viewer whose host claimed nothing keeps the card where it always was.
  * The check sizes are the desktop window the defect was measured in, a phone
@@ -298,6 +299,8 @@ describe('the card keeps clear of a claimed bottom-right corner', () => {
         const viewport = harness.shell.container.getBoundingClientRect();
         expect(card.top).toBeGreaterThanOrEqual(viewport.top);
         expect(viewport.right - card.right).toBeCloseTo(edge, 0);
+        // It rises by exactly the claimed corner's 64px, on top of its own lift.
+        expect(viewport.bottom - card.bottom).toBeCloseTo(edge + lift + 64, 0);
       });
 
       test(`${label}, ${mode}: without a claim the card keeps its corner`, () => {
