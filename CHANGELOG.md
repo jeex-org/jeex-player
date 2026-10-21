@@ -57,6 +57,19 @@ as described under [Versioning](#versioning).
 
 ### Fixed
 
+- **The demo tour no longer walks through door leaves, grazes walls or stares
+  into them.** The demo flat's authored tour walked through the open leaves
+  of the bathroom, guest-room and loggia doors (inside them or within 0.01 m
+  at about 38, 48, 54 and 58 s of the 73 s run), passed within 0.06-0.3 m of
+  other leaves and door jambs, and at several points kept its gaze on the
+  previous room's object while walking away from it, so the frame filled
+  with the wall in between. Its waypoints now cross every door straight
+  through its centre and walk the hall clear of the open leaves, its gaze
+  keys hand over to the next room before the camera leaves one, the kitchen
+  and guest-room doors open into their rooms, and the bathroom door is
+  hinged on its west jamb. The run is now 78 s long (69.5 m). A test samples
+  the played tour and holds it to the walls and the leaves. Only demo
+  content changed; the player is unchanged.
 - **The mini-map no longer sits under a claimed `bottom-right` slot.** In
   walk and tour, a host box in `bottom-right` (for example a 56px assistant
   button) covered the card's lower-right corner. The card now rises 64px
