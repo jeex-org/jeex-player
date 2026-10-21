@@ -1113,8 +1113,13 @@
   .jeex-viewer .minimap {
     position: absolute;
     z-index: 6;
-    inset-inline-end: max(18px, env(safe-area-inset-right));
-    inset-block-end: max(18px, env(safe-area-inset-bottom));
+    --jeex-minimap-edge: 18px;
+    --jeex-minimap-lift-slot: 0px;
+    --jeex-minimap-lift-tour: 0px;
+    inset-inline-end: max(var(--jeex-minimap-edge), env(safe-area-inset-right));
+    inset-block-end: calc(
+      max(var(--jeex-minimap-edge), env(safe-area-inset-bottom)) + var(--jeex-minimap-lift-slot) + var(--jeex-minimap-lift-tour)
+    );
     inline-size: min(var(--jeex-minimap-size), 42cqw);
     block-size: min(var(--jeex-minimap-size), 42cqw);
     padding: 8px;
@@ -1132,7 +1137,19 @@
   }
   /* The tour's progress bar runs along the bottom edge; the card steps over it. */
   .jeex-viewer .minimap[data-mode='tour'] {
-    inset-block-end: calc(max(18px, env(safe-area-inset-bottom)) + 26px);
+    --jeex-minimap-lift-tour: 26px;
+  }
+  /* A host box claimed at `bottom-right` (for example a 56px assistant button)
+     sits at layer 8, over this card's lower-right corner: the card rises 64px,
+     the button plus an 8px gap at desktop width, 4px in viewers 600px and
+     narrower (edge 14px, slot inset 18px); the same 64px `.camera-preview` (which
+     takes this corner while a checkpoint is focused), `.degraded-notice` and
+     the tour bar's end padding step by. Like theirs, the 64px is calibrated
+     on a 56px box at the default `--jeex-slot-inset`; a taller box or a larger
+     inset still reaches the card. It only moves up its own column and leaves
+     every other control where it was. */
+  .jeex-viewer[data-jeex-slot-bottom-right='true'] .minimap {
+    --jeex-minimap-lift-slot: 64px;
   }
   .jeex-viewer .minimap-canvas {
     display: block;
@@ -1142,13 +1159,9 @@
 
   @container (max-width: 600px) {
     .jeex-viewer .minimap {
-      inset-inline-end: max(14px, env(safe-area-inset-right));
-      inset-block-end: max(14px, env(safe-area-inset-bottom));
+      --jeex-minimap-edge: 14px;
       padding: 6px;
       border-radius: calc(var(--jeex-radius) - 4px);
-    }
-    .jeex-viewer .minimap[data-mode='tour'] {
-      inset-block-end: calc(max(14px, env(safe-area-inset-bottom)) + 26px);
     }
   }
 

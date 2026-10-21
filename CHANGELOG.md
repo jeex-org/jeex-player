@@ -42,6 +42,14 @@ as described under [Versioning](#versioning).
   library UUID the document names for the placement (its `library`, else
   `assetLibrary`) and are absent for the built-in bank.
 
+### Fixed
+
+- **The mini-map no longer sits under a claimed `bottom-right` slot.** In
+  walk and tour, a host box in `bottom-right` (for example a 56px assistant
+  button) covered the card's lower-right corner. The card now rises 64px
+  above it, as the camera preview, the degraded-asset notice and the tour
+  bar already did; without that slot the card stays where it was.
+
 ## [0.1.0] — 2026-10-19
 
 The first public release of JEEX Player (the package name is `jeex-viewer`;

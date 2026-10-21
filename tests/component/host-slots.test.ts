@@ -23,6 +23,8 @@ import {
   SETTLE_FRAMES,
   closeContainers,
   demoScene,
+  fillSlot,
+  intersects,
   nextFrame,
   openContainer,
   openShell,
@@ -87,24 +89,6 @@ async function untilAnchorStill(handle: ViewerHandle, what: string): Promise<{ x
     SETTLE_FRAMES,
   );
   return last!;
-}
-
-/**
- * Axis-aligned rectangle overlap; `false` on merely touching edges.
- *
- * Module scope so both the corner-stepping tests
- * below and the viewport-containment tests reuse the one definition.
- */
-function intersects(a: DOMRect, b: DOMRect): boolean {
-  return a.left < b.right && a.right > b.left && a.top < b.bottom && a.bottom > b.top;
-}
-
-/** A box with no content has zero size — give it the button's own footprint. */
-function fill(box: HTMLElement): void {
-  const content = document.createElement('div');
-  content.style.setProperty('inline-size', '56px');
-  content.style.setProperty('block-size', '56px');
-  box.append(content);
 }
 
 /** The boxes for `names`, built into the shell the same way `viewer-context` will. */
@@ -280,7 +264,7 @@ describe('the degraded notice steps aside for a claimed corner', () => {
 
   test('does not overlap a requested bottom-right slot box', () => {
     const slots = build(['bottom-right']);
-    fill(slots.get('bottom-right'));
+    fillSlot(slots.get('bottom-right'));
     const notice = shell.roots.byName('degraded-notice');
     notice.classList.remove('is-hidden');
     const overlap = intersects(notice.getBoundingClientRect(), slots.get('bottom-right').getBoundingClientRect());
@@ -304,8 +288,8 @@ describe('the degraded notice steps aside for a claimed corner', () => {
 
   test('stacks above the bottom band when both bottom corners are claimed, clearing both boxes', () => {
     const slots = build(['bottom-right', 'bottom-left']);
-    fill(slots.get('bottom-right'));
-    fill(slots.get('bottom-left'));
+    fillSlot(slots.get('bottom-right'));
+    fillSlot(slots.get('bottom-left'));
     const notice = shell.roots.byName('degraded-notice');
     notice.classList.remove('is-hidden');
     const noticeRect = notice.getBoundingClientRect();
@@ -315,8 +299,8 @@ describe('the degraded notice steps aside for a claimed corner', () => {
 
   test("every rect involved stays inside the viewer's own viewport", () => {
     const slots = build(['bottom-right', 'bottom-left']);
-    fill(slots.get('bottom-right'));
-    fill(slots.get('bottom-left'));
+    fillSlot(slots.get('bottom-right'));
+    fillSlot(slots.get('bottom-left'));
     const notice = shell.roots.byName('degraded-notice');
     notice.classList.remove('is-hidden');
     // "The viewport" is the mounted container, not the test runner's window —
@@ -360,7 +344,7 @@ describe('the degraded notice fits the check sizes', () => {
     test(`${label}: the notice's width is capped, and its box never crosses the container edge or the FAB corner`, () => {
       shell = openShell(width, height);
       const slots = build(['bottom-right']);
-      fill(slots.get('bottom-right'));
+      fillSlot(slots.get('bottom-right'));
       const notice = shell.roots.byName('degraded-notice');
       // `.viewer-ui` itself starts `is-hidden` in the raw shell tree
       // (`viewer-shell.ts`, revealed only by `ViewerChrome.showLoaded()` once
@@ -407,7 +391,7 @@ describe('the tour bar keeps clear of a claimed bottom-right corner', () => {
     test(`${label}: no control of the bar is under the slot box, and the track keeps a usable width`, () => {
       shell = openShell(width, height);
       const slots = build(['bottom-right']);
-      fill(slots.get('bottom-right'));
+      fillSlot(slots.get('bottom-right'));
       shell.roots.byName('viewer-ui').classList.remove('is-hidden');
       const bar = shell.roots.byName('tour-bar');
       bar.dataset['visible'] = 'true';

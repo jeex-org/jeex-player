@@ -9,10 +9,22 @@
 
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest';
 import { Minimap, type MinimapDeps } from '../../src/ui/minimap.js';
+import { HostSlots } from '../../src/ui/host-slots.js';
 import { OVERLAY_NAMES } from '../../src/ui/viewer-shell.js';
 import { roomAt } from '../../src/plan/plan-drawing.js';
 import type { PlanCameraMarker } from '../../src/plan/plan-canvas.js';
-import { canvasHasInk, closeContainers, demoDrawing, demoScene, nextFrame, openShell, until, type Shell } from './support.js';
+import {
+  canvasHasInk,
+  closeContainers,
+  demoDrawing,
+  demoScene,
+  fillSlot,
+  intersects,
+  nextFrame,
+  openShell,
+  until,
+  type Shell,
+} from './support.js';
 
 type World = { camera: PlanCameraMarker | null; enabled: boolean; hasDrawing: boolean };
 type Harness = { shell: Shell; map: Minimap; world: World; onRoomPicked: ReturnType<typeof vi.fn> };
@@ -22,8 +34,8 @@ const ROOM_ID = demoScene().rooms[0]!.id;
 /** A well-formed room id the demo does not have, fixed UUID v7. */
 const UNKNOWN_ROOM_ID = '01a12ffa-de61-7e99-9822-172e2877328a';
 
-function build(overrides: Partial<MinimapDeps> = {}): Harness {
-  const shell = openShell();
+function build(overrides: Partial<MinimapDeps> = {}, size: { width?: number; height?: number } = {}): Harness {
+  const shell = openShell(size.width, size.height);
   shell.roots.byName('viewer-ui').classList.remove('is-hidden');
   const world: World = { camera: { x: 2, z: 2, yaw: 0 }, enabled: true, hasDrawing: true };
   const onRoomPicked = vi.fn();
@@ -238,4 +250,72 @@ describe('the tour cameras on the card', () => {
     harness.map.update();
     expect(harness.map.element.querySelector('canvas')!.toDataURL()).not.toBe(before);
   });
+});
+
+/**
+ * A host may claim the `bottom-right` box (the studio puts its 56px assistant
+ * button there); the box sits at layer 8, above the card's 6, so it covered
+ * the map's lower-right corner in walk and tour (at 1280 wide: 56 x 56 px in
+ * walk, 56 x 30 px in tour). The
+ * card rises out of the box's way like the camera preview that takes its place,
+ * and a viewer whose host claimed nothing keeps the card where it always was.
+ * The check sizes are the desktop window the defect was measured in, a phone
+ * (the narrow-container insets) and the narrowest width the viewer supports.
+ */
+describe('the card keeps clear of a claimed bottom-right corner', () => {
+  const CHECK_SIZES = [
+    { label: 'desktop 1280x774', width: 1280, height: 774, edge: 18 },
+    { label: 'phone 390x844', width: 390, height: 844, edge: 14 },
+    { label: 'narrow 360x640', width: 360, height: 640, edge: 14 },
+  ] as const;
+  /** The tour bar runs along the bottom edge; the tour card stands 26px higher. */
+  const MODES = [
+    { mode: 'walk', lift: 0 },
+    { mode: 'tour', lift: 26 },
+  ] as const;
+
+  function rebuild(width: number, height: number): void {
+    harness.map.dispose();
+    closeContainers();
+    harness = build({}, { width, height });
+  }
+
+  for (const { label, width, height, edge } of CHECK_SIZES) {
+    for (const { mode, lift } of MODES) {
+      test(`${label}, ${mode}: the card does not intersect the claimed box`, () => {
+        rebuild(width, height);
+        const slots = new HostSlots(harness.shell.roots.root, ['bottom-right']);
+        const box = slots.get('bottom-right');
+        fillSlot(box);
+        harness.map.setMode(mode);
+        const card = harness.map.element.getBoundingClientRect();
+        const claimed = box.getBoundingClientRect();
+        // Measured, not assumed: both are real boxes in the same corner.
+        expect(card.width).toBeGreaterThan(0);
+        expect(claimed.width).toBe(56);
+        expect(claimed.right).toBeGreaterThan(card.left);
+        expect(intersects(card, claimed)).toBe(false);
+        // Still in the viewer, still in its own column.
+        const viewport = harness.shell.container.getBoundingClientRect();
+        expect(card.top).toBeGreaterThanOrEqual(viewport.top);
+        expect(viewport.right - card.right).toBeCloseTo(edge, 0);
+        // It rises by exactly the claimed corner's 64px, on top of its own lift.
+        expect(viewport.bottom - card.bottom).toBeCloseTo(edge + lift + 64, 0);
+      });
+
+      test(`${label}, ${mode}: without a claim the card keeps its corner`, () => {
+        rebuild(width, height);
+        const slots = new HostSlots(harness.shell.roots.root, ['top-left']);
+        // The host built boxes, just not the corner the card lives in.
+        expect(slots.get('top-left').isConnected).toBe(true);
+        expect(harness.shell.roots.root.dataset['jeexSlotBottomRight']).toBe('false');
+        harness.map.setMode(mode);
+        const card = harness.map.element.getBoundingClientRect();
+        const viewport = harness.shell.container.getBoundingClientRect();
+        expect(card.width).toBeGreaterThan(0);
+        expect(viewport.right - card.right).toBeCloseTo(edge, 0);
+        expect(viewport.bottom - card.bottom).toBeCloseTo(edge + lift, 0);
+      });
+    }
+  }
 });
