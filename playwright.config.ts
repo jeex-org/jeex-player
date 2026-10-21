@@ -19,11 +19,11 @@ import { portEnv, positiveIntEnv } from './scripts/config-input.js';
 
 /**
  * The e2e server's port: default 3701 (the dev server is on 3700), override
- * with `JEEX_E2E_PORT`. The override exists because two gate runs on one machine at once
- * (for example in two worktrees) otherwise share one port, and `reuseExistingServer` lets each run
- * silently reuse — and then tear down — the other's `vite`, which reads as a
- * storm of `ERR_CONNECTION_REFUSED` failures that have nothing to do with
- * the code either run touched.
+ * with `JEEX_E2E_PORT`. The override exists because two gate runs on one
+ * machine at once (for example in two worktrees) otherwise share one port, and
+ * `reuseExistingServer` lets each run silently reuse — and then tear down —
+ * the other's `vite`, which reads as a storm of `ERR_CONNECTION_REFUSED`
+ * failures that have nothing to do with the code either run touched.
  */
 export const E2E_PORT = portEnv('JEEX_E2E_PORT', 3701);
 export const E2E_BASE_URL = `http://127.0.0.1:${E2E_PORT}`;

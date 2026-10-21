@@ -37,10 +37,10 @@ export function isExactOrigin(raw: string): boolean {
 }
 
 /** `?host=`: an exact `http(s)` origin, never `*`, never a URL with a path. */
-export const hostOriginParamSchema = z.string().check(z.refine(isExactOrigin, { error: 'must be an exact http(s) origin' }));
+const hostOriginParamSchema = z.string().check(z.refine(isExactOrigin, { error: 'must be an exact http(s) origin' }));
 
 /** `?ratio=`: `16:9`, `16/9`, `4:3`, `1` or `1.5`, two positive numbers or one. */
-export const ratioParamSchema = z.string().check(z.refine((raw) => parseRatio(raw) !== null, { error: 'must be a ratio such as 16:9' }));
+const ratioParamSchema = z.string().check(z.refine((raw) => parseRatio(raw) !== null, { error: 'must be a ratio such as 16:9' }));
 
 /** Whether a `?host=` value is an origin the bridge may answer to. */
 export function isHostOriginParam(raw: string): boolean {

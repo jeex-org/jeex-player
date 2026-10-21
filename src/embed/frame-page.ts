@@ -9,10 +9,11 @@
  * frames `embed.html` itself, controls it just as well.
  *
  * - `hostOriginFrom` decides whether the postMessage bridge is installed at
- *   all (`frame-page.schema.ts` judges the value). It refuses `?host=*`, which would make the frame broadcast every
- *   event to whatever framed it — an origin check the party it constrains could
- *   switch off — and `?host=notanorigin`, which would make `postMessage` throw
- *   inside a tour listener on every frame.
+ *   all (`frame-page.schema.ts` judges the value). It refuses `?host=*`,
+ *   which would make the frame broadcast every event to whatever framed it —
+ *   an origin check the party it constrains could switch off — and
+ *   `?host=notanorigin`, which would make `postMessage` throw inside a tour
+ *   listener on every frame.
  * - `embedPageOptions` takes `debug` away. An embed page has no legitimate
  *   authoring capability, and with `allow-same-origin` the parent page reads
  *   `frame.contentWindow.__viewerDebug` straight out of the frame — past the

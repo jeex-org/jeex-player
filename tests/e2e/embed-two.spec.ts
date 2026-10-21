@@ -37,6 +37,7 @@ test('the locale is per instance: switching one leaves the other in English', as
   // Both mount in English. The button's description is localized; its
   // visible name is `Walk` in both (mode names are never translated).
   const before = await modeButton(stage(page, 'stage-b'), 'walk').getAttribute('title');
+  expect((before ?? '').length).toBeGreaterThan(0);
   expect(await modeButton(stage(page, 'stage-a'), 'walk').getAttribute('title')).toBe(before);
 
   await page.evaluate(() => window.jeexPair?.second.setLocale('de'));
@@ -46,7 +47,6 @@ test('the locale is per instance: switching one leaves the other in English', as
   await expect(modeButton(stage(page, 'stage-b'), 'walk')).toHaveText('Walk');
   expect(await page.evaluate(() => window.jeexPair?.first.getLocale())).toBe('en');
   expect(await page.evaluate(() => window.jeexPair?.second.getLocale())).toBe('de');
-  expect((before ?? '').length).toBeGreaterThan(0);
 });
 
 test('keys go to the viewer that was clicked, and never to the host page’s input', async ({ page }) => {
