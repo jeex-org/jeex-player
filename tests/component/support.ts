@@ -79,6 +79,23 @@ export function delay(ms: number): Promise<void> {
   });
 }
 
+/**
+ * Parks a mounted viewer in `plan2d`, which stops the 3D render loop, before
+ * a test exports the committed document.
+ *
+ * An export never reads the live view: `prepareExport` builds its own graph
+ * from the committed document. But on SwiftShader every 3D frame holds the
+ * page's main thread in the GL command buffer for about a second, and the
+ * exporter's own awaits (texture encoding, `FileReader`) queue behind those
+ * frames. Measured on four hardware threads, one test at a time, over the
+ * L-shape plan: the frame bridge's `exportGlb` took 18.1 s with the loop
+ * running and 6.7 s parked, `exportUsdz` 29.5 s and 5.7 s. With two Vitest
+ * workers on a hosted runner the running loop pushed both past their budgets.
+ */
+export function parkForExport(handle: { setMode(mode: 'plan2d'): void }): void {
+  handle.setMode('plan2d');
+}
+
 /** One animation frame; the unit of time everything in the viewer is measured in. */
 export function nextFrame(): Promise<void> {
   return new Promise((resolve) => {
