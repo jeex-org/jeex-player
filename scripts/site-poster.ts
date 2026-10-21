@@ -19,6 +19,7 @@ import { chromium } from '@playwright/test';
 import { existsSync, mkdirSync, writeFileSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { headlessWebglLaunch } from '../tests/headless-webgl.js';
+import { portEnv } from './config-input.js';
 import type { ViewerHandle } from '../src/app/viewer-api.js';
 
 declare global {
@@ -54,7 +55,7 @@ async function main(): Promise<void> {
   const dist = resolve('dist');
   if (!existsSync(join(dist, 'index.html'))) throw new Error('site-poster: dist/index.html is missing: run `bun run build` first');
   const out = resolve(process.argv[2] ?? 'site-out/poster.png');
-  const port = Number(process.env['SITE_POSTER_PORT'] ?? '3704');
+  const port = portEnv('SITE_POSTER_PORT', 3704);
   const server = serveDir(dist, port);
   const browser = await chromium.launch({ headless: true, ...headlessWebglLaunch() });
   try {

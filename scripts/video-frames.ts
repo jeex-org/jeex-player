@@ -16,7 +16,7 @@
  *   npm run dev -- --port 3703 --strictPort
  *   VIEWER_URL=http://127.0.0.1:3703/ bun run scripts/video-frames.ts
  *
- * Every parameter is an environment variable (see the constants below); the
+ * Every parameter is an environment variable (`video-frames-env.ts`); the
  * defaults — 12 frames of `9:16` and `16:9` — are the smoke check this script
  * IS: it exits 1 if what it wrote does not match the frame count and pixel
  * size it asked for. `FRAMES_TO=2` reproduces the acceptance clip (a
@@ -32,18 +32,12 @@ import { headlessWebglLaunch } from '../tests/headless-webgl.js';
 import { waitForBoot } from '../tests/e2e/support.js';
 import type { Aspect } from '../src/app/video-frames.js';
 import type { FramesRunRequest, FramesRunResult } from '../dev/video-frames.js';
+import { readFramesEnv } from './video-frames-env.js';
 
 /** Mirrors `video-frames.ts`'s own table: `width = height * ratio`. */
 const ASPECT_RATIO: Record<Aspect, number> = { '16:9': 16 / 9, '9:16': 9 / 16, '1:1': 1 };
 
-const FPS = Number(process.env['FRAMES_FPS'] ?? '24') as 24 | 25 | 30;
-const HEIGHT = Number(process.env['FRAMES_HEIGHT'] ?? '320');
-const FROM_S = Number(process.env['FRAMES_FROM'] ?? '0');
-/** The smoke check's own frame count when `FRAMES_TO` is not given. */
-const DEFAULT_FRAME_COUNT = 12;
-const TO_S = process.env['FRAMES_TO'] === undefined ? FROM_S + (DEFAULT_FRAME_COUNT - 1) / FPS : Number(process.env['FRAMES_TO']);
-const ASPECTS = (process.env['FRAMES_ASPECTS'] ?? '9:16,16:9').split(',').map((value) => value.trim()) as Aspect[];
-const OUT_DIR = process.env['FRAMES_OUT'] ?? '/tmp/jeex-video-frames';
+const { fps: FPS, height: HEIGHT, from: FROM_S, to: TO_S, aspects: ASPECTS, out: OUT_DIR } = readFramesEnv(process.env);
 
 /** How many samples `[FROM_S, TO_S]` takes at `FPS` — `video-frames.ts`'s own `frameCount` formula. */
 const EXPECTED_COUNT = Math.max(1, Math.round((TO_S - FROM_S) * FPS) + 1);

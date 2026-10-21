@@ -21,6 +21,7 @@ import { defineConfig } from 'vitest/config';
 import { playwright } from '@vitest/browser-playwright';
 import { headlessWebglLaunch } from './tests/headless-webgl.js';
 import { CostShardSequencer } from './tests/component-shards.js';
+import { portEnv } from './scripts/config-input.js';
 
 export default defineConfig({
   // Pre-bundled up front, not on first import. Vite discovers `three` while
@@ -62,7 +63,7 @@ export default defineConfig({
     // incremented per instance), and a busy port must fail rather than quietly
     // move: the browser would then be driven against whatever else answers
     // there.
-    api: { port: Number(process.env['JEEX_COMPONENT_PORT'] ?? 3702), strictPort: true },
+    api: { port: portEnv('JEEX_COMPONENT_PORT', 3702), strictPort: true },
     browser: {
       enabled: true,
       // `timeout` is Playwright's own launch handshake ceiling (its default,

@@ -183,6 +183,19 @@ describe('publishSchemas', () => {
     expect(() => publishSchemas(out, (dir) => mkdirSync(dir, { recursive: true }))).toThrow(/wrote no \*\.schema\.json/);
   });
 
+  test.each([
+    ['no $id', {}],
+    ['a numeric $id', { $id: 7 }],
+    ['an empty $id', { $id: '' }],
+  ])('fails on a schema file with %s', (_name, body) => {
+    out = mkdtempSync(join(tmpdir(), 'site-schemas-'));
+    const write = (dir: string): void => {
+      mkdirSync(dir, { recursive: true });
+      writeFileSync(join(dir, 'scene.schema.json'), JSON.stringify(body));
+    };
+    expect(() => publishSchemas(out, write)).toThrow('site-build: scene.schema.json has no $id');
+  });
+
   test("schema-gen's host is the site's schema folder", () => {
     expect(SCHEMA_HOST).toBe(`${SITE_ORIGIN}/schema`);
   });

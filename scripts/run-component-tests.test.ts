@@ -52,6 +52,9 @@ describe('parseLockOwner', () => {
     expect(parseLockOwner('not json')).toBeUndefined();
     expect(parseLockOwner('{}')).toBeUndefined();
     expect(parseLockOwner('{"pid":"not a number"}')).toBeUndefined();
+    expect(parseLockOwner('{"pid":0,"reportsDirectory":"/a"}')).toBeUndefined();
+    expect(parseLockOwner('{"pid":1.5,"reportsDirectory":"/a"}')).toBeUndefined();
+    expect(parseLockOwner('[1]')).toBeUndefined();
   });
 });
 

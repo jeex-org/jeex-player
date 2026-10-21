@@ -35,6 +35,7 @@
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { CSS_TARGET } from './vite.css-target.ts';
+import { readPackageVersion } from './scripts/config-input.ts';
 import { defineConfig, type LibraryFormats, type Plugin, type UserConfig } from 'vite';
 
 /** Global the `iife` bundle of the whole viewer publishes itself as. */
@@ -60,7 +61,7 @@ const from = (relative: string): string => fileURLToPath(new URL(relative, impor
  * a host reading `VIEWER_VERSION` off any of the three shapes gets the same
  * answer.
  */
-const PKG = JSON.parse(readFileSync(from('package.json'), 'utf8')) as { version: string };
+const VERSION = readPackageVersion(new URL('package.json', import.meta.url));
 
 /**
  * Writes the component stylesheet next to the bundles.
@@ -169,7 +170,7 @@ export default defineConfig(({ mode }): UserConfig => {
   if (!pass) throw new Error(`vite.lib.config: unknown mode ${mode}; expected one of ${Object.keys(PASSES).join(', ')}`);
   return {
     plugins: pass.plugins,
-    define: { __JEEX_VIEWER_VERSION__: JSON.stringify(PKG.version) },
+    define: { __JEEX_VIEWER_VERSION__: JSON.stringify(VERSION) },
     build: {
       target: 'es2022',
       // The stylesheet's own floor, not the JavaScript one (`vite.css-target.ts`).
