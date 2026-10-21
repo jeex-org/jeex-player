@@ -95,6 +95,15 @@ as described under [Versioning](#versioning).
   button) covered the card's lower-right corner. The card now rises 64px
   above it, as the camera preview, the degraded-asset notice and the tour
   bar already did; without that slot the card stays where it was.
+- **The mini-map no longer covers the walk camera stepper on a phone.** In
+  a viewer narrower than 562px the stepper (previous, «i / n», next) at the
+  bottom centre reached under the card: at 390x844 the stepper ran 132-258
+  px across and the card 212-376 px. The stepper keeps its place and the card
+  now stands 8px above it while it is shown; that lift already covers a
+  claimed `bottom-right` box. In a short viewer the card shrinks to stay
+  under the control bar, and below 298px of height it steps out instead of
+  shrinking under 96px. Tour, a document without tour cameras, wider
+  viewers and browsers without `:has()` keep the card where it was.
 
 ## [0.1.0] — 2026-10-19
 

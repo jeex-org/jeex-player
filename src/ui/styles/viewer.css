@@ -273,15 +273,31 @@
   .jeex-viewer .tour-bar {
     pointer-events: auto;
   }
+  /* The control bar's block geometry, declared on the mini-map card too, which
+     reads it to stay under the bar in a short narrow viewer (`.minimap`).
+     Internal, NOT part of the theming contract: the bar's distance from the
+     top edge, its block padding, the mode switcher's padding and the mode
+     button's height; the block size adds the bar's 1px border on both sides.
+     It is the tallest layout of the bar (with the mode switcher); the
+     `unbranded` bar below is shorter, so the card clears it too. */
+  .jeex-viewer :is(.control-bar, .minimap) {
+    --jeex-control-bar-edge: 14px;
+    --jeex-control-bar-pad: 8px;
+    --jeex-mode-switcher-pad: 3px;
+    --jeex-mode-button-block: 27px;
+    --jeex-control-bar-block-size: calc(
+      var(--jeex-mode-button-block) + 2 * var(--jeex-mode-switcher-pad) + 2 * var(--jeex-control-bar-pad) + 2px
+    );
+  }
   .jeex-viewer .control-bar {
     position: absolute;
-    inset-block-start: max(14px, env(safe-area-inset-top));
+    inset-block-start: max(var(--jeex-control-bar-edge), env(safe-area-inset-top));
     inset-inline-start: 50%;
     display: flex;
     align-items: center;
     gap: 12px;
     max-inline-size: calc(100% - 24px);
-    padding: 8px 9px 8px 14px;
+    padding: var(--jeex-control-bar-pad) 9px var(--jeex-control-bar-pad) 14px;
     border: 1px solid var(--jeex-hairline);
     border-radius: var(--jeex-radius);
     background: var(--jeex-surface);
@@ -332,7 +348,7 @@
     display: flex;
     align-items: center;
     gap: 2px;
-    padding: 3px;
+    padding: var(--jeex-mode-switcher-pad, 3px);
     border-radius: calc(var(--jeex-radius) - 6px);
     background: rgba(255, 255, 255, 0.08);
   }
@@ -348,7 +364,7 @@
       transform 0.2s ease;
   }
   .jeex-viewer .mode-button {
-    min-block-size: 27px;
+    min-block-size: var(--jeex-mode-button-block, 27px);
     padding: 0 11px;
     border-radius: calc(var(--jeex-radius) - 9px);
     font-size: 11px;
@@ -742,9 +758,13 @@
   }
 
   @container (max-width: 740px) {
+    .jeex-viewer :is(.control-bar, .minimap) {
+      --jeex-control-bar-pad: 7px;
+      --jeex-mode-button-block: 30px;
+    }
     .jeex-viewer .control-bar {
       gap: 7px;
-      padding: 7px;
+      padding: var(--jeex-control-bar-pad);
       border-radius: calc(var(--jeex-radius) - 2px);
     }
     .jeex-viewer .brand-lockup {
@@ -755,7 +775,6 @@
       display: none;
     }
     .jeex-viewer .mode-button {
-      min-block-size: 30px;
       padding-inline: 10px;
     }
     /* The bar's own buttons only: the floating fullscreen button keeps its
@@ -1115,11 +1134,20 @@
     z-index: 6;
     --jeex-minimap-edge: 18px;
     --jeex-minimap-lift-slot: 0px;
+    --jeex-minimap-lift-stepper: 0px;
     --jeex-minimap-lift-tour: 0px;
     inset-inline-end: max(var(--jeex-minimap-edge), env(safe-area-inset-right));
-    inset-block-end: calc(
-      max(var(--jeex-minimap-edge), env(safe-area-inset-bottom)) + var(--jeex-minimap-lift-slot) + var(--jeex-minimap-lift-tour)
+    /* The claimed box and the walk stepper (both below) stand under the card in
+       the same column, so the card clears the HIGHER of the two, never their
+       sum. Where the stepper lift applies it is 114px against the slot's 64px,
+       so it already covers a claimed box; `max()` states that rule rather than
+       relying on the numbers. The tour bar is a third row under both and adds
+       (the stepper never shows in tour). */
+    --jeex-minimap-bottom: calc(
+      max(var(--jeex-minimap-edge), env(safe-area-inset-bottom)) + max(var(--jeex-minimap-lift-slot), var(--jeex-minimap-lift-stepper)) +
+        var(--jeex-minimap-lift-tour)
     );
+    inset-block-end: var(--jeex-minimap-bottom);
     inline-size: min(var(--jeex-minimap-size), 42cqw);
     block-size: min(var(--jeex-minimap-size), 42cqw);
     padding: 8px;
@@ -1162,6 +1190,48 @@
       --jeex-minimap-edge: 14px;
       padding: 6px;
       border-radius: calc(var(--jeex-radius) - 4px);
+    }
+  }
+  /* The walk's camera stepper keeps its bottom-centre place; in a narrow
+     viewer its right half reaches under this card, so the card yields and
+     stands 8px above the stepper's top edge. The lift is the stepper's own
+     geometry (edge, lift and block size, shared with it below) minus the
+     card's edge, so a change to the stepper moves the card with it. It applies
+     only while the viewer's OWN stepper is shown (a child of the root, so a
+     host's markup inside a slot never matches): walk, a document with tour
+     cameras and the viewer's own controls (`walk-camera-bar.ts` sets `hidden`
+     otherwise). A browser without `:has()` keeps the card where it was.
+     The width is where the stepper (half of its 126px from the centre) comes
+     within that same 8px of the card's left edge at the default 196px card and
+     14px edge: 2 × (63 + 8 + 196 + 14) = 562px. A label wider than its 44px
+     minimum (from 10 cameras on) only narrows that gap by a few px, and a
+     host that enlarges `--jeex-minimap-size` widens the overlap beyond this
+     calibration, as it does for the claimed corner above.
+     Lifted that high, the card would reach the top row in a short viewer (a
+     480x330 embed), so it also shrinks to the height between its new bottom
+     and 8px under the control bar, whose block size the bar shares with this
+     card (above). At the default 18px `--jeex-slot-inset` that line is also
+     the bottom of a 56px box claimed at `top-right`. */
+  @container (max-width: 561.98px) {
+    .jeex-viewer:has(> .walk-cameras:not([hidden])) .minimap {
+      --jeex-minimap-lift-stepper: calc(
+        max(var(--jeex-walk-cameras-edge), env(safe-area-inset-bottom)) - max(var(--jeex-minimap-edge), env(safe-area-inset-bottom)) +
+          var(--jeex-walk-cameras-lift) + var(--jeex-walk-cameras-block-size) + 8px
+      );
+      --jeex-minimap-top: calc(max(var(--jeex-control-bar-edge), env(safe-area-inset-top)) + var(--jeex-control-bar-block-size) + 8px);
+      inline-size: min(var(--jeex-minimap-size), 42cqw, 100cqh - var(--jeex-minimap-bottom) - var(--jeex-minimap-top));
+      block-size: min(var(--jeex-minimap-size), 42cqw, 100cqh - var(--jeex-minimap-bottom) - var(--jeex-minimap-top));
+    }
+  }
+  /* Below a 96px card the plan is too small to read or to click a room on,
+     so the card steps out instead of collapsing to its padding. The height is
+     that card plus the space above and below it at the default insets
+     (`env()` cannot enter a container query): the 128px bottom (14px edge,
+     114px stepper lift), and 14px edge + 52px bar + 8px gap = 74px on top:
+     128 + 96 + 74 = 298px. */
+  @container (max-width: 561.98px) and (max-height: 297.98px) {
+    .jeex-viewer:has(> .walk-cameras:not([hidden])) .minimap {
+      display: none;
     }
   }
 
@@ -1477,17 +1547,29 @@
     color: #1c2523;
   }
 
-  /* The walk's camera stepper: previous, «i / n», next, bottom centre. */
+  /* The walk's camera stepper: previous, «i / n», next, bottom centre.
+     Its geometry is declared on the mini-map card too, which reads it to stand
+     clear of the stepper in a narrow viewer (above). Internal, NOT part of the
+     theming contract: the stepper's distance from the bottom edge, its lift
+     over the hint row, and its block size (a button, the padding on both
+     sides, a 1px border on both sides). */
+  .jeex-viewer :is(.walk-cameras, .minimap) {
+    --jeex-walk-cameras-edge: 18px;
+    --jeex-walk-cameras-lift: 0px;
+    --jeex-walk-cameras-button: 32px;
+    --jeex-walk-cameras-pad: 4px;
+    --jeex-walk-cameras-block-size: calc(var(--jeex-walk-cameras-button) + 2 * var(--jeex-walk-cameras-pad) + 2px);
+  }
   .jeex-viewer .walk-cameras {
     position: absolute;
     z-index: 6;
-    inset-block-end: max(18px, env(safe-area-inset-bottom));
+    inset-block-end: calc(max(var(--jeex-walk-cameras-edge), env(safe-area-inset-bottom)) + var(--jeex-walk-cameras-lift));
     inset-inline-start: 50%;
     translate: -50% 0;
     display: flex;
     align-items: center;
     gap: 4px;
-    padding: 4px;
+    padding: var(--jeex-walk-cameras-pad);
     border: 1px solid var(--jeex-hairline);
     border-radius: 999px;
     background: var(--jeex-surface);
@@ -1502,8 +1584,8 @@
   .jeex-viewer .walk-cameras button {
     display: grid;
     place-items: center;
-    inline-size: 32px;
-    block-size: 32px;
+    inline-size: var(--jeex-walk-cameras-button);
+    block-size: var(--jeex-walk-cameras-button);
     padding: 0;
     border: 0;
     border-radius: 50%;
@@ -1538,8 +1620,9 @@
      that cap, so the centred stepper would overlap it in any viewer narrower
      than about 920 px (2 × (398 + 63)). */
   @container (max-width: 920px) {
-    .jeex-viewer .walk-cameras {
-      inset-block-end: calc(max(14px, env(safe-area-inset-bottom)) + 64px);
+    .jeex-viewer :is(.walk-cameras, .minimap) {
+      --jeex-walk-cameras-edge: 14px;
+      --jeex-walk-cameras-lift: 64px;
     }
   }
 }
