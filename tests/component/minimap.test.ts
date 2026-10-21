@@ -13,7 +13,18 @@ import { HostSlots } from '../../src/ui/host-slots.js';
 import { OVERLAY_NAMES } from '../../src/ui/viewer-shell.js';
 import { roomAt } from '../../src/plan/plan-drawing.js';
 import type { PlanCameraMarker } from '../../src/plan/plan-canvas.js';
-import { canvasHasInk, closeContainers, demoDrawing, demoScene, nextFrame, openShell, until, type Shell } from './support.js';
+import {
+  canvasHasInk,
+  closeContainers,
+  demoDrawing,
+  demoScene,
+  fillSlot,
+  intersects,
+  nextFrame,
+  openShell,
+  until,
+  type Shell,
+} from './support.js';
 
 type World = { camera: PlanCameraMarker | null; enabled: boolean; hasDrawing: boolean };
 type Harness = { shell: Shell; map: Minimap; world: World; onRoomPicked: ReturnType<typeof vi.fn> };
@@ -274,10 +285,7 @@ describe('the card keeps clear of a claimed bottom-right corner', () => {
         rebuild(width, height);
         const slots = new HostSlots(harness.shell.roots.root, ['bottom-right']);
         const box = slots.get('bottom-right');
-        const button = document.createElement('div');
-        button.style.setProperty('inline-size', '56px');
-        button.style.setProperty('block-size', '56px');
-        box.append(button);
+        fillSlot(box);
         harness.map.setMode(mode);
         const card = harness.map.element.getBoundingClientRect();
         const claimed = box.getBoundingClientRect();
@@ -285,8 +293,7 @@ describe('the card keeps clear of a claimed bottom-right corner', () => {
         expect(card.width).toBeGreaterThan(0);
         expect(claimed.width).toBe(56);
         expect(claimed.right).toBeGreaterThan(card.left);
-        const overlaps = card.left < claimed.right && card.right > claimed.left && card.top < claimed.bottom && card.bottom > claimed.top;
-        expect(overlaps).toBe(false);
+        expect(intersects(card, claimed)).toBe(false);
         // Still in the viewer, still in its own column.
         const viewport = harness.shell.container.getBoundingClientRect();
         expect(card.top).toBeGreaterThanOrEqual(viewport.top);
@@ -296,8 +303,9 @@ describe('the card keeps clear of a claimed bottom-right corner', () => {
       test(`${label}, ${mode}: without a claim the card keeps its corner`, () => {
         rebuild(width, height);
         const slots = new HostSlots(harness.shell.roots.root, ['top-left']);
-        expect(harness.shell.roots.root.dataset['jeexSlotBottomRight']).toBe('false');
+        // The host built boxes, just not the corner the card lives in.
         expect(slots.get('top-left').isConnected).toBe(true);
+        expect(harness.shell.roots.root.dataset['jeexSlotBottomRight']).toBe('false');
         harness.map.setMode(mode);
         const card = harness.map.element.getBoundingClientRect();
         const viewport = harness.shell.container.getBoundingClientRect();

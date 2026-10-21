@@ -1143,8 +1143,10 @@
      sits at layer 8, over this card's lower-right corner: the card rises above
      it by the button plus an 8px gap, the same 64px `.camera-preview` (which
      takes this corner while a checkpoint is focused), `.degraded-notice` and
-     the tour bar's end padding step by. It moves up into its own column only;
-     nothing else of the chrome lives there. */
+     the tour bar's end padding step by. Like theirs, the 64px is calibrated
+     on a 56px box at the default `--jeex-slot-inset`; a taller box or a larger
+     inset still reaches the card. It only moves up its own column and leaves
+     every other control where it was. */
   .jeex-viewer[data-jeex-slot-bottom-right='true'] .minimap {
     --jeex-minimap-lift-slot: 64px;
   }

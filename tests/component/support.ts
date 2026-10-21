@@ -49,6 +49,19 @@ export function openShell(width?: number, height?: number): Shell {
   return { container, roots: createViewerShell(container, messages), messages };
 }
 
+/** Whether two client rects share any area; touching edges do not count. */
+export function intersects(a: DOMRect, b: DOMRect): boolean {
+  return a.left < b.right && a.right > b.left && a.top < b.bottom && a.bottom > b.top;
+}
+
+/** A slot box with no content has zero size: give it a 56px host button's footprint. */
+export function fillSlot(box: HTMLElement): void {
+  const content = document.createElement('div');
+  content.style.setProperty('inline-size', '56px');
+  content.style.setProperty('block-size', '56px');
+  box.append(content);
+}
+
 /** The demo apartment, solved once and shared: solving it is not the subject. */
 let solved: SolvedPlan | null = null;
 export function demoPlan(): SolvedPlan {
