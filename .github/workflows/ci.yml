@@ -219,13 +219,16 @@ jobs:
       # `--reporter=github` is not passed here: `playwright.config.ts` picks
       # the GitHub reporter itself when `CI` is set, so a local run and this
       # one differ in exactly one place rather than two.
-      # One worker and three times the budgets (`playwright.config.ts`,
-      # `JEEX_E2E_TIME_SCALE`). Measured on three hardware threads (about a
-      # hosted runner's pace) over one quarter of the suite: two workers and
+      #
+      # One worker and three times every budget (`JEEX_E2E_TIME_SCALE`,
+      # `tests/e2e/time-scale.ts`). Measured on three hardware threads (about
+      # a hosted runner's pace) over one quarter of the suite: two workers and
       # the plain budgets failed 15 of 21 specs on the runner; one worker and
-      # three times the budgets passed 20 of 21 in 23 minutes, and the 21st
-      # (a hover that raced the control bar's idle timer) is fixed in its
-      # spec. Eight shards keep each job near 12 minutes.
+      # three times the budgets passed 20 of 21 in 23 minutes. The specs that
+      # still failed on the runner after that activate the control bar's
+      # buttons from the keyboard instead of racing its idle timer with
+      # clicks. With eight shards the jobs took 5 to 26 minutes on the runner,
+      # inside the 30-minute job limit.
       - name: e2e tests (Playwright) shard ${{ matrix.shard }}/8
         env:
           JEEX_E2E_WORKERS: '1'

@@ -11,6 +11,7 @@
 
 import { expect, test, type Page } from '@playwright/test';
 import { waitForBoot, waitForCameraStill } from './support.js';
+import { scaled } from './time-scale.js';
 
 type Pose = { x: number; y: number; z: number };
 
@@ -53,7 +54,7 @@ async function watchPlate(page: Page): Promise<void> {
 
 /** Polls until the camera has moved more than `metres` away from `from`. */
 async function expectCameraMoved(page: Page, from: Pose, metres: number): Promise<void> {
-  await expect.poll(async () => moved(from, await camera(page)), { timeout: 30_000 }).toBeGreaterThan(metres);
+  await expect.poll(async () => moved(from, await camera(page)), { timeout: scaled(30_000) }).toBeGreaterThan(metres);
 }
 
 test.beforeEach(async ({ page }) => {
@@ -72,7 +73,7 @@ test('an unfocused viewer lets a plain wheel scroll the page, and shows how to z
   await waitForCameraStill(page);
   expect(moved(before, await camera(page))).toBeLessThan(1e-3);
   // The plate goes on its own.
-  await expect(page.locator('[data-jeex="scroll-hint"]')).toHaveAttribute('data-visible', 'false', { timeout: 5_000 });
+  await expect(page.locator('[data-jeex="scroll-hint"]')).toHaveAttribute('data-visible', 'false', { timeout: scaled(5_000) });
 });
 
 test('Ctrl + wheel zooms the unfocused viewer and leaves the page where it was', async ({ page }) => {

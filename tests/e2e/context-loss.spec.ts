@@ -15,9 +15,10 @@
 
 import { expect, test } from '@playwright/test';
 import { expectCanvasStillRendering, waitForBoot } from './support.js';
+import { scaled } from './time-scale.js';
 
 /** How long a restored context may take to reach a drawn frame, ms — the whole document rebuilds on a GPU that just came back. */
-const RESTORE_TIMEOUT_MS = 20_000;
+const RESTORE_TIMEOUT_MS = scaled(20_000);
 
 test('a real WEBGL_lose_context loss raises the card and the context-lost event, and restoreContext() brings the scene back', async ({
   page,

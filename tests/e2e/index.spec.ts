@@ -40,11 +40,24 @@ test('boots into orbit with the apartment on screen and the chrome revealed', as
 
 test('the five modes switch, and exactly one button is pressed at a time', async ({ page }) => {
   const root = viewerRoot(page);
+  // Five mode switches, each a camera flight or a plan build, are five tests'
+  // worth of frames: 2.2 min on four hardware threads without a GPU against
+  // the 3 min a scaled single-test budget gives a hosted runner, which is
+  // slower than those threads.
+  test.slow();
+  // The pressed buttons and the viewer's own mode are read in ONE in-page pass
+  // per step: on a software rasteriser every protocol call waits behind a
+  // rendered frame, and one assertion per reading ran past the budget.
+  const reading = async (): Promise<{ pressed: string[]; mode: string | undefined }> =>
+    root.evaluate((viewer) => ({
+      pressed: [...viewer.querySelectorAll<HTMLElement>('[data-jeex="control-bar"] [data-mode][aria-pressed="true"]')].map(
+        (button) => button.dataset['mode'] ?? '',
+      ),
+      mode: window.__viewerDebug?.mode(),
+    }));
   for (const mode of ['plan2d', 'plan3d', 'orbit', 'walk', 'tour']) {
     await pressMode(root, mode);
-    await expect(modeButton(root, mode)).toHaveAttribute('aria-pressed', 'true');
-    await expect(root.locator('[data-jeex="control-bar"] [data-mode][aria-pressed="true"]')).toHaveCount(1);
-    await expect.poll(async () => page.evaluate(() => window.__viewerDebug?.mode())).toBe(mode);
+    await expect.poll(reading).toEqual({ pressed: [mode], mode });
   }
 });
 

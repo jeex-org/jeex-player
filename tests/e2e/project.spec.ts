@@ -24,6 +24,7 @@
 import { expect, test } from '@playwright/test';
 import { PROJECT_FIXTURE } from '../fixtures/project/fixture-ids.js';
 import { waitForBoot } from './support.js';
+import { scaled } from './time-scale.js';
 
 /** The bake the dev server serves as static files; every request must stay inside it. */
 const PROJECT_PATH = '/tests/fixtures/project/';
@@ -32,7 +33,7 @@ const PROJECT_PATH = '/tests/fixtures/project/';
 const INVALID_PROJECT = '/tests/fixtures/project-invalid/project.json';
 
 /** How long the fixture GLB may take to arrive and swap in. A local static file; generous anyway. */
-const SWAP_TIMEOUT_MS = 30_000;
+const SWAP_TIMEOUT_MS = scaled(30_000);
 
 test('opens a bake by url: a stand-in first, then the GLB, and the manifest on the handle', async ({ page }) => {
   await page.goto('/dev/project.html');

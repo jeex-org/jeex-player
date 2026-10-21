@@ -6,6 +6,7 @@
 import { writeFileSync } from 'node:fs';
 import { expect, test, type FrameLocator, type Locator, type Page, type TestInfo } from '@playwright/test';
 import AxeBuilder from '@axe-core/playwright';
+import { scaled } from './time-scale.js';
 
 /** The WCAG levels the viewer commits to. */
 export const WCAG_TAGS = ['wcag2a', 'wcag2aa', 'wcag22aa'];
@@ -68,7 +69,7 @@ function positiveMs(raw: string | undefined, fallback: number): number {
 }
 
 /** How long a viewer boot may take on a software rasteriser. */
-export const BOOT_TIMEOUT_MS = 45_000;
+export const BOOT_TIMEOUT_MS = scaled(45_000);
 
 /** The viewer's own root, wherever the page put it. */
 export function viewerRoot(page: Page): Locator {
@@ -85,17 +86,6 @@ export function viewerRoot(page: Page): Locator {
 export function modeButton(scope: Page | Locator, mode: string): Locator {
   return scope.locator(`[data-jeex="control-bar"] [data-mode="${mode}"]`);
 }
-
-/**
- * How long the pinned state may take to show up in the DOM.
- *
- * The wake and the pin both run synchronously inside the chrome's own
- * listeners, in the same task `pressMode` dispatches them from, so the
- * attribute is already `false` when the assertion first reads it. The budget
- * is only for the protocol round trip, which on a busy software rasteriser
- * waits behind a rendered frame (about 1 s on a machine without a usable GPU).
- */
-const PIN_TIMEOUT_MS = 5_000;
 
 /**
  * Wakes the chrome, PINS it open, then presses a mode button.
@@ -118,7 +108,12 @@ const PIN_TIMEOUT_MS = 5_000;
  *    trusted-input-only by design and must stay unarmed by a test's wake.)
  * 2. Focusing the button makes the chrome wake with `force`, which arms NO
  *    hide timer: the bar is now pinned open for as long as focus stays in it.
- * 3. Only then the real click, which now has no deadline to lose to.
+ * 3. Only then the button is activated, with Enter on the keyboard: a trusted
+ *    key press on the focused button, which a `<button>` turns into its own
+ *    click. Not `click()`: its actionability checks (stable over two frames,
+ *    then a hit test) each wait behind a SwiftShader frame, and on a hosted
+ *    runner at under one frame per second a single click outlasted a 180 s
+ *    test budget. The key press needs no hit test and no frame.
  *
  * Steps 1 and 2 run in ONE in-page task. Every separate protocol call waits
  * for the page's main thread, which a SwiftShader frame holds for its whole
@@ -130,23 +125,27 @@ const PIN_TIMEOUT_MS = 5_000;
  *
  * `data-collapsed` is the chrome's own machine-readable mirror of the collapse
  * state (`viewer-chrome.ts`: "a browser check reads this, never the CSS
- * class"). It is asserted AFTER the focus, together with the focus itself: an
+ * class"). It is read AFTER the focus, together with the focus itself and in
+ * the same task (both are set synchronously by the chrome's listeners): an
  * `inert` button cannot take focus at all, so the pair proves the bar is
  * pinned and not merely awake. A pin that does not hold is a real failure,
  * so there is no retry loop to hide it.
+ *
+ * Two protocol calls in all, the read and the key press: on a hosted runner
+ * each call waited 10 to 40 s behind SwiftShader frames, and the five calls
+ * this helper used to make (a handle, the wake, two assertions, the click)
+ * let a spec that switches modes five times run out of a 180 s budget.
  */
 export async function pressMode(root: Locator, mode: string): Promise<void> {
-  const bar = root.locator('[data-jeex="control-bar"]');
-  const button = modeButton(root, mode);
-  const rootHandle = await root.elementHandle();
-  await button.evaluate((element: HTMLElement, viewer) => {
-    viewer?.dispatchEvent(new PointerEvent('pointermove', { bubbles: true, composed: true }));
+  const pinned = await modeButton(root, mode).evaluate((element: HTMLElement) => {
+    element.closest('[data-jeex="viewer"]')?.dispatchEvent(new PointerEvent('pointermove', { bubbles: true, composed: true }));
     element.focus();
-  }, rootHandle);
-  await rootHandle?.dispose();
-  await expect(bar).toHaveAttribute('data-collapsed', 'false', { timeout: PIN_TIMEOUT_MS });
-  await expect(button).toBeFocused({ timeout: PIN_TIMEOUT_MS });
-  await button.click();
+    const bar = element.closest<HTMLElement>('[data-jeex="control-bar"]');
+    const scope = element.getRootNode() as Document | ShadowRoot;
+    return { collapsed: bar?.dataset['collapsed'] ?? null, focused: scope.activeElement === element };
+  });
+  expect(pinned, `the ${mode} button is pinned open and focused`).toEqual({ collapsed: 'false', focused: true });
+  await root.page().keyboard.press('Enter');
 }
 
 /**
@@ -362,7 +361,7 @@ export async function expectCanvasStillRendering(canvas: Locator, name: string):
  * come; the budget is two idle deadlines plus a slow SwiftShader frame.
  */
 export async function waitForChromeIdle(root: Page | FrameLocator): Promise<void> {
-  await expect(root.locator('[data-jeex="control-bar"]')).toHaveAttribute('data-collapsed', 'true', { timeout: 15_000 });
+  await expect(root.locator('[data-jeex="control-bar"]')).toHaveAttribute('data-collapsed', 'true', { timeout: scaled(15_000) });
 }
 
 /**
@@ -387,7 +386,7 @@ export async function waitForCameraStill(page: Page, tolerance = 1e-3): Promise<
           if (!before || !after) return false;
           return Math.hypot(after.x - before.x, after.y - before.y, after.z - before.z) < limit;
         }, tolerance),
-      { timeout: 30_000 },
+      { timeout: scaled(30_000) },
     )
     .toBe(true);
 }
