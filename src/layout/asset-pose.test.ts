@@ -76,13 +76,18 @@ describe('proposePose', () => {
     );
   });
 
-  test('turned across the living room the sofa does not fit: refused with the issue', () => {
-    const context = drag(DEMO.asset.livingSofa);
+  test('turned square on the spot the study desk does not fit: refused with the issue', () => {
+    // The desk stands 1.24 m wide with its back on the south wall and its chair
+    // tucked in front. A small turn settles; a quarter turn swings 0.62 m of
+    // desk into the wall and across the chair, more than a settle can undo.
+    const context = drag(DEMO.asset.studyDesk);
     const along = proposePose(context, request(context, 0, 0, Math.PI / 12, false));
     expect(along.settled).not.toBeNull();
     const across = proposePose(context, request(context, 0, 0, Math.PI / 2, false));
     expect(across.settled).toBeNull();
-    expect(across.judgement.issues.map((issue) => issue.rule)).toContain('no-interpenetration');
+    const rules = across.judgement.issues.map((issue) => issue.rule);
+    expect(rules).toContain('no-interpenetration');
+    expect(rules).toContain('inside-a-wall');
   });
 });
 

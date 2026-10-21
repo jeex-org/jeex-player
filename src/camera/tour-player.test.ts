@@ -20,21 +20,21 @@ const plan = solvePlan(apartmentScene);
  * Clearance the camera has to keep from a furniture footprint edge, metres.
  *
  * Not a body's clearance — the tour is a point on a rail and ignores collision
- * entirely — but enough that the run never grazes or enters a solid. It is the
- * widest bound this apartment allows: the kitchen galley leaves a 0.54 m
- * corridor between the worktop and the fridge, so 0.27 is the ceiling there.
+ * entirely — but enough that the run never grazes or enters a solid. The
+ * tightest pass of this apartment's tour is the fillet round the living room's
+ * floor lamp on the way back from the bay, about 0.26 m off its footprint.
  */
 const CAMERA_CLEARANCE_M = 0.25;
 
-/** Every room the tour is supposed to enter: the whole flat minus the two loggias. */
+/** Every room the tour is supposed to enter: the whole flat minus the WC. */
 const TOURED_ROOMS = [
   DEMO.room.bathroom,
   DEMO.room.bedroom,
-  DEMO.room.closet,
   DEMO.room.guestRoom,
   DEMO.room.hall,
   DEMO.room.kitchen,
   DEMO.room.living,
+  DEMO.room.loggia,
   DEMO.room.study,
 ];
 
@@ -148,10 +148,10 @@ describe('tour player', () => {
       const pose = recorder.pose;
       if (!pose) break;
       if (Math.abs(pose.position.y - 1.6) < 0.01) sawEyeLevel = true;
-      // Waypoint 36 of the demo tour: the centre of the bedroom door.
-      if (pose.position.distanceTo(new THREE.Vector3(9.55, 1.6, 7.025)) < 0.45) passedBedroomDoor = true;
-      // Gaze key at waypoint 3: the living room's TV wall.
-      if (pose.target.distanceTo(new THREE.Vector3(2.44, 1.35, 2.45)) < 1.2) gazedAtTvWall = true;
+      // Waypoint 35 of the demo tour: the centre of the bedroom door.
+      if (pose.position.distanceTo(new THREE.Vector3(7.7, 1.6, 5.2)) < 0.45) passedBedroomDoor = true;
+      // Gaze key at waypoint 5: the media unit on the living room's west wall.
+      if (pose.target.distanceTo(new THREE.Vector3(0.36, 1.0, 6.0)) < 1.2) gazedAtTvWall = true;
       const settling = player.getDuration() - player.getElapsed() < 0.5;
       if (previous && pose.position.y < 3 && previous.y < 3 && guard > 15 && !settling) {
         stall = pose.position.distanceTo(previous) < 0.08 ? stall + 1 : 0;
@@ -167,7 +167,7 @@ describe('tour player', () => {
     expect(player.getState()).toBe('ended');
   });
 
-  test('the smoothed run enters every room of the flat except the loggias', () => {
+  test('the smoothed run enters every room of the flat except the WC', () => {
     // Measured on the SMOOTHED path, not the authored waypoints: the corner
     // fillets are what the viewer actually flies, and they are free to cut a
     // room's only waypoint short.
@@ -242,9 +242,11 @@ describe('tour player', () => {
     player.update(1.2);
     expect(recorder.pose).not.toBeNull();
     const movedAwayFromStart = recorder.pose!.position.distanceTo(away.position) > 0.05;
-    const notYetAtOverview = recorder.pose!.position.distanceTo(new THREE.Vector3(14.6, 9.6, 17.6)) > 0.5;
+    // Still easing: 1.2 s in, the pose has not snapped onto the route's first waypoint.
+    const first = apartmentScene.autotour.path[0]!;
+    const notYetOnRoute = recorder.pose!.position.distanceTo(new THREE.Vector3(first.x, first.y, first.z)) > 0.5;
     expect(movedAwayFromStart).toBe(true);
-    expect(notYetAtOverview).toBe(true);
+    expect(notYetOnRoute).toBe(true);
   });
 });
 
@@ -302,8 +304,10 @@ describe('tour player seeking', () => {
     expect(emitted.length).toBeCloseTo(player.length(), 6);
     const half = pose()!.position.clone();
 
-    // The same fraction always lands on the same point of the route.
-    player.seek(0.1);
+    // The same fraction always lands on the same point of the route. A quarter
+    // in, the tour is in the living room beside the bay, far from the hall it
+    // is in at half way.
+    player.seek(0.25);
     expect(pose()!.position.distanceTo(half)).toBeGreaterThan(0.5);
     player.seek(0.5);
     expect(pose()!.position.distanceTo(half)).toBeLessThan(1e-6);

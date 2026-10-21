@@ -115,8 +115,8 @@ const placementsOf = (ids: ReadonlySet<string>): DemoAsset[] =>
 describe('case goods face the room', () => {
   test('the scene actually holds the case goods this suite claims to cover', () => {
     const covered = new Set(placementsOf(CASE_GOODS).map((placement) => archetypeOf(placement)));
-    // Every wardrobe in the flat, plus at least one of each storage family.
-    expect(placementsOf(CASE_GOODS).length).toBeGreaterThanOrEqual(20);
+    // An exact count: the flat holds 19 case goods, plus at least one of each storage family.
+    expect(placementsOf(CASE_GOODS).length).toBe(19);
     for (const archetype of [
       ARCHETYPE.wardrobe,
       ARCHETYPE.dresser,

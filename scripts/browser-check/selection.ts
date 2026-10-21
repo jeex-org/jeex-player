@@ -10,7 +10,7 @@
 import { DEMO } from '../../src/demo/demo-ids.js';
 import type { CheckContext } from './context.js';
 import { HELPERS } from './page-code.js';
-import { pressControl } from './step.js';
+import { pressControl, waitForCameraStill } from './step.js';
 
 type Reported = { kind: string; id?: string; wallId?: string; roomId?: string; mode: string; point?: { x: number; z: number } };
 
@@ -30,6 +30,9 @@ export async function checkSelection(ctx: CheckContext): Promise<void> {
   // ---- 2. 360: a click on a real wall face reports its wallId ----
   await run(['open', withQuery('?select=1&tour=off')]);
   await run(['wait', '--fn', 'window.__appReady === true']);
+  // The pick casts through the camera of the next frame: click only once the
+  // opening view has landed, or a projected point drifts off its wall.
+  await waitForCameraStill(ctx, 'the opening view to land');
   const wall = await evalValue<{ hit: boolean; report?: Reported; reason?: string }>(`(() => {${HELPERS}
     const room = D.plan().rooms.find((r) => r.id === ${literal(DEMO.room.kitchen)}) ?? D.plan().rooms[0];
     const poly = room.polygon;

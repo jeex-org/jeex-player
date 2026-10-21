@@ -60,7 +60,7 @@ export async function checkFinishes(ctx: CheckContext): Promise<void> {
   await run(['press', 'Escape']);
 
   // ---- Painting the living room must not touch a single kitchen face ----
-  // The central bearing wall is 0.38 m thick and shared: kitchen owns side L, living side R.
+  // The bearing spine is 0.24 m thick and shared: kitchen owns its north side, living its south side.
   const kitchenFacesBefore = await evalValue<Array<[FaceKey, string | null]>>(kitchenFaces);
   const livingWallPick = await evalValue<Pick>(pickWallFaceScript(ROOM.living));
   assert(livingWallPick.hit, `finish panel should open for a living-room wall face (${livingWallPick.reason ?? ''})`);
@@ -73,8 +73,8 @@ export async function checkFinishes(ctx: CheckContext): Promise<void> {
     `painting the living room must leave every kitchen face unchanged | before=${JSON.stringify(kitchenFacesBefore)} | after=${JSON.stringify(kitchenFacesAfter)}`,
   );
   assert(
-    kitchenFacesAfter.some(([face]) => face.wallId === WALL.bearingCentral),
-    'the kitchen must own a face of the shared 0.38 m bearing wall',
+    kitchenFacesAfter.some(([face]) => face.wallId === WALL.spineKitchen),
+    'the kitchen must own a face of the shared 0.24 m bearing spine',
   );
   summary.push(`living painted terra, ${kitchenFacesAfter.length} kitchen faces unchanged`);
   await run(['press', 'Escape']);

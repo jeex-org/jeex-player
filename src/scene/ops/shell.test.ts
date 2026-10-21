@@ -43,9 +43,9 @@ const NEW = {
   spare: '01a12ff3-0a5e-7575-bc06-4500f3d7633a',
   diagonal: '01a12ff3-0a5f-7632-a61a-14acf81856af',
   thin: '01a12ff3-0a60-770b-914d-ccfd90acfdb6',
-  nodeGhMid: '01a12ff3-0a61-7a90-80b4-a2c20ff9e63b',
-  wallGhW: '01a12ff3-0a62-705a-97dd-bff6f88fad89',
-  wallGhE: '01a12ff3-0a63-7ccd-8da5-6bb1fe46cda5',
+  nodeSplitMid: '01a12ff3-0a61-7a90-80b4-a2c20ff9e63b',
+  wallSplitW: '01a12ff3-0a62-705a-97dd-bff6f88fad89',
+  wallSplitE: '01a12ff3-0a63-7ccd-8da5-6bb1fe46cda5',
   wSame: '01a12ff3-0a64-7a74-8eb4-d0be5a372c46',
   ghost: '01a12ff3-0a65-73dd-9b26-69b7125099ff',
   node: '01a12ff3-0a66-7d3d-b658-c03073154263',
@@ -601,17 +601,19 @@ describe('split_wall', () => {
     const model = new SceneModel(apartmentScene, CATALOGUE_REGISTRIES, { lint: lintLayout });
     const result = model.apply({
       baseRev: model.rev,
-      ops: [{ op: 'split_wall', wallId: DEMO.wall.wallGuestHall, at: 1.9, nodeId: NEW.nodeGhMid, ids: [NEW.wallGhW, NEW.wallGhE] }],
+      ops: [
+        { op: 'split_wall', wallId: DEMO.wall.wallBedroomHall, at: 2.5, nodeId: NEW.nodeSplitMid, ids: [NEW.wallSplitW, NEW.wallSplitE] },
+      ],
       lint: 'strict',
     });
 
     if (!isApplyOk(result)) throw new Error(`expected the split to commit, got ${result.error}: ${result.message}`);
-    expect(model.scene.walls.some((wall) => wall.id === NEW.wallGhW)).toBe(true);
-    expect(model.scene.walls.some((wall) => wall.id === NEW.wallGhE)).toBe(true);
+    expect(model.scene.walls.some((wall) => wall.id === NEW.wallSplitW)).toBe(true);
+    expect(model.scene.walls.some((wall) => wall.id === NEW.wallSplitE)).toBe(true);
     const door = model.scene.walls
-      .find((wall) => wall.id === NEW.wallGhW)!
-      .openings!.find((opening) => opening.id === DEMO.opening.doorGuestHall)!;
-    expect(door.center).toBeCloseTo(0.8, 9);
+      .find((wall) => wall.id === NEW.wallSplitW)!
+      .openings!.find((opening) => opening.id === DEMO.opening.doorBedroom)!;
+    expect(door.center).toBeCloseTo(0.7, 9);
     expect(validateScene(model.scene, CATALOGUE_REGISTRIES)).toBe(model.scene);
     expect(describeIssues(lintLayout(model.scene, model.plan))).toBe('0 error(s), 0 warning(s)');
     expect(countIssues(lintLayout(model.scene, model.plan))).toEqual({ errors: 0, warnings: 0, byRule: {} });
@@ -621,18 +623,18 @@ describe('split_wall', () => {
     const scene = draftOf(apartmentScene);
     const error = refusalOf(scene, {
       op: 'split_wall',
-      wallId: DEMO.wall.wallGuestHall,
-      at: 0.8,
-      nodeId: NEW.nodeGhMid,
-      ids: [NEW.wallGhW, NEW.wallGhE],
+      wallId: DEMO.wall.wallBedroomHall,
+      at: 0.7,
+      nodeId: NEW.nodeSplitMid,
+      ids: [NEW.wallSplitW, NEW.wallSplitE],
     });
     const detail = splitDetail(error);
 
     expect(detail['kind']).toBe('split_wall_through_opening');
-    expect(detail['openingId']).toBe(DEMO.opening.doorGuestHall);
-    // The door spans 0.35..1.25; with the 0.1 m reveal the blocked zone is
-    // 0.25..1.35 and those are the two cuts the editor is offered.
-    expect(detail['before']).toBeCloseTo(0.25, 9);
-    expect(detail['after']).toBeCloseTo(1.35, 9);
+    expect(detail['openingId']).toBe(DEMO.opening.doorBedroom);
+    // The bedroom door spans 0.30..1.10; with the 0.1 m reveal the blocked
+    // zone is 0.20..1.20 and those are the two cuts the editor is offered.
+    expect(detail['before']).toBeCloseTo(0.2, 9);
+    expect(detail['after']).toBeCloseTo(1.2, 9);
   });
 });

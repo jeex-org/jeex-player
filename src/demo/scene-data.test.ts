@@ -1,6 +1,8 @@
 import { CATALOGUE_REGISTRIES } from '../assets/catalogue-registries.js';
 import { describe, expect, test } from 'bun:test';
 import { footprintOf, obstaclesFor } from '../assets/asset-footprint.js';
+import { isResolved, resolveAsset } from '../assets/asset-resolver.js';
+import { ARCHETYPE } from '../assets/catalogue-ids.js';
 
 import { EPS, arcFromChord, arcLength, dist, pointInPolygon, projectOnPolyline } from '../plan/plan-geometry.js';
 import type { SolvedPlan } from '../plan/plan-solver.js';
@@ -71,8 +73,8 @@ describe('apartmentScene plan', () => {
     expect(apartmentScene.id).toBe(DEMO.scene);
   });
 
-  test('solves into exactly the ten rooms of the programme', () => {
-    expect(plan.rooms).toHaveLength(10);
+  test('solves into exactly the nine rooms of the programme', () => {
+    expect(plan.rooms).toHaveLength(9);
     expect(plan.rooms.map((room) => room.roomId).sort()).toEqual([...ROOM_IDS].sort());
     for (const room of plan.rooms) expect(room.polygon.length).toBeGreaterThanOrEqual(4);
   });
@@ -83,39 +85,40 @@ describe('apartmentScene plan', () => {
     }
   });
 
-  test('the two loggias are marked as loggias, every other room is not', () => {
+  test('the loggia is marked as a loggia, every other room is not', () => {
     const loggias = apartmentScene.rooms.filter((room) => room.kind === 'loggia').map((room) => room.id);
-    expect(loggias.sort()).toEqual([ROOM.loggiaNorth, ROOM.loggiaWest].sort());
+    expect(loggias).toEqual([ROOM.loggia]);
   });
 
-  test('bearing-central carries two faces 0.38 m apart', () => {
-    const faces = [...plan.faces.values()].filter((face) => face.wallId === WALL.bearingCentral);
+  test('the bearing spine carries two faces 0.24 m apart between the kitchen and the living room', () => {
+    const faces = [...plan.faces.values()].filter((face) => face.wallId === WALL.spineKitchen);
     expect(faces).toHaveLength(2);
     expect(faces.map((face) => face.roomId).sort((a, b) => String(a).localeCompare(String(b)))).toEqual([ROOM.kitchen, ROOM.living].sort());
-    // The wall runs north–south at x = 2.20, so the faces are two parallel
-    // lines whose x differ by the full thickness.
-    const [left, right] = faces as [(typeof faces)[number], (typeof faces)[number]];
+    // The spine runs east–west at z = 3.60, so the faces are two parallel
+    // lines whose z differ by the full thickness.
+    const [north, south] = faces as [(typeof faces)[number], (typeof faces)[number]];
     for (const face of faces) {
-      for (const point of face.polyline) expect(Math.abs(point.x - face.polyline[0]!.x)).toBeLessThan(1e-6);
+      for (const point of face.polyline) expect(Math.abs(point.z - face.polyline[0]!.z)).toBeLessThan(1e-6);
     }
-    expect(Math.abs(left.polyline[0]!.x - right.polyline[0]!.x)).toBeCloseTo(0.38, 6);
-    expect(wallById(WALL.bearingCentral).thickness).toBe(0.38);
-    expect(wallById(WALL.bearingCentral).role).toBe('bearing');
+    expect(Math.abs(north.polyline[0]!.z - south.polyline[0]!.z)).toBeCloseTo(0.24, 6);
+    expect(wallById(WALL.spineKitchen).thickness).toBe(0.24);
+    expect(wallById(WALL.spineKitchen).role).toBe('bearing');
   });
 
-  test('the living room loop contains the semicircular bay', () => {
+  test('the living room loop contains the curved bay', () => {
     const living = plan.rooms.find((room) => room.roomId === ROOM.living)!;
     const curved = living.loop.filter((face) => face.arc);
     expect(curved).toHaveLength(1);
     expect(curved[0]!.wallId).toBe(WALL.bayLiving);
-    // Room side of a 0.30 wall on a 1.60 radius arc.
-    expect(curved[0]!.arc!.radius).toBeCloseTo(1.45, 6);
-    // The bay bulges north beyond the straight part of the facade.
-    expect(living.bbox.minZ).toBeLessThan(0.0);
+    // Room side of a 0.30 wall on a 2.20 radius arc.
+    expect(curved[0]!.arc!.radius).toBeCloseTo(2.05, 6);
+    // The bay bulges south beyond the straight facade's inner face (z 9.05):
+    // a 3.40 chord on a 2.20 radius rises 0.80, so the inner apex is at 9.85.
+    expect(living.bbox.maxZ).toBeCloseTo(9.2 + 0.8 - 0.15, 1);
   });
 
   test('wall thicknesses follow the facade / bearing / partition scheme', () => {
-    const allowed: Record<string, number> = { facade: 0.3, bearing: 0.38, partition: 0.1 };
+    const allowed: Record<string, number> = { facade: 0.3, bearing: 0.24, partition: 0.1 };
     for (const wall of apartmentScene.walls) {
       expect(wall.role).toBeDefined();
       expect(wall.thickness).toBeCloseTo(allowed[wall.role!]!, 6);
@@ -169,6 +172,23 @@ describe('apartmentScene plan', () => {
     expect(entrances.map((opening) => opening.id)).toEqual([OPENING.doorEntrance]);
   });
 
+  test('exactly ten doors, and the loggia opens to the living room and to the bedroom', () => {
+    const doors = apartmentScene.walls.flatMap((wall) => (wall.openings ?? []).filter((opening) => opening.type === 'door'));
+    expect(doors).toHaveLength(10);
+    const loggiaDoors = new Map<string, string>();
+    for (const face of plan.faces.values()) {
+      if (face.roomId === null || face.roomId === ROOM.loggia) continue;
+      const wall = wallById(face.wallId);
+      const otherSide = [...plan.faces.values()].some((other) => other.wallId === wall.id && other.roomId === ROOM.loggia);
+      if (!otherSide) continue;
+      for (const opening of wall.openings ?? []) if (opening.type === 'door') loggiaDoors.set(opening.id, face.roomId);
+    }
+    expect(Object.fromEntries(loggiaDoors)).toEqual({
+      [OPENING.doorLivingLoggia]: ROOM.living,
+      [OPENING.doorBedroomLoggia]: ROOM.bedroom,
+    });
+  });
+
   test('walk mode has an authored spawn inside the plan', () => {
     const spawn = apartmentScene.walkSpawn;
     expect(spawn).toBeDefined();
@@ -179,25 +199,18 @@ describe('apartmentScene plan', () => {
     expect(spawn!.position.z).toBeCloseTo(apartmentScene.roomCameras[ROOM.living]!.position.z, 6);
   });
 
-  test('the rooms of the photo programme have their windows and doors', () => {
+  test('every room but the hall and the WC has a window, and every room a door', () => {
     const openingIds = apartmentScene.walls.flatMap((wall) => (wall.openings ?? []).map((opening) => opening.id));
-    for (const id of [
-      OPENING.windowLivingBay,
-      OPENING.windowStudy,
-      OPENING.windowBedroomEast,
-      OPENING.windowKitchenSouth,
-      OPENING.doorEntrance,
-      OPENING.doorKitchenLoggia,
-      OPENING.doorGuestLoggia,
-      OPENING.doorLivingHall,
-      OPENING.doorGuestHall,
-      OPENING.doorStudy,
-      OPENING.doorBedroom,
-      OPENING.doorCloset,
-      OPENING.doorBathroom,
-    ]) {
-      expect(openingIds).toContain(id);
+    for (const id of Object.values(OPENING)) expect(openingIds).toContain(id);
+    const windowed = new Set<string>();
+    const doored = new Set<string>();
+    for (const face of plan.faces.values()) {
+      if (face.roomId === null) continue;
+      const wall = wallById(face.wallId);
+      for (const opening of wall.openings ?? []) (opening.type === 'window' ? windowed : doored).add(face.roomId);
     }
+    expect([...doored].sort()).toEqual([...ROOM_IDS].sort());
+    expect([...windowed].sort()).toEqual(ROOM_IDS.filter((id) => id !== ROOM.hall && id !== ROOM.wc).sort());
   });
 });
 
@@ -209,10 +222,10 @@ describe('apartmentScene contents', () => {
       expect(resolveSurfaceFinish(room.floorMaterial)).not.toBeNull();
       expect(floors).toContain(room.floorMaterial);
     }
-    expect(apartmentScene.rooms.find((room) => room.id === ROOM.bathroom)!.floorMaterial).toBe(FINISH.stone);
-    for (const id of [ROOM.loggiaWest, ROOM.loggiaNorth]) {
-      expect(apartmentScene.rooms.find((room) => room.id === id)!.floorMaterial).toBe(FINISH.ceramic_light);
+    for (const id of [ROOM.bathroom, ROOM.wc]) {
+      expect(apartmentScene.rooms.find((room) => room.id === id)!.floorMaterial).toBe(FINISH.stone);
     }
+    expect(apartmentScene.rooms.find((room) => room.id === ROOM.loggia)!.floorMaterial).toBe(FINISH.ceramic_light);
   });
 
   test('every asset names its room and sits inside it', () => {
@@ -228,7 +241,46 @@ describe('apartmentScene contents', () => {
     }
   });
 
-  test('room cameras cover all ten rooms at eye height, inside their room', () => {
+  test('the kitchen has an island and both bedrooms a double bed with two nightstands', () => {
+    const archetypeOf = (asset: (typeof apartmentScene.assets)[number]): string | null => {
+      const resolved = resolveAsset(asset);
+      return isResolved(resolved) ? resolved.asset.archetypeId : null;
+    };
+    const inRoom = (room: string, archetype: string): number =>
+      apartmentScene.assets.filter((asset) => asset.room === room && archetypeOf(asset) === archetype).length;
+    expect(inRoom(ROOM.kitchen, ARCHETYPE.island_kitchen)).toBe(1);
+    for (const room of [ROOM.bedroom, ROOM.guestRoom]) {
+      expect({ room, beds: inRoom(room, ARCHETYPE.bed_double), stands: inRoom(room, ARCHETYPE.nightstand) }).toEqual({
+        room,
+        beds: 1,
+        stands: 2,
+      });
+    }
+  });
+
+  test('no room camera, navigation point or the walk spawn stands inside a piece of furniture', () => {
+    const footprints = apartmentScene.assets.flatMap((asset) => {
+      const footprint = footprintOf(asset);
+      if (!footprint) return [];
+      return [
+        {
+          id: asset.id,
+          quad: obbQuad({ x: asset.position.x, z: asset.position.z, hx: footprint.hx, hz: footprint.hz, angle: asset.rotationY ?? 0 }),
+        },
+      ];
+    });
+    const standing: Array<[string, Vec3]> = [
+      ...Object.entries(apartmentScene.roomCameras).map(([room, camera]): [string, Vec3] => [`camera ${room}`, camera.position]),
+      ...apartmentScene.navigation.points.map((point, index): [string, Vec3] => [`point ${index}`, point]),
+      ['walk spawn', apartmentScene.walkSpawn!.position],
+    ];
+    for (const [label, point] of standing) {
+      const inside = footprints.filter(({ quad }) => pointInPolygon({ x: point.x, z: point.z }, quad)).map(({ id }) => id);
+      expect({ label, inside }).toEqual({ label, inside: [] });
+    }
+  });
+
+  test('room cameras cover all nine rooms at eye height, inside their room', () => {
     expect(Object.keys(apartmentScene.roomCameras).sort()).toEqual([...ROOM_IDS].sort());
     for (const [roomId, camera] of Object.entries(apartmentScene.roomCameras)) {
       expect(camera.position.y).toBeCloseTo(1.6, 6);
@@ -238,7 +290,9 @@ describe('apartmentScene contents', () => {
 
   test('from the living spawn, the lounge and the hall doorway are reachable past the furniture', () => {
     // Walk mode drops the camera on `roomCameras.living`; a tap that cannot be
-    // reached is refused, so the spawn must not be boxed in by the dining set.
+    // reached is refused, so the spawn must not be boxed in by the lounge or
+    // the dining set: from the aisle it reaches the floor south of the lounge
+    // and the hall door.
     const spawn = {
       x: apartmentScene.roomCameras[ROOM.living]!.position.x,
       y: 1.65,
@@ -249,7 +303,7 @@ describe('apartmentScene contents', () => {
       const resolved = resolveNavigationTarget(plan, apartmentScene, target, obstacles);
       return canTraverse(plan, spawn, resolved) && !pathBlockedByFurniture(obstacles, spawn, resolved);
     };
-    expect({ lounge: reachable({ x: 3.6, y: 1.65, z: 2.0 }), hall: reachable({ x: 5.9, y: 1.65, z: 6.2 }) }).toEqual({
+    expect({ lounge: reachable({ x: 1.8, y: 1.65, z: 8.55 }), hall: reachable({ x: 3.95, y: 1.65, z: 4.4 }) }).toEqual({
       lounge: true,
       hall: true,
     });
@@ -304,13 +358,13 @@ describe('apartmentScene contents', () => {
     }
   });
 
-  test('the autotour visits hall, living, guest room, kitchen, study and bedroom', () => {
-    const visited = apartmentScene.autotour.path.map((point) => roomContaining(point)).filter((room): room is string => room !== null);
-    for (const id of [ROOM.hall, ROOM.living, ROOM.guestRoom, ROOM.kitchen, ROOM.study, ROOM.bedroom]) {
-      expect(visited).toContain(id);
-    }
-    // The tour dips into the bay, which reaches north of the straight facade.
-    expect(apartmentScene.autotour.path.some((point) => roomContaining(point) === ROOM.living && point.z < 0.55)).toBe(true);
+  test('the autotour visits every room but the WC', () => {
+    const visited = new Set(
+      apartmentScene.autotour.path.map((point) => roomContaining(point)).filter((room): room is string => room !== null),
+    );
+    expect([...visited].sort()).toEqual(ROOM_IDS.filter((id) => id !== ROOM.wc).sort());
+    // The tour dips into the bay, which reaches south of the straight facade's inner face.
+    expect(apartmentScene.autotour.path.some((point) => roomContaining(point) === ROOM.living && point.z > 9.05)).toBe(true);
   });
 
   test('gaze keys and speed zones reference real waypoints and slow down in small rooms', () => {
@@ -386,8 +440,34 @@ describe('apartmentScene layout', () => {
 });
 
 describe('apartmentScene interiors', () => {
-  test('the four presets are the ones the panel offers, in order', () => {
+  test('the four presets are the ones the panel offers, in order, the first named Oak and sand', () => {
     expect(apartmentScene.interiors?.map((preset) => preset.id)).toEqual(Object.values(DEMO.preset));
+    expect(apartmentScene.interiors?.[0]?.name).toBe('Oak and sand');
+  });
+
+  test('a preset dresses the flat and never re-lays it: every pose, footprint and height stays', () => {
+    const shape = (asset: (typeof apartmentScene.assets)[number]): unknown => {
+      const resolved = resolveAsset(asset);
+      return {
+        position: asset.position,
+        rotationY: asset.rotationY ?? 0,
+        scale: asset.scale ?? 1,
+        footprint: footprintOf(asset),
+        dims: isResolved(resolved) ? resolved.asset.dims : null,
+      };
+    };
+    const shipped = new Map(apartmentScene.assets.map((asset) => [asset.id, shape(asset)]));
+    for (const preset of apartmentScene.interiors ?? []) {
+      const model = new SceneModel(apartmentScene, CATALOGUE_REGISTRIES);
+      expect(isApplyOk(applyPresetBatch(model, preset.id))).toBe(true);
+      for (const asset of model.scene.assets) {
+        expect({ preset: preset.id, asset: asset.id, shape: shape(asset) }).toEqual({
+          preset: preset.id,
+          asset: asset.id,
+          shape: shipped.get(asset.id),
+        });
+      }
+    }
   });
 
   // The whole point of the footprint rule in the preset tables: a preset

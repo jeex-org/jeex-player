@@ -215,7 +215,7 @@ describe('the interior-preset kind', () => {
   });
 
   test('the active preset is pressed, an inactive one is not', () => {
-    expect(build(make({ active: true, dataset: { preset: DEMO.preset.nordicOak } }), 'interior').attributes['aria-pressed']).toBe('true');
-    expect(build(make({ active: false, dataset: { preset: DEMO.preset.nordicOak } }), 'interior').attributes['aria-pressed']).toBe('false');
+    expect(build(make({ active: true, dataset: { preset: DEMO.preset.oakSand } }), 'interior').attributes['aria-pressed']).toBe('true');
+    expect(build(make({ active: false, dataset: { preset: DEMO.preset.oakSand } }), 'interior').attributes['aria-pressed']).toBe('false');
   });
 });

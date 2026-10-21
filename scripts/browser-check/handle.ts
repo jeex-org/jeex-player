@@ -180,8 +180,8 @@ export async function checkHandle(ctx: CheckContext): Promise<void> {
     const plain = { camera: handle.getState().walk.camera, events: events.splice(0) };
     handle.setMode('orbit');
     const scene = handle.getScene();
-    const first = { id: ${literal(CAMERA.living)}, position: { x: 4.4, y: 1.55, z: 2.4 }, yaw: 0.5, pitch: -0.3 };
-    scene.tourCheckpoints = [first, { id: ${literal(CAMERA.kitchen)}, position: { x: 1.1, y: 1.5, z: 5.2 }, yaw: -1.57, pitch: -0.4 }];
+    const first = { id: ${literal(CAMERA.living)}, position: { x: 3.95, y: 1.55, z: 6.9 }, yaw: 0.5, pitch: -0.3 };
+    scene.tourCheckpoints = [first, { id: ${literal(CAMERA.kitchen)}, position: { x: 3.6, y: 1.5, z: 2.9 }, yaw: -1.57, pitch: -0.4 }];
     await handle.loadScene({ document: scene });
     handle.setMode('orbit');
     await pause(300);

@@ -138,7 +138,7 @@ describe('judge', () => {
 
   test('a pendant refuses the loggia, which has no ceiling', () => {
     const context = drag(DEMO.asset.livingPendant);
-    const loggia = plan.rooms.find((room) => room.roomId === DEMO.room.loggiaNorth)!;
+    const loggia = plan.rooms.find((room) => room.roomId === DEMO.room.loggia)!;
     const inside = loggia.polygon.reduce((sum, p) => ({ x: sum.x + p.x / loggia.polygon.length, z: sum.z + p.z / loggia.polygon.length }), {
       x: 0,
       z: 0,

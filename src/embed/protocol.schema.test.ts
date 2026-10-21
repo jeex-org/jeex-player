@@ -209,7 +209,7 @@ describe('readCommand', () => {
   });
 
   test('setSelection takes a target or null and nothing else', () => {
-    expect(readCommand('setSelection', { target: { kind: 'wall', id: DEMO.wall.bearingCentral } }).ok).toBe(true);
+    expect(readCommand('setSelection', { target: { kind: 'wall', id: DEMO.wall.spineKitchen } }).ok).toBe(true);
     expect(refusal('setSelection', { target: { kind: 'wall', id: 'w1' } })).toEqual([
       { path: 'params.target.id', message: 'must be a UUID v7' },
     ]);
@@ -292,10 +292,10 @@ describe('the event union', () => {
     mode: 'walk',
     select: {
       kind: 'wall',
-      id: DEMO.wall.bearingCentral,
-      wallId: DEMO.wall.bearingCentral,
+      id: DEMO.wall.spineKitchen,
+      wallId: DEMO.wall.spineKitchen,
       roomId: DEMO.room.kitchen,
-      face: { room: DEMO.room.kitchen, wallId: DEMO.wall.bearingCentral, side: 'L' },
+      face: { room: DEMO.room.kitchen, wallId: DEMO.wall.spineKitchen, side: 'R' },
       point: { x: 1, z: 2 },
       mode: 'plan2d',
     },
@@ -328,7 +328,7 @@ describe('the event union', () => {
   test('a select event names its face as a FaceKey, never as a joined string', () => {
     const select = (face: unknown) => z.safeParse(eventSchema, { event: 'select', payload: { kind: 'wall', face, mode: 'orbit' } }).success;
     expect(select({ wallId: DEMO.wall.bayLiving, side: 'R' })).toBe(true);
-    expect(select(`${DEMO.room.kitchen}:${DEMO.wall.bearingCentral}:L`)).toBe(false);
+    expect(select(`${DEMO.room.kitchen}:${DEMO.wall.spineKitchen}:L`)).toBe(false);
     expect(select({ wallId: DEMO.wall.bayLiving, side: 'up' })).toBe(false);
     expect(select({ wallId: DEMO.wall.bayLiving, side: 'R', faceId: 'x' })).toBe(false);
   });

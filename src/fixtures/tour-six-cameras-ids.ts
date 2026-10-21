@@ -13,5 +13,5 @@ export const SIX_CAMERAS = {
   hall: '01a12fe6-aef2-74a1-811f-7374dd33ff02',
   bed: '01a12fe6-aef3-7420-a4d2-0edfd8e1a0b5',
   room: '01a12fe6-aef4-71b0-a1a1-47f62d0c8f34',
-  study: '01a12fe6-aef5-7323-ae8c-ed37d02b47f2',
+  guest: '01a12fe6-aef5-7323-ae8c-ed37d02b47f2',
 } as const;

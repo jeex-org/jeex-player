@@ -2,7 +2,5 @@
   "$schema": "./node_modules/oxfmt/configuration_schema.json",
   "singleQuote": true,
   "printWidth": 140,
-  "ignorePatterns": [
-    "**/*.md"
-  ]
+  "ignorePatterns": ["**/*.md", "openspec/**"]
 }

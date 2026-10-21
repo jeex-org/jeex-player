@@ -14,10 +14,10 @@
  * mulberry32, so the same request answers the same pose — an undo and a repeat
  * of a catalogue click land the sofa in the same spot.
  *
- * Cost, measured on the demo apartment (61 objects): one
- * `lintLayout` is 12.6 ms and a call runs at most `LINT_CANDIDATES + 1` of
- * them, so the worst case measured was 35.7 ms (`stool_bar` into `study`, five
- * survivors all rejected) — a click on a catalogue card, not a frame. The
+ * Cost, measured on the demo apartment (59 objects, 2026-10-21): one
+ * `lintLayout` is about 21 ms and a call runs at most `LINT_CANDIDATES + 1` of
+ * them, so the worst case measured was 60 ms (`stool_bar` into the living
+ * room) — a click on a catalogue card, not a frame. The
  * candidate plan is never re-solved: `place_object` touches only
  * `scene.assets`, and a `SolvedPlan` is derived from nodes, walls and rooms,
  * which saves 0.5 ms of `solvePlan` per candidate.

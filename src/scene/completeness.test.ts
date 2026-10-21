@@ -29,7 +29,8 @@ describe('checkCompleteness — the demo apartment', () => {
   test('names the interior rooms that carry no window as info, not warning', () => {
     const windowless = demoReport.entries.filter((entry) => entry.code === 'room-no-window');
     const ids = windowless.map((entry) => entry.entity?.id).sort((a, b) => (a ?? '').localeCompare(b ?? ''));
-    expect(ids).toEqual([DEMO.room.bathroom, DEMO.room.closet, DEMO.room.hall].sort((a, b) => a.localeCompare(b)));
+    // The hall and the WC are the two rooms the plan gives no window.
+    expect(ids).toEqual([DEMO.room.hall, DEMO.room.wc].sort((a, b) => a.localeCompare(b)));
     expect(windowless.every((entry) => entry.severity === 'info')).toBe(true);
   });
 

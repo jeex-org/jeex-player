@@ -5,7 +5,7 @@
  * Deliberately outside `scene-repository.ts`, which the library graph reaches
  * from `embed/index.ts` (`viewer-api.ts` re-exports `FetchSceneRepository`
  * and `InlineSceneRepository`). If this class lived there, its default
- * constructor argument would pull `scene-data.ts` — the 68-object demo flat —
+ * constructor argument would pull `scene-data.ts` — the whole furnished demo flat —
  * into every host's bundle by one static edge. Keeping it here instead means
  * `scene-data.ts` is UNREACHABLE from the library entry, not merely unused by
  * it (`purity.test.ts`, "the library entry").

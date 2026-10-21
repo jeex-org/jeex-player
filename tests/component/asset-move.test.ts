@@ -17,6 +17,7 @@ import type { AssetMoveDebug } from '../../src/edit/asset-move-session.js';
 import { DEMO } from '../../src/demo/demo-ids.js';
 import { dragContext, judge, poseItem } from '../../src/layout/asset-legality.js';
 import { mask } from '../../src/layout/asset-mask.js';
+import { pointInPolygon } from '../../src/plan/plan-geometry.js';
 import { solvePlan } from '../../src/plan/plan-solver.js';
 import type { SceneData } from '../../src/scene/types.js';
 import type { SlotName } from '../../src/ui/host-slots.js';
@@ -98,15 +99,24 @@ function drag(canvas: HTMLCanvasElement, from: { x: number; y: number }, to: { x
 }
 
 /** A legal spot for `id`, `away` metres or more from home, read off its own legality field. */
-function legalSpot(scene: SceneData, id: string, away: number, surface: 'floor' | 'ceiling'): { x: number; z: number } {
+function legalSpot(
+  scene: SceneData,
+  id: string,
+  away: number,
+  surface: 'floor' | 'ceiling',
+  accept: (spot: { x: number; z: number }) => boolean = () => true,
+): { x: number; z: number } {
   const plan = solvePlan(scene);
   const context = dragContext(scene, plan, id)!;
   const home = context.placement;
+  // In its own room: a drag here never has to cross a wall the view may hide it behind.
+  const room = plan.rooms.find((candidate) => candidate.roomId === home.room)!;
   const field = mask(context, poseItem(context, { position: home.position, rotationY: home.rotationY ?? 0 }), surface);
   for (let cell = 0; cell < field.count; cell += 1) {
     const x = field.positions[cell * 12]! + field.step / 2;
     const z = field.positions[cell * 12 + 2]! + field.step / 2;
     if (field.ok[cell] !== 1 || Math.hypot(x - home.position.x, z - home.position.z) < away) continue;
+    if (!pointInPolygon({ x, z }, room.polygon) || !accept({ x, z })) continue;
     if (judge(context.ctx, poseItem(context, { position: { x, y: home.position.y, z }, rotationY: home.rotationY ?? 0 })).ok)
       return { x, z };
   }
@@ -147,9 +157,14 @@ describe('the asset move tool', { timeout: MOUNT_PLUS_CHUNK_TIMEOUT_MS }, () => 
     test(`a floor drag in ${mode} draws the field, then emits move_object for the host on the start revision`, async () => {
       const { canvas, edits, refusals, scene } = await mount(mode, DEMO.asset.bedroomBed);
       const home = placement(scene, DEMO.asset.bedroomBed).position;
-      const spot = legalSpot(scene, DEMO.asset.bedroomBed, 0.4, 'floor');
+      // The opening view looks from the north over the corridor wall, which
+      // hides the north half of the bedroom floor at bed height: the bed is
+      // grabbed 0.7 m south of its centre and dropped on a spot south of 7.0 m,
+      // and the grab offset rides along to the release.
+      const spot = legalSpot(scene, DEMO.asset.bedroomBed, 0.4, 'floor', (candidate) => candidate.z >= 7.0);
       let cells = 0;
-      drag(canvas, pixel(mode, home.x, 0.5, home.z), pixel(mode, spot.x, 0.5, spot.z), () => {
+      const grab = 0.7;
+      drag(canvas, pixel(mode, home.x, 0.5, home.z + grab), pixel(mode, spot.x, 0.5, spot.z + grab), () => {
         cells = debug().assetMove().state?.maskCells ?? 0;
       });
       expect(cells).toBeGreaterThan(1000);
@@ -205,7 +220,7 @@ describe('the asset move tool', { timeout: MOUNT_PLUS_CHUNK_TIMEOUT_MS }, () => 
     let surface: string | null = null;
     // A 5 cm thick picture is two pixels wide from above: the toggle moves it to the next press instead.
     handle.armAssetMove();
-    const target = pixel('plan3d', home.x + 0.5, home.y, home.z + 0.3);
+    const target = pixel('plan3d', home.x - 0.3, home.y, home.z + 0.5);
     drag(canvas, target, { x: target.x + 1, y: target.y }, () => {
       surface = debug().assetMove().state?.surface ?? null;
     });
@@ -215,15 +230,16 @@ describe('the asset move tool', { timeout: MOUNT_PLUS_CHUNK_TIMEOUT_MS }, () => 
     const op = edits[0]!.ops[0]!;
     if (op.op !== 'move_object') throw new Error('expected move_object');
     // It stayed on its face — flat on it now, within layout rule 5's 2 cm of where it was authored — and at its height.
-    expect(Math.abs(op.position!.z - home.z)).toBeLessThan(0.02);
+    // The bed's picture hangs on the east wall, so along the wall is along z.
+    expect(Math.abs(op.position!.x - home.x)).toBeLessThan(0.02);
     expect(op.position!.y).toBeCloseTo(home.y, 6);
-    expect(op.position!.x).toBeGreaterThan(home.x + 0.3);
+    expect(op.position!.z).toBeGreaterThan(home.z + 0.3);
   });
 
   test('an armed Move ignores a press on host slot content and stays armed; the next canvas press moves', async () => {
     const { handle, canvas, edits, refusals, scene } = await mount('plan3d', DEMO.asset.bedroomArt, ['selection-anchor']);
     const home = placement(scene, DEMO.asset.bedroomArt).position;
-    const target = pixel('plan3d', home.x + 0.5, home.y, home.z + 0.3);
+    const target = pixel('plan3d', home.x - 0.3, home.y, home.z + 0.5);
     // A host editor's selection card lives in a slot inside the canvas's parent; its button sits over the scene.
     const card = handle.slots.get('selection-anchor');
     const button = document.createElement('button');
@@ -259,7 +275,7 @@ describe('the asset move tool', { timeout: MOUNT_PLUS_CHUNK_TIMEOUT_MS }, () => 
     expect(phases).toEqual(['dragging', 'idle']);
   });
 
-  test('turnAsset turns a placement 15° through the handle, and refuses a sofa across its room', async () => {
+  test('turnAsset turns a placement 15° through the handle, and refuses the study desk turned square', async () => {
     const { handle, edits, refusals } = await mount('plan3d', DEMO.asset.bedroomBed);
     expect(handle.turnAsset(DEMO.asset.livingChairA, 1)).toBe(true);
     expect(edits).toHaveLength(1);
@@ -267,8 +283,8 @@ describe('the asset move tool', { timeout: MOUNT_PLUS_CHUNK_TIMEOUT_MS }, () => 
     if (rotate?.op !== 'rotate_object') throw new Error('expected rotate_object');
     expect(rotate.rotationY).toBeCloseTo(Math.PI / 12, 6);
     handle.revertAssetEdit();
-    expect(handle.turnAsset(DEMO.asset.livingSofa, 6)).toBe(true);
-    expect(refusals.at(-1)?.assetId).toBe(DEMO.asset.livingSofa);
+    expect(handle.turnAsset(DEMO.asset.studyDesk, 6)).toBe(true);
+    expect(refusals.at(-1)?.assetId).toBe(DEMO.asset.studyDesk);
     expect(handle.turnAsset('01a12fe6-0000-7000-8000-000000000000', 1)).toBe(false);
   });
 });

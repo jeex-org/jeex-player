@@ -103,7 +103,7 @@ describe('a checkpoint run moves smoothly', () => {
   test('the run comes to a standstill where the track turns back on a camera, then leaves it', () => {
     // The kitchen is a dead end: the walk turns back on its camera.
     const frames = ride({ ...apartmentScene, tourCheckpoints: [...sixCameraTour] });
-    const kitchen = new THREE.Vector3(1.1, 1.5, 5.2);
+    const kitchen = new THREE.Vector3(1.2, 1.5, 1.2);
     const index = frames.reduce(
       (best, frame, at) => (frame.position.distanceTo(kitchen) < frames[best]!.position.distanceTo(kitchen) ? at : best),
       0,

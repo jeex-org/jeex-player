@@ -7,6 +7,19 @@ as described under [Versioning](#versioning).
 
 ## [Unreleased]
 
+### Changed
+
+- **The demo apartment is a new, invented flat.** The scene the demo pages
+  and the player site ship (`src/demo/`, published as
+  `demo/demo-apartment.json`) is now `Two-bedroom demo apartment`: an
+  invented two-bedroom flat with a study, a curved bay and a loggia, drawn
+  for the player and furnished from the built-in bank. Every demo entity id
+  (scene, nodes, walls, openings, rooms, placements, interior presets) is
+  new, so a host that addressed demo entities by id reads them from the new
+  document; a saved copy of the previous demo document still loads, since
+  the schema and the catalogue ids are unchanged. The first interior preset
+  is now called "Oak and sand". The library build is not affected.
+
 ### Changed (breaking)
 
 - **Scene schema `2.2`: a placement's catalogue reference is two fields.**

@@ -315,8 +315,8 @@ export async function checkEditing(ctx: CheckContext): Promise<void> {
   // `eval` would place a SECOND object and then assert about it.
   //
   // The room is NOT hard-coded. The demo apartment is furnished to the edges
-  // (measured: the living room has no free space for a sofa or even
-  // a bar stool, and the study's survivors all break rule 6), and re-authoring the
+  // (measured: neither the living room nor the bedroom has free space for a
+  // sofa, and the study has none even for a bar stool), and re-authoring the
   // demo must not break this check — so it tries several rooms and reports
   // what each answered.
   await waitFor(ctx, `window.__viewerDebug.suggestPlacement(${literal(ARCHETYPE.stool_bar)}) !== null`, 'the lazy layout module to land');

@@ -187,7 +187,7 @@ describe('previews carry no text', () => {
 
 describe('interior panel', () => {
   const PRESETS: InteriorPreset[] = [
-    { id: DEMO.preset.nordicOak, name: 'Nordic oak', swatch: [FINISH.oak, FINISH.sand], ops: [] },
+    { id: DEMO.preset.oakSand, name: 'Oak and sand', swatch: [FINISH.oak, FINISH.sand], ops: [] },
     { id: DEMO.preset.sageGraphite, name: 'Sage and graphite', swatch: [FINISH.chevron, FINISH.sage], ops: [] },
   ];
 
@@ -198,7 +198,7 @@ describe('interior panel', () => {
   test('offers one item per preset, keyed by preset id', () => {
     const request = panel();
     expect(request.kind).toBe('interior');
-    expect(request.items.map((item) => item.dataset['preset'])).toEqual([DEMO.preset.nordicOak, DEMO.preset.sageGraphite]);
+    expect(request.items.map((item) => item.dataset['preset'])).toEqual([DEMO.preset.oakSand, DEMO.preset.sageGraphite]);
     expect(request.panelData).toEqual({ presets: '2' });
     expect(request.anchor).toBe(ANCHOR);
   });

@@ -55,8 +55,8 @@ const ROOM = {
 const WALL = {
   w1: '01a12ffc-489a-7eed-9370-4c001acc9310',
   w2: '01a12ffc-489b-792b-ab3a-693f5ff9c8b5',
-  bayLiving: '01a12ffc-489c-757c-a3bd-b037afe8e14e',
-  bearingCentral: '01a12ffc-489d-7e55-8fd0-d3ad5eaa3d63',
+  curvedFacade: '01a12ffc-489c-757c-a3bd-b037afe8e14e',
+  bearing: '01a12ffc-489d-7e55-8fd0-d3ad5eaa3d63',
 } as const;
 const DOOR = '01a12ffc-489e-7ace-b6a9-022b15e9c7f3';
 const ASSET = { sofa: '01a12ffc-489f-7934-b9ae-6450e559d1c9', bedroomBed: '01a12ffc-48a0-7886-af50-8692f69f6fc6' } as const;
@@ -147,15 +147,15 @@ describe('registration', () => {
 
 describe('pickSurface', () => {
   test('reads the face key and room id of a wall through the resolvers', () => {
-    const wall = wallQuad(0, faceKey(null, WALL.bayLiving, 'R'));
+    const wall = wallQuad(0, faceKey(null, WALL.curvedFacade, 'R'));
     const root = scene(wall);
     const picker = new Picker(canvas());
     picker.register(root);
     expect(picker.pickSurface(CENTRE.x, CENTRE.y, camera())).toEqual({
       surface: 'wall',
       roomId: undefined,
-      face: faceKey(null, WALL.bayLiving, 'R'),
-      wallId: WALL.bayLiving,
+      face: faceKey(null, WALL.curvedFacade, 'R'),
+      wallId: WALL.curvedFacade,
     });
   });
 
@@ -219,10 +219,10 @@ describe('pickSurface', () => {
   });
 
   test('a wall pick carries the wall id straight off userData', () => {
-    const wall = wallQuad(0, faceKey(ROOM.kitchen, WALL.bearingCentral, 'L'));
+    const wall = wallQuad(0, faceKey(ROOM.kitchen, WALL.bearing, 'L'));
     const picker = new Picker(canvas());
     picker.register(scene(wall));
-    expect(picker.pickSurface(CENTRE.x, CENTRE.y, camera())?.wallId).toBe(WALL.bearingCentral);
+    expect(picker.pickSurface(CENTRE.x, CENTRE.y, camera())?.wallId).toBe(WALL.bearing);
   });
 
   test('an opening pick carries the wall it hangs on', () => {

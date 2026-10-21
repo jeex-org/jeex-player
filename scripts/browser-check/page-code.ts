@@ -193,7 +193,7 @@ export const PICK_FACADE = `(() => {${HELPERS}
   }
   for (let dx = -40; dx <= 40; dx += 20) {
     for (let dy = -20; dy <= 20; dy += 10) {
-      candidates.push({ x: innerWidth * (572 + dx) / 1280, y: innerHeight * (180 + dy) / 800 });
+      candidates.push({ x: innerWidth * (830 + dx) / 1280, y: innerHeight * (190 + dy) / 800 });
     }
   }
   for (const p of candidates) {

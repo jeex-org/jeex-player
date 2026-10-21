@@ -238,8 +238,8 @@ describe('joint cores', () => {
   });
 
   test('a thickness step on a straight run needs no core', () => {
-    // apartmentScene c-lgw: the 0.38 bearing wall continues north as 0.30, and
-    // both prisms already cover their own cross-section up to the node.
+    // A 0.38 wall continues straight on as 0.30 at j2, and both prisms
+    // already cover their own cross-section up to the node.
     const jog: SceneData = {
       ...lShapePlan,
       nodes: [
