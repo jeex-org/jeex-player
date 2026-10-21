@@ -1,11 +1,15 @@
 #!/usr/bin/env bash
 # Quality gate for jeex-viewer. Every step below is a HARD step, with one
 # exception: `code-ranker`, an optional structural lint, is skipped with a
-# message when the tool is not installed. `.github/workflows/ci.yml` runs the
-# same step LIST (in a different order, see its own header), minus
+# message when the tool is not installed. The two GitHub workflows together
+# run the same step LIST (in a different order, see their headers), minus
 # `code-ranker` and plus the Playwright browser install CI needs and a
-# developer's machine already has. `scripts/ci-parity.test.ts` proves the LIST
-# itself never drifts.
+# developer's machine already has: `.github/workflows/ci.yml` runs every step
+# that needs no browser on each push and pull request, and
+# `.github/workflows/browser.yml` runs the browser levels only when started by
+# hand. This script is therefore the only place the browser levels run before
+# a pull request. `scripts/ci-parity.test.ts` proves the LIST itself never
+# drifts.
 #
 # THREE TIERS, one content:
 #
@@ -17,10 +21,11 @@
 #             `bun test` run with its per-layer coverage floors, the Vitest
 #             browser level with the DOM floors, the demo build and its bundle
 #             budget. No Playwright.
-#   full      before a pull request and in CI — everything `standard` runs
-#             plus Playwright e2e, the library build and its per-file budgets,
-#             `publint`/`attw`, `bun audit` and `code-ranker`. It is the
-#             DEFAULT: a bare `check.sh` is the full gate.
+#   full      before a pull request — everything `standard` runs plus
+#             Playwright e2e, the library build and its per-file budgets,
+#             `publint`/`attw`, the site build, `bun audit` and
+#             `code-ranker`. It is the DEFAULT: a bare `check.sh` is the full
+#             gate.
 #
 # The tiers are nested BY CONSTRUCTION, not by a second list: every step below
 # is either unconditional (all three tiers), inside `if [ "$TIER" != fast ]`
@@ -184,6 +189,11 @@ echo "== check:pkg"
 # `publint`/`attw` read the built `dist-lib`: needs `npm run build:lib` above,
 # so it stays full-only along with the build itself.
 bun run check:pkg
+echo "== site build"
+# The player site (`site/` plus the demo build under `demo/` and the
+# published schemas) assembled into `site-out/` from the `dist/` the
+# standard tier's `npm run build` wrote. It is what a release deploys.
+bun run scripts/site-build.ts
 echo "== bun audit"
 bun audit
 echo "== code-ranker check"

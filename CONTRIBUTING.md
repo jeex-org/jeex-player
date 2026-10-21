@@ -48,10 +48,24 @@ The gate is `scripts/check.sh`, in three nested tiers:
   their floors, and the demo build with its bundle budget.
 - `full` (the default) runs before a pull request: the Playwright end-to-end
   suite, the library build and its per-file budgets, `publint` and `attw`,
-  and `bun audit`.
+  the site build, and `bun audit`.
 
-CI (`.github/workflows/ci.yml`) runs the full step list on every pull
-request. Two things run only on a contributor's machine:
+Run the full gate (`bash scripts/check.sh`) before you open a pull request:
+it is the proof a change is ready. CI splits the same step list in two:
+
+- `.github/workflows/ci.yml` runs on every push to `main` and every pull
+  request, and weekly for new dependency advisories. It runs every step that
+  needs no browser: type checks, lint, format, the unit tests with their
+  coverage floors, the demo, site and library builds with their budgets,
+  the static checks and `bun audit`. It takes about a minute and a half.
+- `.github/workflows/browser.yml` runs the browser levels (the component
+  tests in Vitest browser mode with their coverage floors, and the
+  Playwright end-to-end suite) on hosted runners. A push does not start it:
+  a maintainer starts it by hand (Actions, "Browser tests", "Run workflow")
+  when a change needs them checked on a machine nobody owns. On hosted
+  runners without a GPU it takes about twenty minutes.
+
+Two things run only on a contributor's machine:
 
 - **Screenshot comparisons.** The baselines of the end-to-end suite are
   rendered locally and depend on the platform's GPU and fonts, so CI skips

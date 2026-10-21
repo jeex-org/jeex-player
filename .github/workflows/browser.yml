@@ -1,0 +1,156 @@
+# The browser levels of the quality gate, on hosted runners, ON DEMAND ONLY.
+#
+# A push or a pull request does not start this workflow: the browser levels
+# run in the local gate (`bash scripts/check.sh`, the proof before a pull
+# request), and `ci.yml` runs every step that needs no browser. Start it from
+# Actions, "Browser tests", "Run workflow", on any branch, to see the browser
+# levels on a machine nobody owns.
+#
+# `scripts/ci-parity.test.ts` reads this file together with `ci.yml`: the two
+# workflows together carry `check.sh`'s step list.
+#
+#  - `component` runs the Vitest browser level split across eight runners
+#    (`--shard=<i>/8`). On a hosted runner (4 vCPUs, no GPU, SwiftShader) the
+#    whole tier costs about 20 minutes in one job, against about 6 minutes on
+#    a 16-thread developer machine, and the software rasteriser is the
+#    bottleneck: more Vitest workers on the same 4 vCPUs do not shorten the
+#    run, they only slow every test against its own timeout. Eight runners
+#    with one worker each keep every test near its developer-machine pace.
+#    `tests/component-shards.ts` balances the shards by measured cost.
+#  - `component-coverage` merges the eight shards' blob reports, coverage
+#    included, into the `coverage-component/lcov.info` one local run writes,
+#    and runs the DOM-layer floors on it: a floor checked per shard would
+#    measure an eighth of the tests.
+#  - `e2e` runs Playwright split the same way (`--shard=<i>/8`), one worker
+#    per runner and three times the developer machine's budgets
+#    (`JEEX_E2E_TIME_SCALE`, `playwright.config.ts`): a frame of the demo
+#    apartment costs about a second on SwiftShader, and every Playwright
+#    round trip waits for it.
+#
+# Screenshot comparisons in the e2e level run only locally; with `CI` set they
+# are skipped, because the baselines are rendered on the maintainers' machines.
+name: Browser tests
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: browser-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  component:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    strategy:
+      # Every shard reports, so one red file does not hide a second one.
+      fail-fast: false
+      matrix:
+        shard: [1, 2, 3, 4, 5, 6, 7, 8]
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - uses: ./.github/actions/setup
+        with:
+          browser: 'true'
+
+      # One worker, not the four `vitest.config.ts` pins for a developer
+      # machine: on 4 vCPUs the shared software rasteriser is the bottleneck,
+      # and every further page only stretches each test (measured on four
+      # hardware threads: 759 s with four workers, 817 s with two, but the
+      # slowest test of a file halves). With two workers on four shards, two
+      # tests that sit near their budgets (a click in 360 that opens no panel,
+      # the glide to the first tour camera) ran 5 s past them on the runner;
+      # one worker gives each test the whole runner.
+      #
+      # The ceiling replaces the watchdog's 10-minute default
+      # (`scripts/run-component-tests.ts`), which is sized for the whole tier
+      # on a developer machine. With two workers the four shards took 6 to 10
+      # minutes on the runner; eight shards with one worker each should take
+      # about as long, and 15 leaves room for a slow runner.
+      - name: component tests (Vitest browser mode) shard ${{ matrix.shard }}/8
+        env:
+          JEEX_COMPONENT_TIMEOUT_MS: '900000'
+        run: >-
+          bun run test:component
+          --shard=${{ matrix.shard }}/8
+          --maxWorkers=1
+          --reporter=default
+          --reporter=blob
+          --outputFile.blob=component-blobs/blob-${{ matrix.shard }}.json
+
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: component-blob-${{ matrix.shard }}
+          path: component-blobs/
+          retention-days: 1
+
+  component-coverage:
+    needs: component
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - uses: ./.github/actions/setup
+
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+        with:
+          pattern: component-blob-*
+          path: component-blobs
+          merge-multiple: true
+
+      # Runs no test and launches no browser: it replays the eight blobs and
+      # writes the merged `coverage-component/lcov.info` the floors read.
+      - name: merge the component shards (coverage included)
+        run: bunx vitest run --config vitest.config.ts --merge-reports=component-blobs
+
+      - name: DOM-layer coverage floors
+        run: bun run check:coverage:component
+
+  e2e:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [1, 2, 3, 4, 5, 6, 7, 8]
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - uses: ./.github/actions/setup
+        with:
+          browser: 'true'
+
+      # `--reporter=github` is not passed here: `playwright.config.ts` picks
+      # the GitHub reporter itself when `CI` is set, so a local run and this
+      # one differ in exactly one place rather than two.
+      #
+      # One worker and three times every budget (`JEEX_E2E_TIME_SCALE`,
+      # `tests/e2e/time-scale.ts`). Measured on three hardware threads (about
+      # a hosted runner's pace) over one quarter of the suite: two workers and
+      # the plain budgets failed 15 of 21 specs on the runner; one worker and
+      # three times the budgets passed 20 of 21 in 23 minutes. The specs that
+      # still failed on the runner after that activate the control bar's
+      # buttons from the keyboard instead of racing its idle timer with
+      # clicks. With eight shards the jobs took 5 to 26 minutes on the runner,
+      # inside the 30-minute job limit.
+      - name: e2e tests (Playwright) shard ${{ matrix.shard }}/8
+        env:
+          JEEX_E2E_WORKERS: '1'
+          JEEX_E2E_TIME_SCALE: '3'
+        run: bun run test:e2e --shard=${{ matrix.shard }}/8
+
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        # The traces, the failure screenshots and the axe reports; only when
+        # something failed, because they are large and useless when it did not.
+        if: failure()
+        with:
+          name: playwright-artifacts-${{ matrix.shard }}
+          path: |
+            test-results/
+            playwright-report/
+          retention-days: 7

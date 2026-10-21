@@ -1008,9 +1008,9 @@ The gate has three nested tiers:
 
 - `fast`: the static steps (both type checks, oxlint, oxfmt, source hygiene, module size, dependency-cruiser layers, knip, the schema check, console and listener policies) plus the unit tests selected by the change. No browser, no build.
 - `standard`: everything in `fast` with the whole unit run and its coverage floors, the Vitest browser level with its coverage floors, the demo build and its bundle budget.
-- `full`: everything in `standard` plus the Playwright e2e suite, the library build and its per-file budgets, `publint`/`attw`, `bun audit` and `code-ranker` when it is installed.
+- `full`: everything in `standard` plus the Playwright e2e suite, the library build and its per-file budgets, `publint`/`attw`, the site build, `bun audit` and `code-ranker` when it is installed.
 
-Requirements: Node ≥ 22.12 (`.node-version` pins the version used in development), Bun (`.bun-version`), `bunx playwright install chromium` once. CI (`.github/workflows/ci.yml`) runs the same steps as the full tier, except `code-ranker` and the screenshot comparisons, which run only locally.
+Requirements: Node ≥ 22.12 (`.node-version` pins the version used in development), Bun (`.bun-version`), `bunx playwright install chromium` once. CI runs the full tier's steps except `code-ranker` and the screenshot comparisons, which run only locally: `.github/workflows/ci.yml` runs every step that needs no browser on each push and pull request, and the browser levels (component and e2e tests) run in the local gate (`bash scripts/check.sh`) and on demand in the hand-started `.github/workflows/browser.yml`.
 
 Dev pages under `dev/` also include `embed-two.html` (two independent viewers), `embed-element.html` (custom element), `embed-iframe.html` (iframe host) and `embed-tt.html` (a Trusted Types host), all covered by the e2e suite.
 

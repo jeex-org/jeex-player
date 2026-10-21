@@ -1,7 +1,7 @@
 /**
  * How many times longer than on a developer machine an e2e wait may take
  * here: `JEEX_E2E_TIME_SCALE`, unset means 1. A hosted CI runner sets it in
- * `ci.yml`; a machine with a GPU leaves it alone.
+ * `browser.yml`; a machine with a GPU leaves it alone.
  *
  * On SwiftShader one frame of the demo apartment costs about 1.2 s on four
  * hardware threads (0.82 fps, one page, 1280 x 720), and every Playwright
