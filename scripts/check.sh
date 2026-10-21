@@ -23,8 +23,9 @@
 #             budget. No Playwright.
 #   full      before a pull request — everything `standard` runs plus
 #             Playwright e2e, the library build and its per-file budgets,
-#             `publint`/`attw`, the site build, `bun audit` and `code-ranker`. It is the
-#             DEFAULT: a bare `check.sh` is the full gate.
+#             `publint`/`attw`, the site build, `bun audit` and
+#             `code-ranker`. It is the DEFAULT: a bare `check.sh` is the full
+#             gate.
 #
 # The tiers are nested BY CONSTRUCTION, not by a second list: every step below
 # is either unconditional (all three tiers), inside `if [ "$TIER" != fast ]`

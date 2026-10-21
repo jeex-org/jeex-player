@@ -57,7 +57,7 @@ it is the proof a change is ready. CI splits the same step list in two:
   request, and weekly for new dependency advisories. It runs every step that
   needs no browser: type checks, lint, format, the unit tests with their
   coverage floors, the demo, site and library builds with their budgets,
-  the static checks and `bun audit`. It takes a couple of minutes.
+  the static checks and `bun audit`. It takes about a minute and a half.
 - `.github/workflows/browser.yml` runs the browser levels (the component
   tests in Vitest browser mode with their coverage floors, and the
   Playwright end-to-end suite) on hosted runners. A push does not start it:

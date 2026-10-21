@@ -5,9 +5,10 @@
 # in one job of about a minute and a half. The browser levels (the Vitest
 # browser tier, its DOM-layer floors and the Playwright e2e suite) are not
 # here: on a hosted runner (4 vCPUs, no GPU, SwiftShader) they cost about
-# twenty minutes of wall time across sixteen runners, against minutes on a
-# developer machine. They run in the local gate (`bash scripts/check.sh`),
-# which is the proof a change is ready, and on demand in `browser.yml`
+# twenty minutes of wall time across sixteen runners and a merge job, against
+# minutes on a developer machine. They run in the local gate
+# (`bash scripts/check.sh`), which is the proof a change is ready, and on
+# demand in `browser.yml`
 # (Actions, "Browser tests", "Run workflow").
 #
 # Together the two workflows run the step list of `scripts/check.sh`, with two

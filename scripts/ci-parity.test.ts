@@ -142,6 +142,8 @@ describe('CI parity', () => {
         `browser.yml has no "${step}"`,
       ).toBe(true);
     }
+    // A browser command under another step name is caught by its `run:` line.
+    expect(CI_SOURCE).not.toMatch(/^\s+run:.*(test:component|test:e2e|playwright)/m);
     // The setup input that installs Chromium, outside a comment.
     expect(CI_SOURCE).not.toMatch(/^\s+browser:\s*'true'/m);
     expect(BROWSER_SOURCE).toMatch(/^\s+browser:\s*'true'/m);
