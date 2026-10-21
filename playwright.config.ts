@@ -14,6 +14,7 @@
 
 import { defineConfig, devices } from '@playwright/test';
 import { headlessWebglLaunch } from './tests/headless-webgl.js';
+import { scaled } from './tests/e2e/time-scale.js';
 
 /**
  * The e2e server's port, from the viewer's own 3700–3709 port block
@@ -38,8 +39,9 @@ export default defineConfig({
   testDir: 'tests/e2e',
   // A scene builds on a software rasteriser; 30 s is the boot budget, not the
   // target (`READY_BUDGET_MS` in the browser check is 5 s on a real GPU).
-  timeout: 60_000,
-  expect: { timeout: 15_000 },
+  // Both stretched by `JEEX_E2E_TIME_SCALE` (`tests/e2e/time-scale.ts`).
+  timeout: scaled(60_000),
+  expect: { timeout: scaled(15_000) },
   fullyParallel: true,
   // A `.only` left in a spec is a suite that silently stopped testing things.
   forbidOnly: !!process.env['CI'],

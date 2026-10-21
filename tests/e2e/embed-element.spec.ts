@@ -5,6 +5,7 @@
 
 import { expect, test } from '@playwright/test';
 import { expectCanvasScreenshot, expectChromeScreenshot, expectNoNewA11yViolations, waitForBoot } from './support.js';
+import { scaled } from './time-scale.js';
 
 /** The color-contrast finding (#log/#events) is fixed. */
 const A11Y_BUDGET = 0;
@@ -58,7 +59,7 @@ test('a src swap loads the new scene and raises jeex-scene', async ({ page }) =>
   const before = await sceneEvents();
   expect(before, 'the boot itself raises jeex-scene, which is why presence alone proves nothing').toBeGreaterThan(0);
   await page.locator('#swap-scene').click();
-  await expect.poll(sceneEvents, { timeout: 45_000 }).toBeGreaterThan(before);
+  await expect.poll(sceneEvents, { timeout: scaled(45_000) }).toBeGreaterThan(before);
   // The swapped document differs where the chrome shows it.
   const name = await page.evaluate(
     () => document.querySelector('#viewer')?.shadowRoot?.querySelector('[data-jeex="brand-context"]')?.textContent,

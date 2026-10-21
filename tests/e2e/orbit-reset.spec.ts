@@ -8,6 +8,7 @@
 
 import { expect, test, type Page } from '@playwright/test';
 import { waitForBoot } from './support.js';
+import { scaled } from './time-scale.js';
 
 type Point = { x: number; y: number; z: number };
 
@@ -26,11 +27,11 @@ function distance(a: Point, b: Point): number {
  * can take a second, and a fixed frame count ran past the test budget.
  */
 async function awayFrom(page: Page, home: Point): Promise<void> {
-  await expect.poll(async () => distance(await cameraPosition(page), home), { timeout: 30_000 }).toBeGreaterThan(0.5);
+  await expect.poll(async () => distance(await cameraPosition(page), home), { timeout: scaled(30_000) }).toBeGreaterThan(0.5);
 }
 
 async function backAt(page: Page, home: Point): Promise<void> {
-  await expect.poll(async () => distance(await cameraPosition(page), home), { timeout: 30_000 }).toBeLessThan(1e-3);
+  await expect.poll(async () => distance(await cameraPosition(page), home), { timeout: scaled(30_000) }).toBeLessThan(1e-3);
 }
 
 test('the 360 button and handle.setMode("orbit") both land on the Reset camera pose', async ({ page }) => {

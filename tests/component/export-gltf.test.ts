@@ -11,7 +11,7 @@ import { exportGlb, type ExportDeps } from '../../src/app/export-gltf.js';
 import { lShapePlan } from '../../src/fixtures/plan-l-shape.js';
 import { metadataTable } from '../../src/scene/metadata-table.js';
 import { solvePlan } from '../../src/plan/plan-solver.js';
-import { closeContainers, demoScene, openContainer } from './support.js';
+import { closeContainers, openContainer, parkForExport } from './support.js';
 
 const GLB_MAGIC = 0x46546c67;
 
@@ -203,22 +203,24 @@ describe('exportGlb, wired through a mounted handle', () => {
     closeContainers();
   });
 
-  // Timeout above the suite's default 30 s: since the GLB furniture
-  // loader landed, the demo apartment's furniture bodies carry real loaded
-  // geometry/textures for `GLTFExporter` to walk, on top of the demo's own
-  // measured worst frame of 8.1 s under headless SwiftShader
-  // (`export-gltf.test.ts`'s scene-choice note). 60 s is the same margin
-  // `export-usdz.test.ts` and `tests/component/frame-bridge.test.ts` give
-  // their own texture-heavy exports.
-  test('handle.exportGlb() on the demo apartment gives a well-formed GLB', async () => {
+  // The L-shape plan, not the demo apartment: what this test proves is the
+  // handle's wiring (a mounted viewer hands its committed document to
+  // `exportGlb` and gets a GLB with the metadata and the scene id back), which
+  // the small plan proves as well as the full apartment; the exporter's own
+  // behaviour over a real document is the describe block above. The viewer is
+  // parked first (`parkForExport`), so the export does not queue behind
+  // SwiftShader frames. On the demo apartment with the loop running, this test
+  // ran past a 90 s budget on a hosted runner.
+  test('handle.exportGlb() on a mounted viewer gives a well-formed GLB', async () => {
     const container = openContainer();
     const handle = mountViewer(container, {
-      scene: { repository: new InlineSceneRepository(demoScene()) },
+      scene: { repository: new InlineSceneRepository(lShapePlan) },
       tour: { mode: 'off' },
       debug: false,
     });
     handles.push(handle);
     await handle.ready;
+    parkForExport(handle);
 
     const blob = await handle.exportGlb();
     expect(blob.type).toBe('model/gltf-binary');
@@ -226,6 +228,6 @@ describe('exportGlb, wired through a mounted handle', () => {
     const json = await readGlbJson(blob);
     expect((json['extensionsUsed'] as string[]) ?? []).toContain('EXT_structural_metadata');
     const extras = json['extras'] as { jeex: { sceneId: string } };
-    expect(extras.jeex.sceneId).toBe(demoScene().id);
-  }, 90_000);
+    expect(extras.jeex.sceneId).toBe(lShapePlan.id);
+  });
 });

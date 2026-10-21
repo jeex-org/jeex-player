@@ -13,6 +13,10 @@ coverage/
 # because the two measure different layers against different floors
 # (`scripts/coverage-check.ts`).
 coverage-component/
+# Vitest blob reports: CI's sharded component runs write them for the merge
+# job, and a local `--reporter=blob` run writes `.vitest/`.
+component-blobs/
+.vitest/
 test-results/
 playwright-report/
 .code-ranker/

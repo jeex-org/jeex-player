@@ -33,7 +33,7 @@ import { embedPageOptions, hostOriginFrom } from '../../src/embed/frame-page.js'
 import { CHANNEL, PROTOCOL_VERSION, commandReply, type JeexMessage } from '../../src/embed/protocol.js';
 import { InlineSceneRepository, mountViewer } from '../../src/app/viewer-api.js';
 import type { ViewerHandle } from '../../src/app/viewer-handle.js';
-import { closeContainers, delay, demoScene, openContainer, until } from './support.js';
+import { closeContainers, delay, demoScene, openContainer, parkForExport, until } from './support.js';
 import { lShapePlan } from '../../src/fixtures/plan-l-shape.js';
 import { L_SHAPE } from '../../src/fixtures/plan-l-shape-ids.js';
 import { MAX_SCENE_BYTES } from '../../src/shared/limits.js';
@@ -457,8 +457,18 @@ describe('the frame side, wrapping a real viewer', () => {
    *
    * `scene` defaults to the fixture for the reason the table above measures;
    * the one smoke test that needs the demo apartment names it.
+   *
+   * The counterparty window is opened BEFORE the mount, and the bridge is
+   * installed in the same task as `mountViewer`, the order `frame-boot.ts`
+   * uses. The other way round loses the `ready` event: a `srcdoc` frame's
+   * `load` is dispatched only once the page's main thread is free, and on the
+   * software rasteriser that is after the mount's first frame. Measured with
+   * the demo apartment: `ready` fired at 2093 ms, the frame's `load` at
+   * 2095 ms, so a bridge installed after `load` never saw it and the test
+   * waited out its 45 s.
    */
   async function bridged(scene: SceneData = fixtureScene(), options: Record<string, unknown> = {}): Promise<Bridged> {
+    const counterparty = await counterpartyWindow();
     const handle = mountViewer(openContainer(), {
       scene: { repository: new InlineSceneRepository(scene) },
       tour: { mode: 'off' },
@@ -466,7 +476,6 @@ describe('the frame side, wrapping a real viewer', () => {
       ...options,
     });
     handles.push(handle);
-    const counterparty = await counterpartyWindow();
     const posted: JeexMessage[] = [];
     // Everything the bridge posts arrives in the counterparty window; this
     // listener runs there and hands it back. Registered FIRST, so a waiter
@@ -721,16 +730,13 @@ describe('the frame side, wrapping a real viewer', () => {
     // `Object.prototype.toString` and `Uint8Array`'s constructor both go by the
     // internal slot, not the prototype chain, so they see it correctly either way.
     //
-    // Like `exportUsdz` below, this one gets its own longer wait rather than
-    // the file's shared `ARRIVAL_TIMEOUT_MS`: the demo apartment carries
-    // loaded GLB furniture now, and `GLTFExporter` normalises every
-    // non-normalised normal attribute over that geometry. Measured at
-    // 23.1 s under the full gate's shared-GPU load (against the shared
-    // 15 s), while every other reply in this file settles well inside it.
-    // The change that widened `exportUsdz` for the same reason left this
-    // sibling on the shared budget.
+    // The viewer is parked first (`parkForExport`): with the 3D loop running
+    // on SwiftShader the export queues behind every frame. Parked, the reply
+    // took 6.7 s on four hardware threads; the 45 s wait, kept from before,
+    // is for a hosted runner where two workers share those threads.
     const { handle, posted, post, arrived } = await bridged();
     await handle.ready;
+    parkForExport(handle);
     post(command('a10', 'exportGlb'));
     await arrived(isReply('a10'), 'the reply to exportGlb', 45_000);
     const reply = replyTo(posted, 'a10')!;
@@ -743,15 +749,11 @@ describe('the frame side, wrapping a real viewer', () => {
   }, 90_000);
 
   test('exportUsdz crosses the real boundary as an ArrayBuffer', async () => {
-    // Same cross-realm story as `exportGlb`, above — but `USDZExporter`
-    // rasterises every texture through a `<canvas>` (`app/export-usdz.ts`'s
-    // header), a real cost even on `fixtureScene()`'s small material set,
-    // so this one gets its own longer wait rather than the file's shared
-    // `ARRIVAL_TIMEOUT_MS` (measured to time out at 15 s under the full
-    // gate's shared-GPU load, where every other reply in this file settles
-    // well inside it).
+    // Same cross-realm story as `exportGlb`, above, parked and budgeted the
+    // same way (5.7 s parked on four hardware threads).
     const { handle, posted, post, arrived } = await bridged();
     await handle.ready;
+    parkForExport(handle);
     post(command('a11', 'exportUsdz'));
     await arrived(isReply('a11'), 'the reply to exportUsdz', 45_000);
     const reply = replyTo(posted, 'a11')!;

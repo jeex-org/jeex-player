@@ -11,8 +11,8 @@ import type { ViewerHandle } from '../../src/app/viewer-handle.js';
 import type { AssetEdit } from '../../src/edit/asset-move-tool.js';
 import type { AssetMoveDebug } from '../../src/edit/asset-move-session.js';
 import { DEMO } from '../../src/demo/demo-ids.js';
-import type { SceneOp } from '../../src/scene/types.js';
-import { closeContainers, demoScene, nextFrame, openContainer, until } from './support.js';
+import type { SceneData, SceneOp } from '../../src/scene/types.js';
+import { ASSET_MOVE_CHUNK_TIMEOUT_MS, closeContainers, demoScene, nextFrame, openContainer, parkForExport, until } from './support.js';
 
 type Debug = {
   mode: () => string | undefined;
@@ -52,11 +52,32 @@ async function reflectedNodes(handle: ViewerHandle): Promise<number> {
   }).length;
 }
 
-describe('mirrorAsset', () => {
+/**
+ * The demo apartment cut down to the two assets the test touches: the sofa,
+ * whose catalogue entry allows a mirror across `x`, and the TV unit, whose
+ * entry allows none. The other 59 assets (and the interiors that restyle them)
+ * add nothing to what is proved here, and each of them is GLB geometry the
+ * two exports below would walk. The walls, rooms and ids stay the demo's.
+ */
+function mirrorScene(): SceneData {
+  const keep = new Set<string>([DEMO.asset.livingSofa, DEMO.asset.livingTvUnit]);
+  const { interiors: _interiors, ...scene } = demoScene();
+  return { ...scene, assets: scene.assets.filter((asset) => keep.has(asset.id)) };
+}
+
+/**
+ * The test mounts a scene and exports it to GLB twice (before and after the
+ * commit), with the viewer parked for each (`parkForExport`), so it declares
+ * its own budget instead of living on the 60 s light-path default. On the full
+ * apartment with the loop running it ran past 180 s on a hosted runner.
+ */
+const MOUNT_PLUS_TWO_EXPORTS_TIMEOUT_MS = 180_000;
+
+describe('mirrorAsset', { timeout: MOUNT_PLUS_TWO_EXPORTS_TIMEOUT_MS }, () => {
   test('emits mirror_object; the committed mirror reaches describeSelection and the glTF export', async () => {
     const container = openContainer();
     const handle = mountViewer(container, {
-      scene: { repository: new InlineSceneRepository(demoScene()) },
+      scene: { repository: new InlineSceneRepository(mirrorScene()) },
       tour: { mode: 'off' },
       debug: true,
     });
@@ -70,7 +91,7 @@ describe('mirrorAsset', () => {
     // Not armed yet: nothing happens.
     expect(handle.mirrorAsset(sofa, 'x')).toBe(false);
     handle.setAssetMoveTool(true);
-    await until(() => debug().assetMove().loaded, 'the asset move chunk');
+    await until(() => debug().assetMove().loaded, 'the asset move chunk', ASSET_MOVE_CHUNK_TIMEOUT_MS);
     await nextFrame();
 
     expect(handle.describeSelection({ kind: 'furniture', id: sofa, mode: 'orbit' })?.mirror).toEqual({
@@ -84,6 +105,7 @@ describe('mirrorAsset', () => {
     expect(edits[0]!.ops[0]).toEqual({ op: 'mirror_object', assetId: sofa, mirror: { x: true } });
     expect(edits[0]!.gesture).toBe('mirror');
 
+    parkForExport(handle);
     const before = await reflectedNodes(handle);
     // The host commits what it was handed.
     const applied = debug().applyOps([...edits[0]!.ops]);

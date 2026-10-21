@@ -91,7 +91,9 @@ describe('judge', () => {
     expect(disagreements).toBe(0);
     // The nudges really did reach illegal poses, so the agreement is not over empty lists.
     expect(illegal).toBeGreaterThan(100);
-  });
+    // About 2.3 s on a developer machine, 5.06 s on a hosted CI runner under
+    // coverage: past Bun's 5 s default, so this test names its own budget.
+  }, 15_000);
 
   test('the full lintLayout of a sofa shoved into the bedroom agrees with judge on every item rule', () => {
     const context = drag(DEMO.asset.livingSofa);

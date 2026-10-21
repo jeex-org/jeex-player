@@ -79,6 +79,23 @@ export function delay(ms: number): Promise<void> {
   });
 }
 
+/**
+ * Parks a mounted viewer in `plan2d`, which stops the 3D render loop, before
+ * a test exports the committed document.
+ *
+ * An export never reads the live view: `prepareExport` builds its own graph
+ * from the committed document. But on SwiftShader every 3D frame holds the
+ * page's main thread in the GL command buffer for about a second, and the
+ * exporter's own awaits (texture encoding, `FileReader`) queue behind those
+ * frames. Measured on four hardware threads, one test at a time, over the
+ * L-shape plan: the frame bridge's `exportGlb` took 18.1 s with the loop
+ * running and 6.7 s parked, `exportUsdz` 29.5 s and 5.7 s. With two Vitest
+ * workers on a hosted runner the running loop pushed both past their budgets.
+ */
+export function parkForExport(handle: { setMode(mode: 'plan2d'): void }): void {
+  handle.setMode('plan2d');
+}
+
 /** One animation frame; the unit of time everything in the viewer is measured in. */
 export function nextFrame(): Promise<void> {
   return new Promise((resolve) => {
@@ -104,6 +121,20 @@ export async function until(predicate: () => boolean, what: string, timeoutMs = 
     await nextFrame();
   }
 }
+
+/**
+ * What a wait for the lazily loaded asset move chunk (`app/asset-move-wiring.ts`)
+ * gets instead of `until`'s 15 s.
+ *
+ * Arming the tool imports a module graph from the dev server and builds the
+ * session once it lands. On four hardware threads with two Vitest workers
+ * (the shape of a CI runner), in the shard that runs `asset-move`,
+ * `asset-mirror` and `frame-bridge` side by side, that wait ran past 15 s in
+ * two runs out of two (two tests each, cold and warm imports alike), while
+ * the same tests passed on a 16-thread machine. 45 s is the budget
+ * `frame-bridge.test.ts` gives work that competes for the shared rasteriser.
+ */
+export const ASSET_MOVE_CHUNK_TIMEOUT_MS = 45_000;
 
 /**
  * Waits until `predicate` holds within `frames` animation frames, or fails.

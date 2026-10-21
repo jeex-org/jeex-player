@@ -8,6 +8,7 @@
 
 import { expect, test, type Page } from '@playwright/test';
 import { viewerRoot, waitForBoot } from './support.js';
+import { scaled } from './time-scale.js';
 
 /** The nodes this spec reads, by shell name. */
 const NAMES = [
@@ -42,7 +43,7 @@ async function chromeState(page: Page): Promise<{ fullscreen: boolean; shown: Re
 test('controls=0 + fullscreenButton + readonly: floating button, then the read-only bar in fullscreen, then back', async ({ page }) => {
   // A fullscreen viewport is the largest canvas any spec renders; on a
   // software rasteriser under gate load one frame takes seconds.
-  test.setTimeout(120_000);
+  test.setTimeout(scaled(120_000));
   await page.goto('/?controls=0&fullscreenButton=1&readonly=1');
   await waitForBoot(page, 'window.__appReady === true');
   const root = viewerRoot(page);
@@ -61,13 +62,18 @@ test('controls=0 + fullscreenButton + readonly: floating button, then the read-o
   });
   expect(offsets).toEqual({ right: 32, top: 32 });
 
-  // A real click is the user gesture `requestFullscreen` needs.
-  await page.locator('[data-jeex="fullscreen-float"]').click();
+  // A real key press on the focused button is the user gesture
+  // `requestFullscreen` needs, as a real click would be. Not `click()`: its
+  // actionability checks wait behind SwiftShader frames, and at this, the
+  // largest viewport any spec renders, one click outlasted a 120 s budget on a
+  // hosted runner. `press` focuses the button and sends a trusted Enter, which
+  // the `<button>` turns into its own click.
+  await page.locator('[data-jeex="fullscreen-float"]').press('Enter');
   // Polled as a whole: `fullscreenElement` is set before `fullscreenchange`
   // is dispatched (in the next rendering update), and the chrome follows the
   // event, so on a slow frame the two can be read one frame apart.
   await expect
-    .poll(() => chromeState(page), { timeout: 30_000 })
+    .poll(() => chromeState(page), { timeout: scaled(30_000) })
     .toEqual({
       fullscreen: true,
       shown: {
@@ -93,7 +99,7 @@ test('controls=0 + fullscreenButton + readonly: floating button, then the read-o
           bar: shown['control-bar'],
         };
       },
-      { timeout: 30_000 },
+      { timeout: scaled(30_000) },
     )
     .toEqual({ fullscreen: false, float: true, bar: false });
 });

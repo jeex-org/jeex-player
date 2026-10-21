@@ -20,7 +20,7 @@ import { mask } from '../../src/layout/asset-mask.js';
 import { solvePlan } from '../../src/plan/plan-solver.js';
 import type { SceneData } from '../../src/scene/types.js';
 import type { SlotName } from '../../src/ui/host-slots.js';
-import { closeContainers, demoScene, nextFrame, openContainer, until } from './support.js';
+import { ASSET_MOVE_CHUNK_TIMEOUT_MS, closeContainers, demoScene, nextFrame, openContainer, until } from './support.js';
 
 type Debug = {
   mode: () => string | undefined;
@@ -61,7 +61,7 @@ async function mount(mode: 'orbit' | 'plan3d', assetId: string, slots: readonly 
   await until(() => debug().mode() === mode, mode);
   handle.setSelection({ kind: 'furniture', id: assetId });
   handle.setAssetMoveTool(true);
-  await until(() => debug().assetMove().loaded, 'the asset move chunk');
+  await until(() => debug().assetMove().loaded, 'the asset move chunk', ASSET_MOVE_CHUNK_TIMEOUT_MS);
   await nextFrame();
   const canvas = container.querySelector<HTMLCanvasElement>('[data-jeex="scene-canvas"]');
   if (!canvas) throw new Error('no scene canvas');
@@ -119,7 +119,15 @@ function placement(scene: SceneData, id: string) {
   return found;
 }
 
-describe('the asset move tool', () => {
+/**
+ * Every test here mounts the demo apartment, waits up to 15 s for the mode and
+ * then up to `ASSET_MOVE_CHUNK_TIMEOUT_MS` for the tool before it drags
+ * anything, so the 60 s light-path default could fire before the chunk wait
+ * gives its own, clearer, error. The budget covers the three waits in series.
+ */
+const MOUNT_PLUS_CHUNK_TIMEOUT_MS = 120_000;
+
+describe('the asset move tool', { timeout: MOUNT_PLUS_CHUNK_TIMEOUT_MS }, () => {
   test('loads only when armed, and stays idle for a press off the selected object', async () => {
     const container = openContainer();
     const handle = mountViewer(container, {
@@ -131,7 +139,7 @@ describe('the asset move tool', () => {
     await handle.ready;
     expect(debug().assetMove()).toEqual({ enabled: false, loaded: false, state: null });
     handle.setAssetMoveTool(true);
-    await until(() => debug().assetMove().loaded, 'the asset move chunk');
+    await until(() => debug().assetMove().loaded, 'the asset move chunk', ASSET_MOVE_CHUNK_TIMEOUT_MS);
     expect(debug().assetMove().state?.phase).toBe('idle');
   });
 

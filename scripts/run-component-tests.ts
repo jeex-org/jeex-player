@@ -152,19 +152,41 @@ export const BROWSER_COUNT_UNAVAILABLE = -1;
  * numbers that separate "outgrew the ceiling" from "stuck before the first
  * test" is the most it can honestly do.
  */
-export function watchdogTimeoutMessage(timeoutMs: number, liveBrowsers: number, measuredCostMs = MEASURED_TIER_COST_MS): string {
+export function watchdogTimeoutMessage(
+  timeoutMs: number,
+  liveBrowsers: number,
+  measuredCostMs = MEASURED_TIER_COST_MS,
+  shard?: string,
+): string {
   const minutes = (timeoutMs / 60_000).toFixed(1);
   const measuredSeconds = (measuredCostMs / 1000).toFixed(0);
   const browsers =
     liveBrowsers === BROWSER_COUNT_UNAVAILABLE
       ? 'live chrome-headless-shell processes: count unavailable (ps could not be read)'
       : `live chrome-headless-shell processes: ${liveBrowsers}`;
+  // A shard's ceiling is set by whoever split the tier (CI's workflow), and
+  // the whole tier's cost on a developer machine says nothing about one part
+  // of it on another machine: the comparison below would mislead.
+  const comparison =
+    shard === undefined
+      ? `If the elapsed time is near that ${measuredSeconds} s, the tier has outgrown the ceiling: re-measure on an idle machine and raise the default in this file.`
+      : `This run is shard ${shard} of the tier, so that number does not apply: if the shard has outgrown its ceiling, re-measure the shard on the machine that runs it and raise the JEEX_COMPONENT_TIMEOUT_MS the caller sets.`;
   return [
     `test:component: killed after ${minutes} min, its JEEX_COMPONENT_TIMEOUT_MS ceiling. The whole process group went with it, so this kill leaves no orphan behind.`,
     `Measured at the kill: ${browsers}. The full tier last cost ${measuredSeconds} s on an idle machine.`,
-    `If the elapsed time is near that ${measuredSeconds} s, the tier has outgrown the ceiling: re-measure on an idle machine and raise the default in this file. If it is far below and the browser count is 0, the browser launch never completed; above 0 with no test finished, look for a foreign hold on the software rasteriser.`,
+    `${comparison} If it is far below and the browser count is 0, the browser launch never completed; above 0 with no test finished, look for a foreign hold on the software rasteriser.`,
     'If only the two boot lines (API started at …, Coverage enabled with v8) appear above this kill, re-run with --reporter=verbose to see each test as it lands.',
   ].join('\n');
+}
+
+/** The `<index>/<count>` of a `--shard` among Vitest's arguments, either spelling; `undefined` when the run is not sharded. */
+export function shardOf(args: readonly string[]): string | undefined {
+  for (let at = 0; at < args.length; at += 1) {
+    const arg = args[at]!;
+    if (arg.startsWith('--shard=')) return arg.slice('--shard='.length);
+    if (arg === '--shard') return args[at + 1];
+  }
+  return undefined;
 }
 
 /**
@@ -272,7 +294,7 @@ function runVitestUnderWatchdog(): void {
   });
 
   const timer = setTimeout(() => {
-    console.error(watchdogTimeoutMessage(timeoutMs, liveBrowserCount()));
+    console.error(watchdogTimeoutMessage(timeoutMs, liveBrowserCount(), MEASURED_TIER_COST_MS, shardOf(extraArgs)));
     if (typeof child.pid === 'number') {
       try {
         process.kill(-child.pid, 'SIGKILL'); // Negative pid: the whole process group, browser children included.
