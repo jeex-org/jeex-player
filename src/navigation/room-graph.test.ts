@@ -131,15 +131,25 @@ describe('routeToRoom', () => {
     expect(route.at(-1)!.z).toBeCloseTo(centre.z, 6);
   });
 
-  test('living to bedroom passes a hall door node', () => {
-    const route = routeToRoom(graph, plan, roomCentre(plan, scene, DEMO.room.living, obstacles), DEMO.room.bedroom, obstacles)!;
+  test('living to study passes a hall door node', () => {
+    // The study opens only to the hall, so the walk has to leave the living
+    // room by its hall door and enter the study by its own.
+    const route = routeToRoom(graph, plan, roomCentre(plan, scene, DEMO.room.living, obstacles), DEMO.room.study, obstacles)!;
     const hallDoors = graph.nodes.filter((node) => node.kind === 'door' && node.roomIds.includes(DEMO.room.hall));
     expect(hallDoors.length).toBeGreaterThan(1);
     const passed = hallDoors.filter((door) =>
       route.some((point) => Math.hypot(point.x - door.point.x, point.z - door.point.z) <= DOOR_STANDOFF_M + 1e-6),
     );
-    // Both ends of the walk are hall doors: out of the living room, into the bedroom.
-    expect(passed.map((door) => door.id).sort()).toEqual([DEMO.opening.doorBedroom, DEMO.opening.doorLivingHall].sort());
+    // Both ends of the walk are hall doors: out of the living room, into the study.
+    expect(passed.map((door) => door.id).sort()).toEqual([DEMO.opening.doorLivingHall, DEMO.opening.doorStudy].sort());
+  });
+
+  test('living to bedroom takes the loggia, which both rooms open onto', () => {
+    const route = routeToRoom(graph, plan, roomCentre(plan, scene, DEMO.room.living, obstacles), DEMO.room.bedroom, obstacles)!;
+    const doorsOn = route.flatMap((point) => (point.door === undefined ? [] : [point.door]));
+    expect([...new Set(doorsOn)].sort((a, b) => a.localeCompare(b))).toEqual(
+      [DEMO.opening.doorBedroomLoggia, DEMO.opening.doorLivingLoggia].sort((a, b) => a.localeCompare(b)),
+    );
   });
 
   test('the two standoff points of a door carry its id, and nothing else does', () => {
@@ -282,8 +292,8 @@ describe('walkSpawn: where a walkthrough begins', () => {
 
 describe('routeBetween', () => {
   test('walks from a point in one room to a POINT in another, through the doors, ending on that point', () => {
-    const from = { x: 4.4, z: 2.4 };
-    const to = { x: 11.9, z: 8.4 };
+    const from = { x: 4.0, z: 8.3 };
+    const to = { x: 8.2, z: 8.4 };
     expect(roomAt(plan, from)).toBe(DEMO.room.living);
     expect(roomAt(plan, to)).toBe(DEMO.room.bedroom);
     const route = routeBetween(graph, plan, from, to);
@@ -299,10 +309,10 @@ describe('routeBetween', () => {
   });
 
   test('two points in one room are one straight leg', () => {
-    const route = routeBetween(graph, plan, { x: 3.5, z: 1.5 }, { x: 5.5, z: 3.5 });
+    const route = routeBetween(graph, plan, { x: 3.95, z: 5.0 }, { x: 3.95, z: 7.6 });
     expect(route).toEqual([
-      { x: 3.5, z: 1.5 },
-      { x: 5.5, z: 3.5 },
+      { x: 3.95, z: 5.0 },
+      { x: 3.95, z: 7.6 },
     ]);
   });
 });

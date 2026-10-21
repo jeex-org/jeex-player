@@ -27,7 +27,7 @@ const ID = {
   sofa: '01a12ffa-e529-79f2-968f-ecac4905c209',
   lamp: '01a12ffa-e52a-7510-8b92-059746e460d5',
   room: '01a12ffa-e52b-7b9e-8d9b-c96d98830fe6',
-  nordic: '01a12ffa-e52c-7c3c-9aac-7725fb691c26',
+  oak: '01a12ffa-e52c-7c3c-9aac-7725fb691c26',
 } as const;
 
 /** The placement behind the sofa root: a selection names what it picked from the document. */
@@ -216,7 +216,7 @@ describe('edits', () => {
       assets: [],
       walls: [],
       rooms: [{ id: ID.room, name: 'Room' }],
-      interiors: [{ id: ID.nordic, name: 'Nordic', swatch: [FINISH.oak, FINISH.white], ops: [] }],
+      interiors: [{ id: ID.oak, name: 'Oak', swatch: [FINISH.oak, FINISH.white], ops: [] }],
     };
     const deps = {
       model: {
@@ -301,7 +301,7 @@ describe('edits', () => {
     const built = editsHarness('emit');
     const before = built.rev();
     built.editor.openInteriorPanel();
-    built.panel().onPick({ id: ID.nordic, scopeChecked: false });
+    built.panel().onPick({ id: ID.oak, scopeChecked: false });
     expect(built.committed).toEqual([]);
     expect(built.rev()).toBe(before);
     expect(built.sent).toHaveLength(1);
@@ -332,7 +332,7 @@ describe('edits', () => {
   test("the debug `applyPreset` is ungated: it commits even in 'emit'", () => {
     const built = editsHarness('emit');
     const before = built.rev();
-    built.editor.applyPreset(ID.nordic);
+    built.editor.applyPreset(ID.oak);
     expect(built.rev()).toBeGreaterThan(before);
     expect(built.sent).toEqual([]);
   });

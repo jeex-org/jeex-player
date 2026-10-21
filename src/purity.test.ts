@@ -381,7 +381,7 @@ describe('the zod boundary', () => {
  * The library ships no apartment.
  *
  * `src/embed/index.ts` is what `import … from 'jeex-viewer'` gets, and the
- * demo flat (`scene-data.ts`, 68 objects) is the DEMO PAGE's scene — a library
+ * demo flat (`scene-data.ts`) is the DEMO PAGE's scene — a library
  * that carried it would make every host pay for it and would let a viewer with
  * no `options.scene` quietly mount someone else's flat instead of saying it
  * was not told which (`scene-repository.resolveSceneSource`).
@@ -398,7 +398,8 @@ describe('the zod boundary', () => {
  * is the one layer the library graph may not touch, so anything added there
  * later is covered without anyone remembering to extend a list. The proof that
  * it holds is the build: `dist-lib/jeex-viewer*.js` contains no
- * `apartment-real-plan`, the demo build's `dist/assets/*.js` does.
+ * the demo scene's name (`Two-bedroom demo apartment`), the demo build's
+ * `dist/assets/*.js` does.
  */
 describe('the library entry', () => {
   /** Names `embed/index.ts` re-exports, however it spells the re-export. */

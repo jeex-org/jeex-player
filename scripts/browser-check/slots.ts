@@ -249,6 +249,7 @@ export async function checkSlots(ctx: CheckContext): Promise<void> {
   // ---- 8. `edits: 'emit'` — the panel opens, the batch goes out, rev stands ----
   await run(['open', withViewerOptions(url, { tour: 'off', edits: 'emit' })]);
   await run(['wait', '--fn', 'window.__appReady === true']);
+  await waitForCameraStill(ctx, 'the opening view to land');
   // The subscription is armed ONCE (memoized on `window`): a retried eval here
   // must not add a second listener, or every edit would be counted twice.
   await evalValue<boolean>(
@@ -261,7 +262,7 @@ export async function checkSlots(ctx: CheckContext): Promise<void> {
     `(() => {${HELPERS}
     window.__jeexEdits.length = 0;
     const revBefore = window.jeexViewer.getState().rev;
-    const room = D.plan().rooms[0];
+    const room = D.plan().rooms.find((r) => r.id === ${literal(DEMO.room.living)}) ?? D.plan().rooms[0];
     const b = room.bbox;
     let opened = false;
     for (let u = 0.3; u <= 0.75 && !opened; u += 0.15) {
@@ -270,7 +271,8 @@ export async function checkSlots(ctx: CheckContext): Promise<void> {
         if (!ONSCREEN(p)) continue;
         CLOSED();
         CLICK(p.x, p.y);
-        opened = PANEL().open === 'true';
+        // A floor point, not whatever furniture stands on it: a furniture panel's swatches are variants, not finishes.
+        opened = PANEL().open === 'true' && PANEL().surface === 'floor';
       }
     }
     const swatch = document.querySelector('.finish-swatch[data-finish]');

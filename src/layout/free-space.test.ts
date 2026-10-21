@@ -118,7 +118,7 @@ describe('suggestPlacement', () => {
   test('adds no NEW layout error to the demo apartment', () => {
     const before = errorKeys(lintLayout(apartmentScene, apartment));
     expect(before.size).toBe(0);
-    const pose = suggestPlacement({ scene: apartmentScene, plan: apartment, asset: ARCHETYPE.stool_bar, roomId: DEMO.room.bedroom });
+    const pose = suggestPlacement({ scene: apartmentScene, plan: apartment, asset: ARCHETYPE.stool_bar, roomId: DEMO.room.guestRoom });
     expect(pose.how).toBe('sampled');
     const placed: SceneData = {
       ...apartmentScene,
@@ -197,7 +197,7 @@ describe('suggestPlacement', () => {
       [],
     );
 
-    const loggia = suggestPlacement({ scene: apartmentScene, plan: apartment, asset: ARCHETYPE.pendant, roomId: DEMO.room.loggiaNorth });
+    const loggia = suggestPlacement({ scene: apartmentScene, plan: apartment, asset: ARCHETYPE.pendant, roomId: DEMO.room.loggia });
     expect(loggia.warning).toBe('no-free-space');
     expect(loggia.how).toBe('room-centre');
   });

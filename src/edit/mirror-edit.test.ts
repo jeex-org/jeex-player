@@ -132,8 +132,9 @@ describe('planMirror', () => {
   test('a mirrored object that stands a little wrong settles within reach, and the edit carries the move', () => {
     const sofa = placement(SOFA);
     const yaw = sofa.rotationY ?? 0;
-    // 0.2 m towards its neighbour: an overlap a settle within 0.25 m clears.
-    const pushed = { x: sofa.position.x, y: 0, z: sofa.position.z - 0.2 };
+    // 0.2 m south, into the floor lamp that stands 0.10 m off its arm: an
+    // overlap a settle within 0.25 m clears.
+    const pushed = { x: sofa.position.x, y: 0, z: sofa.position.z + 0.2 };
     const scene = {
       ...apartmentScene,
       assets: apartmentScene.assets.map((asset) => (asset.id === SOFA ? { ...asset, position: pushed } : asset)),

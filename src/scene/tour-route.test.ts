@@ -193,9 +193,9 @@ describe('a walk through the flat', () => {
 
   test('the demo apartment: a three-room walk stays on walkable ground and passes every camera', () => {
     const demoCameras: TourCheckpoint[] = [
-      { id: ID.camLiving, position: { x: 4.4, y: 1.55, z: 2.4 }, yaw: 0.5, pitch: -0.3 },
-      { id: ID.camBedroom, position: { x: 11.9, y: 1.6, z: 8.4 }, yaw: Math.PI, pitch: -0.2 },
-      { id: ID.camKitchen, position: { x: 1.1, y: 1.5, z: 5.2 }, yaw: -Math.PI / 2, pitch: -0.4 },
+      { id: ID.camLiving, position: { x: 4.0, y: 1.55, z: 8.3 }, yaw: 0.5, pitch: -0.3 },
+      { id: ID.camBedroom, position: { x: 8.2, y: 1.6, z: 8.4 }, yaw: Math.PI, pitch: -0.2 },
+      { id: ID.camKitchen, position: { x: 3.6, y: 1.5, z: 2.9 }, yaw: -Math.PI / 2, pitch: -0.4 },
     ];
     const scene = { ...apartmentScene, tourCheckpoints: demoCameras };
     const demoPlan = solvePlan(scene);
@@ -284,9 +284,9 @@ describe('legs cross walls only through openings', () => {
     [
       'three cameras',
       [
-        { id: ID.camLiving, position: { x: 4.4, y: 1.55, z: 2.4 }, yaw: 0.5, pitch: -0.3 },
-        { id: ID.camBedroom, position: { x: 11.9, y: 1.6, z: 8.4 }, yaw: Math.PI, pitch: -0.2 },
-        { id: ID.camKitchen, position: { x: 1.1, y: 1.5, z: 5.2 }, yaw: -Math.PI / 2, pitch: -0.4 },
+        { id: ID.camLiving, position: { x: 4.0, y: 1.55, z: 8.3 }, yaw: 0.5, pitch: -0.3 },
+        { id: ID.camBedroom, position: { x: 8.2, y: 1.6, z: 8.4 }, yaw: Math.PI, pitch: -0.2 },
+        { id: ID.camKitchen, position: { x: 3.6, y: 1.5, z: 2.9 }, yaw: -Math.PI / 2, pitch: -0.4 },
       ],
     ],
     // The rounded corners of six legs, three turnarounds and a corridor.

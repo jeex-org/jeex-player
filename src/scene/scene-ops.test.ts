@@ -222,9 +222,10 @@ type VocabularyCase = {
 };
 
 const R = DEMO.room;
-const ROOMS_IN_ORDER = [R.loggiaWest, R.kitchen, R.living, R.guestRoom, R.loggiaNorth, R.study, R.bedroom, R.bathroom, R.closet, R.hall];
-const PLANT = DEMO.asset.loggiaWestPlant;
-const HALL_FACE = faceKey(R.hall, DEMO.wall.wallLivHall, 'L');
+const ROOMS_IN_ORDER = [R.kitchen, R.bathroom, R.wc, R.guestRoom, R.hall, R.living, R.bedroom, R.study, R.loggia];
+const PLANT = DEMO.asset.livingPlant;
+// The corridor's south wall runs east, so the hall (north of it) is its right side.
+const HALL_FACE = faceKey(R.hall, DEMO.wall.wallLivingHall, 'R');
 
 const VOCABULARY_SNAPSHOT: readonly VocabularyCase[] = [
   {
@@ -254,7 +255,7 @@ const VOCABULARY_SNAPSHOT: readonly VocabularyCase[] = [
   {
     name: 'set_material face',
     op: { op: 'set_material', target: HALL_FACE, material: FINISH.sand },
-    summary: `Wall face ${R.hall}/${DEMO.wall.wallLivHall}/L set to ${FINISH.sand}`,
+    summary: `Wall face ${R.hall}/${DEMO.wall.wallLivingHall}/R set to ${FINISH.sand}`,
     touched: [touchedFace(HALL_FACE)],
   },
   {
@@ -265,8 +266,8 @@ const VOCABULARY_SNAPSHOT: readonly VocabularyCase[] = [
   },
   {
     name: 'replace_asset_variant',
-    op: { op: 'replace_asset_variant', assetId: PLANT, variant: VARIANT.plant_kentia_clay },
-    summary: `Asset ${PLANT} replaced with variant ${VARIANT.plant_kentia_clay}`,
+    op: { op: 'replace_asset_variant', assetId: PLANT, variant: VARIANT.plant_strelitzia_clay },
+    summary: `Asset ${PLANT} replaced with variant ${VARIANT.plant_strelitzia_clay}`,
     touched: [touchedAsset(PLANT)],
   },
   {
@@ -290,25 +291,25 @@ const VOCABULARY_SNAPSHOT: readonly VocabularyCase[] = [
   {
     name: 'set_opening delta',
     op: { op: 'set_opening', openingId: DEMO.opening.windowStudy, dcenter: 0.2, dwidth: -0.1 },
-    summary: `Opening ${DEMO.opening.windowStudy} set to centre 2.8 m, width 1.7 m, sill 0.85 m, head 2.3 m`,
+    summary: `Opening ${DEMO.opening.windowStudy} set to centre 1.3 m, width 1.1 m, sill 0.85 m, head 2.3 m`,
     touched: [TOUCHED_SHELL],
   },
   {
     name: 'add_opening',
-    // The closet wall is 2.10 m long and its door already occupies 0.65..1.45,
-    // so the window goes north of it: a window at 1.00 x 0.80 would sit right
-    // on top of the door, and `add_opening` refuses that itself through its
-    // fit check (`ops/openings.fitOntoWall`) rather than leaving a document
-    // `validateScene` refuses with `openings-overlap`. Neither the summary nor
-    // the touched entities depend on the geometry.
-    op: { op: 'add_opening', id: NEW.window, wallId: DEMO.wall.wallCloset, type: 'window', center: 0.35, width: 0.4 },
-    summary: `Added window ${NEW.window} to wall ${DEMO.wall.wallCloset}`,
+    // The study's corridor wall is 2.20 m long and its door already occupies
+    // 0.20..1.00, so the window goes east of it: a window at 0.60 x 0.80 would
+    // sit right on top of the door, and `add_opening` refuses that itself
+    // through its fit check (`ops/openings.fitOntoWall`) rather than leaving a
+    // document `validateScene` refuses with `openings-overlap`. Neither the
+    // summary nor the touched entities depend on the geometry.
+    op: { op: 'add_opening', id: NEW.window, wallId: DEMO.wall.wallStudyHall, type: 'window', center: 1.6, width: 0.6 },
+    summary: `Added window ${NEW.window} to wall ${DEMO.wall.wallStudyHall}`,
     touched: [TOUCHED_SHELL],
   },
   {
     name: 'remove_opening',
     op: { op: 'remove_opening', openingId: DEMO.opening.windowStudy },
-    summary: `Removed opening ${DEMO.opening.windowStudy} from wall ${DEMO.wall.facNStudy}`,
+    summary: `Removed opening ${DEMO.opening.windowStudy} from wall ${DEMO.wall.facSouthStudy}`,
     touched: [TOUCHED_SHELL],
   },
   {
@@ -316,9 +317,9 @@ const VOCABULARY_SNAPSHOT: readonly VocabularyCase[] = [
     op: {
       op: 'set_camera',
       target: 'presentation',
-      pose: { position: { x: 7.2, y: 14.0, z: 22.0 }, target: { x: 7.2, y: 0.6, z: 5.2 } },
+      pose: { position: { x: 6.6, y: 14.5, z: 21.5 }, target: { x: 6.6, y: 0.6, z: 5.2 } },
     },
-    summary: 'Camera presentation set to (7.2, 14, 22)',
+    summary: 'Camera presentation set to (6.6, 14.5, 21.5)',
     touched: [touchedCamera('presentation')],
   },
   {
@@ -326,9 +327,9 @@ const VOCABULARY_SNAPSHOT: readonly VocabularyCase[] = [
     op: {
       op: 'set_camera',
       target: 'walkSpawn',
-      pose: { position: { x: 3.45, y: 1.6, z: 3.3 }, target: { x: 4.4, y: 1.3, z: 0.6 } },
+      pose: { position: { x: 4.0, y: 1.6, z: 8.3 }, target: { x: 0.5, y: 1.3, z: 5.6 } },
     },
-    summary: 'Camera walkSpawn set to (3.45, 1.6, 3.3)',
+    summary: 'Camera walkSpawn set to (4, 1.6, 8.3)',
     touched: [touchedCamera('walkSpawn')],
   },
   {
@@ -336,9 +337,9 @@ const VOCABULARY_SNAPSHOT: readonly VocabularyCase[] = [
     op: {
       op: 'set_camera',
       target: { room: R.kitchen },
-      pose: { position: { x: 1.15, y: 1.6, z: 6.4 }, target: { x: 0.5, y: 1.2, z: 4.6 } },
+      pose: { position: { x: 3.6, y: 1.6, z: 2.9 }, target: { x: 1.6, y: 1.2, z: 0.5 } },
     },
-    summary: `Camera room:${R.kitchen} set to (1.15, 1.6, 6.4)`,
+    summary: `Camera room:${R.kitchen} set to (3.6, 1.6, 2.9)`,
     touched: [touchedCamera({ room: R.kitchen })],
   },
   {
@@ -373,8 +374,8 @@ const VOCABULARY_SNAPSHOT: readonly VocabularyCase[] = [
   },
   {
     name: 'add_room',
-    op: { op: 'add_room', id: NEW.room, name: 'Pantry', anchor: { x: 1.05, z: 5.2 } },
-    summary: `Room ${NEW.room}: added Pantry at (1.05, 5.20)`,
+    op: { op: 'add_room', id: NEW.room, name: 'Pantry', anchor: { x: 1.2, z: 1.2 } },
+    summary: `Room ${NEW.room}: added Pantry at (1.20, 1.20)`,
     touched: [TOUCHED_SHELL, touchedFloor(NEW.room)],
   },
   {
@@ -385,16 +386,11 @@ const VOCABULARY_SNAPSHOT: readonly VocabularyCase[] = [
   },
   {
     name: 'remove_room',
-    op: { op: 'remove_room', roomId: R.closet },
-    // The demo binds the closet's three pieces to it (`DemoAsset.room`), so
-    // the removal unbinds them and names each one.
-    summary: `Room ${R.closet}: removed Walk-in closet, 3 objects unbound, room camera dropped`,
-    touched: [
-      TOUCHED_SHELL,
-      touchedAsset(DEMO.asset.closetWardrobe),
-      touchedAsset(DEMO.asset.closetShoeCabinet),
-      touchedAsset(DEMO.asset.closetMirror),
-    ],
+    op: { op: 'remove_room', roomId: R.wc },
+    // The demo binds the WC's three pieces to it (`DemoAsset.room`), so the
+    // removal unbinds them and names each one.
+    summary: `Room ${R.wc}: removed WC, 3 objects unbound, room camera dropped`,
+    touched: [TOUCHED_SHELL, touchedAsset(DEMO.asset.wcToilet), touchedAsset(DEMO.asset.wcVanity), touchedAsset(DEMO.asset.wcMirror)],
   },
   {
     name: 'place_object',
@@ -404,15 +400,15 @@ const VOCABULARY_SNAPSHOT: readonly VocabularyCase[] = [
       asset: ARCHETYPE.sofa_3s,
       variant: VARIANT.sofa_3s_linen,
       room: R.living,
-      position: { x: 1.2, y: 0, z: 2.4 },
+      position: { x: 2.0, y: 0, z: 8.4 },
     },
-    summary: `Object ${NEW.sofa}: placed ${ARCHETYPE.sofa_3s}@${VARIANT.sofa_3s_linen} in ${R.living} at (1.20, 0.00, 2.40)`,
+    summary: `Object ${NEW.sofa}: placed ${ARCHETYPE.sofa_3s}@${VARIANT.sofa_3s_linen} in ${R.living} at (2.00, 0.00, 8.40)`,
     touched: [touchedAsset(NEW.sofa)],
   },
   {
     name: 'move_object',
-    op: { op: 'move_object', assetId: PLANT, position: { x: 0.5, y: 0, z: 1.6 } },
-    summary: `Object ${PLANT}: moved to (0.50, 0.00, 1.60)`,
+    op: { op: 'move_object', assetId: PLANT, position: { x: 1.0, y: 0, z: 8.6 } },
+    summary: `Object ${PLANT}: moved to (1.00, 0.00, 8.60)`,
     touched: [touchedAsset(PLANT)],
   },
   {
@@ -435,8 +431,8 @@ const VOCABULARY_SNAPSHOT: readonly VocabularyCase[] = [
   },
   {
     name: 'set_opening onto another wall',
-    op: { op: 'set_opening', openingId: DEMO.opening.windowStudy, wallId: DEMO.wall.facEStudy, center: 1.5 },
-    summary: `Opening ${DEMO.opening.windowStudy} moved to wall ${DEMO.wall.facEStudy} and set to centre 1.5 m, width 1.8 m, sill 0.85 m, head 2.3 m`,
+    op: { op: 'set_opening', openingId: DEMO.opening.windowStudy, wallId: DEMO.wall.facEastStudy, center: 1.5 },
+    summary: `Opening ${DEMO.opening.windowStudy} moved to wall ${DEMO.wall.facEastStudy} and set to centre 1.5 m, width 1.2 m, sill 0.85 m, head 2.3 m`,
     touched: [TOUCHED_SHELL],
   },
   {
@@ -447,8 +443,8 @@ const VOCABULARY_SNAPSHOT: readonly VocabularyCase[] = [
   },
   {
     name: 'move_node',
-    op: { op: 'move_node', nodeId: DEMO.node.beSe, dp: { x: 0.2, z: 0 } },
-    summary: `Node ${DEMO.node.beSe}: moved to (14.6, 10.5)`,
+    op: { op: 'move_node', nodeId: DEMO.node.southEast, dp: { x: 0.2, z: 0 } },
+    summary: `Node ${DEMO.node.southEast}: moved to (13.4, 9.2)`,
     touched: [TOUCHED_SHELL],
   },
   {
@@ -460,26 +456,28 @@ const VOCABULARY_SNAPSHOT: readonly VocabularyCase[] = [
   },
   {
     name: 'add_wall',
-    op: { op: 'add_wall', id: NEW.wall, a: DEMO.node.baNw, b: DEMO.node.baSe, thickness: 0.12 },
-    summary: `Wall ${NEW.wall}: added between ${DEMO.node.baNw} and ${DEMO.node.baSe}, thickness 0.12 m`,
+    op: { op: 'add_wall', id: NEW.wall, a: DEMO.node.corridorBedroom, b: DEMO.node.studyBedroomS, thickness: 0.12 },
+    summary: `Wall ${NEW.wall}: added between ${DEMO.node.corridorBedroom} and ${DEMO.node.studyBedroomS}, thickness 0.12 m`,
     touched: [TOUCHED_SHELL],
   },
   {
     name: 'set_wall',
-    op: { op: 'set_wall', wallId: DEMO.wall.wallCloset, thickness: 0.15 },
-    summary: `Wall ${DEMO.wall.wallCloset}: thickness 0.15 m`,
+    op: { op: 'set_wall', wallId: DEMO.wall.wallBathWc, thickness: 0.15 },
+    summary: `Wall ${DEMO.wall.wallBathWc}: thickness 0.15 m`,
     touched: [TOUCHED_SHELL],
   },
   {
     name: 'remove_wall',
-    op: { op: 'remove_wall', wallId: DEMO.wall.wallCloset },
-    summary: `Wall ${DEMO.wall.wallCloset}: removed with opening ${DEMO.opening.doorCloset}`,
-    touched: [TOUCHED_SHELL, touchedOpening(DEMO.opening.doorCloset)],
+    op: { op: 'remove_wall', wallId: DEMO.wall.wallStudyHall },
+    summary: `Wall ${DEMO.wall.wallStudyHall}: removed with opening ${DEMO.opening.doorStudy}`,
+    touched: [TOUCHED_SHELL, touchedOpening(DEMO.opening.doorStudy)],
   },
   {
     name: 'split_wall',
-    op: { op: 'split_wall', wallId: DEMO.wall.wallGuestHall, at: 1.9, nodeId: NEW.splitNode, ids: [NEW.splitWest, NEW.splitEast] },
-    summary: `Wall ${DEMO.wall.wallGuestHall}: split at 1.9 m into ${NEW.splitWest} (1.9 m) and ${NEW.splitEast} (1.05 m)`,
+    // The bedroom's corridor wall runs 4.00 m east from x 7.00; its door
+    // (0.30..1.10) stays on the first half.
+    op: { op: 'split_wall', wallId: DEMO.wall.wallBedroomHall, at: 2.5, nodeId: NEW.splitNode, ids: [NEW.splitWest, NEW.splitEast] },
+    summary: `Wall ${DEMO.wall.wallBedroomHall}: split at 2.5 m into ${NEW.splitWest} (2.5 m) and ${NEW.splitEast} (1.5 m)`,
     touched: [TOUCHED_SHELL],
   },
 ];

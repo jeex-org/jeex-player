@@ -196,11 +196,12 @@ export async function checkTourPlayback(ctx: CheckContext): Promise<void> {
         assert((await tourState()) === 'paused', 'the run should be paused for the deterministic seek check');
         await run(['eval', 'window.__viewerDebug.tour.seek(0.5)']);
         const halfway = await cameraAt();
-        await run(['eval', 'window.__viewerDebug.tour.seek(0.1)']);
-        const tenth = await cameraAt();
+        // A quarter in, the demo tour is in the living room beside the bay; half way it is in the hall.
+        await run(['eval', 'window.__viewerDebug.tour.seek(0.25)']);
+        const quarter = await cameraAt();
         await run(['eval', 'window.__viewerDebug.tour.seek(0.5)']);
         const halfwayAgain = await cameraAt();
-        assert(distance(halfway, tenth) > 0.5, 'seeking to a different fraction should move the camera');
+        assert(distance(halfway, quarter) > 0.5, 'seeking to a different fraction should move the camera');
         assert(
           distance(halfway, halfwayAgain) < 0.05,
           `the same fraction must land on the same pose | ${distance(halfway, halfwayAgain).toFixed(3)} m apart`,

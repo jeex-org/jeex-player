@@ -760,7 +760,7 @@ Rules the validator enforces:
 - Finish UUIDs resolve through the built-in catalogue; `materials` only adds or overrides.
 - An interior preset dresses what exists: it may not carry an operation that creates an entity (`add_node`, `add_wall`, `split_wall`, `add_room`, `add_opening`, `place_object`).
 
-The demo document `src/demo/scene-data.ts` (38 walls, 68 objects) exercises every feature and is the reference for authoring.
+The demo document `src/demo/scene-data.ts` (an invented two-bedroom flat with a study: nine rooms, a curved bay and a loggia, furnished throughout) exercises every feature and is the reference for authoring.
 
 A JSON Schema (draft 2020-12) is generated from this same `SceneData` type — no second, hand-written source of truth — and published alongside the package, next to one for the viewer options (`bun run build:lib` writes both to `dist-lib/schema/`):
 

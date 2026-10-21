@@ -297,7 +297,12 @@ export async function checkMinimap(ctx: CheckContext): Promise<void> {
     while (turn < -Math.PI) turn += Math.PI * 2;
     sharpest = Math.max(sharpest, ((Math.abs(turn) * 180) / Math.PI) * (0.18 / step.step));
   }
-  assert(sharpest <= 25, `the camera never pivots on the spot | sharpest turn ${sharpest.toFixed(1)} deg per 100 ms`);
+  // A pivot on the spot reads as hundreds of degrees per 100 ms. The bound is
+  // the demo's tightest rounded corner with margin: the walk to the bedroom
+  // crosses the loggia, turning square out of the living room's loggia door
+  // (x 6.30) and into the bedroom's (x 8.40), 2.10 m apart along a 1.20 m-deep
+  // loggia, measured at 27.4 deg per 100 ms.
+  assert(sharpest <= 32, `the camera never pivots on the spot | sharpest turn ${sharpest.toFixed(1)} deg per 100 ms`);
 
   const expected = travelCurve!.length / 1.8;
   assert(

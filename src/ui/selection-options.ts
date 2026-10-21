@@ -20,9 +20,10 @@
  * a renderer arrives as a callback (`renderPreview`), which is what lets this
  * module be unit-tested under Bun and keeps it in the `ui` layer.
  *
- * Cost, and why there is no preview cache. Measured on the demo flat (61
- * placements, `scripts/browser-check/describe.ts` reports the first call of a
- * run): a furniture description with four offscreen renders is 34 ms cold and
+ * Cost, and why there is no preview cache. Measured with
+ * `scripts/browser-check/describe.ts`, which reports the first call of a run:
+ * a furniture description with four offscreen renders is about 30 ms cold
+ * (28 ms on the demo flat, 2026-10-21) and
  * 8 ms on a repeat of the same placement, 16 ms for another one; nine canvas
  * floor swatches are 59 ms; four schematic opening swatches are 2 ms. The very
  * first call after a mount is ~190 ms, because it is what builds the preview

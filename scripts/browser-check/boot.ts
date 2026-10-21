@@ -4,6 +4,7 @@
  * furniture-layout rule.
  */
 
+import { DEMO } from '../../src/demo/demo-ids.js';
 import { READY_BUDGET_MS, type CheckContext } from './context.js';
 import { SHELL_NAMES } from '../../src/ui/viewer-shell.js';
 
@@ -17,6 +18,14 @@ export async function checkBoot(ctx: CheckContext): Promise<void> {
   await run(['open', withQuery('view=tour')]);
   await run(['wait', '--fn', 'window.__appReady === true']);
   const wallClockMs = Date.now() - openedAt;
+  // Every probe below addresses the demo through this checkout's ids: a page
+  // served from another checkout (another branch's dev server) shows another
+  // demo, and the first probe that looks a room up would fail far from here.
+  const servedScene = await evalValue<string | null>('JSON.stringify(window.jeexViewer?.getScene()?.id ?? null)');
+  assert(
+    servedScene === DEMO.scene,
+    `the page serves scene ${String(servedScene)}, not this checkout's demo ${DEMO.scene}: point VIEWER_URL at this checkout's own dev server`,
+  );
   // The wall clock includes the CLI round trips, so the budget is asserted on
   // the IN-PAGE measurement: `performance.now()` at the moment `__appReady` was
   // set, i.e. milliseconds from navigation start to a usable viewer.

@@ -14,6 +14,8 @@ import { DEMO } from '../demo/demo-ids.js';
 import { solvePlan } from '../plan/plan-solver.js';
 import { dragContext, judge, poseItem, wallPose, type DragPose } from '../layout/asset-legality.js';
 import { mask, type LegalityMask } from '../layout/asset-mask.js';
+import { proposePose } from '../layout/asset-pose.js';
+import { pointInPolygon } from '../plan/plan-geometry.js';
 import { nearestFace } from '../layout/rules/context.js';
 import { AssetMoveTool, type AssetEdit, type AssetEditRefused, type AssetMoveHost, type PointerSample } from './asset-move-tool.js';
 import type { Scheduler } from './drag-kit.js';
@@ -111,10 +113,14 @@ function placement(id: string) {
   return apartmentScene.assets.find((asset) => asset.id === id)!;
 }
 
-/** A legal spot for `id` at least `away` metres from where it stands, read off its own mask. */
+/**
+ * A legal spot for `id` at least `away` metres from where it stands, in its own
+ * room, read off its own mask: the drags here stay inside the room they start in.
+ */
 function legalSpot(id: string, away: number, surface: 'floor' | 'ceiling', turnedBy = 0): { x: number; z: number } {
   const context = dragContext(apartmentScene, plan, id)!;
   const home = placement(id);
+  const room = plan.rooms.find((candidate) => candidate.roomId === home.room)!;
   const item = poseItem(context, { position: home.position, rotationY: home.rotationY ?? 0 });
   const field = mask(context, item, surface);
   for (let cell = 0; cell < field.count; cell += 1) {
@@ -122,10 +128,16 @@ function legalSpot(id: string, away: number, surface: 'floor' | 'ceiling', turne
     const x = field.positions[cell * 12]! + field.step / 2;
     const z = field.positions[cell * 12 + 2]! + field.step / 2;
     if (Math.hypot(x - home.position.x, z - home.position.z) < away) continue;
+    if (!pointInPolygon({ x, z }, room.polygon)) continue;
     // The field is stored in float32; a cell on the edge of a touch can read differently at full precision.
     const pose = { position: { x, y: home.position.y, z }, rotationY: home.rotationY ?? 0 };
     const turned = { ...pose, rotationY: pose.rotationY + turnedBy };
-    if (judge(context.ctx, poseItem(context, pose)).ok && judge(context.ctx, poseItem(context, turned)).ok) return { x, z };
+    // A drag ends through the tool's own pose function, wall snap included: a
+    // spot the snap would carry into a neighbour is not one a drag can land on.
+    const dropped = proposePose(context, { kind: 'plan', point: { x, z }, rotationY: pose.rotationY, y: home.position.y, snap: true });
+    const stays = Math.hypot(dropped.snapped.pose.position.x - x, dropped.snapped.pose.position.z - z) < 0.01;
+    if (stays && dropped.judgement.ok && judge(context.ctx, poseItem(context, pose)).ok && judge(context.ctx, poseItem(context, turned)).ok)
+      return { x, z };
   }
   throw new Error(`no legal spot for ${id}`);
 }
@@ -179,6 +191,12 @@ describe('a floor drag', () => {
       host.rig = rig;
       const home = placement(DEMO.asset.livingSofa).position;
       const spot = legalSpot(DEMO.asset.livingSofa, 1, 'floor');
+      // Precondition: the drop pose with the wall snap is the spot itself, so the
+      // asserted position below is what the drag lands on, not a snapped one.
+      const context = dragContext(apartmentScene, plan, DEMO.asset.livingSofa)!;
+      const yaw = placement(DEMO.asset.livingSofa).rotationY ?? 0;
+      const dropped = proposePose(context, { kind: 'plan', point: spot, rotationY: yaw, y: home.y, snap: true });
+      expect(Math.hypot(dropped.snapped.pose.position.x - spot.x, dropped.snapped.pose.position.z - spot.z)).toBeLessThan(0.01);
       drag(tool, home, spot);
       expect(host.refusals).toEqual([]);
       expect(host.edits).toHaveLength(1);
@@ -287,7 +305,8 @@ describe('a wall slide', () => {
   test('a slide across a doorway is refused: the mirror would hang across the opening', () => {
     host.selection = DEMO.asset.hallMirror;
     const home = placement(DEMO.asset.hallMirror).position;
-    drag(tool, home, { x: home.x + 0.3, z: home.z + 0.3 });
+    // Along the spine, west to the guest bedroom's door (centre x 9.00).
+    drag(tool, home, { x: 9.0, z: home.z + 0.3 });
     expect(host.edits).toEqual([]);
     expect(host.refusals[0]!.issues.map((issue) => issue.rule)).toContain('wall-hung');
     expect(host.last().position).toEqual(home);
@@ -328,7 +347,7 @@ describe('a ceiling move', () => {
   test('into the loggia it is refused: no ceiling there', () => {
     host.selection = DEMO.asset.livingPendant;
     const home = placement(DEMO.asset.livingPendant).position;
-    const loggia = plan.rooms.find((room) => room.roomId === DEMO.room.loggiaNorth)!;
+    const loggia = plan.rooms.find((room) => room.roomId === DEMO.room.loggia)!;
     const centre = { x: (loggia.bbox.minX + loggia.bbox.maxX) / 2, z: (loggia.bbox.minZ + loggia.bbox.maxZ) / 2 };
     drag(tool, home, centre);
     expect(host.edits).toEqual([]);
@@ -490,7 +509,8 @@ describe('turning', () => {
   });
 
   test('a turn that does not fit is refused with the issue; the object keeps its yaw', () => {
-    expect(tool.turnAsset(DEMO.asset.livingSofa, 6)).toBe(true);
+    // A quarter turn swings the study desk into its wall and its chair.
+    expect(tool.turnAsset(DEMO.asset.studyDesk, 6)).toBe(true);
     expect(host.edits).toEqual([]);
     expect(host.refusals[0]!.issues.map((issue) => issue.rule)).toContain('no-interpenetration');
     expect(host.shown).toEqual([]);
@@ -517,14 +537,18 @@ describe('turning', () => {
   test('Q at rest that does not fit is refused at once and the burst commits nothing', () => {
     const timer = manualScheduler();
     tool = new AssetMoveTool(host, timer.schedule);
+    host.selection = DEMO.asset.studyDesk;
     for (let press = 0; press < 6; press += 1) tool.key('q', false);
     expect(host.refusals.length).toBeGreaterThan(0);
     timer.fire();
     // Every 15° step that fitted was taken; the ones that did not were refused, never committed half-way.
     for (const edit of host.edits) {
       const rotate = edit.ops.find((op) => op.op === 'rotate_object');
-      if (rotate?.op === 'rotate_object')
-        expect(Math.abs((rotate.rotationY ?? 0) - (placement(DEMO.asset.livingSofa).rotationY ?? 0))).toBeLessThan(Math.PI / 2);
+      if (rotate?.op === 'rotate_object') {
+        // Compared as a turn, wrapped to (-π, π]: the desk stands at π, so a step past it reads as 2π - 15°.
+        const turned = (rotate.rotationY ?? 0) - (placement(DEMO.asset.studyDesk).rotationY ?? 0);
+        expect(Math.abs(Math.atan2(Math.sin(turned), Math.cos(turned)))).toBeLessThan(Math.PI / 2);
+      }
     }
   });
 });

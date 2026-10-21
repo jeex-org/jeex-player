@@ -221,7 +221,7 @@ describe('the four demo interiors', () => {
 
   test('there are four of them and the first is the shipped standard', () => {
     expect(presets).toHaveLength(4);
-    expect(standardPreset(apartmentScene)?.id).toBe(DEMO.preset.nordicOak);
+    expect(standardPreset(apartmentScene)?.id).toBe(DEMO.preset.oakSand);
   });
 
   test('every preset applies to a fresh model as one revision', () => {
@@ -308,7 +308,7 @@ describe('the four demo interiors', () => {
     // Sanity: the warm preset really did move things.
     expect(shippedLook(model.scene)).not.toEqual(shipped);
 
-    expect(isApplyOk(applyPresetBatch(model, DEMO.preset.nordicOak))).toBe(true);
+    expect(isApplyOk(applyPresetBatch(model, DEMO.preset.oakSand))).toBe(true);
     expect(shippedLook(model.scene)).toEqual(shipped);
   });
 });

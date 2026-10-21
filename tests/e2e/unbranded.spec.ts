@@ -7,7 +7,14 @@
  */
 
 import { expect, test, type Page } from '@playwright/test';
-import { expectCanvasScreenshot, expectChromeScreenshot, expectNoNewA11yViolations, viewerRoot, waitForBoot } from './support.js';
+import {
+  expectCanvasScreenshot,
+  expectChromeScreenshot,
+  expectNoNewA11yViolations,
+  viewerRoot,
+  waitForBoot,
+  waitForChromeIdle,
+} from './support.js';
 
 /** WCAG 2.2 §2.5.8 minimum target size, CSS px — same floor as `target-sizes.test.ts`. */
 const MIN_TARGET_PX = 24;
@@ -55,6 +62,9 @@ for (const viewport of [
     test('the canvas does not move on its own for 3 s without input', async ({ page }) => {
       await gotoUnbranded(page);
       const canvas = page.locator('[data-jeex="scene-canvas"]');
+      // The bar auto-hides on an idle timer: capture once it has, so the
+      // baseline does not depend on which side of the timer the capture fell.
+      await waitForChromeIdle(page);
       // Two captures of the same element, 3 s apart, against the SAME
       // committed baseline: if the tour (or anything else) had started
       // moving the camera on its own, the second capture would drift outside

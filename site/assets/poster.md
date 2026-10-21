@@ -2,7 +2,7 @@
 
 `poster.webp` (1600×900) and `og.png` (1200×630) are one render of the demo apartment (`src/demo/scene-data.ts`), made by the player itself, not drawn by hand. They are labelled as the demo apartment on the site.
 
-- Date: 2026-10-19.
+- Date: 2026-10-21 (the invented demo apartment, presentation camera from the north).
 - Capture: `scripts/site-poster.ts` serves the built demo page and opens `dist/index.html?lang=en`, then calls `window.jeexViewer.capture.still({ width: 1600, height: 900, camera: 'presentation', state: 'current' })`, keeping the default disclosure caption.
 - Renderer: headless Chromium from `@playwright/test`. It uses SwiftShader by default; `JEEX_BROWSER_GPU=nvidia` renders on an NVIDIA GPU when the machine has one.
 - Conversion (ImageMagick 7):

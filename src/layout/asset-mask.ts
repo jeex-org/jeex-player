@@ -39,9 +39,10 @@ export const TOP_STEP_M = 0.05;
 const TOP_PROBE_M = 0.1;
 /**
  * Floor and ceiling poses judged per cell along each axis (2: a 0.1 m lattice
- * under 0.2 m cells). Measured on the demo flat: a 0.2 m
- * lattice showed the sofa 274 green cells where a 0.05 m one finds 361; 0.1 m
- * finds 351.
+ * under 0.2 m cells). Measured on the demo flat (2026-10-21): a 0.2 m
+ * lattice shows the sofa 528 green cells where a 0.05 m one finds 609; 0.1 m
+ * finds 546. About a tenth of the places the sofa only just fits are still
+ * shown red at 0.1 m: a known gap of the probe step, held by `asset-mask.test.ts`.
  */
 const PROBES_PER_CELL = 2;
 /** Slack added to an object's reach when a mask narrows the scene around a room, metres. */
