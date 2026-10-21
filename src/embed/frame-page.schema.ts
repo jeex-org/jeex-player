@@ -8,14 +8,16 @@
  * or "the default ratio" and logs the value it refused.
  *
  * Judging invariant: these schemas never transform. The origin that flows on
- * is the string the query held, and the ratio is read by `parseRatio`, the one
- * reader both embed surfaces share.
+ * is the string the query held. The ratio is READ once, by `parseRatio` (the
+ * one reader both embed surfaces share), and this schema judges what it read.
+ * The ratio has to be read before it can be judged, so the schema cannot
+ * check the raw string.
  *
  * Pure module: no `three`, no DOM.
  */
 
 import { z } from 'zod/mini';
-import { parseRatio } from './ratio.js';
+import type { Ratio } from './ratio.js';
 
 /** The two schemes a browser can postMessage between; nothing else is an origin. */
 const ORIGIN_PROTOCOLS: ReadonlySet<string> = new Set(['http:', 'https:']);
@@ -39,15 +41,20 @@ export function isExactOrigin(raw: string): boolean {
 /** `?host=`: an exact `http(s)` origin, never `*`, never a URL with a path. */
 const hostOriginParamSchema = z.string().check(z.refine(isExactOrigin, { error: 'must be an exact http(s) origin' }));
 
-/** `?ratio=`: `16:9`, `16/9`, `4:3`, `1` or `1.5`, two positive numbers or one. */
-const ratioParamSchema = z.string().check(z.refine((raw) => parseRatio(raw) !== null, { error: 'must be a ratio such as 16:9' }));
+/** A side of a ratio: a positive, finite number. */
+const ratioSide = z
+  .number()
+  .check(z.positive({ error: 'must be a positive number' }), z.refine(Number.isFinite, { error: 'must be finite' }));
+
+/** `?ratio=` once `parseRatio` has read it: width and height, both positive and finite. */
+const ratioParamSchema = z.object({ width: ratioSide, height: ratioSide });
 
 /** Whether a `?host=` value is an origin the bridge may answer to. */
 export function isHostOriginParam(raw: string): boolean {
   return z.safeParse(hostOriginParamSchema, raw).success;
 }
 
-/** Whether a `?ratio=` value is a ratio. */
-export function isRatioParam(raw: string): boolean {
-  return z.safeParse(ratioParamSchema, raw).success;
+/** Whether the ratio `parseRatio` read off `?ratio=` is one the frame may apply. */
+export function isRatioParam(ratio: Ratio): boolean {
+  return z.safeParse(ratioParamSchema, ratio).success;
 }

@@ -65,8 +65,8 @@ export function embedPageOptions(search: string): DeepPartial<ViewerOptions> {
 export function framePageRatio(query: URLSearchParams, onInvalid?: (raw: string) => void): Ratio {
   const raw = query.get(RATIO_PARAM);
   if (raw === null || raw === '') return DEFAULT_RATIO;
-  const ratio = isRatioParam(raw) ? parseRatio(raw) : null;
-  if (ratio !== null) return ratio;
+  const ratio = parseRatio(raw);
+  if (ratio !== null && isRatioParam(ratio)) return ratio;
   onInvalid?.(raw);
   return DEFAULT_RATIO;
 }

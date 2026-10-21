@@ -375,6 +375,8 @@ describe('isJeexEnvelope, the frame side of isJeexMessage', () => {
     ['no id', { ...command, id: undefined }, false],
     ['a numeric method', { ...command, method: 7 }, false],
     ['a reply whose ok is a string', { ...command, kind: 'reply', ok: 'yes' }, false],
+    ['a reply with no id', { ...command, kind: 'reply', ok: true, id: undefined }, false],
+    ['an event with no event name', { channel: CHANNEL, version: PROTOCOL_VERSION, viewerId: 'v1', kind: 'event' }, false],
     ['null', null, false],
     ['undefined', undefined, false],
     ['a bare string', 'jeex-embed', false],

@@ -28,10 +28,11 @@ bun install
 npm run dev          # the demo page on http://localhost:3700/
 ```
 
-Install the git hooks of `lefthook.yml` once with `bun run hooks:install`. The
-pre-commit hook is deliberately small: `scripts/no-docs-refs.sh --staged`,
-which refuses a staged file that points at a documents folder outside this
-repository.
+`bun install` also installs the git hooks of `lefthook.yml` (the `lefthook`
+dev dependency's postinstall step, which skips itself when `CI` is set);
+`bun run hooks:install` reinstalls them. The pre-commit hook is deliberately
+small: `scripts/no-docs-refs.sh --staged`, which refuses a staged file that
+points at a documents folder outside this repository.
 
 `README.md` lists the other dev pages and the build commands.
 
