@@ -51,7 +51,9 @@ concurrency:
 jobs:
   check:
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    # The job takes about a minute and a half; ten minutes leaves room for a
+    # cold package cache and a slow runner without letting a hang run long.
+    timeout-minutes: 10
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
