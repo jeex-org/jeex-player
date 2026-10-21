@@ -78,6 +78,16 @@ class FakeIframe {
   remove(): void {
     this.removed = true;
   }
+  /** The frame's `load` listeners; `fireLoad` plays the browser finishing the frame page. */
+  private readonly loads = new Set<() => void>();
+  addEventListener(type: string, callback: () => void, options?: { signal?: AbortSignal }): void {
+    if (type !== 'load') return;
+    this.loads.add(callback);
+    options?.signal?.addEventListener('abort', () => this.loads.delete(callback), { once: true });
+  }
+  fireLoad(): void {
+    for (const callback of [...this.loads]) callback();
+  }
 }
 
 let iframe: FakeIframe;
@@ -113,7 +123,7 @@ beforeEach(() => {
     },
   };
   (globalThis as { window?: unknown }).window = {
-    location: { origin: HOST_ORIGIN, href: `${HOST_ORIGIN}/page.html` },
+    location: { origin: HOST_ORIGIN, href: `${HOST_ORIGIN}/listing/1234567?utm=x`, pathname: '/listing/1234567' },
     // Honours `{ signal }` exactly as the platform does: aborting unbinds.
     addEventListener: (type: string, callback: (event: MessageEvent) => void, options?: { signal?: AbortSignal }) => {
       if (type !== 'message') return;
@@ -975,5 +985,45 @@ describe('the export options the handle sends', () => {
     const asViewer: ExportUsdzOptions = asEmbed;
     const backAgain: EmbedExportUsdzOptions = asViewer;
     expect(backAgain).toEqual(asEmbed);
+  });
+});
+
+describe('the telemetry context', () => {
+  test('the host page path goes to the frame by postMessage after it loads, never in its URL', () => {
+    make();
+    expect(iframe.src).not.toContain('listing');
+    expect(iframe.contentWindow.commands).toEqual([]);
+    iframe.fireLoad();
+    expect(iframe.contentWindow.commands).toEqual([
+      { ...iframe.contentWindow.commands[0]!, method: 'context', params: { page: '/listing/1234567' } },
+    ]);
+    expect(iframe.contentWindow.posted[0]?.origin).toBe(FRAME_ORIGIN);
+  });
+
+  test('every spelling of off reaches the frame as analytics=off, and the host hands over nothing', () => {
+    for (const analytics of ['off', false, null, 'OFF', 'none', 'false', 0, { mode: 'off' }, { mode: 'OFF' }, { mode: false }]) {
+      for (const embed of made.splice(0)) embed.dispose();
+      iframe = new FakeIframe();
+      make({ analytics });
+      iframe.fireLoad();
+      expect({ analytics, commands: iframe.contentWindow.commands }).toEqual({ analytics, commands: [] });
+      expect({ analytics, query: new URL(iframe.src).searchParams.get('analytics') }).toEqual({ analytics, query: 'off' });
+    }
+  });
+
+  test('on, absent, or an object without a mode stays on; an endpoint inside the object is forwarded', () => {
+    make({ analytics: { endpoint: 'https://stats.agency.example/p' } });
+    expect(new URL(iframe.src).searchParams.get('analytics')).toBeNull();
+    expect(new URL(iframe.src).searchParams.get('analyticsEndpoint')).toBe('https://stats.agency.example/p');
+    iframe.fireLoad();
+    expect(iframe.contentWindow.commands.map((command) => command.method)).toEqual(['context']);
+  });
+
+  test('the context listener goes with dispose', () => {
+    const embed = make();
+    embed.dispose();
+    made.pop();
+    iframe.fireLoad();
+    expect(iframe.contentWindow.commands.filter((command) => command.method === 'context')).toEqual([]);
   });
 });

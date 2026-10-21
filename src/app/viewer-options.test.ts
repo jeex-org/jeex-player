@@ -67,6 +67,10 @@ function sampleValueFor(spec: OptionSpec): { raw: string; resolved: unknown } {
       const first = (spec.values ?? [])[0]!;
       return { raw: first, resolved: [first] };
     }
+    case 'endpoint':
+      return { raw: 'https://stats.example/player', resolved: 'https://stats.example/player' };
+    case 'switch':
+      return { raw: 'off', resolved: 'off' };
   }
 }
 
@@ -108,6 +112,7 @@ describe('resolveViewerOptions', () => {
       edits: 'local',
       debug: DEFAULT_VIEWER_OPTIONS.debug,
       scene: { url: undefined },
+      analytics: { mode: 'on', endpoint: undefined },
       onLog: logged.sink,
     });
     // The tour only engages at start in `view.mode: 'tour'`; `tour.mode` says
@@ -169,6 +174,7 @@ describe('resolveViewerOptions', () => {
       edits: 'local',
       debug: DEFAULT_VIEWER_OPTIONS.debug,
       scene: { url: undefined },
+      analytics: { mode: 'on', endpoint: undefined },
       onLog: logged.sink,
     });
     expect(Object.keys(resolved)).toEqual([
@@ -189,6 +195,7 @@ describe('resolveViewerOptions', () => {
       'edits',
       'debug',
       'scene',
+      'analytics',
       'onLog',
     ]);
   });
@@ -724,6 +731,8 @@ describe('OPTION_SCHEMA', () => {
         'edits',
         'debug',
         'scene.url',
+        'analytics.mode',
+        'analytics.endpoint',
       ].sort(),
     );
   });
@@ -741,9 +750,12 @@ describe('OPTION_SCHEMA', () => {
         expect(warnings()).toEqual([]);
       });
 
-      test('invalid -> default + one warning naming the path', () => {
+      test('invalid -> default (an endpoint: off) + one warning naming the path', () => {
         const bogus = spec.kind === 'string' ? { nope: true } : 'not-a-valid-value-9x';
-        expect(readPath(resolve(partialAt(path, bogus)), path)).toEqual(spec.default);
+        // A refused endpoint override must never fall back to the DEFAULT endpoint.
+        // A switch fails CLOSED: anything it does not know is off.
+        const closed = spec.kind === 'endpoint' ? '' : spec.kind === 'switch' ? 'off' : spec.default;
+        expect(readPath(resolve(partialAt(path, bogus)), path)).toEqual(closed);
         expect(warnings().length).toBe(1);
         expect(warnings()[0]).toContain(path);
       });
@@ -963,5 +975,57 @@ describe('fullscreenButton and readonly', () => {
     expect(resolved.fullscreenButton.show).toBe(true);
     expect(resolved.readonly).toBe(true);
     expect(resolve(optionsFromQuery('?chrome=0')).fullscreenButton.show).toBe(false);
+  });
+});
+
+describe('analytics', () => {
+  test('on by default, off by the attribute, the query or the object', () => {
+    expect(resolve().analytics.mode).toBe('on');
+    expect(resolve(optionsFromDataset({ analytics: 'off' })).analytics.mode).toBe('off');
+    expect(resolve(optionsFromQuery('?analytics=off')).analytics.mode).toBe('off');
+    expect(resolve({ analytics: { mode: 'off' } }).analytics.mode).toBe('off');
+  });
+
+  test('it fails closed: only an absent mode or exactly on is on, every other spelling is off', () => {
+    expect(resolve({ analytics: { mode: 'on' } }).analytics.mode).toBe('on');
+    expect(resolve(optionsFromDataset({ analytics: 'on' })).analytics.mode).toBe('on');
+    const off: unknown[] = ['off', false, null, 'OFF', 'Off', 'false', '0', 'none', '', 'no', 0, {}];
+    for (const value of off) {
+      expect({ value, object: resolve({ analytics: { mode: value as 'off' } }).analytics.mode }).toEqual({ value, object: 'off' });
+      // `analytics: {}` is an options object with no mode, which is the default; every other value is a mode.
+      if (typeof value !== 'object' || value === null) {
+        expect({ value, shorthand: resolve({ analytics: value as 'off' }).analytics.mode }).toEqual({ value, shorthand: 'off' });
+      }
+    }
+    for (const raw of ['off', 'OFF', 'false', 'none', '0', '']) {
+      expect({ raw, attribute: resolve(optionsFromDataset({ analytics: raw })).analytics.mode }).toEqual({ raw, attribute: 'off' });
+      expect({ raw, query: resolve(optionsFromQuery(`?analytics=${raw}`)).analytics.mode }).toEqual({ raw, query: 'off' });
+    }
+  });
+
+  test('analytics: off is shorthand for { mode: off }, and only off and false are silent', () => {
+    expect(resolve({ analytics: 'off' }).analytics).toEqual({ mode: 'off', endpoint: undefined });
+    expect(resolve({ analytics: false as unknown as 'off' }).analytics.mode).toBe('off');
+    expect(warnings()).toEqual([]);
+    expect(resolve({ analytics: 'OFF' as 'off' }).analytics.mode).toBe('off');
+    expect(warnings().length).toBe(1);
+  });
+
+  test('an endpoint override is kept when it is https or local http', () => {
+    expect(resolve(optionsFromDataset({ analyticsEndpoint: 'https://stats.example/p' })).analytics.endpoint).toBe(
+      'https://stats.example/p',
+    );
+    expect(resolve(optionsFromQuery('?analyticsEndpoint=http%3A%2F%2Flocalhost%3A3700%2Ft')).analytics.endpoint).toBe(
+      'http://localhost:3700/t',
+    );
+    expect(warnings()).toEqual([]);
+  });
+
+  test('a refused or non-string endpoint resolves to off, never to the default, with exactly one warning', () => {
+    for (const endpoint of ['ftp://stats.example/', 'http://stats.example/', 42, { url: 'https://x.example/' }]) {
+      logged.clear();
+      expect(resolve({ analytics: { endpoint: endpoint as string } }).analytics.endpoint).toBe('');
+      expect(warnings().length).toBe(1);
+    }
   });
 });

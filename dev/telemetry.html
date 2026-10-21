@@ -1,0 +1,31 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>JEEX telemetry</title>
+    <style>
+      body {
+        margin: 0;
+        padding: 20px;
+        background: #101615;
+        color: #e9e1d4;
+        font-family: Inter, ui-sans-serif, system-ui, sans-serif;
+      }
+      jeex-viewer,
+      #stage {
+        max-inline-size: 960px;
+      }
+      #stage {
+        aspect-ratio: 16 / 9;
+      }
+    </style>
+  </head>
+  <body>
+    <h1>Anonymous telemetry</h1>
+    <p><code>?form=element|script|iframe</code>; <code>?analytics=…</code> and <code>?endpoint=…</code> are handed to it as given.</p>
+    <jeex-viewer id="viewer" view="orbit" tour="off" lang="en"></jeex-viewer>
+    <div id="stage"></div>
+    <script type="module" src="/dev/telemetry.ts"></script>
+  </body>
+</html>

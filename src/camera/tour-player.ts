@@ -116,6 +116,11 @@ type TourCallbacks = {
    * cuts to camera 1.
    */
   pose?: (() => TourPose) | undefined;
+  /**
+   * The tour PLAYED to its end. Only the playback clock raises it: a seek to
+   * the end of a playing tour reaches `ended` too, but is not a completion.
+   */
+  onComplete?: (() => void) | undefined;
 };
 
 export type TourPose = { position: THREE.Vector3; target: THREE.Vector3 };
@@ -389,11 +394,13 @@ export class TourPlayer {
     } else {
       this.elapsed += delta * this.advanceRate(delta);
     }
-    if (this.elapsed >= this.totalDuration) {
+    const finished = this.elapsed >= this.totalDuration;
+    if (finished) {
       this.elapsed = this.totalDuration;
       this.setState('ended');
     }
     this.emitPose(this.pathPose(this.distanceAt(this.elapsed)));
+    if (finished) this.callbacks.onComplete?.();
   }
 
   /** The clock factor for a frame of `delta` seconds, advancing an easing speed change. */

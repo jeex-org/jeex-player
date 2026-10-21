@@ -18,7 +18,8 @@
  * Pure module: no `three`, no DOM.
  */
 
-import { add, mul, norm, pointInPolygon, sub } from '../plan/plan-geometry.js';
+import { add, mul, norm, sub } from '../plan/plan-geometry.js';
+import { roomOf } from '../plan/plan-rooms.js';
 import { polylineSlabs } from './layout-geometry.js';
 import { obbQuad, polylineSlice, type Obb } from '../plan/plan-geometry.js';
 import { resolveDoorSwing } from '../plan/door-swing.js';
@@ -59,17 +60,6 @@ const RUN_EPS_M = 1e-4;
 const DEFAULT_CLEARANCE_M = 0.6;
 
 /* ------------------------------------------------------ context building --- */
-
-/** The room a plan point stands in, `null` outside every room polygon. */
-export function roomOf(plan: SolvedPlan, point: Vec2): string | null {
-  for (const room of plan.rooms) {
-    // The bounding box first: a drag's mask asks this for thousands of points.
-    const box = room.bbox;
-    if (point.x < box.minX || point.x > box.maxX || point.z < box.minZ || point.z > box.maxZ) continue;
-    if (pointInPolygon(point, room.polygon)) return room.roomId;
-  }
-  return null;
-}
 
 /**
  * What the linter reads of the object bank for ONE placement.

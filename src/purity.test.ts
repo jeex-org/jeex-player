@@ -44,6 +44,7 @@ const SCHEMA_MODULES: readonly string[] = [
   'assets/project-manifest.schema',
   'geometry/glb-container.schema',
   'embed/frame-page.schema',
+  'telemetry/telemetry.schema',
 ];
 
 /** Modules the architecture declares pure: no `three`, no DOM. */
@@ -56,6 +57,7 @@ const PURE_MODULES = [
   'plan/plan-openings',
   'plan/plan-solver',
   'plan/plan-drawing',
+  'plan/plan-rooms',
   'plan/opening-arc',
   'plan/opening-geometry',
   'shared/readonly-map',

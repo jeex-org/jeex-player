@@ -426,6 +426,15 @@ export class RenderRuntime {
   }
 
   /**
+   * The frame clock reading (`now`, ms) of the last frame that actually RENDERED
+   * the scene; `-Infinity` before the first. A post-render hook compares it with
+   * its own `now` to tell a drawn frame from one the plan heartbeat skipped.
+   */
+  get lastDrawnAt(): number {
+    return this.lastDrawn;
+  }
+
+  /**
    * A hook that runs AFTER the frame's render, while the GL state is still
    * current. This is where an inset render lives — the camera-preview card
    * draws the scene from a second camera into a scissored corner of the SAME

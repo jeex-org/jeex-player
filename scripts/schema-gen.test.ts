@@ -7,6 +7,7 @@
  * is the whole point of generating rather than hand-writing.
  */
 
+import Ajv2020 from 'ajv/dist/2020.js';
 import { describe, expect, test } from 'bun:test';
 import { mkdtempSync, readFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -14,6 +15,9 @@ import { join } from 'node:path';
 import {
   SCENE_SCHEMA_TARGET,
   SCHEMA_TARGETS,
+  TELEMETRY_SCHEMA_FILE,
+  generateTelemetrySchema,
+  schemaText,
   UUID_FIELDS,
   VIEWER_OPTIONS_SCHEMA_TARGET,
   generateSchema,
@@ -133,7 +137,8 @@ describe('writeSchemas', () => {
     const dir = mkdtempSync(join(tmpdir(), 'jeex-schema-gen-'));
     try {
       const written = writeSchemas(dir, FIXED_VERSION);
-      expect(written.length).toBe(SCHEMA_TARGETS.length);
+      expect(written.length).toBe(SCHEMA_TARGETS.length + 1);
+      expect(written).toContain(join(dir, 'telemetry.schema.json'));
       for (const target of SCHEMA_TARGETS) {
         const path = join(dir, `${target.name}.schema.json`);
         expect(written).toContain(path);
@@ -143,5 +148,61 @@ describe('writeSchemas', () => {
     } finally {
       rmSync(dir, { recursive: true, force: true });
     }
+  });
+});
+
+describe('the telemetry schema', () => {
+  test('the committed telemetry.schema.json is exactly what the send schema generates (run `bun scripts/schema-gen.ts --telemetry`)', () => {
+    expect(readFileSync(TELEMETRY_SCHEMA_FILE, 'utf8')).toBe(schemaText(generateTelemetrySchema()));
+  });
+
+  test('it is closed: every object refuses keys it does not name', () => {
+    const text = schemaText(generateTelemetrySchema());
+    expect(text).toContain('"additionalProperties": false');
+    expect(generateTelemetrySchema()['$id']).toBe('https://player.jeex.org/schema/telemetry/1.0.0.json');
+  });
+
+  test('each branch of the schema has exactly the documented keys', () => {
+    type Branch = { properties?: Record<string, { const?: unknown }>; oneOf?: Branch[]; additionalProperties?: unknown };
+    const branches: Branch[] = [];
+    const collect = (node: Branch): void => {
+      if (node.properties) branches.push(node);
+      for (const child of node.oneOf ?? []) collect(child);
+    };
+    collect(generateTelemetrySchema());
+    const context = ['embed', 'group', 'lang', 'page', 'player', 'schema', 'site', 'subject'];
+    const keysOf = (branch: Branch) => {
+      const group = String(branch.properties?.['group']?.const);
+      const event = branch.properties?.['event']?.const;
+      return [`${group}/${typeof event === 'string' ? event : ''}`, Object.keys(branch.properties ?? {}).sort()] as const;
+    };
+    expect(Object.fromEntries(branches.map((branch) => keysOf(branch)))).toEqual({
+      'lifecycle/view': [...context, 'event'].sort(),
+      'lifecycle/ready': [...context, 'event', 'load'].sort(),
+      'lifecycle/models_loaded': [...context, 'assets', 'event', 'failed', 'load', 'outcome'].sort(),
+      'actions/': [...context, 'counts'].sort(),
+      'rooms/': [...context, 'rooms'].sort(),
+      'device/': [...context, 'fps', 'fullscreen', 'gpu', 'input', 'width'].sort(),
+      'error/': [...context, 'browser', 'code', 'count', 'frames', 'name', 'stage'].sort(),
+    });
+    expect(branches.every((branch) => branch.additionalProperties === false)).toBe(true);
+  });
+
+  test('the published schema and the runtime schema agree on a valid send and on a forbidden key', () => {
+    const validate = new Ajv2020({ strict: false }).compile(generateTelemetrySchema());
+    const view = {
+      schema: '1.0.0',
+      player: '0.1.0',
+      embed: 'script',
+      site: 'https://agency.example',
+      page: '/flats/:id',
+      subject: { project: null, bake: null, scene: null },
+      lang: 'en',
+      group: 'lifecycle',
+      event: 'view',
+    };
+    expect(validate(view)).toBe(true);
+    expect(validate({ ...view, visitor: 'x' })).toBe(false);
+    expect(validate({ ...view, page: '/flat?email=a@b.example' })).toBe(false);
   });
 });

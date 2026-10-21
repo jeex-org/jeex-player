@@ -394,6 +394,16 @@ p code, li code, td code, summary code, dd code {
   .toc { position: static; }
 }
 
+/* ---------- telemetry page ---------- */
+
+.table-wrap { overflow-x: auto; max-width: 100%; }
+.doc-table { width: 100%; border-collapse: collapse; font-size: 14.5px; }
+.doc-table th, .doc-table td { text-align: start; vertical-align: top; padding: 10px 12px; border-bottom: 1px solid var(--line-soft); }
+.doc-table th { color: var(--faint); font-family: var(--mono); font-size: 12px; letter-spacing: 0.08em; text-transform: uppercase; font-weight: 500; }
+.doc-table td { color: var(--muted); }
+.doc-table td:first-child { white-space: nowrap; color: var(--text); }
+.step-doc pre { overflow-x: auto; margin: 0; padding: 14px 16px; border: 1px solid var(--line); border-radius: 10px; background: var(--surface); font-family: var(--mono); font-size: 13px; color: var(--text); }
+
 /* ---------- footer ---------- */
 
 .foot { border-top: 1px solid var(--line-soft); padding-block: 44px 40px; color: var(--muted); font-size: 14px; }

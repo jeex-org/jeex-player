@@ -14,6 +14,7 @@ import { resolveViewerOptions, type ViewerOptionsInput } from './viewer-options.
 import { prefersReducedMotion } from './motion-wiring.js';
 import { createLogger } from '../shared/logger.js';
 import type { ViewerHandle } from './viewer-handle.js';
+import type { Embedding } from './telemetry-wiring.js';
 import type { ExportGlbOptions } from './export-gltf.js';
 import type { ExportUsdzOptions } from './export-usdz.js';
 
@@ -56,7 +57,12 @@ export type { ViewerMode } from '../scene/types.js';
  * (`scene-repository.resolveSceneSource`).
  */
 export function mountViewer(container: HTMLElement, options?: ViewerOptionsInput): ViewerHandle {
-  const app = new ViewerApp(container, resolveViewerOptions(options, { reducedMotion: prefersReducedMotion() }));
+  return mountViewerAs({ embed: 'script' }, container, options);
+}
+
+/** `mountViewer` for the element and the iframe page, which say how they embed it. */
+export function mountViewerAs(embedding: Embedding, container: HTMLElement, options?: ViewerOptionsInput): ViewerHandle {
+  const app = new ViewerApp(container, resolveViewerOptions(options, { reducedMotion: prefersReducedMotion() }), embedding);
   const ready = app.init();
   // The error card is the user-facing report and the `error` event is the
   // machine-readable one; `ready` still rejects for a host that awaits it, so

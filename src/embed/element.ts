@@ -40,7 +40,7 @@
  * ONE microtask.
  */
 
-import { mountViewer } from '../app/viewer-api.js';
+import { mountViewerAs } from '../app/viewer-api.js';
 import { ensureViewerStyles } from '../ui/viewer-shell.js';
 import {
   COMPOUND_SCHEMA,
@@ -283,7 +283,7 @@ export class ViewerElementController {
   /** True while a microtask flush is already scheduled. */
   private flushing = false;
 
-  constructor(host: ElementHost, mount: ElementMount = mountViewer) {
+  constructor(host: ElementHost, mount: ElementMount = (container, options) => mountViewerAs({ embed: 'element' }, container, options)) {
     this.host = host;
     this.mount = mount;
   }

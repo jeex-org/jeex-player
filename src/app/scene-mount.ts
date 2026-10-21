@@ -21,8 +21,9 @@
  * which adopts it and only then calls `reseed` (`viewer-editor.ts`).
  */
 
+import type { UsageSink } from '../shared/usage.js';
 import type * as THREE from 'three';
-import { SceneBuilder, type BuildResult, type SceneBuilderOptions } from '../geometry/scene-builder.js';
+import { SceneBuilder, type BuildResult, type SceneBuilderOptions, type UpgradeResult } from '../geometry/scene-builder.js';
 import type { VariantBank } from '../assets/asset-variants.js';
 import { isTouchedAsset, isTouchedOpening, type TouchedEntity } from '../scene/scene-ops.js';
 import { touchedText } from '../geometry/touched-kind.js';
@@ -71,6 +72,14 @@ type SceneMountDeps = {
    * composition root routes it to the `error` event of the handle.
    */
   onError: (error: ViewerError) => void;
+  /**
+   * The first model pass of a freshly mounted document ended, and was not cut
+   * short by a dispose or another document. Passes after an edit or a rebuild
+   * are not reported: they say nothing about how the document loaded.
+   */
+  onModelsSettled?: ((model: SceneModel, result: UpgradeResult) => void) | undefined;
+  /** Hears accepted actions in the built-in panels (`shared/usage.ts`). */
+  usage?: UsageSink | undefined;
 };
 
 export class SceneMount {
@@ -152,6 +161,7 @@ export class SceneMount {
       edits: this.deps.edits,
       rebuild: () => this.rebuild(),
       reseed: () => this.deps.onDocument(model),
+      usage: this.deps.usage,
     });
     this.currentEditor = editor;
     editor.attachRoot(built.root);
@@ -179,7 +189,7 @@ export class SceneMount {
       }),
     );
     this.deps.onDocument(model);
-    this.scheduleUpgrade(builder);
+    this.scheduleUpgrade(builder, model);
     return built;
   }
 
@@ -235,13 +245,13 @@ export class SceneMount {
    * (that is what `failed` counts) and a disposed mount rejects the frame
    * wait, which is the normal way a pass ends early.
    */
-  private scheduleUpgrade(builder: SceneBuilder): void {
+  private scheduleUpgrade(builder: SceneBuilder, reportFor?: SceneModel): void {
     const signal = this.upgrades.signal;
     this.upgradePass = this.upgradePass
       .then(async () => {
         if (signal.aborted) return;
         await nextFrame(signal);
-        await builder.upgradeModels(
+        const result = await builder.upgradeModels(
           signal,
           () => nextFrame(signal),
           (group, replaced) => {
@@ -250,6 +260,7 @@ export class SceneMount {
             this.currentEditor?.adoptUpgradedBody(group, replaced);
           },
         );
+        if (reportFor && !signal.aborted) this.deps.onModelsSettled?.(reportFor, result);
       })
       .catch(() => undefined);
   }

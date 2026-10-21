@@ -24,8 +24,9 @@
  * else with it.
  */
 
-import { loadDocument, type LoadedDocument, type LoadedProjectContext, type ProjectInfo } from './project-wiring.js';
-import { resolveSceneSource, type SceneRepository, type SceneSource } from '../scene/scene-repository.js';
+import type { ProjectInfo } from './project-wiring.js';
+import type { SceneSource } from '../scene/scene-repository.js';
+import { DocumentSource } from './document-source.js';
 import { SceneModel } from '../scene/scene-model.js';
 import { Picker } from '../geometry/picker.js';
 import { hasWebGL } from '../render/render-runtime.js';
@@ -61,6 +62,8 @@ import { applyStartView, nextFrame, showBootStep } from './viewer-boot.js';
 import { ViewerStage } from './viewer-stage.js';
 import type { Logger } from '../shared/logger.js';
 import { instanceLogger, raiseFailure } from './viewer-failure.js';
+import { telemetryWiring, type Embedding, type TelemetryWiring } from './telemetry-wiring.js';
+import type { UsageSink } from '../shared/usage.js';
 
 export class ViewerApp {
   readonly options: ViewerOptions;
@@ -73,6 +76,9 @@ export class ViewerApp {
   private readonly log: Logger = instanceLogger(() => this.options);
   private readonly tourEvents = new TourEvents(this.log);
   private readonly events = new ViewerEvents(this.log);
+  /** Anonymous telemetry (`telemetry-wiring.ts`); every method a no-op when it is off. */
+  private readonly telemetry: TelemetryWiring;
+  private readonly usage: UsageSink = (action) => this.telemetry.usage(action);
   /**
    * The public tour surface. It is created before the camera stack exists and
    * defers to it, so a host can hold `handle.tour` from the moment
@@ -99,6 +105,7 @@ export class ViewerApp {
     setFurnitureVisible: (visible) => this.handle.setFurnitureVisible(visible),
     furnitureVisible: () => this.furnitureVisible,
     onFullscreenUnavailable: (message) => this.ui.setHint(message),
+    usage: this.usage,
   });
   private readonly ui: ViewerUI;
   /**
@@ -123,17 +130,8 @@ export class ViewerApp {
    * in the one module whose size limit says it may only delegate.
    */
   readonly handle: HandleCommands;
-  private repository: SceneRepository;
-  /** Sequence number of the last `loadScene` call started; see its doc comment. */
-  private loadSeq = 0;
-  /**
-   * The baked project on screen, or `null` when the document is a bare scene.
-   *
-   * Set only after a document has been VALIDATED against its own registries,
-   * for the same reason `repository` is: a `loadScene` that fails leaves the
-   * previous document — and so the previous project — exactly as it was.
-   */
-  private loadedProject: LoadedProjectContext | null = null;
+  /** The boot's source, the latest replacement's, and the project on screen (`document-source.ts`). */
+  private readonly documents: DocumentSource;
   private readonly dollhouse = new Dollhouse(() => this.picker.exteriors());
   private readonly animator = new FurnitureAnimator();
   private readonly doors: DoorController;
@@ -164,14 +162,14 @@ export class ViewerApp {
     released: () => this.released,
   });
 
-  constructor(container: HTMLElement, options: ViewerOptions) {
+  constructor(container: HTMLElement, options: ViewerOptions, embedding: Embedding = { embed: 'script' }) {
     this.options = options;
     // The SCENE SOURCE first, because this is the one line that can throw: a
     // library that quietly mounts SOME apartment is worse than one that says
     // it was not told which. Resolved before any DOM is built, so a throw
     // never leaves the host with an exception, a dangling viewer root and no
     // handle to dispose it with.
-    this.repository = resolveSceneSource(options.scene);
+    this.documents = new DocumentSource(options.scene, this.log);
     // The context is built next: everything below is scoped to its root and
     // speaks its catalogue, and nothing reaches for the host document again.
     this.context = createViewerContext(container, options.locale, options.slots);
@@ -198,6 +196,7 @@ export class ViewerApp {
         void this.retry();
       },
       signal: this.context.signal,
+      usage: this.usage,
     });
     // Bound right here, not deep inside `init()` — see `ViewerUI.bind()` for
     // why a boot that fails before the scene loads still needs this.
@@ -216,6 +215,7 @@ export class ViewerApp {
       panelOpen: () => this.ui.isPanelOpen(),
       travelling: () => this.stage?.director?.controller.isTravelling() === true,
       signal: this.context.signal,
+      usage: this.usage,
     });
     this.mount = new SceneMount({
       scene: () => this.stage?.runtime.scene,
@@ -231,6 +231,18 @@ export class ViewerApp {
       // A variant swap hands out a new opening group with its leaf open again.
       onOpeningsChanged: () => this.doors.reapply(),
       onError: (error) => this.events.emit('error', error),
+      onModelsSettled: (model, result) => this.telemetry.modelsSettled(model, result),
+      usage: this.usage,
+    });
+    this.telemetry = telemetryWiring({
+      ...embedding,
+      options,
+      container,
+      events: this.events,
+      tourEvents: this.tourEvents,
+      project: () => this.project(),
+      plan: () => this.mount.model?.plan,
+      fullscreen: () => this.shell.isFullscreen(),
     });
     this.handle = handleCommands({
       stage: () => this.stage,
@@ -252,19 +264,6 @@ export class ViewerApp {
       messages: () => this.messages,
       setMessages: (messages) => {
         this.messages = messages;
-      },
-    });
-  }
-
-  /** The mode the page opens in, and whether the tour runs behind it. */
-  private startView(): void {
-    applyStartView({
-      options: this.options,
-      ui: this.ui,
-      tour: this.tour,
-      setMode: (mode) => this.handle.setMode(mode),
-      engageTour: () => {
-        this.stage?.director?.engageTour();
       },
     });
   }
@@ -294,12 +293,12 @@ export class ViewerApp {
         return;
       }
       showBootStep(this.ui, this.messages, 'scene');
-      const loaded = await loadDocument(this.repository, this.options.scene, this.log);
+      const loaded = await this.documents.boot();
       const model = loaded.model;
-      this.loadedProject = loaded.project;
       showBootStep(this.ui, this.messages, 'geometry');
       await nextFrame(this.context.signal);
       this.buildStage(model);
+      if (this.stage) this.telemetry.attach(this.stage);
       this.mount.mountDocument(loaded);
       this.stage?.director?.setMotion(resolveMotionInstant(this.options.motion, prefersReducedMotion()));
       showBootStep(this.ui, this.messages, 'furniture');
@@ -312,7 +311,15 @@ export class ViewerApp {
       this.ui.showViewer();
       this.globals.publishReady();
       this.ui.setHintForMode('orbit');
-      this.startView();
+      // The mode the page opens in, and whether the tour runs behind it.
+      const { options, ui, tour } = this;
+      applyStartView({
+        options,
+        ui,
+        tour,
+        setMode: (mode) => this.handle.setMode(mode),
+        engageTour: () => void this.stage?.director?.engageTour(),
+      });
       // The map's own state must be right BEFORE the first frame: `__appReady`
       // is already set, and an embedding page (or a browser check) may read
       // the card's `data-visible` in the same task.
@@ -353,6 +360,7 @@ export class ViewerApp {
         ui: this.ui,
         doors: this.doors,
         tourEvents: this.tourEvents,
+        usage: this.usage,
       }),
       model.scene.presentationCamera.position,
     );
@@ -360,33 +368,23 @@ export class ViewerApp {
 
   /** The manifest and folder of the project on screen, or `null` (`ViewerHandle.project`). */
   project(): ProjectInfo | null {
-    return this.loadedProject?.info ?? null;
+    return this.documents.project();
   }
 
   /**
-   * Replaces the scene. The document is loaded and validated BEFORE anything is
-   * released, so a failure leaves the current scene on screen and `rev`
-   * untouched — the host gets a rejection and an `error` event, not a blank
-   * viewer. Calls race by START order: `loadSeq`,
-   * re-checked after the await, supersedes a call a later one overtook, or
-   * `dispose()` outlived — no `scene`/`ready`/`error`, promise resolves quietly.
+   * Replaces the scene. The document is loaded and validated BEFORE anything is released, so a failure
+   * leaves the current scene on screen and `rev` untouched — the host gets a rejection and an `error`
+   * event, not a blank viewer. Calls race by START order (`document-source.ts`).
    */
   async loadScene(source: SceneSource): Promise<void> {
-    const requestId = ++this.loadSeq;
-    const stale = () => requestId !== this.loadSeq || this.released;
-    const repository = resolveSceneSource(source);
-    let loaded: LoadedDocument;
-    try {
-      loaded = await loadDocument(repository, source, this.log);
-    } catch (error) {
-      if (stale()) return;
-      const failure = toViewerError(sceneErrorCode(error), error, this.messages.t('error.unknown'));
-      this.events.emit('error', failure);
-      throw error;
-    }
-    if (stale()) return;
-    this.repository = repository;
-    this.loadedProject = loaded.project;
+    this.telemetry.loadStarted();
+    const loaded = await this.documents.replace(
+      source,
+      () => this.released,
+      (error) => this.events.emit('error', toViewerError(sceneErrorCode(error), error, this.messages.t('error.unknown'))),
+    );
+    if (loaded === null) return;
+    this.telemetry.beforePresent(loaded.model.scene.id);
     this.mount.present(loaded);
     await this.announceReady(loaded.model);
   }
@@ -490,6 +488,7 @@ export class ViewerApp {
     if (this.released) return;
     this.released = true;
     this.teardown();
+    this.telemetry.dispose();
     this.tourEvents.clear();
     this.events.clear();
     // `window.jeexViewer` is not ours at all — `main.ts` publishes it and owns

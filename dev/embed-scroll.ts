@@ -18,6 +18,8 @@ async function main(): Promise<void> {
   const stage = document.querySelector<HTMLElement>('#stage');
   if (!stage) throw new Error('embed-scroll: no #stage container');
   const handle = mountViewer(stage, {
+    // Development pages never send telemetry; `/dev/telemetry.html` is the one that tests it.
+    analytics: 'off',
     scene: { repository: new LocalFixtureRepository() },
     view: { mode: 'orbit' },
     tour: { mode: 'off' },

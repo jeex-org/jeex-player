@@ -840,7 +840,7 @@ type QueueProbe = {
  * Builds the queue scene with a model source whose every request is held open
  * until `release()`, so the pass's concurrency is observable rather than raced.
  */
-function queueProbe(options: { bytesPerModel?: number; warnings?: readonly string[] } = {}): QueueProbe {
+function queueProbe(options: { bytesPerModel?: number; warnings?: readonly string[]; fail?: boolean } = {}): QueueProbe {
   const scene = queueScene();
   const order: string[] = [];
   const held: Array<() => void> = [];
@@ -855,6 +855,7 @@ function queueProbe(options: { bytesPerModel?: number; warnings?: readonly strin
       held.push(resolve);
     });
     inFlight -= 1;
+    if (options.fail) throw new TypeError('Failed to fetch');
     return {
       group: new THREE.Group(),
       triangles: 0,
@@ -968,6 +969,20 @@ describe('upgrading a baked project', () => {
     const budget = probe.warnings.filter((entry) => entry.code === 'project-budget');
     expect(budget.length).toBeGreaterThan(0);
     expect((budget[0]!.detail as { limit: number }).limit).toBe(MAX_PROJECT_BYTES);
+    expect(result.budget).toBe(true);
+    probe.builder.dispose();
+  });
+
+  test('failed loads are counted and their errors kept for the pass outcome', async () => {
+    const probe = queueProbe({ fail: true });
+    const result = await drain(probe, new AbortController().signal);
+    expect({ upgraded: result.upgraded, failed: result.failed, budget: result.budget }).toEqual({
+      upgraded: 0,
+      failed: QUEUE_COUNT,
+      budget: false,
+    });
+    expect(result.failures.length).toBe(QUEUE_COUNT);
+    expect(result.failures.every((error) => error instanceof TypeError)).toBe(true);
     probe.builder.dispose();
   });
 
@@ -1077,7 +1092,7 @@ describe('the body swap is reported', () => {
       throw new Error('a listener that cannot cope');
     });
     // Neither placement is stranded, and the failure is said out loud.
-    expect(result).toEqual({ upgraded: 2, failed: 0 });
+    expect(result).toEqual({ upgraded: 2, failed: 0, budget: false, failures: [] });
     expect(errors).toEqual(['listener-failed', 'listener-failed']);
     builder.dispose();
   });
@@ -1177,7 +1192,7 @@ describe('a variant swap moves the upgrade onto the new body', () => {
     const swapped: THREE.Object3D[] = [];
     const pass = await builder.upgradeModels(new AbortController().signal, undefined, (group) => swapped.push(group));
 
-    expect(pass).toEqual({ upgraded: 1, failed: 0 });
+    expect(pass).toMatchObject({ upgraded: 1, failed: 0, budget: false, failures: [] });
     expect(swapped).toHaveLength(1);
     expect(swapped[0]).toBe(arriving);
     expect(arriving.userData['modelState']).toBe('gltf');

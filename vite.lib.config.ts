@@ -170,7 +170,13 @@ export default defineConfig(({ mode }): UserConfig => {
   if (!pass) throw new Error(`vite.lib.config: unknown mode ${mode}; expected one of ${Object.keys(PASSES).join(', ')}`);
   return {
     plugins: pass.plugins,
-    define: { __JEEX_VIEWER_VERSION__: JSON.stringify(VERSION) },
+    define: {
+      __JEEX_VIEWER_VERSION__: JSON.stringify(VERSION),
+      // A classic script has no `import.meta`: say so instead of letting the
+      // bundler empty it with a warning. `src/telemetry/own-files.ts` then reads
+      // `document.currentScript`, which a classic script does have.
+      ...(pass.formats.length === 1 && pass.formats[0] === 'iife' ? { 'import.meta.url': 'undefined' } : {}),
+    },
     build: {
       target: 'es2022',
       // The stylesheet's own floor, not the JavaScript one (`vite.css-target.ts`).

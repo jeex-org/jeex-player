@@ -968,3 +968,41 @@ describe('negative paths', () => {
     expect(strictHost.posted).toEqual([]);
   });
 });
+
+describe('the telemetry context', () => {
+  function withSite(): { pages: string[]; verified: string[] } {
+    const { handle } = fakeHandle();
+    const seen = { pages: [] as string[], verified: [] as string[] };
+    installFrameBridge(handle, {
+      hostOrigin: HOST_ORIGIN,
+      target: hostWindow as unknown as Window,
+      viewerId: VIEWER_ID,
+      site: { verified: (origin) => seen.verified.push(origin), context: (page) => seen.pages.push(page) },
+    });
+    return seen;
+  }
+
+  test('the host page path is accepted before ready and answered with an empty success', async () => {
+    const seen = withSite();
+    sendCommand('context', { page: '/listing/1234567' });
+    await settled();
+    expect(seen).toEqual({ pages: ['/listing/1234567'], verified: [HOST_ORIGIN] });
+    expect(replies()).toMatchObject([{ ok: true, origin: HOST_ORIGIN }]);
+  });
+
+  test('a context from another window or another origin is ignored', async () => {
+    const seen = withSite();
+    sendCommand('context', { page: '/forged' }, { source: new FakeWindow() });
+    sendCommand('context', { page: '/forged' }, { origin: 'https://evil.example' });
+    await settled();
+    expect(seen).toEqual({ pages: [], verified: [] });
+  });
+
+  test('a context without a string page is refused', async () => {
+    const seen = withSite();
+    sendCommand('context', { page: 42 });
+    await settled();
+    expect(seen.pages).toEqual([]);
+    expect(replies()[0]?.error?.code).toBe('bad-params');
+  });
+});

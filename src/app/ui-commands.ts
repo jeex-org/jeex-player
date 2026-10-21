@@ -12,6 +12,7 @@
  * afterwards.
  */
 
+import type { UsageSink } from '../shared/usage.js';
 import type { ViewerCommands } from '../ui/viewer-ui.js';
 import type { CameraDirector } from '../camera/camera-director.js';
 import type { Messages } from '../ui/messages.js';
@@ -33,6 +34,8 @@ type UiCommandDeps = {
   furnitureVisible: () => boolean;
   /** Fullscreen was asked for and the browser has no API for it. */
   onFullscreenUnavailable: (message: string) => void;
+  /** Hears the visitor entering fullscreen (`shared/usage.ts`). */
+  usage?: UsageSink | undefined;
 };
 
 /** The command bag `ViewerUI` is built with. */
@@ -42,7 +45,9 @@ export function uiCommands(deps: UiCommandDeps): ViewerCommands {
     toggleTour: () => deps.director()?.toggleTour(),
     resetCamera: () => deps.director()?.reset(),
     toggleFullscreen: async () => {
-      if (!(await deps.shell().toggle())) deps.onFullscreenUnavailable(deps.messages().t('hint.fullscreenUnavailable'));
+      const shell = deps.shell();
+      if (!(await shell.toggle())) deps.onFullscreenUnavailable(deps.messages().t('hint.fullscreenUnavailable'));
+      else if (shell.isFullscreen()) deps.usage?.('fullscreen');
     },
     toggleFurniture: () => deps.setFurnitureVisible(!deps.furnitureVisible()),
     tourSeek: (fraction) => deps.tour.seek(fraction),

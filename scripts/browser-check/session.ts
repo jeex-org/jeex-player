@@ -25,8 +25,11 @@ export function literal(value: unknown): string {
  * `VIEWER_URL=http://localhost:3703/`.
  */
 export function resolveViewerUrl(): string {
-  return process.env['VIEWER_URL'] ?? 'http://127.0.0.1:3700/';
+  return withViewerOptions(process.env['VIEWER_URL'] ?? 'http://127.0.0.1:3700/', NO_TELEMETRY);
 }
+
+/** The check never sends the player's anonymous telemetry: every page it opens carries this. */
+export const NO_TELEMETRY: Readonly<Record<string, string>> = { analytics: 'off' };
 
 /**
  * The viewer URL with extra query options, whatever `VIEWER_URL` already had.
@@ -300,6 +303,8 @@ export function createSession(url: string): Session {
     withQuery: (search) => {
       const target = new URL(url);
       target.search = search;
+      // The one option a scenario's own query never drops: the check sends no telemetry.
+      for (const [option, value] of Object.entries(NO_TELEMETRY)) target.searchParams.set(option, value);
       return target.href;
     },
     summary: [],

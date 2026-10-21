@@ -48,6 +48,7 @@
 
 import { z } from 'zod/mini';
 import { isLocale } from '../ui/messages.js';
+import { isTelemetryEndpoint } from '../telemetry/telemetry.schema.js';
 
 /**
  * How one option is declared, resolved and reached from the two adapters.
@@ -57,7 +58,7 @@ import { isLocale } from '../ui/messages.js';
  * language this build never shipped, and a schema built once at module load
  * would refuse it.
  */
-export type OptionKind = 'enum' | 'flag' | 'fraction' | 'pixels' | 'string' | 'locale' | 'list';
+export type OptionKind = 'enum' | 'flag' | 'fraction' | 'pixels' | 'string' | 'locale' | 'list' | 'endpoint' | 'switch';
 
 export type OptionSpec = {
   kind: OptionKind;
@@ -90,6 +91,7 @@ export type OptionSpec = {
 function buildSchema(spec: OptionSpec) {
   switch (spec.kind) {
     case 'enum':
+    case 'switch':
       return z.enum(spec.values ?? []);
     case 'list':
       // A CLOSED list: every member of the array is one of the row's values.
@@ -108,6 +110,9 @@ function buildSchema(spec: OptionSpec) {
       return z.string();
     case 'locale':
       return z.string().check(z.refine((value) => isLocale(value)));
+    case 'endpoint':
+      // The telemetry endpoint override: judged by telemetry's own check.
+      return z.string().check(z.refine((value) => isTelemetryEndpoint(value)));
   }
 }
 
@@ -216,4 +221,5 @@ export const viewerOptionsSchema = z.object({
   slots: z.readonly(z.array(z.enum(SLOT_VALUES))),
   edits: z.enum(EDITS_VALUES),
   debug: z.boolean(),
+  analytics: z.object({ mode: z.enum(['on', 'off']), endpoint: z.optional(z.string()) }),
 });

@@ -203,7 +203,7 @@ describe('publishSchemas', () => {
   test('serves the real generated schemas at the URL each $id names', () => {
     out = mkdtempSync(join(tmpdir(), 'site-schemas-'));
     const paths = publishSchemas(out, (dir) => void writeSchemas(dir, '9.9.9'));
-    expect(paths).toEqual(['schema/scene/9.9.9.json', 'schema/viewer-options/9.9.9.json']);
+    expect(paths).toEqual(['schema/scene/9.9.9.json', 'schema/telemetry/1.0.0.json', 'schema/viewer-options/9.9.9.json']);
     for (const path of paths) {
       const schema = JSON.parse(readFileSync(join(out, path), 'utf8')) as { $id: string };
       expect(`${SITE_ORIGIN}/${path}`).toBe(schema.$id);

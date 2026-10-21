@@ -896,3 +896,30 @@ describe('a checkpoint run eases in and out', () => {
     expect(Math.max(...poses.map((pose) => pose.z))).toBeLessThanOrEqual(0.5 + 1e-9);
   });
 });
+
+describe('tour completion', () => {
+  test('onComplete fires when the tour PLAYS to its end, not when a playing tour is sought to the end', () => {
+    let completions = 0;
+    const states: string[] = [];
+    const player = new TourPlayer(apartmentScene, () => undefined, {
+      onState: (state) => states.push(state),
+      onProgress: () => undefined,
+      onComplete: () => {
+        completions += 1;
+      },
+    });
+    player.play();
+    player.update(0.05);
+    player.seek(1);
+    expect(player.getState()).toBe('ended');
+    expect(completions).toBe(0);
+    player.play();
+    let guard = 0;
+    while (player.getState() !== 'ended' && guard < 20000) {
+      player.update(0.05);
+      guard += 1;
+    }
+    expect(completions).toBe(1);
+    expect(states.filter((state) => state === 'ended')).toHaveLength(2);
+  });
+});

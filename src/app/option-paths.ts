@@ -66,7 +66,11 @@ export function descend(
 
 /** `value` itself, or — a boolean at a shorthand section — the record with `field` set to it. */
 function expandShorthand(value: unknown, field: string | undefined): Record<string, unknown> | undefined {
-  if (field === undefined || typeof value !== 'boolean') return value as Record<string, unknown> | undefined;
+  // Only a section that HAS a shorthand expands, and then any value that is not
+  // an object stands for its one field: `fullscreenButton: true`,
+  // `analytics: 'off'` (and `analytics: false`, which its resolver reads as off).
+  const scalar = value === null || (typeof value !== 'object' && value !== undefined);
+  if (field === undefined || !scalar) return value as Record<string, unknown> | undefined;
   const record = blankRecord();
   record[field] = value;
   return record;

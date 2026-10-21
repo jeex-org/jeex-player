@@ -10,6 +10,7 @@
  * exported draft and what the viewer shows identical.
  */
 
+import type { UsageSink } from '../shared/usage.js';
 import * as THREE from 'three';
 import { effectiveAsset } from '../scene/types.js';
 import { mirrorFactsOf } from '../geometry/asset-mirror.js';
@@ -79,6 +80,8 @@ export type EditorDeps = {
    * the new root has been adopted, never before.
    */
   reseed: () => void;
+  /** Hears an interior preset the visitor applied (`shared/usage.ts`). */
+  usage?: UsageSink | undefined;
 };
 
 /** What the open panel is editing. */
@@ -351,13 +354,15 @@ export class ViewerEditor {
     // commit and emit nothing. The debug `applyPreset` stays
     // ungated — this seam is the panel's, not the authoring surface's.
     if (this.deps.edits.mode === 'off') return;
-    if (this.deps.edits.mode !== 'emit') {
-      this.applyPreset(presetId);
-      return;
-    }
     const model = this.deps.model;
     const preset = findPreset(model.scene, presetId);
     if (!preset) return;
+    if (this.deps.edits.mode !== 'emit') {
+      // Counted once the batch is accepted: a refused preset is not an applied one.
+      if (isApplyOk(this.applyPreset(presetId))) this.deps.usage?.('interior');
+      return;
+    }
+    this.deps.usage?.('interior');
     this.deps.edits.onEdit({ ops: presetBatchOps(model.scene, preset, model.registries), baseRev: model.rev });
   }
 

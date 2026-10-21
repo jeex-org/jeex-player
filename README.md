@@ -23,6 +23,7 @@ This document is the integration reference.
 - [Events](#events)
 - [Errors](#errors)
 - [Logging](#logging)
+- [Telemetry](#telemetry)
 - [Sizing and styling](#sizing-and-styling)
 - [Theming](#theming)
 - [Languages](#languages)
@@ -260,6 +261,8 @@ Every option has one name in each of the three spellings. Unknown keys are ignor
 | `motion` | `motion` | `motion` | `auto` | `auto`, `full`, `reduced`. `auto` follows `prefers-reduced-motion`; `reduced` opens an engaged tour paused (unless `tour.mode` was set) and makes scripted travel instant; `full` forces full motion. See [Accessibility](#accessibility). |
 | `debug` | `debug` | `debug` | dev build: `true`, otherwise `false` | Installs the authoring calls (`applyOps`, `exportScene`, `loadScene`) on `window.__viewerDebug`. |
 | `scene.url` | `scene` | `src` | none | Scene document URL. See [scene sources](#scene-sources). |
+| `analytics.mode` | `analytics` | `analytics` | `on` | `on`, `off`. Anonymous [telemetry](#telemetry); `off` sends nothing at all. Fails closed: any value other than `on` (`OFF`, `none`, `false`, an empty attribute) is off. In JS, `analytics: 'off'` is shorthand for `{ mode: 'off' }`. |
+| `analytics.endpoint` | `analyticsEndpoint` | `analytics-endpoint` | `https://telemetry.jeex.org/v1/player` | Where telemetry goes: an `https:` URL, or `http:` on `localhost`/`127.0.0.1`. Any other value turns telemetry off (and is reported as `option-invalid`). |
 
 **Compound attributes.** `chrome`, `overlay` and `unbranded` are query/attribute-only sugar, applied in this order — `overlay` (or, when it is absent, `unbranded`), then `chrome`, then every individual attribute — so a preset never has the last word: `<jeex-viewer overlay="kiosk" chrome-status="true">` shows the status pill even though `kiosk` turns it off, and `<jeex-viewer chrome="false" chrome-status="true">` hides everything but the status pill. `<jeex-viewer unbranded overlay="kiosk">` (or the query-string equivalent, in either order) resolves to plain `kiosk`: an explicit `overlay=` is read first and, when present, decides everything on its own, so `unbranded` never even gets a look. None of the three names works in the plain options object passed to `mountViewer` — `chrome` already names the nested `{ brand, controls, … }` object there, and `overlay`/`unbranded` have nothing to expand into without going through `optionsFromDataset`/`optionsFromQuery` first.
 
@@ -566,6 +569,10 @@ mountViewer(container, {
 
 `level` is `warn` or `error`; `code` is a stable id (`option-invalid`, `walkspawn-derived`, `listener-failed`, `locale-unknown`, …) to filter on. Without `onLog` the viewer falls back to the console, prefixed `[jeex-viewer]`. `<jeex-viewer>` takes the same sink as a property (`element.onLog = …`, before you connect it); `embedViewer({ onLog })` covers the iframe handle.
 
+## Telemetry
+
+The player sends anonymous usage and error counts to `https://telemetry.jeex.org/v1/player` to improve the player: it uses no cookies or storage and sends no identifiers, no fingerprint and no free text. [TELEMETRY.md](TELEMETRY.md) lists every field. Turn it off with `analytics="off"` (`?analytics=off`, `{ analytics: { mode: 'off' } }`); a browser with Global Privacy Control sends nothing. Under a Content Security Policy, add the endpoint to `connect-src`, or the sends fail silently.
+
 ## Sizing and styling
 
 - The viewer fills its container. Give the container a height; `100%` of an unsized parent is zero.
@@ -675,7 +682,7 @@ default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; c
 
 - **`style-src 'self'`** is enough because the component stylesheet is delivered as a constructed `CSSStyleSheet` through `adoptedStyleSheets` — never a `<style>` element and never a `style` attribute (Baseline widely available since 2023-03-27). Dynamic values are written with `element.style.setProperty`, which no CSP directive governs.
 - **`img-src data:`** is required: finish and furniture swatches are rendered by the viewer and shown as `data:` PNG URLs.
-- **`connect-src`** must cover wherever `scene.url` is fetched from. A scene on another origin also needs CORS from that origin.
+- **`connect-src`** must cover wherever `scene.url` is fetched from. A scene on another origin also needs CORS from that origin. It must also allow the [telemetry](#telemetry) endpoint (`https://telemetry.jeex.org`, or your `analytics-endpoint`); without it the sends are refused silently and the player works as before.
 - **Trusted Types** (`require-trusted-types-for 'script'`) needs nothing from the host: the viewer builds every node with `createElement`/`append`/`textContent` and assigns no string to `innerHTML` anywhere, so it needs no policy of its own and cannot fall foul of a host's `trusted-types` allowlist. `src/html-sinks.test.ts` holds every production module to that (no `innerHTML`/`outerHTML`/`srcdoc` assignment, `insertAdjacentHTML`, `eval`, string timers or script elements; its allowlist is empty), and the e2e `trusted-types.spec.ts` mounts two viewers under an enforcing page.
 - The viewer bundles three.js and loads no script at runtime, so `script-src 'self'` is enough for the ES-module and custom-element paths. The iframe path additionally needs `frame-src` for the viewer's origin.
 

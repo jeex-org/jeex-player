@@ -66,13 +66,25 @@
  * from `types.ts`, never restated, and `schema-gen.test.ts` proves that every
  * definition with an `id` property is in the table.
  *
- * CLI: `bun scripts/schema-gen.ts --out <dir>` writes `scene.schema.json` and
- * `viewer-options.schema.json` into `<dir>`; `npm run build:lib` runs it into
- * `dist-lib/schema/` after the three Vite passes.
+ * The THIRD schema is not generated from types at all: the telemetry send
+ * schema (`src/telemetry/telemetry.schema.ts`) is a Zod schema and the runtime
+ * judge of every send, so `generateTelemetrySchema` converts it with Zod's own
+ * `toJSONSchema`, which is exact for it (strict objects, enums, patterns,
+ * bounds). Its `$id` carries the TELEMETRY schema version, not the package's.
+ *
+ * CLI: `bun scripts/schema-gen.ts --out <dir>` writes `scene.schema.json`,
+ * `viewer-options.schema.json` and `telemetry.schema.json` into `<dir>`;
+ * `npm run build:lib` runs it into `dist-lib/schema/` after the three Vite
+ * passes. `bun scripts/schema-gen.ts --telemetry` rewrites the committed
+ * `telemetry.schema.json` at the repository root (`TELEMETRY.md` links it);
+ * `schema-gen.test.ts` fails when that file differs from the schema.
  */
 
 import { createGenerator } from 'ts-json-schema-generator';
+import { z } from 'zod/mini';
 import { mkdirSync, writeFileSync } from 'node:fs';
+import { telemetrySendSchema } from '../src/telemetry/telemetry.schema.js';
+import { TELEMETRY_SCHEMA_VERSION } from '../src/telemetry/vocabulary.js';
 import { join } from 'node:path';
 import { UUID_V7_PATTERN } from '../src/scene/types.js';
 import { readPackageVersion } from './config-input.js';
@@ -263,20 +275,45 @@ function annotateUuidFields(schema: Record<string, unknown>): void {
   }
 }
 
-/** Generates both schemas and writes them into `outDir` as `<name>.schema.json`. */
+/** The committed copy of the telemetry schema, at the repository root. */
+export const TELEMETRY_SCHEMA_FILE = 'telemetry.schema.json';
+
+/** The JSON Schema of every telemetry send, from the Zod schema that judges them. */
+export function generateTelemetrySchema(): Record<string, unknown> {
+  const converted = z.toJSONSchema(telemetrySendSchema, { target: 'draft-2020-12' }) as Record<string, unknown>;
+  return {
+    $schema: SCHEMA_DRAFT,
+    $id: `${SCHEMA_HOST}/telemetry/${TELEMETRY_SCHEMA_VERSION}.json`,
+    title: 'JEEX player telemetry send',
+    description: 'One anonymous telemetry request body of the JEEX player. TELEMETRY.md explains every field.',
+    ...Object.fromEntries(Object.entries(converted).filter(([key]) => key !== '$schema')),
+  };
+}
+
+/** The text a schema file holds. */
+export function schemaText(schema: Record<string, unknown>): string {
+  return `${JSON.stringify(schema, null, 2)}\n`;
+}
+
+/** Generates every schema and writes them into `outDir` as `<name>.schema.json`. */
 export function writeSchemas(outDir: string, version: string = packageVersion()): readonly string[] {
   mkdirSync(outDir, { recursive: true });
   const written: string[] = [];
   for (const target of SCHEMA_TARGETS) {
-    const schema = generateSchema(target, version);
     const path = join(outDir, `${target.name}.schema.json`);
-    writeFileSync(path, `${JSON.stringify(schema, null, 2)}\n`);
+    writeFileSync(path, schemaText(generateSchema(target, version)));
     written.push(path);
   }
+  const telemetry = join(outDir, TELEMETRY_SCHEMA_FILE);
+  writeFileSync(telemetry, schemaText(generateTelemetrySchema()));
+  written.push(telemetry);
   return written;
 }
 
-if (import.meta.main) {
+if (import.meta.main && process.argv.includes('--telemetry')) {
+  writeFileSync(TELEMETRY_SCHEMA_FILE, schemaText(generateTelemetrySchema()));
+  console.log(`schema-gen: wrote ${TELEMETRY_SCHEMA_FILE}`);
+} else if (import.meta.main) {
   const args = process.argv.slice(2);
   const outIndex = args.indexOf('--out');
   const outDir = outIndex >= 0 ? args[outIndex + 1] : undefined;

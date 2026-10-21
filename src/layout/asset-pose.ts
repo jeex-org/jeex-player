@@ -18,7 +18,7 @@
 import { projectOnPolyline, type PolylineHit } from '../plan/plan-geometry.js';
 import { wrapAngle } from '../shared/math.js';
 import { frontOf, frontYaw } from '../scene/mirror.js';
-import { roomOf } from './layout-lint.js';
+import { roomOf } from '../plan/plan-rooms.js';
 import { topUnder } from './rules/surfaces.js';
 import {
   boxAround,

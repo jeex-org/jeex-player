@@ -78,6 +78,15 @@ function embed(options: Record<string, unknown> = {}): JeexEmbed {
   return handle;
 }
 
+/**
+ * What the HOST'S CODE asked of the frame: the stub's record without the
+ * telemetry `context` the helper posts on its own when the frame loads (its
+ * own test is below).
+ */
+function hostCommands(stub: StubWindow): NonNullable<StubWindow['jeexReceived']> {
+  return (stub.jeexReceived ?? []).filter((entry) => entry.method !== 'context');
+}
+
 /** The stub's own record of what it was sent, once it has booted. */
 async function stubOf(handle: JeexEmbed): Promise<StubWindow> {
   const stub = (): StubWindow => handle.iframe.contentWindow as StubWindow;
@@ -213,7 +222,7 @@ describe('an inline document across the real boundary', () => {
     expect(failure).toBeInstanceOf(EmbedError);
     expect((failure as EmbedError).code).toBe('bad-params');
     const stub = await stubOf(handle);
-    expect(stub.jeexReceived!.map((entry) => entry.method)).toEqual([]);
+    expect(hostCommands(stub).map((entry) => entry.method)).toEqual([]);
   });
 
   test('one the browser cannot clone rejects with bad-params rather than throwing out of send', async () => {
@@ -261,6 +270,19 @@ describe('the host side, against a real frame', () => {
     expect(embed({ allowFullscreen: false }).iframe.hasAttribute('allow')).toBe(false);
   });
 
+  test('the helper hands the frame its page path once the frame has loaded, and not with analytics off', async () => {
+    const on = embed();
+    const onStub = await stubOf(on);
+    await until(() => (onStub.jeexReceived ?? []).some((entry) => entry.method === 'context'), 'the context command');
+    expect(onStub.jeexReceived!.find((entry) => entry.method === 'context')?.params).toEqual({ page: window.location.pathname });
+    // The path travels by postMessage alone: the frame URL carries only the bridge's own two parameters.
+    expect([...new URL(on.iframe.src).searchParams.keys()].sort()).toEqual(['host', 'viewerId']);
+    const off = embed({ viewerId: 'quiet', analytics: 'off' });
+    const offStub = await stubOf(off);
+    await off.ready;
+    expect((offStub.jeexReceived ?? []).some((entry) => entry.method === 'context')).toBe(false);
+  });
+
   test('ready resolves with what the frame reported', async () => {
     const info = await embed().ready;
     expect(info.sceneId).toBe(STUB_SCENE_ID);
@@ -273,7 +295,7 @@ describe('the host side, against a real frame', () => {
     const handle = embed({ readyDelay: 250 });
     const answers = await Promise.all([handle.getMode(), handle.setMode('walk'), handle.progress()]);
     const stub = await stubOf(handle);
-    expect(stub.jeexReceived!.map((entry) => entry.method)).toEqual(['getMode', 'setMode', 'progress']);
+    expect(hostCommands(stub).map((entry) => entry.method)).toEqual(['getMode', 'setMode', 'progress']);
     expect(answers[0]).toBe('orbit');
     expect(answers[2]).toEqual({ fraction: 0.25, elapsed: 5, duration: 20, state: 'paused' });
   });
@@ -285,12 +307,12 @@ describe('the host side, against a real frame', () => {
     await handle.setLocale('ru');
     await handle.setFurnitureVisible(false);
     const stub = await stubOf(handle);
-    expect(stub.jeexReceived!.map((entry) => [entry.method, entry.params])).toEqual([
+    expect(hostCommands(stub).map((entry) => [entry.method, entry.params])).toEqual([
       ['seek', { fraction: 0.4 }],
       ['setLocale', { locale: 'ru' }],
       ['setFurnitureVisible', { visible: false }],
     ]);
-    expect(new Set(stub.jeexReceived!.map((entry) => entry.origin))).toEqual(new Set([window.location.origin]));
+    expect(new Set(hostCommands(stub).map((entry) => entry.origin))).toEqual(new Set([window.location.origin]));
   });
 
   test('a rejected command rejects with the frame’s own code', async () => {
@@ -393,8 +415,8 @@ describe('the host side, against a real frame', () => {
     await left.setMode('walk');
     const leftStub = await stubOf(left);
     const rightStub = await stubOf(right);
-    expect(leftStub.jeexReceived!.map((entry) => entry.method)).toEqual(['setMode']);
-    expect(rightStub.jeexReceived).toEqual([]);
+    expect(hostCommands(leftStub).map((entry) => entry.method)).toEqual(['setMode']);
+    expect(hostCommands(rightStub)).toEqual([]);
     left.dispose();
     await expect(right.getMode()).resolves.toBe('orbit');
   });

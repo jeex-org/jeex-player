@@ -36,3 +36,17 @@ export const SLOT_VALUES = [
 /** Exhaustiveness: fails to compile if `SLOT_VALUES` is missing a member of `SlotName`. */
 type _MissingSlotName = Exclude<SlotName, (typeof SLOT_VALUES)[number]>;
 ((): _MissingSlotName extends never ? true : ['SLOT_VALUES missing', _MissingSlotName] => true)();
+
+/**
+ * A closed set, proved complete against its union at compile time:
+ * `closedSet<Union>()(['a', 'b'] as const)` fails to compile when the list
+ * misses a member of `Union`, and `satisfies`-style checking refuses a member
+ * the union does not have. The sets of `viewer-options.ts` use it so each needs
+ * one line rather than a type alias and a call of its own; it imports no type
+ * from there, so no cycle appears.
+ */
+export function closedSet<Union extends string>() {
+  return <const List extends readonly Union[]>(
+    list: List & ([Exclude<Union, List[number]>] extends [never] ? unknown : ['missing', Exclude<Union, List[number]>]),
+  ): List => list;
+}

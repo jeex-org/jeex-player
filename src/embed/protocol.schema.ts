@@ -227,6 +227,9 @@ const exportGlbParamsSchema = z.object(
 /** `ExportUsdzOptions` off the wire: the one shared field, `exportGlbParamsSchema`'s neighbour. */
 const exportUsdzParamsSchema = z.object({ includeFurniture: z.optional(wireBoolean) }, { error: 'must be an object of export options' });
 
+/** `context`: the host page's path, bounded; the frame sanitises it before anything else sees it. */
+const contextParamsSchema = z.object({ page: z.string().check(z.maxLength(2048)) }, { error: 'must be { page: string }' });
+
 /**
  * The methods that take no parameters. They share ONE branch: a multi-valued
  * `z.literal` discriminates them all and whatever a host sent alongside is
@@ -269,6 +272,7 @@ export const commandSchema = z.discriminatedUnion('method', [
   z.object({ method: z.literal('capturePanorama'), params: capturePanoramaParamsSchema }),
   z.object({ method: z.literal('exportGlb'), params: z.optional(exportGlbParamsSchema) }),
   z.object({ method: z.literal('exportUsdz'), params: z.optional(exportUsdzParamsSchema) }),
+  z.object({ method: z.literal('context'), params: contextParamsSchema }),
 ]);
 
 /** One command, method and params together, once the params have been proved. */

@@ -345,6 +345,12 @@ export class EmbedError extends Error {
   }
 }
 
+/** Telemetry off in any spelling (`'off'`, `false`, `null`, `{ mode: 'off' }`, a typo): it fails closed, like the frame's resolver. */
+function analyticsOff(analytics: unknown): boolean {
+  const mode = typeof analytics === 'object' && analytics !== null ? (analytics as { mode?: unknown }).mode : analytics;
+  return mode !== undefined && mode !== 'on';
+}
+
 /** `?host=…&viewerId=…` plus every option key, in the viewer's query spelling. */
 function frameSearch(options: EmbedOptions, viewerId: string, hostOrigin: string): string {
   const params = new URLSearchParams();
@@ -357,6 +363,11 @@ function frameSearch(options: EmbedOptions, viewerId: string, hostOrigin: string
     if (typeof value !== 'string' && typeof value !== 'number' && typeof value !== 'boolean') continue;
     params.set(key, String(value));
   }
+  // An object or `null` has no query spelling: the switch goes on its own, so no "off" is lost.
+  const analytics = options['analytics'];
+  if (analyticsOff(analytics)) params.set('analytics', 'off');
+  const endpoint = (analytics as { endpoint?: unknown } | null | undefined)?.endpoint;
+  if (typeof endpoint === 'string') params.set('analyticsEndpoint', endpoint);
   return params.toString();
 }
 
@@ -527,6 +538,13 @@ export function embedViewer(container: HTMLElement, options: EmbedOptions): Jeex
   /** The `message` listener's lifetime; `dispose()` is one `abort()`. */
   const transport = new AbortController();
   window.addEventListener('message', onMessage, { signal: transport.signal });
+  // The host page's path for the frame's telemetry (TELEMETRY.md): by postMessage, never in the frame
+  // URL, not at all when it is off. The reply matches no pending command and is dropped.
+  if (!analyticsOff(options['analytics'])) {
+    const page = { page: window.location.pathname };
+    const post = () => iframe.contentWindow?.postMessage(commandMessage(viewerId, 'context', 'context', page), frameOrigin);
+    iframe.addEventListener('load', post, { signal: transport.signal });
+  }
 
   const send = (method: CommandMethod, params?: Record<string, unknown>): Promise<unknown> => {
     if (disposed) return Promise.reject(new EmbedError('disposed', 'this embed has been disposed'));

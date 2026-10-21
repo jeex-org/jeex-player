@@ -41,6 +41,8 @@
   "files": [
     "dist-lib",
     "README.md",
+    "TELEMETRY.md",
+    "telemetry.schema.json",
     "LICENSE",
     "NOTICE"
   ],
@@ -71,6 +73,7 @@
     "./style.css": "./dist-lib/jeex-viewer.css",
     "./schema/scene.json": "./dist-lib/schema/scene.schema.json",
     "./schema/viewer-options.json": "./dist-lib/schema/viewer-options.schema.json",
+    "./schema/telemetry.json": "./dist-lib/schema/telemetry.schema.json",
     "./package.json": "./package.json"
   },
   "unpkg": "./dist-lib/jeex-viewer.iife.js",

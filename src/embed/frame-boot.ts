@@ -22,7 +22,8 @@
  * 4. Installs the postMessage bridge when `?host=` is an exact origin.
  */
 
-import { mountViewer } from '../app/viewer-api.js';
+import { mountViewerAs } from '../app/viewer-api.js';
+import { FrameSite } from './frame-site.js';
 import type { ViewerHandle } from '../app/viewer-handle.js';
 import { NO_SCENE_SOURCE, type SceneRepository } from '../scene/scene-repository.js';
 import { ViewerLibError } from '../shared/errors.js';
@@ -118,7 +119,8 @@ export function bootFramePage(doc: Document, win: Window, fallbackScene?: SceneR
   const options = embedPageOptions(win.location.search);
   const log = createLogger(options.onLog);
   const scene = options.scene?.url ? options.scene : { repository: fallbackScene ?? MISSING_SCENE };
-  const handle = mountViewer(container, { ...options, scene });
+  const site = new FrameSite(win);
+  const handle = mountViewerAs({ embed: 'iframe', site }, container, { ...options, scene });
 
   const box = doc.querySelector<HTMLElement>(`#${FRAME_SIZE_ID}`);
   let sizes: SizeWatch | undefined;
@@ -143,6 +145,7 @@ export function bootFramePage(doc: Document, win: Window, fallbackScene?: SceneR
         target: win.parent,
         viewerId: query.get(VIEWER_ID_PARAM) ?? undefined,
         sizes: sizes?.subscribe,
+        site,
       })
     : undefined;
   return {

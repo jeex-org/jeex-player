@@ -1,0 +1,163 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Telemetry - JEEX Player</title>
+<link rel="icon" type="image/svg+xml" href="assets/favicon.svg">
+<meta name="theme-color" content="#0A0D14">
+<meta name="description" content="Exactly what the JEEX Player sends as anonymous telemetry, what it never sends, and how a site or a visitor turns it off.">
+<link rel="canonical" href="https://player.jeex.org/telemetry.html">
+<meta property="og:site_name" content="JEEX Player">
+<meta property="og:title" content="JEEX Player telemetry">
+<meta property="og:description" content="Exactly what the JEEX Player sends as anonymous telemetry, what it never sends, and how a site or a visitor turns it off.">
+<meta property="og:type" content="article">
+<meta property="og:url" content="https://player.jeex.org/telemetry.html">
+<meta property="og:image" content="https://player.jeex.org/assets/og.png">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta property="og:image:alt" content="The JEEX Player demo apartment, rendered in 3D">
+<meta property="og:locale" content="en_US">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:image" content="https://player.jeex.org/assets/og.png">
+<link rel="stylesheet" href="assets/site.css">
+<script src="assets/site.js" defer></script>
+</head>
+<body id="top">
+<a class="skip" href="#main">Skip to content</a>
+
+<header class="nav">
+  <div class="wrap">
+    <a class="brand" href="index.html" aria-label="JEEX Player, home">
+      <svg viewBox="0 0 64 64" aria-hidden="true"><path d="M32 8 52 19.5v25L32 56 12 44.5v-25Z" fill="none" stroke="#5CC8FF" stroke-width="4" stroke-linejoin="round"/><path d="M12 19.5 32 31l20-11.5M32 31v25" fill="none" stroke="#5CC8FF" stroke-width="4" stroke-linejoin="round"/><path d="M32 31 52 19.5v25L32 56Z" fill="#5CC8FF" fill-opacity=".22"/></svg>
+      JEEX <span>Player</span>
+    </a>
+    <nav class="nav-links" aria-label="Sections">
+      <a href="index.html#views">Views</a>
+      <a href="index.html#embed">Embed</a>
+      <a href="index.html#customise">Customise</a>
+      <a href="index.html#faq">FAQ</a>
+      <a href="index.html#open-source">Open source</a>
+      <a class="back" href="https://jeex.org">jeex.org</a>
+      <a class="btn btn-primary btn-github" href="https://github.com/jeex-org/jeex-player"><svg viewBox="0 0 16 16" aria-hidden="true" focusable="false"><path fill="currentColor" d="M6.766 11.328c-2.063-.25-3.516-1.734-3.516-3.656 0-.781.281-1.625.75-2.188-.203-.515-.172-1.609.063-2.062.625-.078 1.468.25 1.968.703.594-.187 1.219-.281 1.985-.281.765 0 1.39.094 1.953.265.484-.437 1.344-.765 1.969-.687.218.422.25 1.515.046 2.047.5.593.766 1.39.766 2.203 0 1.922-1.453 3.375-3.547 3.64.531.344.89 1.094.89 1.954v1.625c0 .468.391.734.86.547C13.781 14.359 16 11.53 16 8.03 16 3.61 12.406 0 7.984 0 3.563 0 0 3.61 0 8.031a7.88 7.88 0 0 0 5.172 7.422c.422.156.828-.125.828-.547v-1.25c-.219.094-.5.156-.75.156-1.031 0-1.64-.562-2.078-1.609-.172-.422-.36-.672-.719-.719-.187-.015-.25-.093-.25-.187 0-.188.313-.328.625-.328.453 0 .844.281 1.25.86.313.452.64.655 1.031.655s.641-.14 1-.5c.266-.265.47-.5.657-.656"/></svg>GitHub</a>
+    </nav>
+    <button class="menu-btn" type="button" popovertarget="menu" aria-controls="menu" aria-expanded="false" aria-label="Menu">
+      <svg class="i-open" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16M4 12h16M4 17h16" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>
+      <svg class="i-close" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6 6 18" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>
+    </button>
+  </div>
+</header>
+
+<nav class="menu" id="menu" popover aria-label="Menu">
+  <ul>
+    <li><a href="index.html#views">Views</a></li>
+    <li><a href="index.html#embed">Embed</a></li>
+    <li><a href="index.html#customise">Customise</a></li>
+    <li><a href="index.html#faq">FAQ</a></li>
+    <li><a href="index.html#open-source">Open source</a></li>
+    <li><a href="integration.html">Integration guide</a></li>
+    <li><a href="https://jeex.org">Back to jeex.org</a></li>
+  </ul>
+  <a class="btn btn-primary btn-github" href="https://github.com/jeex-org/jeex-player"><svg viewBox="0 0 16 16" aria-hidden="true" focusable="false"><path fill="currentColor" d="M6.766 11.328c-2.063-.25-3.516-1.734-3.516-3.656 0-.781.281-1.625.75-2.188-.203-.515-.172-1.609.063-2.062.625-.078 1.468.25 1.968.703.594-.187 1.219-.281 1.985-.281.765 0 1.39.094 1.953.265.484-.437 1.344-.765 1.969-.687.218.422.25 1.515.046 2.047.5.593.766 1.39.766 2.203 0 1.922-1.453 3.375-3.547 3.64.531.344.89 1.094.89 1.954v1.625c0 .468.391.734.86.547C13.781 14.359 16 11.53 16 8.03 16 3.61 12.406 0 7.984 0 3.563 0 0 3.61 0 8.031a7.88 7.88 0 0 0 5.172 7.422c.422.156.828-.125.828-.547v-1.25c-.219.094-.5.156-.75.156-1.031 0-1.64-.562-2.078-1.609-.172-.422-.36-.672-.719-.719-.187-.015-.25-.093-.25-.187 0-.188.313-.328.625-.328.453 0 .844.281 1.25.86.313.452.64.655 1.031.655s.641-.14 1-.5c.266-.265.47-.5.657-.656"/></svg>GitHub</a>
+</nav>
+
+<main id="main">
+
+  <section class="hero page-hero" aria-labelledby="telemetry-title">
+    <div class="wrap">
+      <div class="hero-copy">
+        <p class="eyebrow">Telemetry</p>
+        <h1 id="telemetry-title">What the player sends.</h1>
+        <p class="lede">The JEEX player sends a small amount of anonymous data about how it runs, so that we can make it faster, fix its errors and see which of its features are used, and on which sites. This page lists everything it sends. Nothing else leaves the player.</p>
+      </div>
+    </div>
+  </section>
+
+  <div class="wrap guide">
+    <nav class="toc" aria-label="On this page">
+      <p>On this page</p>
+      <ol>
+        <li><a href="#how-to-turn-it-off">How to turn it off</a></li>
+        <li><a href="#where-it-goes">Where it goes</a></li>
+        <li><a href="#what-is-never-sent">What is never sent</a></li>
+        <li><a href="#what-is-sent">What is sent</a></li>
+        <li><a href="#schema">Schema</a></li>
+      </ol>
+    </nav>
+
+    <div class="steps-doc">
+      <p>The data is anonymous and is used only to improve the player. It is never sold, never used for advertising and never linked to people.</p>
+      <section class="step-doc" aria-labelledby="how-to-turn-it-off">
+        <h2 id="how-to-turn-it-off">How to turn it off</h2>
+        <ul><li>On the element: <code>&lt;jeex-viewer analytics="off"&gt;</code>. It fails closed: only a missing attribute or exactly <code>on</code> sends; any other value turns it off.</li><li>On the iframe page: <code>embed.html?analytics=off</code>, or <code>analytics: 'off'</code> in <code>embedViewer(...)</code>.</li><li>In code: <code>mountViewer(el, { analytics: { mode: 'off' } })</code>.</li><li>A visitor whose browser sends <a class="text-link" href="https://globalprivacycontrol.org/">Global Privacy Control</a> (<code>navigator.globalPrivacyControl === true</code>) is never counted.</li></ul>
+        <p>Off means no request at all. Everything else the player does is unchanged: it still loads its scene and models from wherever they are served.</p>
+        <p><code>analytics-endpoint</code> (<code>?analyticsEndpoint=</code>, <code>analytics.endpoint</code>) sends the same data to another address instead: an <code>https:</code> URL, or <code>http:</code> on <code>localhost</code>/<code>127.0.0.1</code>. Any other value turns telemetry off.</p>
+      </section>
+      <section class="step-doc" aria-labelledby="where-it-goes">
+        <h2 id="where-it-goes">Where it goes</h2>
+        <p>Every request is a <code>POST</code> of one JSON object to <code>https://telemetry.jeex.org/v1/player</code>, made with <code>fetch</code> and <code>keepalive</code>, without credentials (<code>credentials: 'omit'</code>), without a referrer (<code>referrerPolicy: 'no-referrer'</code>), without custom headers and without retries. A failed request is ignored. A site with a Content Security Policy must allow the endpoint in <code>connect-src</code>; otherwise the requests are refused silently.</p>
+        <p>Like any web request, a request reaches the server with the visitor's IP address and the browser's standard headers. The player cannot remove them; the player itself never sends them in the body, and the receiving server's own policy covers what it keeps of them.</p>
+      </section>
+      <section class="step-doc" aria-labelledby="what-is-never-sent">
+        <h2 id="what-is-never-sent">What is never sent</h2>
+        <p>No cookies and nothing read from or written to any browser storage. No visitor or visit identifier, not even a temporary one: two requests of the same visit share no field beyond the shared context below. No user-agent string, no GPU vendor or renderer string, no fonts, no screen size, no time zone. No camera position, no path through the apartment, no order of events, no timestamps. No query string or fragment of the page address. No error message and no raw stack. No form data or other content of the page.</p>
+      </section>
+      <section class="step-doc" aria-labelledby="what-is-sent">
+        <h2 id="what-is-sent">What is sent</h2>
+        <p>Each request belongs to one group (<code>group</code>) and carries the shared context. Every field of every request is in the tables below; a field that is not in them is never sent.</p>
+        <h3 id="shared-context">Shared context</h3>
+        <div class="table-wrap"><table class="doc-table"><thead><tr><th scope="col">Field</th><th scope="col">Meaning</th><th scope="col">Example</th></tr></thead><tbody><tr><td><code>schema</code></td><td>version of this payload format</td><td><code>"1.0.0"</code></td></tr><tr><td><code>player</code></td><td>version of the player</td><td><code>"0.1.0"</code></td></tr><tr><td><code>embed</code></td><td>how the player is embedded: <code>element</code>, <code>iframe</code> or <code>script</code></td><td><code>"element"</code></td></tr><tr><td><code>site</code></td><td>origin of the page; for the iframe page, the embedding page's origin as the browser reports it or as the host's verified messages prove it; <code>null</code> when not known</td><td><code>"https://agency.example"</code></td></tr><tr><td><code>page</code></td><td>path of the page without query and fragment; a segment that looks like an email, a handle, a UUID, a token or a long number becomes <code>:id</code>; at most 200 characters; <code>null</code> when not known</td><td><code>"/flats/:id"</code></td></tr><tr><td><code>subject</code></td><td>what is played: the three ids below</td><td><code>{"project": "0192…", "bake": "0192…", "scene": "0192…"}</code></td></tr><tr><td><code>lang</code></td><td>language of the player's interface: <code>en</code>, <code>de</code>, <code>fr</code>, <code>it</code>, <code>es</code>, <code>sr-Latn</code>, <code>ru</code>, or <code>other</code></td><td><code>"en"</code></td></tr><tr><td><code>group</code></td><td>which group the request belongs to: <code>lifecycle</code>, <code>actions</code>, <code>rooms</code>, <code>device</code>, <code>error</code></td><td><code>"lifecycle"</code></td></tr></tbody></table></div>
+        <p><code>subject</code>, each a UUID of the document on screen, or <code>null</code> when not known:</p>
+        <div class="table-wrap"><table class="doc-table"><thead><tr><th scope="col">Field</th><th scope="col">Meaning</th><th scope="col">Example</th></tr></thead><tbody><tr><td><code>project</code></td><td>the baked project</td><td><code>"0192f5c4-7a1b-7c3d-8e9f-0a1b2c3d4e51"</code></td></tr><tr><td><code>bake</code></td><td>this bake of the project</td><td><code>"0192f5c4-7a1b-7c3d-8e9f-0a1b2c3d4e52"</code></td></tr><tr><td><code>scene</code></td><td>the scene document</td><td><code>"0192f5c4-7a1b-7c3d-8e9f-0a1b2c3d4e53"</code></td></tr></tbody></table></div>
+        <h3 id="lifecycle"><code>lifecycle</code></h3>
+        <div class="table-wrap"><table class="doc-table"><thead><tr><th scope="col">Field</th><th scope="col">Meaning</th><th scope="col">Example</th></tr></thead><tbody><tr><td><code>event</code></td><td><code>view</code> (the player mounted), <code>ready</code> (the first frame was drawn), <code>models_loaded</code> (the 3D models finished loading)</td><td><code>"ready"</code></td></tr><tr><td><code>load</code></td><td><code>ready</code> and <code>models_loaded</code>: time since the mount or the scene change: <code>&lt;1s</code>, <code>1-3s</code>, <code>3-10s</code>, <code>10-30s</code>, <code>&gt;30s</code></td><td><code>"1-3s"</code></td></tr><tr><td><code>outcome</code></td><td><code>models_loaded</code>: <code>complete</code>, <code>partial</code> (some failed), <code>budget</code> (stopped by the size limit), <code>none</code> (nothing to load)</td><td><code>"complete"</code></td></tr><tr><td><code>failed</code></td><td><code>models_loaded</code>: models that could not load, at most 50</td><td><code>0</code></td></tr><tr><td><code>assets</code></td><td><code>models_loaded</code>: UUIDs of the project's library assets, at most 50</td><td><code>["0192…"]</code></td></tr></tbody></table></div>
+        <p><code>view</code> and <code>ready</code> are sent at once (the iframe page waits up to 2 seconds for its host to name the page first); everything else is sent when the page is hidden or closed, every 5 minutes, and when the scene changes.</p>
+        <h3 id="actions"><code>actions</code></h3>
+        <div class="table-wrap"><table class="doc-table"><thead><tr><th scope="col">Field</th><th scope="col">Meaning</th><th scope="col">Example</th></tr></thead><tbody><tr><td><code>counts</code></td><td>how often each action below was done since the last request; each at most 50 over the whole view</td><td><code>{"mode": 3, "door": 1, …}</code></td></tr></tbody></table></div>
+        <p>The actions in <code>counts</code>:</p>
+        <div class="table-wrap"><table class="doc-table"><thead><tr><th scope="col">Field</th><th scope="col">Meaning</th><th scope="col">Example</th></tr></thead><tbody><tr><td><code>mode</code></td><td>the view mode changed (not the start mode)</td><td><code>3</code></td></tr><tr><td><code>interior</code></td><td>an interior style was applied</td><td><code>0</code></td></tr><tr><td><code>select_furniture</code></td><td>a piece of furniture was selected (when the site enables selection)</td><td><code>0</code></td></tr><tr><td><code>select_opening</code></td><td>a door or window was selected</td><td><code>0</code></td></tr><tr><td><code>select_wall</code></td><td>a wall was selected</td><td><code>0</code></td></tr><tr><td><code>select_room</code></td><td>a room was selected</td><td><code>0</code></td></tr><tr><td><code>panel</code></td><td>a selection panel was opened</td><td><code>1</code></td></tr><tr><td><code>door</code></td><td>a door was opened or shut</td><td><code>1</code></td></tr><tr><td><code>fullscreen</code></td><td>fullscreen was entered</td><td><code>0</code></td></tr><tr><td><code>minimap</code></td><td>the mini-map was used to move</td><td><code>2</code></td></tr><tr><td><code>camera_step</code></td><td>the camera stepped to a tour camera</td><td><code>4</code></td></tr><tr><td><code>tour_start</code></td><td>the tour started</td><td><code>1</code></td></tr><tr><td><code>tour_complete</code></td><td>the tour played to its end</td><td><code>0</code></td></tr></tbody></table></div>
+        <h3 id="rooms"><code>rooms</code></h3>
+        <div class="table-wrap"><table class="doc-table"><thead><tr><th scope="col">Field</th><th scope="col">Meaning</th><th scope="col">Example</th></tr></thead><tbody><tr><td><code>rooms</code></td><td>the rooms the camera was in during a walk or a tour, sorted by room id, never in visit order, at most 100</td><td><code>[{"room": "0192…", "dwell": "30s-2m"}]</code></td></tr><tr><td><code>room</code></td><td>the room's UUID from the scene</td><td><code>"0192f5c4-7a1b-7c3d-8e9f-0a1b2c3d4e54"</code></td></tr><tr><td><code>dwell</code></td><td>time spent there: <code>&lt;5s</code>, <code>5-30s</code>, <code>30s-2m</code>, <code>2-10m</code>, <code>&gt;10m</code></td><td><code>"30s-2m"</code></td></tr></tbody></table></div>
+        <h3 id="device"><code>device</code></h3>
+        <div class="table-wrap"><table class="doc-table"><thead><tr><th scope="col">Field</th><th scope="col">Meaning</th><th scope="col">Example</th></tr></thead><tbody><tr><td><code>fps</code></td><td>share of drawn time per frame-rate range, in whole tenths of percent</td><td><code>{"&lt;20": 0, "20-30": 10, "30-50": 30, "&gt;50": 60}</code></td></tr><tr><td><code>&lt;20</code></td><td>share below 20 frames per second</td><td><code>0</code></td></tr><tr><td><code>20-30</code></td><td>share from 20 to 30</td><td><code>10</code></td></tr><tr><td><code>30-50</code></td><td>share from 30 to 50</td><td><code>30</code></td></tr><tr><td><code>&gt;50</code></td><td>share above 50</td><td><code>60</code></td></tr><tr><td><code>gpu</code></td><td>capability class from what WebGL supports (texture size, multisampling, float colour buffers), not a performance ranking: <code>low</code>, <code>mid</code>, <code>high</code>, <code>none</code></td><td><code>"mid"</code></td></tr><tr><td><code>width</code></td><td>width of the player: <code>&lt;480</code>, <code>480-1024</code>, <code>1024-1600</code>, <code>&gt;1600</code></td><td><code>"1024-1600"</code></td></tr><tr><td><code>input</code></td><td><code>touch</code> or <code>pointer</code></td><td><code>"pointer"</code></td></tr><tr><td><code>fullscreen</code></td><td>share of drawn time in fullscreen, in whole tenths of percent</td><td><code>0</code></td></tr></tbody></table></div>
+        <h3 id="error"><code>error</code></h3>
+        <p>One request per distinct error, at most 10 per view; repeats of the same error are counted, not sent again.</p>
+        <div class="table-wrap"><table class="doc-table"><thead><tr><th scope="col">Field</th><th scope="col">Meaning</th><th scope="col">Example</th></tr></thead><tbody><tr><td><code>code</code></td><td><code>network</code>, <code>scene_format</code>, <code>manifest_format</code>, <code>model_format</code>, <code>webgl_unavailable</code>, <code>context_lost</code>, <code>size_limit</code>, <code>exception</code>, <code>rejection</code>, <code>other</code></td><td><code>"network"</code></td></tr><tr><td><code>stage</code></td><td><code>scene_load</code>, <code>model_load</code>, <code>capture</code>, <code>mode</code>, <code>tour</code>, <code>embed</code>, <code>bridge</code>, <code>runtime</code></td><td><code>"scene_load"</code></td></tr><tr><td><code>name</code></td><td>standard class name of the error, otherwise <code>Error</code>: <code>Error</code>, <code>TypeError</code>, <code>RangeError</code>, <code>ReferenceError</code>, <code>SyntaxError</code>, <code>EvalError</code>, <code>URIError</code>, <code>AggregateError</code>, <code>InternalError</code>, <code>ViewerLibError</code>, <code>SceneValidationError</code>, <code>AbortError</code>, <code>NetworkError</code>, <code>NotSupportedError</code>, <code>NotAllowedError</code>, <code>InvalidStateError</code>, <code>SecurityError</code>, <code>QuotaExceededError</code>, <code>DataCloneError</code>, <code>EncodingError</code>, <code>TimeoutError</code>, <code>OperationError</code>, <code>UnknownError</code></td><td><code>"TypeError"</code></td></tr><tr><td><code>frames</code></td><td>up to 5 top stack frames in the player's own published files only</td><td><code>[{"file": "jeex-viewer.iife.js", "line": 1, "column": 52310}]</code></td></tr><tr><td><code>file</code></td><td>the frame's file name, without its directory, query or fragment</td><td><code>"jeex-viewer.iife.js"</code></td></tr><tr><td><code>line</code></td><td>the frame's line</td><td><code>1</code></td></tr><tr><td><code>column</code></td><td>the frame's column</td><td><code>52310</code></td></tr><tr><td><code>browser</code></td><td>browser family and major version range</td><td><code>"chromium-14x"</code></td></tr><tr><td><code>count</code></td><td>how often it happened since the last request, 1 to 50</td><td><code>2</code></td></tr></tbody></table></div>
+        <p>An exception whose stack has no frame in the player's own files (the site's code, a browser extension, or a player bundled into a site's own script) is not reported at all.</p>
+      </section>
+      <section class="step-doc" aria-labelledby="schema">
+        <h2 id="schema">Schema</h2>
+        <p><a class="text-link" href="schema/telemetry/1.0.0.json"><code>telemetry.schema.json</code></a> is the exact JSON Schema of every request body, generated from the schema the player checks each request against before it is sent. It is also published at <code>https://player.jeex.org/schema/telemetry/1.0.0.json</code> and in the package as <code>jeex-viewer/schema/telemetry.json</code>. Any change to these fields changes the schema version and is listed in <a class="text-link" href="https://github.com/jeex-org/jeex-player/blob/main/CHANGELOG.md">CHANGELOG.md</a>.</p>
+      </section>
+    </div>
+  </div>
+
+</main>
+
+<footer class="foot">
+  <div class="wrap">
+    <div>
+      <a class="brand" href="index.html" aria-label="JEEX Player, home">
+        <svg viewBox="0 0 64 64" aria-hidden="true"><path d="M32 8 52 19.5v25L32 56 12 44.5v-25Z" fill="none" stroke="#5CC8FF" stroke-width="4" stroke-linejoin="round"/><path d="M12 19.5 32 31l20-11.5M32 31v25" fill="none" stroke="#5CC8FF" stroke-width="4" stroke-linejoin="round"/><path d="M32 31 52 19.5v25L32 56Z" fill="#5CC8FF" fill-opacity=".22"/></svg>
+        JEEX <span>Player</span>
+      </a>
+      <p>The open-source 3D tour player of JEEX, for your own website.</p>
+    </div>
+    <nav aria-label="Footer">
+      <ul>
+        <li><a href="index.html#views">Views</a></li>
+        <li><a href="index.html#embed">Embed</a></li>
+        <li><a href="index.html#customise">Customise</a></li>
+        <li><a href="index.html#faq">FAQ</a></li>
+        <li><a href="index.html#open-source">Open source</a></li>
+        <li><a href="integration.html">Integration guide</a></li>
+        <li><a href="telemetry.html">Telemetry</a></li>
+        <li><a href="https://github.com/jeex-org/jeex-player">GitHub</a></li>
+        <li><a href="https://jeex.org">jeex.org</a></li>
+      </ul>
+    </nav>
+    <p class="legal">&copy; 2026 JEEX <span data-viewer-sha>viewer {{VIEWER_SHA}}</span></p>
+  </div>
+</footer>
+</body>
+</html>

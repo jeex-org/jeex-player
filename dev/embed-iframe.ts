@@ -36,6 +36,8 @@ const note = (event: string): void => {
 const embed = embedViewer(stage, {
   src: '/embed.html',
   viewerId: 'dev-frame',
+  // Development pages never send telemetry; `/dev/telemetry.html?form=iframe` is the one that tests it.
+  analytics: 'off',
   // The viewer's own options, in their QUERY spelling: the helper forwards
   // them verbatim and the FRAME validates them (`viewer-options.ts`).
   view: 'tour',

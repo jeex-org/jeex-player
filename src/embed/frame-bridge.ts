@@ -68,14 +68,21 @@ type FrameBridgeOptions = {
    * raises none — the protocol does not promise one from every frame.
    */
   sizes?: ((listener: (size: EmbedEventMap['size']) => void) => () => void) | undefined;
+  /**
+   * The frame's telemetry site (`embed/frame-site.ts`): told when a message from
+   * the host passed the source and origin checks, and handed the page of the
+   * host's `context` command. Absent, `context` is answered and ignored.
+   */
+  site?: { verified(origin: string): void; context(page: string): void } | undefined;
 };
 
 /**
  * Commands that are answered before the first scene exists. `getScene` joins
  * `dispose` here: a host may ask what is on screen before there is anything,
- * and `null` is the honest answer rather than `not-ready`.
+ * and `null` is the honest answer rather than `not-ready`. `context` joins
+ * them because the host sends it as soon as the frame has loaded.
  */
-const READY_EXEMPT: ReadonlySet<CommandMethod> = new Set<CommandMethod>(['dispose', 'getScene']);
+const READY_EXEMPT: ReadonlySet<CommandMethod> = new Set<CommandMethod>(['dispose', 'getScene', 'context']);
 
 /** The reply one capture crosses the boundary as: the PNG bytes plus the sidecar. */
 async function captureReply(capture: Promise<CaptureResult>): Promise<{ png: ArrayBuffer; provenance: unknown }> {
@@ -272,6 +279,9 @@ export function installFrameBridge(handle: ViewerHandle, options: FrameBridgeOpt
         const blob = await handle.exportUsdz(exportUsdzOptions(command.params));
         return blob.arrayBuffer();
       }
+      case 'context':
+        options.site?.context(command.params.page);
+        return undefined;
       case 'dispose':
         handle.dispose();
         emit('disposed', {});
@@ -334,6 +344,7 @@ export function installFrameBridge(handle: ViewerHandle, options: FrameBridgeOpt
     if (event.source !== target || event.origin !== hostOrigin) return;
     const data: unknown = event.data;
     if (!isJeexEnvelope(data) || data.kind !== 'command' || data.viewerId !== viewerId) return;
+    options.site?.verified(hostOrigin);
     // A `dispose` uninstalls the bridge inside `perform`, and its own reply is
     // still owed: posting does not go through the listener, so the last answer
     // gets out after the frame has stopped listening for the next one.
