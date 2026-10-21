@@ -121,6 +121,11 @@ echo "== listener policy (signal)"
 # Every `addEventListener` in `src/` must carry `{ signal }`: an allowlist
 # entry inside the script is the only exception, each with its reason. CI runs the same script (`scripts/ci-parity.test.ts`).
 bun run scripts/listener-policy.ts src
+echo "== no-docs-refs"
+# No tracked file may name a documents folder outside this repository: the
+# repository explains itself in its own files. The same script runs staged in
+# the pre-commit hook (`lefthook.yml`) and in CI (`scripts/ci-parity.test.ts`).
+bash scripts/no-docs-refs.sh
 echo "== bun test ($DIR, tier=$TIER)"
 if [ "$TIER" = fast ]; then
   # Selected by the change: `scripts/select-tests.ts` walks the import graph

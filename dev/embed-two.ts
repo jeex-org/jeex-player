@@ -7,8 +7,8 @@
  * - INPUT is per instance. Keys are listened for on each shell root, which a
  *   `pointerdown` on its canvas focuses, so `W` walks the viewer that was
  *   clicked and leaves the other one — and the host page's `<input>` — alone.
- * - LOCALE is per instance. The second mounts with `locale: 'ru'` and its
- *   chrome answers in Russian while the first answers in English.
+ * - LOCALE is per instance. Both mount in English; a check switches ONE of
+ *   them with `setLocale` and the other keeps its own catalogue.
  * - GLOBALS have ONE owner. The first mount claims `window.__viewerDebug`,
  *   `__appReady` and `__viewerReadyAt`; disposing it takes them down and the
  *   second keeps rendering, because they were never its.
@@ -30,7 +30,7 @@ async function main(): Promise<void> {
   // for each, and sharing one would prove nothing about independence.
   const scene = () => ({ repository: new LocalFixtureRepository() });
   const first = mountViewer(stage('stage-a'), { scene: scene(), view: { mode: 'walk' }, tour: { mode: 'off' } });
-  const second = mountViewer(stage('stage-b'), { scene: scene(), view: { mode: 'walk' }, tour: { mode: 'off' }, locale: 'ru' });
+  const second = mountViewer(stage('stage-b'), { scene: scene(), view: { mode: 'walk' }, tour: { mode: 'off' } });
 
   window.jeexPair = {
     first,

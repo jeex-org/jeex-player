@@ -17,9 +17,8 @@ import { headlessWebglLaunch } from './tests/headless-webgl.js';
 import { scaled } from './tests/e2e/time-scale.js';
 
 /**
- * The e2e server's port, from the viewer's own 3700–3709 port block
- * (3700 is the dev server's).
- * Overridable with `JEEX_E2E_PORT`: two gate runs on one machine at once
+ * The e2e server's port: default 3701 (the dev server is on 3700), override
+ * with `JEEX_E2E_PORT`. The override exists because two gate runs on one machine at once
  * (for example in two worktrees) otherwise share one port, and `reuseExistingServer` lets each run
  * silently reuse — and then tear down — the other's `vite`, which reads as a
  * storm of `ERR_CONNECTION_REFUSED` failures that have nothing to do with

@@ -84,6 +84,9 @@ jobs:
       - name: listener policy (signal)
         run: bun run scripts/listener-policy.ts src
 
+      - name: no-docs-refs
+        run: bash scripts/no-docs-refs.sh
+
       - name: build (demo)
         run: bun run build
 

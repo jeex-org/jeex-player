@@ -10,7 +10,7 @@
  * ```
  * project.json
  * scene.json
- * obj/<variant>@<version>.glb
+ * obj/<versionId>.glb
  * tex/<material>_<map>.ktx2
  * prev/<id>.webp
  * poster.webp
@@ -47,8 +47,8 @@ export const PROJECT_FORMAT = 'jeex-project';
  *
  * `model` and `preview` per variant are not an invention of this format — a
  * catalogue export already writes them, because the unit of purchase and of
- * geometry is the VARIANT: `obj/<variant>@<version>.glb`. They stay
- * optional here; an object's own `model` is the one file a bake must have.
+ * geometry is the VARIANT: one `obj/<versionId>.glb` per baked variant
+ * version. They stay optional here; an object's own `model` is the one file a bake must have.
  */
 export type ProjectVariant = Omit<CatalogueVariant, 'slug' | 'finishes'> & {
   /** `slot -> finish UUID` over open slot names. */

@@ -49,6 +49,7 @@ const MAPPING: ReadonlyArray<readonly [string, string]> = [
   ['e2e tests (Playwright)', 'e2e tests (Playwright)'],
   ['console policy (src/)', 'console policy (src/)'],
   ['listener policy (signal)', 'listener policy (signal)'],
+  ['no-docs-refs', 'no-docs-refs'],
   ['typecheck (src, dev, vite.config.ts)', 'typecheck (src, dev, vite.config.ts)'],
   ['typecheck (scripts, vite configs)', 'typecheck (scripts, vite configs)'],
   ['lint', 'lint'],

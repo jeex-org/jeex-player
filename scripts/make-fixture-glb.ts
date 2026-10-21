@@ -5,8 +5,10 @@
  * It lives INSIDE the fixture project (`tests/fixtures/project/`) rather
  * than in a models folder of its own: a baked project names every file by a
  * path relative to its manifest, so the one GLB has to sit where the manifest
- * says it does (`obj/<variant>@<version>.glb`) — and one binary serves both
- * the loader tests and the project fixture instead of being duplicated.
+ * says it does (a bake writes `obj/<versionId>.glb`; the fixture keeps a
+ * readable name, since a file name inside the folder carries no identity) —
+ * and one binary serves both the loader tests and the project fixture instead
+ * of being duplicated.
  *
  * Why generated and not committed as an exported binary: concrete asset ids
  * and their bytes stay outside the viewer, and real catalogue exports are

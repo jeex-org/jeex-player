@@ -1,0 +1,7 @@
+# Git hooks; install them once with `bun run hooks:install`. The full quality
+# gate stays `scripts/check.sh`; the hook only runs what has to hold for every
+# single commit.
+pre-commit:
+  commands:
+    no-docs-refs:
+      run: bash scripts/no-docs-refs.sh --staged

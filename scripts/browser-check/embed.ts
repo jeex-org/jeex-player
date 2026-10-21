@@ -12,8 +12,9 @@
  *
  * - INPUT is per instance: keys are listened for on each shell root, which a
  *   `pointerdown` on its canvas focuses.
- * - LOCALE is per instance: the second mounts `ru` and answers in Russian
- *   while the first answers in English.
+ * - LOCALE is per instance: both mount in English, the check switches the
+ *   second to `de` with `setLocale`, the first keeps answering in English, and
+ *   the second is switched back before the next area.
  * - The page GLOBALS have one owner: the first mount claims them, disposing it
  *   takes them down, and the second keeps rendering because they were never
  *   its.
@@ -90,15 +91,20 @@ export async function checkEmbedTwo(ctx: CheckContext): Promise<void> {
   summary.push(`embed-two: ${mounted.roots} viewers, ${mounted.canvases} canvases, 0 ids, one globals owner`);
 
   // ---- Locale is per instance ----
-  // The mode buttons' descriptions are translated when the fragment is built;
-  // the visible mode name stays `Walk` in both.
+  // Both mount in English. `setLocale` on the SECOND re-translates its chrome
+  // in place; the first keeps its own catalogue. The visible mode name stays
+  // `Walk` in both (mode names are never translated), so the probe is the
+  // button's translated description.
   const locales = await evalValue<{ first: string; second: string }>(`(() => {
     const label = (root) => root.querySelector('[data-mode="walk"]').title;
+    window.jeexPair.second.setLocale('de');
     const roots = ${ROOTS};
-    return JSON.stringify({ first: label(roots[0]), second: label(roots[1]) });
+    const seen = { first: label(roots[0]), second: label(roots[1]) };
+    window.jeexPair.second.setLocale('en');
+    return JSON.stringify(seen);
   })()`);
   assert(locales.first === 'Walk mode', `the first viewer stays English | "${locales.first}"`);
-  assert(locales.second === 'Режим прогулки', `the second viewer speaks Russian | "${locales.second}"`);
+  assert(locales.second === 'Spaziergang-Modus', `the second viewer speaks German after its own setLocale | "${locales.second}"`);
   summary.push(`embed-two locale: "${locales.first}" and "${locales.second}" at once`);
 
   // ---- A press on a canvas gives THAT viewer the keyboard ----
