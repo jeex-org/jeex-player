@@ -10,6 +10,7 @@
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest';
 import { Minimap, type MinimapDeps } from '../../src/ui/minimap.js';
 import { HostSlots } from '../../src/ui/host-slots.js';
+import { WalkCameraBar } from '../../src/ui/walk-camera-bar.js';
 import { OVERLAY_NAMES } from '../../src/ui/viewer-shell.js';
 import { roomAt } from '../../src/plan/plan-drawing.js';
 import type { PlanCameraMarker } from '../../src/plan/plan-canvas.js';
@@ -313,6 +314,171 @@ describe('the card keeps clear of a claimed bottom-right corner', () => {
         const card = harness.map.element.getBoundingClientRect();
         const viewport = harness.shell.container.getBoundingClientRect();
         expect(card.width).toBeGreaterThan(0);
+        expect(viewport.right - card.right).toBeCloseTo(edge, 0);
+        expect(viewport.bottom - card.bottom).toBeCloseTo(edge + lift, 0);
+      });
+    }
+  }
+});
+
+/**
+ * The walk's camera stepper stays at the bottom centre; in a narrow viewer its
+ * right half reaches under the card's corner (measured before this rule: at
+ * 390x844 the stepper ran 132-258 px across, the card 212-376 px). So there the
+ * card yields and stands above the stepper; wider viewers, and any mode or
+ * document where the stepper is not shown, keep the card where it was.
+ * The boundary is where the stepper comes within the same 8 px gap of the
+ * card's column: a 561 px viewer lifts the card (stepper to 343.5 px, card
+ * from 351 px), a 562 px one keeps them 8 px apart side by side.
+ */
+describe('the card keeps clear of the walk camera stepper', () => {
+  /** The gap the lifted card keeps above the stepper's top edge. */
+  const GAP = 8;
+  const NARROW = [
+    { label: 'phone 390x844', width: 390, height: 844 },
+    { label: 'narrow 360x640', width: 360, height: 640 },
+    { label: 'boundary 561x800', width: 561, height: 800 },
+  ] as const;
+  const WIDE = [
+    { label: 'just wider 562x800', width: 562, height: 800, edge: 14 },
+    { label: 'desktop 1280x774', width: 1280, height: 774, edge: 18 },
+  ] as const;
+
+  let stepper: WalkCameraBar;
+
+  /** A viewer of that size with the stepper mounted where the stage mounts it, showing camera 1 of 7. */
+  function rebuild(width: number, height: number, claim: boolean): HTMLElement | null {
+    harness.map.dispose();
+    closeContainers();
+    harness = build({}, { width, height });
+    stepper = new WalkCameraBar({
+      container: harness.shell.roots.viewport,
+      messages: harness.shell.messages,
+      enabled: () => true,
+      onStep: () => {},
+    });
+    stepper.setCamera({ index: 0, count: 7 });
+    if (!claim) return null;
+    const box = new HostSlots(harness.shell.roots.root, ['bottom-right']).get('bottom-right');
+    fillSlot(box);
+    return box;
+  }
+
+  function show(mode: 'walk' | 'tour'): { card: DOMRect; bar: HTMLElement; viewport: DOMRect } {
+    stepper.setMode(mode);
+    harness.map.setMode(mode);
+    return {
+      card: harness.map.element.getBoundingClientRect(),
+      bar: stepper.element,
+      viewport: harness.shell.container.getBoundingClientRect(),
+    };
+  }
+
+  afterEach(() => {
+    stepper.dispose();
+  });
+
+  for (const { label, width, height } of NARROW) {
+    for (const claim of [false, true]) {
+      const corner = claim ? 'a claimed corner' : 'no claim';
+      test(`${label}, walk, ${corner}: the card stands above the stepper, whose lift already clears a claimed box`, () => {
+        const box = rebuild(width, height, claim);
+        const { card, bar, viewport } = show('walk');
+        const steps = bar.getBoundingClientRect();
+        // Measured, not assumed: the stepper is on screen and comes within the gap of the card's column.
+        expect(bar.hidden).toBe(false);
+        expect(steps.width).toBeGreaterThan(0);
+        expect(steps.right + GAP).toBeGreaterThan(card.left);
+        expect(intersects(card, steps)).toBe(false);
+        expect(steps.top - card.bottom).toBeCloseTo(GAP, 0);
+        // The same 8px over the stepper with or without the claim: the box sits lower than the stepper, so it adds no lift.
+        if (box !== null) expect(intersects(card, box.getBoundingClientRect())).toBe(false);
+        // Still in the viewer, still in its own column at the narrow edge.
+        expect(card.top).toBeGreaterThanOrEqual(viewport.top);
+        expect(viewport.right - card.right).toBeCloseTo(14, 0);
+      });
+    }
+  }
+
+  /**
+   * A short narrow viewer: lifted over the stepper, the full card would reach
+   * the top row. It shrinks to stay 8px under the control bar, which also keeps
+   * it off a 56px box claimed at `top-right`; below a 96px card it steps out.
+   */
+  test('short embed 480x330, walk: the lifted card shrinks to sit under the control bar and a claimed top-right box', () => {
+    rebuild(480, 330, false);
+    const slots = new HostSlots(harness.shell.roots.root, ['bottom-right', 'top-right']);
+    fillSlot(slots.get('bottom-right'));
+    const topRight = slots.get('top-right');
+    fillSlot(topRight);
+    const { card, bar } = show('walk');
+    const steps = bar.getBoundingClientRect();
+    const controls = harness.shell.roots.byName('control-bar').getBoundingClientRect();
+    expect(controls.height).toBeGreaterThan(0);
+    expect(intersects(card, steps)).toBe(false);
+    expect(steps.top - card.bottom).toBeCloseTo(GAP, 0);
+    // The card's top is derived from the bar's declared geometry; the real bar must agree with it.
+    expect(card.top - controls.bottom).toBeCloseTo(GAP, 0);
+    expect(intersects(card, topRight.getBoundingClientRect())).toBe(false);
+    expect(card.width).toBeCloseTo(card.height, 0);
+    expect(card.height).toBeLessThan(196);
+  });
+
+  for (const { height, shown } of [
+    { height: 298, shown: true },
+    { height: 297, shown: false },
+  ]) {
+    test(`short embed 480x${height}, walk: the card ${shown ? 'keeps a 96px plan' : 'steps out rather than collapse'}`, () => {
+      rebuild(480, height, false);
+      const { card } = show('walk');
+      if (shown) expect(card.height).toBeCloseTo(96, 0);
+      else expect(card.height).toBe(0);
+      // Not the mode leaving walk: the card still reports itself visible, only the narrow rule takes it away.
+      expect(harness.map.element.dataset['visible']).toBe('true');
+    });
+  }
+
+  // Where the stepper is not shown the card keeps the lift it had; one size is enough, the rule is one selector.
+  test(`phone 390x844, tour: the stepper is hidden and the card keeps its tour lift`, () => {
+    rebuild(390, 844, false);
+    const { card, bar, viewport } = show('tour');
+    expect(bar.hidden).toBe(true);
+    expect(viewport.bottom - card.bottom).toBeCloseTo(14 + 26, 0);
+  });
+
+  test('phone 390x844, walk: a host element named like the stepper inside a slot does not lift the card', () => {
+    rebuild(390, 844, false);
+    stepper.setCamera({ index: null, count: 0 });
+    const box = new HostSlots(harness.shell.roots.root, ['bottom-left']).get('bottom-left');
+    const lookalike = document.createElement('div');
+    lookalike.className = 'walk-cameras';
+    box.append(lookalike);
+    const { card, bar, viewport } = show('walk');
+    expect(bar.hidden).toBe(true);
+    expect(viewport.bottom - card.bottom).toBeCloseTo(14, 0);
+  });
+
+  test(`phone 390x844, walk with no tour cameras: no stepper, the card keeps its corner`, () => {
+    rebuild(390, 844, false);
+    stepper.setCamera({ index: null, count: 0 });
+    const { card, bar, viewport } = show('walk');
+    expect(bar.hidden).toBe(true);
+    expect(viewport.bottom - card.bottom).toBeCloseTo(14, 0);
+  });
+
+  for (const { label, width, height, edge } of WIDE) {
+    for (const { claim, lift } of [
+      { claim: false, lift: 0 },
+      { claim: true, lift: 64 },
+    ]) {
+      test(`${label}, walk, ${claim ? 'a claimed corner' : 'no claim'}: the card keeps its previous inset beside the stepper`, () => {
+        rebuild(width, height, claim);
+        const { card, bar, viewport } = show('walk');
+        const steps = bar.getBoundingClientRect();
+        expect(bar.hidden).toBe(false);
+        expect(steps.width).toBeGreaterThan(0);
+        // Side by side, at least the gap apart: nothing to step over.
+        expect(card.left - steps.right).toBeGreaterThanOrEqual(GAP - 0.5);
         expect(viewport.right - card.right).toBeCloseTo(edge, 0);
         expect(viewport.bottom - card.bottom).toBeCloseTo(edge + lift, 0);
       });
