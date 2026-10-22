@@ -119,6 +119,19 @@ as described under [Versioning](#versioning).
   through its gaze target away from the route's ends: for that instant the
   look pointed toward +Z. Checkpoint tours steer their own travel look and
   are unchanged.
+- **The green field shown while an object is moved reaches the edges and
+  narrow places where it fits.** The field judged one pose per point of a
+  0.1 m lattice and painted their footprints, so it stopped up to a lattice
+  step short of where the legal poses end, and missed places the object
+  only just fits when they lay between two lattice points: on the demo flat
+  the sofa showed 546 of the 616 floor cells it may cover. The field now
+  judges the cell centres, walks from each legal one toward its illegal
+  neighbours to the last legal pose and round the field's corners, and
+  looks between two neighbours that fail for different reasons, to
+  0.025 m: the sofa shows all 616. Across the demo's 50 floor objects
+  6,550 cells turned green and 194 turned red, a mask costs about a fifth
+  more, and a legal patch only a few centimetres across can still fall
+  between the lattice lines.
 
 ## [0.1.0] — 2026-10-19
 

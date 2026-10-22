@@ -68,6 +68,66 @@ function verdictAt(field: LegalityMask, x: number, z: number, y?: number): numbe
   return null;
 }
 
+/**
+ * The footprint of every legal pose standing on the floor, on a lattice of
+ * `spacing` metres from each room's corner (of `roomId` only when given:
+ * no footprint stands legally across a wall), judged against the WHOLE
+ * scene. At 0.025 m it holds
+ * every pose a 0.2 m floor field judges inside a room on that room's own
+ * lattice: the cell centres, and the eighths of a cell its edge and window
+ * searches step through.
+ */
+function legalFootprints(
+  context: DragContext,
+  rotationY: number,
+  spacing: number,
+  roomId?: string,
+): Array<readonly { x: number; z: number }[]> {
+  const legal: Array<readonly { x: number; z: number }[]> = [];
+  for (const room of plan.rooms.filter((candidate) => roomId === undefined || candidate.roomId === roomId)) {
+    const nu = Math.floor((room.bbox.maxX - room.bbox.minX) / spacing);
+    const nv = Math.floor((room.bbox.maxZ - room.bbox.minZ) / spacing);
+    for (let b = 1; b <= nv; b += 1) {
+      for (let a = 1; a <= nu; a += 1) {
+        const point = { x: room.bbox.minX + a * spacing, z: room.bbox.minZ + b * spacing };
+        if (!pointInPolygon(point, room.polygon)) continue;
+        const { judgement, placed, item: moved } = judgePose(context, { kind: 'plan', point, rotationY, y: 0, snap: true });
+        if (judgement.ok && placed.host === null && moved.quad) legal.push(moved.quad);
+      }
+    }
+  }
+  return legal;
+}
+
+/** How many floor cells of `field` some footprint in `legal` covers, and how many of those are green. */
+function floorCoverage(field: LegalityMask, legal: Array<readonly { x: number; z: number }[]>): { reference: number; found: number } {
+  // Floor cells by their place on the field's grid, so each footprint tests only the cells under its box.
+  const cells = new Map<string, number>();
+  for (let cell = 0; cell < field.count; cell += 1) {
+    if (field.positions[cell * 12 + 1]! > 0.01) continue;
+    cells.set(`${Math.round(field.positions[cell * 12]! / field.step)},${Math.round(field.positions[cell * 12 + 2]! / field.step)}`, cell);
+  }
+  const covered = new Set<number>();
+  for (const quad of legal) {
+    const xs = quad.map((corner) => corner.x);
+    const zs = quad.map((corner) => corner.z);
+    for (let i = Math.floor(Math.min(...xs) / field.step) - 1; i <= Math.ceil(Math.max(...xs) / field.step); i += 1) {
+      for (let j = Math.floor(Math.min(...zs) / field.step) - 1; j <= Math.ceil(Math.max(...zs) / field.step); j += 1) {
+        const cell = cells.get(`${i},${j}`);
+        if (cell === undefined || covered.has(cell)) continue;
+        const centre = { x: field.positions[cell * 12]! + field.step / 2, z: field.positions[cell * 12 + 2]! + field.step / 2 };
+        if (pointInPolygon(centre, quad)) covered.add(cell);
+      }
+    }
+  }
+  let found = 0;
+  for (const cell of covered) found += field.ok[cell]!;
+  return { reference: covered.size, found };
+}
+
+/** The pose lattice of `legalFootprints` that holds every pose a 0.2 m floor field judges, metres. */
+const FIELD_POSES_M = 0.025;
+
 describe('mask', () => {
   test('a floor mask marks the floor under the sofa green and under the bed red', () => {
     const context = drag(DEMO.asset.livingSofa);
@@ -212,65 +272,84 @@ describe('cost on the demo flat', () => {
   });
 });
 
-describe('probes finer than the cells', () => {
-  // Two probes per 0.20 m cell against a 0.05 m reference lattice. The bound is
-  // measured, not derived: the sofa's field on this flat reaches 89.7 % of the
-  // reference (546 of 609 cells), and the gap is the places it only just fits
-  // between the lounge and the dining set, where a 0.10 m probe step steps over
-  // a pose the 0.05 m lattice still finds. The floor keeps that from getting worse.
-  test('the sofa field finds the places it only just fits: within 12 % of a 0.05 m probe lattice', () => {
+describe('the field reaches as far as the legal poses do', () => {
+  /** The verdict of the cell at `(x, z)` and whether the legal sofa pose at `probe` covers it. */
+  function sofaAt(probe: { x: number; z: number }, x: number, z: number): { covered: boolean; verdict: number | null } {
     const context = drag(DEMO.asset.livingSofa);
     const item = poseItem(context, at(context, 0, 0));
-    const field = mask(context, item, 'floor');
-    // The reference: every legal pose on a 0.05 m lattice, footprints over the same cells.
-    const legal: Array<readonly { x: number; z: number }[]> = [];
-    for (const room of plan.rooms) {
-      for (let z = room.bbox.minZ + 0.025; z < room.bbox.maxZ; z += 0.05) {
-        for (let x = room.bbox.minX + 0.025; x < room.bbox.maxX; x += 0.05) {
-          if (!pointInPolygon({ x, z }, room.polygon)) continue;
-          const { judgement, item: moved } = judgePose(context, { kind: 'plan', point: { x, z }, rotationY: item.angle, y: 0, snap: true });
-          if (judgement.ok && moved.quad) legal.push(moved.quad);
-        }
-      }
-    }
-    let reference = 0;
-    let green = 0;
-    for (let cell = 0; cell < field.count; cell += 1) {
-      const centre = { x: field.positions[cell * 12]! + field.step / 2, z: field.positions[cell * 12 + 2]! + field.step / 2 };
-      if (legal.some((quad) => pointInPolygon(centre, quad))) reference += 1;
-      green += field.ok[cell]!;
-    }
-    expect(green).toBeGreaterThanOrEqual(reference * 0.88);
+    const { judgement, item: moved } = judgePose(context, { kind: 'plan', point: probe, rotationY: item.angle, y: 0, snap: true });
+    return {
+      covered: judgement.ok && moved.quad !== null && pointInPolygon({ x, z }, moved.quad),
+      verdict: verdictAt(mask(context, item, 'floor'), x, z),
+    };
+  }
+
+  test('where the legal poses end between two lattice points: the floor only the farthest one covers is green', () => {
+    // The sofa stands legally with its centre at x 9.82 and any x up to its wall,
+    // never west of it (a door's clear zone). Only a pose right at that edge
+    // reaches the cell centred at (9.35, 2.65); the 0.1 m lattice has none there.
+    const spot = sofaAt({ x: 9.82, z: 2.0 }, 9.35, 2.65);
+    expect(spot.covered).toBe(true);
+    expect(spot.verdict).toBe(1);
   });
+
+  test('a place the sofa only just fits, narrower than the lattice step, is green', () => {
+    // Snapped back against the wall, the sofa fits between the lounge and a
+    // door's clear zone only on a 0.04 m stretch of pointer positions, which
+    // no point of the 0.1 m lattice meets.
+    const spot = sofaAt({ x: 4.34, z: 9.0 }, 5.25, 8.42);
+    expect(spot.covered).toBe(true);
+    expect(spot.verdict).toBe(1);
+  });
+
+  test('a table that only just fits across a narrow room is green there: crossing the west wall is not crossing the east one', () => {
+    // The WC is 1.30 m wide. Alone in the flat, the dining table scaled to
+    // 1.27 m across fits it only within 0.015 m of its middle line, between
+    // two cell centres: one pokes through the west wall, the next through the
+    // east wall, and both break the same rule for the same object.
+    const table = apartmentScene.assets.find((asset) => asset.id === DEMO.asset.livingTable)!;
+    const probe = drag(DEMO.asset.livingTable, { ...apartmentScene, assets: [table] });
+    const quad = poseItem(probe, at(probe, 0, 0)).quad!;
+    const width = Math.max(...quad.map((corner) => corner.x)) - Math.min(...quad.map((corner) => corner.x));
+    const alone: SceneData = { ...apartmentScene, assets: [{ ...table, scale: ((table.scale ?? 1) * 1.27) / width }] };
+    const context = drag(DEMO.asset.livingTable, alone);
+    const wc = plan.rooms.find((room) => room.roomId === DEMO.room.wc)!;
+    const middle = (wc.bbox.minX + wc.bbox.maxX) / 2;
+    const { judgement } = judgePose(context, { kind: 'plan', point: { x: middle, z: 1 }, rotationY: 0, y: 0, snap: true });
+    expect(judgement.ok).toBe(true);
+    expect(verdictAt(mask(context, poseItem(context, at(context, 0, 0)), 'floor'), middle, 1)).toBe(1);
+  });
+
+  // Against every legal pose on the lattice the field steps through: all
+  // 616 cells green for the sofa across the flat (a 0.1 m lattice of poses
+  // without the edge and window searches found 546), and every cell of the
+  // kitchen for a table lamp, whose field's corners there are cut off both
+  // ways by walls and furniture (one room: a lamp's reference over the whole
+  // flat takes too long on a shared runner).
+  test.each([
+    ['the sofa', DEMO.asset.livingSofa, undefined],
+    ['a table lamp in the kitchen', DEMO.asset.bedroomLampA, DEMO.room.kitchen],
+  ])(
+    'the field of %s finds within 1 %% of what every legal pose on its own step covers',
+    (_, assetId, roomId) => {
+      const context = drag(assetId);
+      const item = poseItem(context, at(context, 0, 0));
+      const legal = legalFootprints(context, item.angle, FIELD_POSES_M, roomId);
+      const { reference, found } = floorCoverage(mask(context, item, 'floor'), legal);
+      expect(found).toBeGreaterThanOrEqual(reference * 0.99);
+    },
+    30_000,
+  );
 });
 
 describe('green means a legal pose covers it', () => {
-  /** Every legal pose on the field's own probe lattice, judged against the WHOLE scene. */
-  function legalCovers(context: DragContext, rotationY: number, step: number): Array<readonly { x: number; z: number }[]> {
-    const probe = step / 2;
-    const legal: Array<readonly { x: number; z: number }[]> = [];
-    for (const room of plan.rooms) {
-      const nu = Math.ceil((room.bbox.maxX - room.bbox.minX) / step - 1e-9) * 2;
-      const nv = Math.ceil((room.bbox.maxZ - room.bbox.minZ) / step - 1e-9) * 2;
-      for (let b = 0; b < nv; b += 1) {
-        for (let a = 0; a < nu; a += 1) {
-          const point = { x: room.bbox.minX + (a + 0.5) * probe, z: room.bbox.minZ + (b + 0.5) * probe };
-          if (!pointInPolygon(point, room.polygon)) continue;
-          const { judgement, item: moved } = judgePose(context, { kind: 'plan', point, rotationY, y: 0, snap: true });
-          if (judgement.ok && moved.quad) legal.push(moved.quad);
-        }
-      }
-    }
-    return legal;
-  }
-
   test('a pose the wall snap turned out of its row is judged against its own surroundings: no false green for the bed', () => {
     // Measured before the fix: 10 green cells of the bed's field came from lattice poses legal against the
     // row's narrowed scene and refused by the whole one (the snap turned the bed up to 1.58 m away onto a face).
     const context = drag(DEMO.asset.bedroomBed);
     const item = poseItem(context, at(context, 0, 0));
     const field = mask(context, item, 'floor');
-    const legal = legalCovers(context, item.angle, field.step);
+    const legal = legalFootprints(context, item.angle, FIELD_POSES_M);
     let falseGreen = 0;
     for (let cell = 0; cell < field.count; cell += 1) {
       if (field.ok[cell] !== 1) continue;
@@ -278,7 +357,7 @@ describe('green means a legal pose covers it', () => {
       if (!legal.some((quad) => pointInPolygon(centre, quad))) falseGreen += 1;
     }
     expect(falseGreen).toBe(0);
-  });
+  }, 30_000);
 
   test('a rug, which has no footprint and may lie anywhere on a floor, colours the floor it covers', () => {
     const context = drag(DEMO.asset.bedroomRug);
