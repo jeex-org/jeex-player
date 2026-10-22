@@ -128,17 +128,46 @@ export function positionOnPath(path: SampledPath, distance: number): THREE.Vecto
 }
 
 /**
- * The aim `progress` of the way from `from` to `to`: yaw along the SHORT arc,
- * pitch and reach blended. Blending two world points instead would cut
- * through the camera itself on a turn-around — two looks opposite ways — and
- * whip the view.
+ * The aim `progress` of the way from `from` to `to`: yaw along the SHORT arc
+ * unless `turn` names the signed way round, pitch and reach blended. Blending
+ * two world points instead would cut through the camera itself on a
+ * turn-around — two looks opposite ways — and whip the view.
  */
-export function turnAim(from: Aim, to: Aim, progress: number): Aim {
+export function turnAim(from: Aim, to: Aim, progress: number, turn = yawDelta(from.yaw, to.yaw)): Aim {
   return {
-    yaw: from.yaw + yawDelta(from.yaw, to.yaw) * progress,
+    yaw: from.yaw + turn * progress,
     pitch: THREE.MathUtils.lerp(from.pitch, to.pitch, progress),
     reach: THREE.MathUtils.lerp(from.reach, to.reach, progress),
   };
+}
+
+/**
+ * The way round of a turn between two looks that move with the eye: the
+ * signed yaw turn at `count + 1` even steps across the turn's window, taken
+ * along the short arc at its first step and followed without wrapping from
+ * there on. `gapAt(u)` is the raw yaw gap `to - from` a fraction `u` of the
+ * way through the window. Taking the short arc afresh on every frame would
+ * flip the turn to the other side the moment the gap passes 180° and snap the
+ * view.
+ */
+export function turnTrack(count: number, gapAt: (u: number) => number): number[] {
+  const turns: number[] = [];
+  for (let index = 0; index <= count; index += 1) {
+    const gap = gapAt(index / count);
+    const previous = turns.at(-1);
+    turns.push(previous === undefined ? yawDelta(0, gap) : previous + yawDelta(previous, gap));
+  }
+  return turns;
+}
+
+/**
+ * The signed turn a fraction `u` of the way through a `turnTrack`: the raw
+ * `gap` there, on the side the track's nearest step took. An empty track
+ * falls back to the short arc.
+ */
+export function turnOnTrack(turns: readonly number[], u: number, gap: number): number {
+  const near = turns[Math.round(clamp(u, 0, 1) * (turns.length - 1))];
+  return near === undefined ? yawDelta(0, gap) : near + yawDelta(near, gap);
 }
 
 /**
