@@ -104,6 +104,13 @@ as described under [Versioning](#versioning).
   under the control bar, and below 298px of height it steps out instead of
   shrinking under 96px. Tour, a document without tour cameras, wider
   viewers and browsers without `:has()` keep the card where it was.
+- **An authored tour's gaze no longer snaps in one frame on a wide turn.**
+  Between two gaze keys the look turned along the short arc, taken again on
+  every frame. Both looks move with the camera, so when the gap between them
+  passed 180° during the turn, the turn flipped to the other side and the
+  view jumped: by 35° and 57° on the demo tour (11.8 s and 28.4 s). A turn
+  now keeps the side it started on until it lands. Checkpoint tours were
+  not affected.
 
 ## [0.1.0] — 2026-10-19
 

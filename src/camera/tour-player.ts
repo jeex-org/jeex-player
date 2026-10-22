@@ -55,6 +55,8 @@ import {
   sampleFilletedPath,
   samplePolyline,
   turnAim,
+  turnOnTrack,
+  turnTrack,
   vec3,
   yawDelta,
   type Aim,
@@ -134,6 +136,8 @@ const END_RAMP_FLOOR = 0.45; // slowest fraction of cruise speed at the very end
 const END_HOLD = 0.4; // seconds held on the final view
 const APPROACH_MIN = 0.4; // metres: closer than this a checkpoint run needs no glide to camera 1
 const TABLE_STEP = 0.05;
+/** Path metres between two samples of a gaze transition's way round (`turnsOf`). */
+const TURN_GRID_M = 0.02;
 /** How far a direction or travel look reaches ahead of the eye, metres (the floor guard may shorten it). */
 const GAZE_REACH_M = 3;
 /** Path metres ahead a `travel` key of a non-checkpoint route aims at. */
@@ -152,7 +156,7 @@ export class TourPlayer {
 
   private route: SampledPath = { samples: [{ p: new THREE.Vector3(), d: 0 }], length: 0, controlDistances: [0] };
   private zoneStarts: Array<{ d: number; speed: number }> = [];
-  private gaze: Array<{ d: number; look: Look; window: number }> = [];
+  private gaze: Array<{ d: number; look: Look; window: number; turns: number[] }> = [];
   private timeTable: TimeEntry[] = [];
   private state: TourState = 'ready';
   private elapsed = 0;
@@ -465,17 +469,14 @@ export class TourPlayer {
     this.zoneStarts = this.baseZones.map((zone) => ({ d: this.controlDistance(zone.at), speed: zone.speed })).sort((a, b) => a.d - b.d);
 
     const keys = this.baseGaze.map((key) => ({ d: this.controlDistance(key.at), look: key.look })).sort((a, b) => a.d - b.d);
-    this.gaze = keys.map((key, index) => ({
-      d: key.d,
-      look: key.look,
+    this.gaze = keys.map((key, index) => {
+      const next = keys[index + 1];
       // Never longer than the gap to the next key: a transition that started
       // before THIS key was reached would jump the gaze the moment the key is
       // passed (checkpoint routes put keys a few metres apart).
-      window:
-        index + 1 < keys.length
-          ? Math.max(1e-3, Math.min(this.gazeWindow(key, keys[index + 1]!), keys[index + 1]!.d - key.d))
-          : GAZE_MIN_WINDOW,
-    }));
+      const window = next ? Math.max(1e-3, Math.min(this.gazeWindow(key, next), next.d - key.d)) : GAZE_MIN_WINDOW;
+      return { d: key.d, look: key.look, window, turns: next ? this.turnsOf(key.look, next, window) : [] };
+    });
 
     this.motion = this.kind === 'checkpoints' ? this.buildMotion() : null;
     this.timeTable = this.motion
@@ -510,6 +511,14 @@ export class TourPlayer {
         index % 2 === 0 && travel[index + 1] !== undefined ? [{ leave, arrive: travel[index + 1]! }] : [],
       ),
       cruise: this.baseSpeed * TOUR_TRACK_SPEED_FACTOR,
+    });
+  }
+
+  /** The way round of the transition from `from` into `next` over its window (`turnTrack`). */
+  private turnsOf(from: Look, next: { d: number; look: Look }, window: number): number[] {
+    return turnTrack(Math.max(1, Math.ceil(window / TURN_GRID_M)), (u) => {
+      const d = next.d - window + window * u;
+      return this.aim(next.look, d).yaw - this.aim(from, d).yaw;
     });
   }
 
@@ -653,8 +662,11 @@ export class TourPlayer {
         const window = current.window || GAZE_MIN_WINDOW;
         const progress = smoothstep((distance - (key.d - window)) / window);
         const from = this.aim(current.look, distance, eye);
-        if (progress <= 0) return lookPoint(eye, from);
-        return lookPoint(eye, turnAim(from, this.aim(key.look, distance, eye), progress));
+        // Before the first key there is no transition yet: the first look holds.
+        if (progress <= 0 || key === current) return lookPoint(eye, from);
+        const to = this.aim(key.look, distance, eye);
+        const turn = turnOnTrack(current.turns, (distance - (key.d - window)) / window, to.yaw - from.yaw);
+        return lookPoint(eye, turnAim(from, to, progress, turn));
       }
     }
     return lookPoint(eye, this.aim(current.look, distance, eye));

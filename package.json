@@ -118,8 +118,8 @@
     "@playwright/test": "^1.63",
     "@swc/core": "1.16.2",
     "@types/bun": "1.4.1",
-    "@vitest/browser-playwright": "^5",
-    "@vitest/coverage-v8": "^5",
+    "@vitest/browser-playwright": "^5.0.5",
+    "@vitest/coverage-v8": "^5.0.5",
     "ajv": "8.20.0",
     "dependency-cruiser": "18.2.0",
     "knip": "6.34.0",
@@ -132,6 +132,6 @@
     "ts-json-schema-generator": "2.9.0",
     "typescript": "7.0.2",
     "vite": "8.2.4",
-    "vitest": "^5"
+    "vitest": "^5.0.5"
   }
 }

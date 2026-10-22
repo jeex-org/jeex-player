@@ -12,7 +12,7 @@ import { solvePlan } from '../plan/plan-solver.js';
 import { footprintOf } from '../assets/asset-footprint.js';
 import { obbQuad } from '../plan/plan-geometry.js';
 import { distanceToPolygon, pointInPolygon } from '../plan/plan-geometry.js';
-import type { TourCheckpoint, Vec2 } from '../scene/types.js';
+import type { SceneData, TourCheckpoint, Vec2 } from '../scene/types.js';
 
 const plan = solvePlan(apartmentScene);
 
@@ -921,5 +921,124 @@ describe('tour completion', () => {
     }
     expect(completions).toBe(1);
     expect(states.filter((state) => state === 'ended')).toHaveLength(2);
+  });
+});
+
+describe('an authored gaze turn', () => {
+  /** The largest change of look direction between two samples of the playback clock, degrees, and where it happens. */
+  function largestYawStep(scene: SceneData, step: number): { at: number; degrees: number } {
+    let pose: TourPose = { position: new THREE.Vector3(), target: new THREE.Vector3() };
+    const player = new TourPlayer(scene, (position, target) => (pose = { position: position.clone(), target: target.clone() }), {
+      onState: () => undefined,
+      onProgress: () => undefined,
+    });
+    let previous: number | null = null;
+    let largest = { at: 0, degrees: 0 };
+    for (let index = 0; index * step <= player.getDuration(); index += 1) {
+      player.seekTime(index * step);
+      const look = pose.target.clone().sub(pose.position);
+      const yaw = Math.atan2(look.x, look.z);
+      if (previous !== null) {
+        const turn = Math.abs(Math.atan2(Math.sin(yaw - previous), Math.cos(yaw - previous))) * (180 / Math.PI);
+        if (turn > largest.degrees) largest = { at: index * step, degrees: turn };
+      }
+      previous = yaw;
+    }
+    return largest;
+  }
+
+  test('keeps turning the way it started when the two looks pass opposite each other mid-turn', () => {
+    // From a far target on the left (+x) to one on the right, ahead: as the eye
+    // walks past it the target swings round behind, and the gap between the
+    // two looks passes 180° while the turn is under way.
+    const scene: SceneData = {
+      ...apartmentScene,
+      tourCheckpoints: [],
+      autotour: {
+        path: [
+          { x: 0, y: 1.6, z: 0 },
+          { x: 0, y: 1.6, z: 5 },
+          { x: 0, y: 1.6, z: 9 },
+          { x: 0, y: 1.6, z: 12 },
+        ],
+        gaze: [
+          { at: 0, target: { x: 100, y: 1.6, z: 6 } },
+          { at: 2, target: { x: -3, y: 1.6, z: 7 } },
+        ],
+      },
+    };
+    expect(largestYawStep(scene, 0.005).degrees).toBeLessThan(2);
+  });
+
+  test('keeps its side while the gap drifts a whole turn: the eye circles the target it turns to', () => {
+    // A ring of 0.8 m round the second target, a turn and a quarter: its look
+    // swings through more than 360° while the turn from the far first target
+    // (the full 180° away where the ring ends, so the turn takes its longest
+    // window) is under way, and a side taken once would flip on the way round.
+    const scene: SceneData = {
+      ...apartmentScene,
+      tourCheckpoints: [],
+      autotour: {
+        path: [
+          { x: 0, y: 1.6, z: 0.8 },
+          { x: -0.566, y: 1.6, z: 0.566 },
+          { x: -0.8, y: 1.6, z: 0 },
+          { x: -0.566, y: 1.6, z: -0.566 },
+          { x: 0, y: 1.6, z: -0.8 },
+          { x: 0.566, y: 1.6, z: -0.566 },
+          { x: 0.8, y: 1.6, z: 0 },
+          { x: 0.566, y: 1.6, z: 0.566 },
+          { x: 0, y: 1.6, z: 0.8 },
+          { x: -0.566, y: 1.6, z: 0.566 },
+          { x: -0.8, y: 1.6, z: 0 },
+        ],
+        gaze: [
+          { at: 0, target: { x: -100, y: 1.6, z: 0 } },
+          { at: 10, target: { x: 0, y: 1.6, z: 0 } },
+        ],
+      },
+    };
+    expect(largestYawStep(scene, 0.005).degrees).toBeLessThan(3);
+  });
+
+  test('before the first gaze key the view holds that key, even when a wide turn follows it', () => {
+    const far = { x: 100, y: 1.6, z: 6 };
+    const scene: SceneData = {
+      ...apartmentScene,
+      tourCheckpoints: [],
+      autotour: {
+        path: [
+          { x: 0, y: 1.6, z: 0 },
+          { x: 0, y: 1.6, z: 5 },
+          { x: 0, y: 1.6, z: 9 },
+          { x: 0, y: 1.6, z: 12 },
+          { x: 0, y: 1.6, z: 16 },
+        ],
+        gaze: [
+          { at: 1, target: far },
+          { at: 3, target: { x: -3, y: 1.6, z: 7 } },
+        ],
+      },
+    };
+    let pose: TourPose = { position: new THREE.Vector3(), target: new THREE.Vector3() };
+    const player = new TourPlayer(scene, (position, target) => (pose = { position: position.clone(), target: target.clone() }), {
+      onState: () => undefined,
+      onProgress: () => undefined,
+    });
+    let held = 0;
+    for (let time = 0; time <= player.getDuration(); time += 0.01) {
+      player.seekTime(time);
+      if (pose.position.z >= 5) break;
+      const look = pose.target.clone().sub(pose.position);
+      const toFar = new THREE.Vector3(far.x, far.y, far.z).sub(pose.position);
+      expect(look.angleTo(toFar) * (180 / Math.PI)).toBeLessThan(0.5);
+      held += 1;
+    }
+    expect(held).toBeGreaterThan(100);
+  });
+
+  test("the demo tour's gaze never snaps from one frame to the next", () => {
+    const largest = largestYawStep(apartmentScene, 0.005);
+    expect(largest.degrees, `${largest.degrees.toFixed(1)}° at ${largest.at.toFixed(3)} s`).toBeLessThan(3);
   });
 });
