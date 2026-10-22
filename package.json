@@ -68,6 +68,11 @@
       "import": "./dist-lib/jeex-viewer-ops.js",
       "default": "./dist-lib/jeex-viewer-ops.js"
     },
+    "./lighting": {
+      "types": "./dist-lib/lighting/index.d.ts",
+      "import": "./dist-lib/jeex-viewer-lighting.js",
+      "default": "./dist-lib/jeex-viewer-lighting.js"
+    },
     "./iife": "./dist-lib/jeex-viewer.iife.js",
     "./host/iife": "./dist-lib/jeex-viewer-host.iife.js",
     "./style.css": "./dist-lib/jeex-viewer.css",
@@ -86,7 +91,7 @@
     "dev:frames": "vite --open /dev/video-frames.html",
     "build": "tsc --noEmit && vite build && bun run scripts/css-contract-check.ts dist",
     "build:site": "bun run build && bun run scripts/site-build.ts",
-    "build:lib": "vite build --config vite.lib.config.ts --mode es && vite build --config vite.lib.config.ts --mode iife && vite build --config vite.lib.config.ts --mode host && vite build --config vite.lib.config.ts --mode ops && tsc -p tsconfig.lib.json && bun run scripts/schema-gen.ts --out dist-lib/schema && bun run scripts/css-contract-check.ts dist-lib",
+    "build:lib": "vite build --config vite.lib.config.ts --mode es && vite build --config vite.lib.config.ts --mode iife && vite build --config vite.lib.config.ts --mode host && vite build --config vite.lib.config.ts --mode ops && vite build --config vite.lib.config.ts --mode lighting && tsc -p tsconfig.lib.json && bun run scripts/schema-gen.ts --out dist-lib/schema && bun run scripts/css-contract-check.ts dist-lib && bun run scripts/lighting-entry-check.ts dist-lib",
     "lint": "oxlint --type-aware --deny-warnings src scripts dev tests",
     "format": "oxfmt src scripts dev tests vite.config.ts vite.css-target.ts vite.lib.config.ts vitest.config.ts playwright.config.ts index.html embed.html",
     "format:check": "oxfmt --check src scripts dev tests vite.config.ts vite.css-target.ts vite.lib.config.ts vitest.config.ts playwright.config.ts index.html embed.html",
@@ -109,7 +114,7 @@
     "hooks:install": "lefthook install"
   },
   "dependencies": {
-    "@types/three": "0.185.4",
+    "@types/three": "0.186.0",
     "zod": "4.6.2"
   },
   "devDependencies": {
@@ -128,7 +133,7 @@
     "oxlint": "1.81.0",
     "oxlint-tsgolint": "7.0.2001",
     "publint": "0.3.24",
-    "three": "0.185.1",
+    "three": "0.186.1",
     "ts-json-schema-generator": "2.9.0",
     "typescript": "7.0.2",
     "vite": "8.2.4",

@@ -14,6 +14,7 @@
  * component test mounts the smallest scene that carries its claim.
  */
 
+import * as THREE from 'three';
 import { afterEach, describe, expect, test } from 'vitest';
 import { CATALOGUE_REGISTRIES } from '../../src/assets/catalogue-registries.js';
 import { captureCommands, type CaptureCommands } from '../../src/app/capture-commands.js';
@@ -182,6 +183,48 @@ describe('capture.pair', () => {
     await capture.still({ width: 64, height: 64, state: 'default' });
     expect(runtime.renderer.info.memory.geometries).toBe(before.geometries);
     expect(runtime.renderer.info.memory.textures).toBe(before.textures);
+  });
+});
+
+describe('the «as is» lighting', () => {
+  test("is an apartment rig of the runtime's context, with its shadow size, gone after the capture", async () => {
+    const runtime = openRuntime();
+    const capture = commandsFor(runtime, loadModel());
+    const lighting = runtime.lighting;
+    const create = lighting.createApartmentRig.bind(lighting);
+    const seen: Array<{ options: unknown; lights: number; shadows: number; rig: ReturnType<typeof create>; scene: THREE.Scene | null }> =
+      [];
+    lighting.createApartmentRig = (options) => {
+      const rig = create(options);
+      const attach = rig.attach.bind(rig);
+      const record = { options, lights: 0, shadows: 0, rig, scene: null as THREE.Scene | null };
+      seen.push(record);
+      rig.attach = (scene) => {
+        attach(scene);
+        record.scene = scene;
+        scene.traverse((object) => {
+          if (!(object as THREE.Light).isLight) return;
+          record.lights += 1;
+          if (object.castShadow) record.shadows += 1;
+        });
+      };
+      return rig;
+    };
+    await capture.still({ width: 64, height: 64, state: 'default' });
+    expect(seen).toHaveLength(1);
+    const [record] = seen;
+    expect(record!.options).toEqual({ shadowMapSize: runtime.shadowMapSize });
+    expect(record!.scene).not.toBe(runtime.scene);
+    // Sky, sun, fill — the live scene's own values — and only the sun casts.
+    expect([record!.lights, record!.shadows]).toEqual([3, 1]);
+    // Disposed with the capture: off the offscreen scene, and refused if reused.
+    expect(record!.rig.scene).toBeNull();
+    let lightsLeft = 0;
+    record!.scene!.traverse((object) => {
+      if ((object as THREE.Light).isLight) lightsLeft += 1;
+    });
+    expect(lightsLeft).toBe(0);
+    expect(() => record!.rig.attach(new THREE.Scene())).toThrow(/disposed/);
   });
 });
 

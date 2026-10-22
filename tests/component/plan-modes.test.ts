@@ -73,9 +73,6 @@ function build(
   const runtime = new RenderRuntime({
     canvas: shell.roots.canvas,
     viewport: shell.roots.viewport,
-    // PMREM over a room environment is seconds of GPU work on SwiftShader and
-    // nothing here looks at a reflection.
-    createEnvironment: () => null,
   });
   runtime.setCamera(perspective);
   const modes = new PlanModes({

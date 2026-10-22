@@ -225,7 +225,7 @@ export const buildCooker: Builder = (asset, kit) => {
     { y: winY, z: frontZ + 0.024 },
   );
   // Oven glass: TRANSPARENT smoked pane (the `glass` slot) set 0.5 mm inside
-  // the bezel face. The PMREM room environment gives it live reflections;
+  // the bezel face. The lighting standard's PMREM environment gives it live reflections;
   // no Reflector here, one mirror RT per scene is the budget.
   put(group, kit.plane(winW, winH), kit.finish('glass'), { y: winY, z: frontZ + 0.0435 });
   // Cavity back: dark enamel 14 mm behind the glass, the depth the eye reads.

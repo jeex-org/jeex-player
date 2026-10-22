@@ -22,7 +22,8 @@
  * - `per-file` (the library, `dist-lib`): the boot files are ALTERNATIVES — a
  *   host loads the ES bundle or the IIFE one, an iframe host loads only the
  *   tiny helper, an editor host that wants the operation vocabulary loads only that
- *   entry — so summing them would double-count the same code and hide the
+ *   entry, an application that only lights its own scenes loads only the
+ *   lighting entry — so summing them would double-count the same code and hide the
  *   budget that actually bites (the 4 KB host helper, the 64.1 KB ops entry).
  *
  * LAZY files are always judged per file, in EITHER mode: a lazy chunk is
@@ -67,6 +68,21 @@ export const HOST_BUDGET_FAIL_BYTES = 4 * 1024;
  */
 export const OPS_BUDGET_FAIL_BYTES = 74 * 1024 + 418;
 
+/**
+ * Hard limit for the `jeex-viewer/lighting` entry, gzip bytes. It carries the
+ * lighting standard and nothing of the viewer: no three.js (the consumer
+ * passes its own in) and no DOM, so it is the environment recipe, the rig
+ * code and the `zod/mini` schema of the rig options — the last of which is
+ * most of the bytes.
+ *
+ * The gate is the last measured size of `jeex-viewer-lighting.js` (9,750 gzip
+ * bytes, 9.5 KB, from `measureBundle('dist-lib')` right after
+ * `bun run build:lib`) plus 1 KB. A three.js that slipped into the entry would
+ * be two orders of magnitude over it; `scripts/lighting-entry-check.ts` is
+ * the gate that says so by name.
+ */
+export const LIGHTING_BUDGET_FAIL_BYTES = 10 * 1024 + 534;
+
 /** File-name prefix of the host helper's bundles (`vite.lib.config.ts`). */
 const HOST_BUNDLE_PREFIX = 'jeex-viewer-host';
 /**
@@ -77,6 +93,8 @@ const HOST_BUNDLE_PREFIX = 'jeex-viewer-host';
  * `ening-frame`), so this `startsWith` cannot claim that chunk by accident.
  */
 const OPS_BUNDLE_PREFIX = 'jeex-viewer-ops';
+/** File-name prefix of the lighting entry's bundle (`vite.lib.config.ts`). */
+const LIGHTING_BUNDLE_PREFIX = 'jeex-viewer-lighting';
 
 /**
  * File-name prefix both vite configs give every dynamic-import chunk
@@ -102,6 +120,7 @@ export type BudgetMode = 'total' | 'per-file';
 export function limitFor(name: string): number {
   if (name.startsWith(HOST_BUNDLE_PREFIX)) return HOST_BUDGET_FAIL_BYTES;
   if (name.startsWith(OPS_BUNDLE_PREFIX)) return OPS_BUDGET_FAIL_BYTES;
+  if (name.startsWith(LIGHTING_BUNDLE_PREFIX)) return LIGHTING_BUDGET_FAIL_BYTES;
   return BUDGET_FAIL_BYTES;
 }
 

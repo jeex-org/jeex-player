@@ -1,8 +1,9 @@
 /**
  * Rendering runtime: the WebGL renderer, the `THREE.Scene` with its sky and
- * fog, the PMREM environment, the light rig, resize handling, the per-frame
- * loop with registrable hooks and the disposal of all of it. The swatch
- * preview draws with this same renderer (`swatch-preview.ts`).
+ * fog, the lighting standard's context and apartment rig (`src/lighting/`),
+ * resize handling, the per-frame loop with registrable hooks and the disposal
+ * of all of it. The swatch preview draws with this same renderer and context
+ * (`swatch-preview.ts`).
  *
  * Invariant: nothing here knows about the apartment. The runtime owns WebGL
  * resources and the frame clock; every scene-specific update runs as a frame
@@ -26,20 +27,25 @@
  * REPORTS through `onContextLost`, and when the browser gives the context back
  * it reports `onContextRestored` so the composition root can re-mount the
  * committed document. Nothing here decides what a lost context means for the
- * user; that is the composition root's answer.
+ * user; that is the composition root's answer. The one GPU resource the
+ * runtime itself owns past a restore is the lighting: its prefiltered
+ * environment was RENDERED, so it cannot be re-uploaded, and the runtime
+ * replaces the lighting context and its rig before reporting the restore.
  */
 import * as THREE from 'three';
 import { Fanout } from '../shared/fanout.js';
-import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
 import { setTextureAnisotropy, skyTexture } from '../materials/textures.js';
 import { sharedTextureCache } from '../materials/texture-cache.js';
 import { linkedAbortController } from '../shared/abort.js';
 import { SwatchPreview, type PreviewRenderer } from './swatch-preview.js';
+import { playerLighting } from './lighting-engine.js';
+import { LIGHTING_STANDARD } from '../lighting/lighting-standard.js';
+import type { LightingContext, LightingRig } from '../lighting/lighting-context.js';
 
 /** Device pixel ratio cap: above this the fill cost outgrows the visible gain. */
 const PIXEL_RATIO_CAP = 1.7;
-/** Shadow map resolution of the sun, in texels per side. */
-const SHADOW_MAP_SIZE = 2048;
+/** Shadow map resolution of the sun, in texels per side: the standard's default. */
+const SHADOW_MAP_SIZE = LIGHTING_STANDARD.apartment.sun.shadow.defaultMapSize;
 /**
  * Longest frame step handed to hooks, in seconds (a tab switch must not teleport).
  * Exported for `scripts/browser-check`, which measures motion on this clock.
@@ -83,7 +89,8 @@ type RenderRuntimeOptions = {
    * so the unit test drives the loop with stubs; production uses the defaults.
    */
   createRenderer?: (canvas: HTMLCanvasElement) => THREE.WebGLRenderer;
-  createEnvironment?: (renderer: THREE.WebGLRenderer) => THREE.Texture | null;
+  /** The lighting standard bound to the renderer; production builds it with the player's three.js. */
+  createLighting?: (renderer: THREE.WebGLRenderer) => LightingContext;
   scheduleFrame?: (callback: () => void) => number;
   cancelFrame?: (handle: number) => void;
   now?: () => number;
@@ -134,30 +141,20 @@ export function measureEntry(entry: ResizeObserverEntry, pixelRatio: number): Ob
   };
 }
 
-type LightRig = {
-  sky: THREE.HemisphereLight;
-  sun: THREE.DirectionalLight;
-  fill: THREE.DirectionalLight;
-};
-
 function defaultRenderer(canvas: HTMLCanvasElement): THREE.WebGLRenderer {
   return new THREE.WebGLRenderer({ canvas, antialias: true, powerPreference: 'high-performance' });
-}
-
-function defaultEnvironment(renderer: THREE.WebGLRenderer): THREE.Texture | null {
-  const pmrem = new THREE.PMREMGenerator(renderer);
-  const room = new RoomEnvironment();
-  const texture = pmrem.fromScene(room, 0.04).texture;
-  room.dispose();
-  pmrem.dispose();
-  return texture;
 }
 
 export class RenderRuntime {
   readonly renderer: THREE.WebGLRenderer;
   readonly scene = new THREE.Scene();
-  readonly lights: LightRig;
-  readonly environment: THREE.Texture | null;
+  /** Sun shadow map size the apartment rigs of this runtime are built with. */
+  readonly shadowMapSize: number;
+  /** The lighting context now; replaced after a context restore. */
+  private lightingContext: LightingContext;
+  /** The apartment rig on `scene`, from `lightingContext`. */
+  private rig: LightingRig;
+  private readonly createLighting: (renderer: THREE.WebGLRenderer) => LightingContext;
   private camera: THREE.Camera | null = null;
   private renderEnabled = true;
   /** `now()` of the last frame actually drawn, for the keep-warm heartbeat. */
@@ -210,14 +207,6 @@ export class RenderRuntime {
     this.renderer = (options.createRenderer ?? defaultRenderer)(options.canvas);
     this.renderer.setPixelRatio(this.pixelRatio());
     this.renderer.setSize(Math.max(1, this.viewport.clientWidth), Math.max(1, this.viewport.clientHeight), false);
-    this.renderer.outputColorSpace = THREE.SRGBColorSpace;
-    this.renderer.toneMapping = THREE.ACESFilmicToneMapping;
-    this.renderer.toneMappingExposure = 1.0;
-    this.renderer.shadowMap.enabled = true;
-    // `PCFSoftShadowMap` was deprecated for `WebGLRenderer` in three r182 —
-    // it warns on every construction and falls back to this constant anyway,
-    // because `PCFShadowMap` is the soft one now.
-    this.renderer.shadowMap.type = THREE.PCFShadowMap;
     // The procedural textures outlive any one runtime and are shared between
     // viewers on a page, so this runtime takes a HOLD on them and frees it in
     // `dispose` — the last holder is what actually disposes (`texture-cache.ts`).
@@ -226,12 +215,20 @@ export class RenderRuntime {
     // two renderers the cache keeps the lower of the two caps.
     setTextureAnisotropy(this.renderer.capabilities.getMaxAnisotropy());
 
-    this.environment = (options.createEnvironment ?? defaultEnvironment)(this.renderer);
-    if (this.environment) this.scene.environment = this.environment;
-    this.scene.environmentIntensity = 0.5;
-    this.lights = this.buildLights(options.shadowMapSize ?? SHADOW_MAP_SIZE);
+    // The lighting standard sets the display transform (PBR Neutral, exposure
+    // 1, sRGB output) and PCF shadows on the renderer, and lights the scene
+    // with its apartment rig.
+    this.createLighting = options.createLighting ?? playerLighting;
+    this.shadowMapSize = options.shadowMapSize ?? SHADOW_MAP_SIZE;
+    this.lightingContext = this.createLighting(this.renderer);
+    this.rig = this.lightingContext.createApartmentRig({ shadowMapSize: this.shadowMapSize });
+    this.rig.attach(this.scene);
 
-    this.preview = new SwatchPreview(this.renderer, () => !this.disposed && !this.contextLost);
+    this.preview = new SwatchPreview(
+      this.renderer,
+      () => this.lightingContext,
+      () => !this.disposed && !this.contextLost,
+    );
     this.observer = observeBox(options.viewport, this.onObserve);
     this.watchContext(options.canvas, options.onContextLost, options.onContextRestored);
     this.watchVisibility();
@@ -371,11 +368,34 @@ export class RenderRuntime {
       'webglcontextrestored',
       () => {
         this.contextLost = false;
+        this.renewLighting();
         onRestored?.();
         this.start();
       },
       { signal },
     );
+  }
+
+  /**
+   * A new lighting context and apartment rig, after a context restore: the
+   * old environment was rendered into a target the lost context took with it.
+   * Disposing the old context detaches its rig and every swatch rig made from
+   * it; the preview builds its next rig from the new one.
+   */
+  private renewLighting(): void {
+    this.lightingContext.dispose();
+    this.lightingContext = this.createLighting(this.renderer);
+    this.rig = this.lightingContext.createApartmentRig({ shadowMapSize: this.shadowMapSize });
+    this.rig.attach(this.scene);
+  }
+
+  /**
+   * The lighting standard bound to this runtime's renderer. A capture builds
+   * its own rigs from it (`app/capture-commands.ts`); it is replaced after a
+   * context restore, so read it at the moment of use.
+   */
+  get lighting(): LightingContext {
+    return this.lightingContext;
   }
 
   /** True while the GL context is gone and nothing can be drawn. */
@@ -501,8 +521,9 @@ export class RenderRuntime {
     this.listeners.abort();
     this.observer?.disconnect();
     this.preview.dispose();
-    this.environment?.dispose();
-    this.scene.environment = null;
+    // Disposes the apartment rig (which restores the scene's environment)
+    // and then the prefiltered environment itself.
+    this.lightingContext.dispose();
     // The sky comes from the shared texture cache, whose ref count the
     // `release` below settles. Clearing the reference is what stops the scene
     // pointing at a texture the last holder may already have freed.
@@ -540,30 +561,6 @@ export class RenderRuntime {
     // skipped hook produces. A drawing hook guards itself.
     this.postRenderHooks.emit(delta, now);
   };
-
-  private buildLights(shadowMapSize: number): LightRig {
-    const sky = new THREE.HemisphereLight('#fff6e6', '#6d675f', 0.62);
-    this.scene.add(sky);
-    const sun = new THREE.DirectionalLight('#ffe2b8', 4.4);
-    sun.position.set(12.5, 15.5, -6.5);
-    sun.target.position.set(8, 0, 5);
-    this.scene.add(sun.target);
-    sun.castShadow = true;
-    sun.shadow.mapSize.set(shadowMapSize, shadowMapSize);
-    sun.shadow.camera.left = -13;
-    sun.shadow.camera.right = 13;
-    sun.shadow.camera.top = 13;
-    sun.shadow.camera.bottom = -13;
-    sun.shadow.camera.near = 2;
-    sun.shadow.camera.far = 60;
-    sun.shadow.bias = -0.0002;
-    sun.shadow.normalBias = 0.02;
-    this.scene.add(sun);
-    const fill = new THREE.DirectionalLight('#bed7de', 0.32);
-    fill.position.set(-14, 8, 14);
-    this.scene.add(fill);
-    return { sky, sun, fill };
-  }
 }
 
 /**

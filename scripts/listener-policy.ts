@@ -50,7 +50,7 @@ export type AllowlistEntry = {
 export const ALLOWLIST: readonly AllowlistEntry[] = [
   {
     file: 'src/fixtures/stubs.ts',
-    line: 101,
+    line: 103,
     date: '2026-09-08',
     reason:
       "the fake canvas's own bookkeeping listener on the CALLER's abort signal, registered with { once: true } so it self-unregisters the one time that signal can fire — passing `signal` here would mean the signal removing a listener on its own 'abort' event, which is circular. FakeCanvas is a per-test throwaway object besides.",

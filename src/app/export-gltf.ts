@@ -148,7 +148,7 @@ function bufferViewSlots(json: Record<string, unknown>): ViewSlot[] {
  * same document byte-for-byte identical.
  *
  * `GLTFExporter` allocates a TEXTURE's bufferView inside the `FileReader`
- * callback chained after `canvas.toBlob` (three r185,
+ * callback chained after `canvas.toBlob` (three r186,
  * `GLTFWriter.processBufferViewImage`), and the binary chunk is the
  * concatenation of `writer.buffers` in push order. Neither `toBlob` nor
  * `FileReader` promises completion order across independent instances: Blink

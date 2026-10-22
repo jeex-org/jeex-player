@@ -15,9 +15,19 @@
  *
  * Answer invariant: every failure answers `null`. The panel then falls back to
  * a flat palette chip, which is a worse picture but never a broken one.
+ *
+ * Light invariant: a swatch is lit by the lighting standard's REFERENCE rig
+ * (`src/lighting/`) — the same environment and key every application uses for
+ * material review — and tone mapped exactly once. Rendering into a render
+ * target applies no tone mapping, so the swatch goes into a half-float target
+ * and through the still capture's display pass (`still-capture.ts`), which
+ * applies the renderer's PBR Neutral, its exposure and the sRGB encoding.
+ * Lights inside the previewed object (a lamp's bulb) are the object's own.
  */
 
 import * as THREE from 'three';
+import { displayMaterial, drawDisplayPass } from './still-capture.js';
+import type { LightingContext, LightingRig } from '../lighting/lighting-context.js';
 
 /** Edge of the square preview render target, in pixels. */
 const PREVIEW_SIZE = 112;
@@ -34,23 +44,36 @@ export type PreviewRenderer = {
 
 export class SwatchPreview implements PreviewRenderer {
   private readonly renderer: THREE.WebGLRenderer;
+  /** The owner's lighting context now; a context restore replaces it. */
+  private readonly lighting: () => LightingContext;
   /** Whether the owner can draw at all right now (disposed, or context lost). */
   private readonly available: () => boolean;
   private readonly scene = new THREE.Scene();
   private readonly camera = new THREE.PerspectiveCamera(32, 1, 0.1, 60);
-  /** The square target swatches are drawn into; reused across sizes. */
+  /** The half-float square target swatches are drawn into; reused across sizes. */
   private target: THREE.WebGLRenderTarget | null = null;
+  /** The reference rig on `scene`, built on first use from the current context. */
+  private rig: LightingRig | null = null;
+  /** The context `rig` was made from. */
+  private rigContext: LightingContext | null = null;
   /** One 2D canvas, reused, that turns read-back pixels into a PNG data URL. */
   private canvas: HTMLCanvasElement | null = null;
 
-  constructor(renderer: THREE.WebGLRenderer, available: () => boolean) {
+  constructor(renderer: THREE.WebGLRenderer, lighting: () => LightingContext, available: () => boolean) {
     this.renderer = renderer;
+    this.lighting = lighting;
     this.available = available;
   }
 
   render(group: THREE.Object3D, size = PREVIEW_SIZE): string | null {
     if (!this.available()) return null;
-    this.ensureLights();
+    // A rig that cannot be renewed (a context restore that failed) is one more
+    // failure that answers `null`, not a throw.
+    try {
+      this.ensureRig();
+    } catch {
+      return null;
+    }
     const target = this.targetOf(size);
     const parent = group.parent;
     const previousTarget = this.renderer.getRenderTarget();
@@ -63,9 +86,8 @@ export class SwatchPreview implements PreviewRenderer {
       this.renderer.setClearColor(0x000000, 0);
       this.renderer.clear();
       this.renderer.render(this.scene, this.camera);
-      const pixels = new Uint8Array(size * size * 4);
-      this.renderer.readRenderTargetPixels(target, 0, 0, size, size, pixels);
-      return this.encode(pixels, size);
+      const material = displayMaterial(this.renderer, { map: { value: target.texture } }, 'uniform sampler2D map;', 'texture2D(map, vUv)');
+      return this.encode(drawDisplayPass(this.renderer, material, size, size), size);
     } catch {
       // A read-back or context failure is expected on some hosts; the caller
       // falls back to the flat palette chip.
@@ -81,21 +103,24 @@ export class SwatchPreview implements PreviewRenderer {
   dispose(): void {
     this.target?.dispose();
     this.target = null;
+    this.rig?.dispose();
+    this.rig = null;
     this.canvas = null;
     this.scene.clear();
   }
 
-  /** The three-light rig the preview scene is lit by; built on first use. */
-  private ensureLights(): void {
-    if (this.scene.children.length > 0) return;
-    const ambient = new THREE.AmbientLight('#fff6e6', 1.6);
-    this.scene.add(ambient);
-    const key = new THREE.DirectionalLight('#ffffff', 2.6);
-    key.position.set(2.5, 4, 2);
-    this.scene.add(key);
-    const fill = new THREE.DirectionalLight('#dbe4ff', 0.9);
-    fill.position.set(-3, 2, 1);
-    this.scene.add(fill);
+  /**
+   * The reference rig the preview scene is lit by, built on first use. A rig
+   * whose context was disposed (a context restore replaced it) is dead: its
+   * environment went with it, so the next swatch takes a rig from the new one.
+   */
+  private ensureRig(): void {
+    const lighting = this.lighting();
+    if (this.rig?.scene === this.scene && this.rigContext === lighting) return;
+    this.rig?.dispose();
+    this.rig = lighting.createReferenceRig();
+    this.rigContext = lighting;
+    this.rig.attach(this.scene);
   }
 
   /**
@@ -109,10 +134,9 @@ export class SwatchPreview implements PreviewRenderer {
       if (existing.width !== size || existing.height !== size) existing.setSize(size, size);
       return existing;
     }
-    const target = new THREE.WebGLRenderTarget(size, size, { depthBuffer: true });
-    // sRGB on the TEXTURE, so the pixels read back are display-encoded, as a
-    // canvas would hand them over.
-    target.texture.colorSpace = THREE.SRGBColorSpace;
+    // Half float and linear: tone mapping happens in the display pass AFTER
+    // this one, and an 8-bit target would clip every highlight it rolls off.
+    const target = new THREE.WebGLRenderTarget(size, size, { type: THREE.HalfFloatType, depthBuffer: true });
     this.target = target;
     return target;
   }

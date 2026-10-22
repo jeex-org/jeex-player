@@ -29,8 +29,14 @@
  * `telemetry` sits right below `app`: it builds, judges and sends the
  * anonymous usage reports, and must never know the viewer's own events —
  * `app/telemetry-wiring.ts` projects those into plain calls.
+ *
+ * `lighting` is the lighting standard, published on its own as
+ * `jeex-viewer/lighting`: it reaches nothing of the viewer, not even
+ * `shared/`, so it sits at the very bottom, and `render` (which binds it to
+ * the player's renderer) is far above it.
  */
 const LAYERS = [
+  'lighting',
   'shared',
   'scene/types',
   'plan',

@@ -9,6 +9,13 @@ as described under [Versioning](#versioning).
 
 ### Added
 
+- **`jeex-viewer/lighting`: the lighting standard as a public entry.**
+  `createLightingContext(three, renderer)` binds it to your own three.js
+  (revision 186) and renderer; `createReferenceRig()` and
+  `createApartmentRig({ shadowMapSize })` light a scene with exactly what the
+  player uses; `LIGHTING_STANDARD` and `LIGHTING_STANDARD_VERSION` describe
+  it. The entry carries no three.js and no DOM access. See the README,
+  «Lighting standard».
 - **Anonymous telemetry, on by default.** The player sends anonymous usage
   and error counts to `https://telemetry.jeex.org/v1/player`: lifecycle
   (`view`, `ready`, `models_loaded`), capped action counters, room time
@@ -29,6 +36,14 @@ as described under [Versioning](#versioning).
 
 ### Changed
 
+- **The player lights with the new standard: PBR Neutral instead of ACES
+  Filmic.** Neutral keeps a material's hue and saturation where ACES washed
+  them out, so colours read truer and the demo looks somewhat different.
+  The synthetic room environment is replaced by a generated grey studio;
+  the sun and sky light are less warm. Swatches in the selection panel are
+  rendered under the reference rig and tone mapped once, and the
+  development furniture gallery uses the reference rig too.
+- **three.js 0.186.1** (from 0.185.1), with `@types/three` 0.186.0.
 - **The demo apartment is a new, invented flat.** The scene the demo pages
   and the player site ship (`src/demo/`, published as
   `demo/demo-apartment.json`) is now `Two-bedroom demo apartment`: an

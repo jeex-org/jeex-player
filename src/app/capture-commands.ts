@@ -15,9 +15,9 @@
  *
  * State invariant: `'default'` is not a second scene the host has to keep. It
  * is the committed document with the paint taken off
- * (`render/offscreen-scene.ts`), built OFFSCREEN into a scene of its own with
- * the runtime's own lights and environment, captured, and disposed in the
- * same call — so a pair is one document photographed twice, which is exactly
+ * (`render/offscreen-scene.ts`), built OFFSCREEN into a scene of its own, lit
+ * by an apartment rig of the runtime's own lighting context, captured, and
+ * disposed in the same call — so a pair is one document photographed twice, which is exactly
  * what «the unaltered original beside the staged image» means for a viewer
  * that owns its geometry.
  */
@@ -153,9 +153,11 @@ export function captureCommands(deps: CaptureDeps): CaptureCommands {
    *
    * `'current'` hands over the LIVE scene, so a still of what is on screen is
    * the same picture with the same background, fog, environment and lights.
-   * `'default'` builds the stripped document offscreen, lights it with clones
-   * of the runtime's own rig, and disposes every mesh and material it made
-   * before it returns — `renderer.info.memory` is back where it started.
+   * `'default'` builds the stripped document offscreen, lights it with an
+   * apartment rig of the runtime's lighting context (the live scene's values
+   * and shadow size), and disposes every mesh, material, light and shadow map
+   * it made before it returns — `renderer.info.memory` is back where it
+   * started.
    */
   async function inState<T>(
     state: SceneState,
@@ -170,19 +172,20 @@ export function captureCommands(deps: CaptureDeps): CaptureCommands {
     const offscreen = SceneModel.load(documentForState(model.toJSON(), 'default'), CATALOGUE_REGISTRIES);
     const builder = new SceneBuilder(offscreen.scene, offscreen.plan);
     const scene = new THREE.Scene();
-    const lights = lightRig(runtime);
+    const rig = runtime.lighting.createApartmentRig({ shadowMapSize: runtime.shadowMapSize });
     try {
       scene.background = runtime.scene.background;
-      scene.environment = runtime.environment;
-      scene.environmentIntensity = runtime.scene.environmentIntensity;
       scene.fog = runtime.scene.fog;
+      rig.attach(scene);
       const built = builder.build();
       shellLike(deps.shellState(), offscreen, built.root, eye);
-      scene.add(built.root, lights);
+      scene.add(built.root);
       return await take(scene);
     } finally {
+      // The rig's sun allocates its shadow map on the first frame it is drawn
+      // in; disposing the rig releases it with the lights.
+      rig.dispose();
       scene.clear();
-      disposeLights(lights);
       builder.dispose();
     }
   }
@@ -299,31 +302,6 @@ export function poseOf(pose: { position: THREE.Vector3; target: THREE.Vector3 } 
     position: { x: pose.position.x, y: pose.position.y, z: pose.position.z },
     target: { x: pose.target.x, y: pose.target.y, z: pose.target.z },
   };
-}
-
-/** Clones of the runtime's light rig, so the offscreen build is lit exactly as the live one is. */
-function lightRig(runtime: RenderRuntime): THREE.Group {
-  const group = new THREE.Group();
-  const sun = runtime.lights.sun.clone();
-  // The target is an object in the graph, not a vector: three clones it with
-  // the light, and it has to be added or the sun points at the origin.
-  group.add(runtime.lights.sky.clone(), sun, sun.target, runtime.lights.fill.clone());
-  return group;
-}
-
-/**
- * Frees the shadow maps the cloned rig allocated.
- *
- * A cloned `DirectionalLight` carries a cloned `LightShadow`, and the shadow
- * allocates its render target on the FIRST frame it is drawn in — so a capture
- * that only removed the lights from the scene left one framebuffer per call on
- * the GPU (measured: two textures per «as is» capture).
- */
-function disposeLights(lights: THREE.Group): void {
-  lights.traverse((object) => {
-    const shadow = (object as { shadow?: { dispose?: () => void } }).shadow;
-    shadow?.dispose?.();
-  });
 }
 
 /**

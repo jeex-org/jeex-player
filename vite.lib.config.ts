@@ -13,11 +13,19 @@
  * | `iife`    | `iife-entry`        | `iife`  | `jeex-viewer.iife.js` (global `JeexViewer`; registers `<jeex-viewer>` on load) |
  * | `host`    | `host`              | `es`+`iife` | `jeex-viewer-host.js`, `jeex-viewer-host.iife.js` (global `JeexViewerHost`) |
  * | `ops`     | `ops`               | `es`    | `jeex-viewer-ops.js` (the `jeex-viewer/ops` entry, `src/embed/ops.ts`) |
+ * | `lighting` | `lighting`         | `es`    | `jeex-viewer-lighting.js` (the `jeex-viewer/lighting` entry, `src/lighting/index.ts`) |
  *
- * `three` is BUNDLED, deliberately: the point of the `<script>` and custom
+ * `three` is BUNDLED, deliberately (the `lighting` pass excepted, see below): the point of the `<script>` and custom
  * element forms is a drop-in tag, an external `three` would force every host
  * into an import map, and the three `three/addons/*` subpath imports
  * have no matching CDN globals to map an `iife` onto.
+ *
+ * The `lighting` entry carries NO three.js at all: the lighting standard is
+ * built with the namespace the consumer passes in, and its modules import
+ * three only as types. `three` is still marked external in that pass, as a
+ * safety net — a runtime import that slipped in would stay an import of the
+ * consumer's own three rather than a second engine bundled into the entry —
+ * and `scripts/lighting-entry-check.ts` fails the build on either.
  *
  * The ES output keeps its whitespace and the `iife` does not, and that is
  * Vite's decision, not an oversight: an ES library is minified by the host's
@@ -128,6 +136,8 @@ type Pass = {
   /** Only the first pass may empty `dist-lib`; the others add to it. */
   empty: boolean;
   plugins: Plugin[];
+  /** Packages left as imports instead of bundled; only the `lighting` pass names any. */
+  external?: (string | RegExp)[];
 };
 
 const PASSES: Record<string, Pass> = {
@@ -160,6 +170,13 @@ const PASSES: Record<string, Pass> = {
     formats: ['es'],
     empty: false,
     plugins: [],
+  },
+  lighting: {
+    entry: { 'jeex-viewer-lighting': from('src/lighting/index.ts') },
+    formats: ['es'],
+    empty: false,
+    plugins: [],
+    external: ['three', /^three\//],
   },
 };
 
@@ -196,6 +213,7 @@ export default defineConfig(({ mode }): UserConfig => {
       // into the boot sum: it is authoring code,
       // loaded by an action, never by opening the page.
       rolldownOptions: {
+        ...(pass.external !== undefined && { external: pass.external }),
         output: {
           chunkFileNames: (chunk) => (chunk.isDynamicEntry ? 'lazy-jeex-viewer-[name]-[hash].js' : 'jeex-viewer-[name]-[hash].js'),
         },

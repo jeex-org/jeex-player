@@ -45,6 +45,7 @@ const SCHEMA_MODULES: readonly string[] = [
   'geometry/glb-container.schema',
   'embed/frame-page.schema',
   'telemetry/telemetry.schema',
+  'lighting/lighting-options.schema',
 ];
 
 /** Modules the architecture declares pure: no `three`, no DOM. */
@@ -142,6 +143,12 @@ const PURE_MODULES = [
   'app/option-resolvers',
   'app/option-paths',
   'app/option-sets',
+  'lighting/index',
+  'lighting/lighting-context',
+  'lighting/lighting-error',
+  'lighting/lighting-standard',
+  'lighting/environment-recipe',
+  'lighting/lighting-three',
   ...SCHEMA_MODULES,
 ];
 

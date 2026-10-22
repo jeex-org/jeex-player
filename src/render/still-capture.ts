@@ -11,7 +11,7 @@
  * Colour invariant, and it is the reason for the second pass: rendering into a
  * plain render target keeps the WORKING colour space and applies NO tone
  * mapping. `WebGLRenderer` picks both from the render target and only an XR
- * one carries the display settings (r185, `WebGLRenderer.js`: `colorSpace =
+ * one carries the display settings (r186, `WebGLRenderer.js`: `colorSpace =
  * _currentRenderTarget === null ? outputColorSpace : … workingColorSpace`).
  * So the scene goes into a half-float target, and a full-screen quad applies
  * the renderer's own tone mapping and the sRGB transfer — three's own shader
