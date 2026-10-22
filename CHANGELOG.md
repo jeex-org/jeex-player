@@ -111,6 +111,14 @@ as described under [Versioning](#versioning).
   view jumped: by 35° and 57° on the demo tour (11.8 s and 28.4 s). A turn
   now keeps the side it started on until it lands. Checkpoint tours were
   not affected.
+- **The tour player's travel direction follows the path outside
+  checkpoint tours.** It was read along a chord whose two ends fell on the
+  same point everywhere except the route's first and last metre, so it came
+  out as yaw 0 (+Z). A scene document's `autotour` holds only `target` gaze
+  keys, so the only case a document could reach was an eye passing exactly
+  through its gaze target away from the route's ends: for that instant the
+  look pointed toward +Z. Checkpoint tours steer their own travel look and
+  are unchanged.
 
 ## [0.1.0] — 2026-10-19
 

@@ -1042,3 +1042,42 @@ describe('an authored gaze turn', () => {
     expect(largest.degrees, `${largest.degrees.toFixed(1)}° at ${largest.at.toFixed(3)} s`).toBeLessThan(3);
   });
 });
+
+describe('a travel look on an authored route', () => {
+  test('looks along the path all the way, not only over its last metre', () => {
+    // North 6 m, then east 8 m; from the corner on, the look is the travel direction.
+    let pose: TourPose = { position: new THREE.Vector3(), target: new THREE.Vector3() };
+    const player = new TourPlayer(apartmentScene, (position, target) => (pose = { position: position.clone(), target: target.clone() }), {
+      onState: () => undefined,
+      onProgress: () => undefined,
+    });
+    const route = {
+      path: [
+        { x: 0, y: 1.6, z: 0 },
+        { x: 0, y: 1.6, z: 6 },
+        { x: 8, y: 1.6, z: 6 },
+      ],
+      gaze: [
+        { at: 0, target: { x: 0, y: 1.6, z: 100 } },
+        { at: 1, travel: true as const },
+      ],
+    };
+    player.setRoute(route);
+    let checked = 0;
+    let previous: number | null = null;
+    for (let time = 0; time <= player.getDuration(); time += 0.005) {
+      player.seekTime(time);
+      const look = pose.target.clone().sub(pose.position);
+      const yaw = Math.atan2(look.x, look.z);
+      if (previous !== null)
+        expect(Math.abs(Math.atan2(Math.sin(yaw - previous), Math.cos(yaw - previous))) * (180 / Math.PI)).toBeLessThan(3);
+      previous = yaw;
+      // Along the east leg, clear of the corner's turn: due east.
+      if (pose.position.x > 3) {
+        expect(Math.abs(yaw - Math.PI / 2) * (180 / Math.PI)).toBeLessThan(2);
+        checked += 1;
+      }
+    }
+    expect(checked).toBeGreaterThan(100);
+  });
+});
