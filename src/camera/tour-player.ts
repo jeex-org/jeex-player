@@ -688,10 +688,11 @@ export class TourPlayer {
     return { ...this.travelAim(distance), reach: GAZE_REACH_M };
   }
 
-  /** The level direction of travel at `distance`: a chord one stride ahead (behind at the very end). */
+  /** The level direction of travel at `distance`: a chord one stride ahead, the route's last stride over its last metre. */
   private travelAim(distance: number): { yaw: number; pitch: number } {
-    const from = positionOnPath(this.route, Math.min(distance, this.route.length - TRAVEL_LOOKAHEAD_M));
-    const to = positionOnPath(this.route, Math.max(distance, TRAVEL_LOOKAHEAD_M));
+    const start = Math.max(0, Math.min(distance, this.route.length - TRAVEL_LOOKAHEAD_M));
+    const from = positionOnPath(this.route, start);
+    const to = positionOnPath(this.route, start + TRAVEL_LOOKAHEAD_M);
     const dx = to.x - from.x;
     const dz = to.z - from.z;
     return { yaw: Math.hypot(dx, dz) < 1e-6 ? 0 : Math.atan2(dx, dz), pitch: 0 };
