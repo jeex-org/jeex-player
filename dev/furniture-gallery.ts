@@ -1,10 +1,10 @@
 import * as THREE from 'three';
-import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
 import { AssetLoader } from '../src/geometry/asset-loader.js';
 import { listCatalogueObjects } from '../src/assets/asset-catalogue.js';
 import { JEEX_GUID_NAMESPACE } from '../src/scene/guid.js';
 import { uuidV5 } from '../src/shared/uuid.js';
 import type { DemoAsset } from '../src/scene/types.js';
+import { playerLighting } from '../src/render/lighting-engine.js';
 
 /**
  * Reference-room preview harness for the object bank.
@@ -19,6 +19,13 @@ import type { DemoAsset } from '../src/scene/types.js';
  *
  * Invariant: the harness only reads the catalogue and the loader; it never
  * mutates either.
+ *
+ * Light: the lighting standard's REFERENCE rig (`src/lighting/`), the one
+ * material swatches and asset review use everywhere, so a finish looks here as
+ * it does in a store preview. The rig's key comes from the front (`+z`) and
+ * the bank's objects face `-z`, so the specimens stand in a content group
+ * turned half a turn and the camera looks at their fronts from `+z`;
+ * `__gallery.look` still takes positions in the layout's own coordinates.
  */
 
 const CELL_PADDING = 0.55; // metres of clear ground around each specimen
@@ -98,19 +105,15 @@ function main(): void {
   const renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
   renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
   renderer.setSize(window.innerWidth, window.innerHeight, false);
-  renderer.outputColorSpace = THREE.SRGBColorSpace;
-  renderer.toneMapping = THREE.ACESFilmicToneMapping;
-  renderer.toneMappingExposure = 1.05;
-  renderer.shadowMap.enabled = true;
-  renderer.shadowMap.type = THREE.PCFShadowMap; // r182: PCFSoftShadowMap deprecated, PCFShadowMap is soft
+  // The standard sets the display transform (PBR Neutral, exposure 1, sRGB).
+  const lighting = playerLighting(renderer);
 
   const scene = new THREE.Scene();
   scene.background = new THREE.Color('#cfc6b6');
-  const pmrem = new THREE.PMREMGenerator(renderer);
-  const environment = new RoomEnvironment();
-  scene.environment = pmrem.fromScene(environment, 0.04).texture;
-  environment.dispose();
-  pmrem.dispose();
+  lighting.createReferenceRig().attach(scene);
+  const content = new THREE.Group();
+  content.rotation.y = Math.PI;
+  scene.add(content);
 
   const items = specimens();
   if (items.length === 0) {
@@ -128,24 +131,7 @@ function main(): void {
     new THREE.MeshStandardMaterial({ color: '#d9d1c2', roughness: 0.95 }),
   );
   ground.rotation.x = -Math.PI / 2;
-  ground.receiveShadow = true;
-  scene.add(ground);
-
-  scene.add(new THREE.HemisphereLight('#fff6e6', '#6f6a63', 1.5));
-  const sun = new THREE.DirectionalLight('#ffe6c2', 3);
-  sun.position.set(-spanX * 0.4, Math.max(10, spanZ), spanZ * 0.5);
-  sun.castShadow = true;
-  sun.shadow.mapSize.set(2048, 2048);
-  const extent = Math.max(spanX, spanZ) * 0.75;
-  sun.shadow.camera.left = -extent;
-  sun.shadow.camera.right = extent;
-  sun.shadow.camera.top = extent;
-  sun.shadow.camera.bottom = -extent;
-  sun.shadow.normalBias = 0.02;
-  scene.add(sun);
-  const fill = new THREE.DirectionalLight('#c3d8e0', 0.55);
-  fill.position.set(spanX, spanZ * 0.6, -spanZ);
-  scene.add(fill);
+  content.add(ground);
 
   const loader = new AssetLoader([], { ceilingHeight: GALLERY_CEILING });
   let degraded = 0;
@@ -159,17 +145,17 @@ function main(): void {
     // Wall pieces hang at eye height so their pivot reads correctly; ceiling
     // pieces are already mounted at `GALLERY_CEILING` by the loader.
     if (item.anchor === 'wall') result.group.position.y = 1.45;
-    scene.add(result.group);
+    content.add(result.group);
     const label = makeLabel(item.label, cell);
     label.position.set(x, 0.05, z - cell * 0.46);
-    scene.add(label);
+    content.add(label);
   });
 
   const camera = new THREE.PerspectiveCamera(38, window.innerWidth / window.innerHeight, 0.1, 400);
-  // Objects face -Z once the loader applies the scene facing convention, so the
-  // reference camera stands in front of them.
+  // Objects face -Z in the content group, which is turned half a turn, so the
+  // reference camera stands at +Z, in front of them and on the key's side.
   const radius = Math.max(spanX, spanZ) * 0.92 + 2.2;
-  camera.position.set(-radius * 0.58, radius * 0.55, -radius * 0.78);
+  camera.position.set(radius * 0.58, radius * 0.55, radius * 0.78);
   camera.lookAt(0, Math.min(0.8, radius * 0.08), 0);
 
   const resize = (): void => {
@@ -187,8 +173,11 @@ function main(): void {
     degraded,
     ids: items.map((item) => item.label),
     look: (x: number, y: number, z: number, distance: number) => {
-      camera.position.set(x + distance * 0.55, y + distance * 0.5, z + distance * 0.75);
-      camera.lookAt(x, y, z);
+      // Layout coordinates in, world out: the content group is turned half a turn.
+      content.updateMatrixWorld();
+      const at = content.localToWorld(new THREE.Vector3(x, y, z));
+      camera.position.set(at.x + distance * 0.55, at.y + distance * 0.5, at.z + distance * 0.75);
+      camera.lookAt(at);
       renderer.render(scene, camera);
     },
     cell: () => ({ cell, columns, rows }),

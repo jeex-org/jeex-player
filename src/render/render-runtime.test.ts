@@ -2,15 +2,16 @@
  * Contract tests for `RenderRuntime`.
  *
  * Bun has no WebGL context and no `requestAnimationFrame`, so the runtime is
- * built with its injection seams: a stub renderer, no PMREM environment and a
- * hand-driven frame scheduler. That covers exactly what the composition root
+ * built with its injection seams: a stub renderer, the lighting standard over
+ * a stub `PMREMGenerator` and a hand-driven frame scheduler. That covers exactly what the composition root
  * depends on — hook order, the frame clock, resize and disposal.
  */
 
 import { describe, expect, test } from 'bun:test';
 import * as THREE from 'three';
 import { KEEP_WARM_MS, RenderRuntime, createRenderRuntime, hasWebGL, measureEntry } from './render-runtime.js';
-import { stubRuntime } from '../fixtures/stubs.js';
+import { stubLighting, stubRuntime } from '../fixtures/stubs.js';
+import { apartmentEnvironmentIntensity, LIGHTING_STANDARD } from '../lighting/lighting-standard.js';
 
 /** A runtime built on the shared stub renderer, with the frame pump in hand. */
 function harness(
@@ -38,7 +39,7 @@ function harness(
     signal: options.signal,
     onError: options.onError,
     createRenderer: () => renderer,
-    createEnvironment: () => null,
+    createLighting: stubLighting,
     scheduleFrame: (callback) => {
       pending = callback;
       handles += 1;
@@ -63,17 +64,41 @@ function harness(
 }
 
 describe('RenderRuntime construction', () => {
-  test('builds a scene with fog and the three-light rig', () => {
+  /** The lights under `scene`, by kind. */
+  function lightsOf(scene: THREE.Scene): { hemisphere: THREE.HemisphereLight[]; directional: THREE.DirectionalLight[] } {
+    const hemisphere: THREE.HemisphereLight[] = [];
+    const directional: THREE.DirectionalLight[] = [];
+    scene.traverse((object) => {
+      if (object instanceof THREE.HemisphereLight) hemisphere.push(object);
+      if (object instanceof THREE.DirectionalLight) directional.push(object);
+    });
+    return { hemisphere, directional };
+  }
+
+  test('builds a scene with fog, lit by the standard apartment rig', () => {
     const { runtime, stub } = harness();
     expect(runtime.scene).toBeInstanceOf(THREE.Scene);
     expect(runtime.scene.fog).toBeInstanceOf(THREE.Fog);
-    expect(runtime.lights.sky).toBeInstanceOf(THREE.HemisphereLight);
-    expect(runtime.lights.sun.castShadow).toBe(true);
-    expect(runtime.lights.sun.shadow.mapSize.x).toBe(2048);
-    expect(runtime.lights.fill.intensity).toBeCloseTo(0.32, 5);
-    // Sky, sun target, sun, fill: every light is parented to the runtime scene.
-    expect(runtime.scene.children.length).toBe(4);
+    const { hemisphere, directional } = lightsOf(runtime.scene);
+    expect(hemisphere).toHaveLength(1);
+    expect(directional).toHaveLength(2);
+    const sun = directional.find((light) => light.castShadow)!;
+    expect(sun.shadow.mapSize.x).toBe(2048);
+    expect(sun.intensity).toBe(LIGHTING_STANDARD.apartment.sun.intensity);
+    expect(runtime.scene.environment).not.toBeNull();
+    expect(runtime.scene.environmentIntensity).toBe(apartmentEnvironmentIntensity());
+    expect(runtime.shadowMapSize).toBe(2048);
     expect(stub.sizes[0]).toEqual({ width: 800, height: 600 });
+    runtime.dispose();
+  });
+
+  test('the lighting standard sets the display transform: PBR Neutral, exposure 1, sRGB, PCF shadows', () => {
+    const { runtime } = harness();
+    expect(runtime.renderer.toneMapping).toBe(THREE.NeutralToneMapping);
+    expect(runtime.renderer.toneMappingExposure).toBe(1);
+    expect(runtime.renderer.outputColorSpace).toBe(THREE.SRGBColorSpace);
+    expect(runtime.renderer.shadowMap.enabled).toBe(true);
+    expect(runtime.renderer.shadowMap.type).toBe(THREE.PCFShadowMap);
     runtime.dispose();
   });
 
@@ -84,21 +109,30 @@ describe('RenderRuntime construction', () => {
       shadowMapSize: 512,
       createRenderer: () =>
         ({
-          capabilities: { getMaxAnisotropy: () => 1 },
+          capabilities: { getMaxAnisotropy: () => 1, maxTextureSize: 4096 },
           shadowMap: {},
           setPixelRatio() {},
           setSize() {},
           render() {},
           dispose() {},
         }) as unknown as THREE.WebGLRenderer,
-      createEnvironment: () => null,
+      createLighting: stubLighting,
       scheduleFrame: () => 1,
       cancelFrame: () => {},
       now: () => 0,
     });
-    expect(runtime.lights.sun.shadow.mapSize.x).toBe(512);
-    expect(runtime.environment).toBeNull();
+    expect(lightsOf(runtime.scene).directional.find((light) => light.castShadow)!.shadow.mapSize.x).toBe(512);
+    expect(runtime.shadowMapSize).toBe(512);
     runtime.dispose();
+  });
+
+  test('dispose releases the lighting and takes the rig off the scene', () => {
+    const { runtime } = harness();
+    const lighting = runtime.lighting;
+    runtime.dispose();
+    expect(lighting.disposed).toBe(true);
+    expect(runtime.scene.environment).toBeNull();
+    expect(lightsOf(runtime.scene).directional).toHaveLength(0);
   });
 });
 
@@ -585,6 +619,34 @@ describe('WebGL context loss', () => {
     expect(order).toEqual(['restored:false']);
     expect(runtime.isContextLost()).toBe(false);
     expect(pending()).not.toBe(null);
+    runtime.dispose();
+  });
+
+  test('a restored context gets a new lighting context and rig before the re-mount', () => {
+    const { canvas, fire } = fakeCanvas();
+    let seen: { fresh: boolean; environment: unknown } | null = null;
+    const { runtime } = harness({
+      canvas,
+      onContextRestored: () => {
+        seen = { fresh: !runtime.lighting.disposed, environment: runtime.scene.environment };
+      },
+    });
+    const before = runtime.lighting;
+    const environment = runtime.scene.environment;
+    fire('webglcontextlost');
+    fire('webglcontextrestored');
+    expect(before.disposed).toBe(true);
+    expect(runtime.lighting).not.toBe(before);
+    expect(seen).not.toBeNull();
+    expect(seen!.fresh).toBe(true);
+    expect(seen!.environment).not.toBe(environment);
+    expect(seen!.environment).not.toBeNull();
+    // Still exactly one rig on the scene.
+    let directional = 0;
+    runtime.scene.traverse((object) => {
+      if (object instanceof THREE.DirectionalLight) directional += 1;
+    });
+    expect(directional).toBe(2);
     runtime.dispose();
   });
 

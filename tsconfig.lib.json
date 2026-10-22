@@ -28,6 +28,7 @@
     "src/embed/index.ts",
     "src/embed/element-entry.ts",
     "src/embed/host.ts",
-    "src/embed/ops.ts"
+    "src/embed/ops.ts",
+    "src/lighting/index.ts"
   ]
 }

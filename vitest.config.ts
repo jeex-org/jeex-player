@@ -31,11 +31,10 @@ export default defineConfig({
   optimizeDeps: {
     include: [
       'three',
-      'three/addons/environments/RoomEnvironment.js',
       // Lazily imported by `app/export-gltf.ts` / `app/export-usdz.ts`:
-      // pre-bundled here for the same
-      // reason as `RoomEnvironment` above — a dynamic `import()` first seen
-      // mid-test reloads the page instead of failing cleanly.
+      // pre-bundled here for the same reason as `three` above — a dynamic
+      // `import()` first seen mid-test reloads the page instead of failing
+      // cleanly.
       'three/addons/exporters/GLTFExporter.js',
       'three/addons/exporters/USDZExporter.js',
     ],

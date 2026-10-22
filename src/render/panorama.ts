@@ -2,7 +2,7 @@
  * One room as an equirectangular 360 image: what a portal, a social post or a
  * WebXR viewer takes when it cannot take the whole tour.
  *
- * There is no cube-to-equirectangular helper in three's addons (r185), so the
+ * There is no cube-to-equirectangular helper in three's addons (r186), so the
  * projection is written here: a `CubeCamera` renders the six faces into a
  * `WebGLCubeRenderTarget`, and one full-screen quad turns each output pixel's
  * (longitude, latitude) into a direction and samples the cube along it. The

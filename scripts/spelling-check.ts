@@ -74,6 +74,7 @@ export const FORCED_NAMES: readonly ForcedName[] = [
   { name: 'SRGBColorSpace', reason: 'three.js: THREE.SRGBColorSpace' },
   { name: 'NoColorSpace', reason: 'three.js: THREE.NoColorSpace' },
   { name: 'LinearSRGBColorSpace', reason: 'three.js: THREE.LinearSRGBColorSpace' },
+  { name: 'ColorManagement', reason: 'three.js: THREE.ColorManagement' },
   { name: 'outputColorSpace', reason: 'three.js: WebGLRenderer.outputColorSpace' },
   { name: 'THREE.Color', reason: 'three.js: THREE.Color' },
   { name: "'color'", reason: 'three.js: the BufferGeometry attribute `vertexColors` reads by name' },

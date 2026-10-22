@@ -16,6 +16,7 @@ import {
   LAZY_CHUNK_FAIL_BYTES,
   LAZY_CHUNK_PREFIX,
   OPS_BUDGET_FAIL_BYTES,
+  LIGHTING_BUDGET_FAIL_BYTES,
   checkBudget,
   formatBytes,
   limitFor,
@@ -63,6 +64,11 @@ describe('constants', () => {
     // build chunk that shares the `jeex-viewer-op` prefix with the ops entry
     // by coincidence; it must fall through to the viewer's own 700 KB budget.
     expect(limitFor('jeex-viewer-opening-frame-DM2W4dUD.js')).toBe(BUDGET_FAIL_BYTES);
+  });
+
+  test('the lighting entry keeps a budget of its own: no three.js fits in it', () => {
+    expect(LIGHTING_BUDGET_FAIL_BYTES).toBe(10 * 1024 + 534);
+    expect(limitFor('jeex-viewer-lighting.js')).toBe(LIGHTING_BUDGET_FAIL_BYTES);
   });
 });
 

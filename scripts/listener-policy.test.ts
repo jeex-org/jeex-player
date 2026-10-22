@@ -159,7 +159,7 @@ describe('scanSource: failing shapes', () => {
 describe('applyAllowlist', () => {
   test('an allowlisted file:line is filtered out and reported separately', () => {
     const violations = [
-      { file: 'src/fixtures/stubs.ts', line: 101, reason: 'options argument "{ once: true }" has no { signal } reachable in one hop' },
+      { file: 'src/fixtures/stubs.ts', line: 103, reason: 'options argument "{ once: true }" has no { signal } reachable in one hop' },
     ];
     const { real, allowlisted } = applyAllowlist(violations);
     expect(real).toEqual([]);
@@ -183,8 +183,8 @@ describe('applyAllowlist', () => {
 });
 
 describe('the real tree', () => {
-  test('src/fixtures/stubs.ts:101 is the ONLY allowlist entry — a shrinking-residue check', () => {
+  test('src/fixtures/stubs.ts:103 is the ONLY allowlist entry — a shrinking-residue check', () => {
     expect(ALLOWLIST).toHaveLength(1);
-    expect(ALLOWLIST[0]).toMatchObject({ file: 'src/fixtures/stubs.ts', line: 101 });
+    expect(ALLOWLIST[0]).toMatchObject({ file: 'src/fixtures/stubs.ts', line: 103 });
   });
 });

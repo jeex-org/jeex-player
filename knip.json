@@ -6,6 +6,7 @@
     "src/embed/frame-entry.ts",
     "src/embed/iife-entry.ts",
     "src/embed/host.ts",
+    "src/lighting/index.ts",
     "src/app/viewer-api.ts",
     "src/main.ts",
     "src/main-embed.ts",

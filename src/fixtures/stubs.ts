@@ -17,7 +17,9 @@
  * name any layer's type without inverting the order.
  */
 
-import type * as THREE from 'three';
+import * as THREE from 'three';
+import { createLightingContext, type LightingContext } from '../lighting/lighting-context.js';
+import type { LightingThree } from '../lighting/lighting-three.js';
 import type { CameraDirector } from '../camera/camera-director.js';
 import type { Picker } from '../geometry/picker.js';
 import type { SceneBuilder } from '../geometry/scene-builder.js';
@@ -168,7 +170,7 @@ export type StubRendererCalls = {
 export function stubRuntime(): { renderer: THREE.WebGLRenderer; calls: StubRendererCalls } {
   const calls: StubRendererCalls = { renders: 0, disposed: 0, sizes: [], pixelRatio: 0 };
   const renderer = {
-    capabilities: { getMaxAnisotropy: () => 8 },
+    capabilities: { getMaxAnisotropy: () => 8, maxTextureSize: 16_384 },
     shadowMap: { enabled: false, type: 0 },
     outputColorSpace: '',
     toneMapping: 0,
@@ -187,6 +189,25 @@ export function stubRuntime(): { renderer: THREE.WebGLRenderer; calls: StubRende
     },
   } as unknown as THREE.WebGLRenderer;
   return { renderer, calls };
+}
+
+/**
+ * The lighting standard over a renderer with no GPU: the real context and
+ * rigs, built with the real three.js classes, but a `PMREMGenerator` that
+ * answers a plain render target instead of prefiltering on a WebGL context
+ * Bun does not have. `RenderRuntimeOptions.createLighting` is the seam.
+ */
+export function stubLighting(renderer: THREE.WebGLRenderer): LightingContext {
+  class StubGenerator {
+    fromEquirectangular(source: THREE.DataTexture): THREE.WebGLRenderTarget {
+      return new THREE.WebGLRenderTarget(source.image.width / 4, source.image.width / 4);
+    }
+    dispose(): void {}
+  }
+  return createLightingContext(
+    { ...(THREE as unknown as LightingThree), PMREMGenerator: StubGenerator as unknown as LightingThree['PMREMGenerator'] },
+    renderer,
+  );
 }
 
 /** The controller half of a `CameraDirector`, answering "no" to everything. */

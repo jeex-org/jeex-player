@@ -17,7 +17,7 @@ const renderers: THREE.WebGLRenderer[] = [];
 function openRenderer(): THREE.WebGLRenderer {
   const renderer = new THREE.WebGLRenderer({ canvas: document.createElement('canvas'), antialias: false });
   renderer.outputColorSpace = THREE.SRGBColorSpace;
-  renderer.toneMapping = THREE.ACESFilmicToneMapping;
+  renderer.toneMapping = THREE.NeutralToneMapping;
   renderers.push(renderer);
   return renderer;
 }

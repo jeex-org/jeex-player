@@ -14,7 +14,7 @@
  * passes apart: **the main pass is the pass with no render target bound.** The
  * transmission pass, and any other off-screen pass, has one. The gate lets the
  * capture run in the main pass only, so it happens exactly once per frame, in
- * the runtime's own render state - the default framebuffer, ACES tone mapping -
+ * the runtime's own render state - the default framebuffer, PBR Neutral tone mapping -
  * and the transmission pass reuses the texture the last frame captured.
  *
  * Why the gate and not a frame hook: `onBeforeRender` runs INSIDE
@@ -34,7 +34,7 @@
  * The other pass that binds a target, `render/swatch-preview.ts`, previews one
  * borrowed group into a 112 px target - and a mirror VARIANT preview does carry
  * a reflector. Skipping the capture there is deliberate: the preview scene holds
- * the previewed group and two lights on a transparent clear, so the reflection
+ * the previewed group and the reference rig on a transparent clear, so the reflection
  * it could capture is black anyway, and capturing it would overwrite the live
  * mirror's texture with an empty room for a frame.
  *

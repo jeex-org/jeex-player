@@ -45,9 +45,15 @@ function thrownConstructors(text: string): string[] {
   return [...text.matchAll(/\bthrow\s+new\s+([A-Za-z_$][\w$]*)/g)].map((match) => match[1]!);
 }
 
-/** Error classes that ARE `ViewerLibError` subclasses, by construction. */
+/**
+ * Error classes that carry a machine-readable code: every `ViewerLibError`
+ * subclass, by construction, and `LightingError`, the coded error of the
+ * separately published lighting entry (`lighting/lighting-error.ts`), which
+ * carries no viewer code and so cannot extend the viewer's class.
+ */
 const CODED = new Set([
   'ViewerLibError',
+  'LightingError',
   'SceneValidationError',
   'PlanError',
   'OpError',
