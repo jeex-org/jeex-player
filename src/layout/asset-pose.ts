@@ -22,7 +22,7 @@ import { roomOf } from '../plan/plan-rooms.js';
 import { topUnder } from './rules/surfaces.js';
 import {
   boxAround,
-  fits,
+  misfit,
   judge,
   narrowContext,
   narrowDrag,
@@ -34,7 +34,7 @@ import {
   type Judgement,
 } from './asset-legality.js';
 import type { SolvedPlan, WallFace } from '../plan/plan-solver.js';
-import type { LintItem } from './rules/context.js';
+import type { LayoutIssue, LintItem } from './rules/context.js';
 import type { DemoAsset, Vec2 } from '../scene/types.js';
 import type { Bounds } from '../plan/plan-geometry.js';
 
@@ -182,20 +182,31 @@ function boundsOf(quad: readonly Vec2[]): Bounds {
 }
 
 /**
- * The snapped pose and only whether it is legal (`fits`, stopping at the
- * first issue): one mask lattice point or settle candidate. On a narrowed
+ * The snapped pose and only whether it is legal (`misfit`, stopping at the
+ * first issue, which it names): one mask lattice point or settle candidate. On a narrowed
  * drag, a pose whose body left the narrowed box (a wall snap turned it round
  * and pulled it onto a face) is judged again against what is around IT, so
  * the narrowing never changes a verdict.
  */
-export function probePose(drag: DragContext, request: PoseRequest): { placed: Placed; ok: boolean; item: LintItem } {
+export function probePose(
+  drag: DragContext,
+  request: PoseRequest,
+): { placed: Placed; ok: boolean; item: LintItem; misfit: LayoutIssue | null } {
   const first = snapped(drag, request);
   const body = first.item.quad ?? first.item.mount?.quad ?? null;
   const narrowed = drag.narrowed;
-  if (!narrowed || !body || quadIn(body, narrowed.box)) return { ...first, ok: fits(drag.ctx, first.item) };
+  if (!narrowed || !body || quadIn(body, narrowed.box)) return verdictOf(drag, first);
   const near: DragContext = { ...drag, ctx: narrowContext(narrowed.whole, boundsOf(body)), narrowed: undefined };
-  const again = snapped(near, request);
-  return { ...again, ok: fits(near.ctx, again.item) };
+  return verdictOf(near, snapped(near, request));
+}
+
+/** A snapped pose with whether it fits and, when it does not, the first issue it raises. */
+function verdictOf(
+  drag: DragContext,
+  pose: { placed: Placed; item: LintItem },
+): { placed: Placed; ok: boolean; item: LintItem; misfit: LayoutIssue | null } {
+  const issue = misfit(drag.ctx, pose.item);
+  return { ...pose, ok: issue === null, misfit: issue };
 }
 
 /** The snapped pose and every issue it raises: what a refusal names. */

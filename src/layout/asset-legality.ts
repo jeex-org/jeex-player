@@ -101,12 +101,17 @@ function quickRank(id: string): number {
  * cost when it is illegal, which is what most cells of a field are.
  */
 export function fits(ctx: LintContext, item: LintItem): boolean {
+  return misfit(ctx, item) === null;
+}
+
+/** The first hard issue `item` raises, in `fits`'s order, or `null` when it raises none. */
+export function misfit(ctx: LintContext, item: LintItem): LayoutIssue | null {
   const issues: LayoutIssue[] = [];
   for (const rule of QUICK_RULES) {
     rule.item!(ctx, item, issues);
-    if (issues.length > 0) return false;
+    if (issues.length > 0) return issues[0]!;
   }
-  return true;
+  return null;
 }
 
 /**

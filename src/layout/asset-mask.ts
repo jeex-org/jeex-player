@@ -4,7 +4,7 @@
  *
  * A floor or ceiling cell is green when it lies under the footprint of at
  * least one legal pose of the dragged object at its current yaw, red when no
- * legal pose covers it. One pose is judged per lattice point, through the
+ * legal pose covers it. Poses are judged through the
  * drag's own pose function (`asset-pose.ts` `probePose`, so the wall snap and
  * the rise onto a top are included), and the footprint of every legal pose is
  * rasterised onto the grid of the surface it stands on: a room's floor, a
@@ -14,6 +14,13 @@
  *
  * The wall field keeps its meaning: spans along the faces at the
  * object's height, green where the object centred on the span is legal.
+ *
+ * Poses are judged on a lattice of the cell centres, then refined where the
+ * field changes: toward the last legal pose at every edge and round its
+ * corners, and into the narrow places between two lattice points that fail
+ * for different reasons, from which it walks sideways too. A patch of legal
+ * poses only a few centimetres across in both directions can still fall
+ * between the lattice lines.
  *
  * Costs, measured on the demo flat in `asset-mask.test.ts` against a 20 ms
  * budget for a floor mask.
@@ -26,7 +33,7 @@ import { WALL_SNAP_M, probePose } from './asset-pose.js';
 import { faceFrame, narrowDrag, reachableRooms, type DragContext } from './asset-legality.js';
 import { topHeight } from './rules/surfaces.js';
 import { effectiveRoom, type SceneData, type Vec2 } from '../scene/types.js';
-import type { LintItem } from './rules/context.js';
+import type { LayoutIssue, LintItem } from './rules/context.js';
 import type { RoomFace } from '../plan/plan-solver.js';
 
 /** A mask cell count above which the floor grid coarsens (keeps a floor mask within its 20 ms budget). */
@@ -38,19 +45,73 @@ export const TOP_STEP_M = 0.05;
 /** The poses judged on a top: a lattice this fine, through the top's centre (where a small top holds anything at all). */
 const TOP_PROBE_M = 0.1;
 /**
- * Floor and ceiling poses judged per cell along each axis (2: a 0.1 m lattice
- * under 0.2 m cells). Measured on the demo flat (2026-10-21): a 0.2 m
- * lattice shows the sofa 528 green cells where a 0.05 m one finds 609; 0.1 m
- * finds 546. About a tenth of the places the sofa only just fits are still
- * shown red at 0.1 m: a known gap of the probe step, held by `asset-mask.test.ts`.
+ * Halvings of the step from a legal lattice pose toward an illegal neighbour
+ * (3: the farthest legal pose found to an eighth of the lattice step, 0.025 m
+ * on a 0.2 m floor grid, the step a release settles by). A lattice alone paints the
+ * footprints of the poses ON it, so wherever the legal poses end between two
+ * lattice points, the floor only the farthest of them covers stays red: up
+ * to a whole lattice step at every edge of the field.
  */
-const PROBES_PER_CELL = 2;
+const EDGE_HALVINGS = 3;
+/**
+ * Divisions of the step between two illegal lattice neighbours that run into
+ * different things, a different rule, a different object, or the room's edge
+ * (8: an eighth of the lattice step, as fine as the edges). A place the
+ * object only just fits, narrower than the lattice step, lies between such a
+ * pair and never on the lattice.
+ */
+const SLIVER_SAMPLES = 8;
 /** Slack added to an object's reach when a mask narrows the scene around a room, metres. */
 const TOUCH_PAD_M = 0.1;
 /** How far the mask is lifted off its surface so it never z-fights it, metres. */
 const MASK_LIFT_M = 0.005;
 
 export type MaskSurface = 'floor' | 'wall' | 'ceiling';
+
+/**
+ * What a pose first runs into, `null` for a legal one: the rule and the
+ * objects it names, and for a footprint that crosses its room's outline
+ * (which names only the object itself, whichever wall it crosses) the way
+ * its corners off the floor lie from its centre.
+ */
+type Misfit = { readonly key: string; readonly off: Vec2 | null } | null;
+
+function misfitOf(drag: DragContext, issue: LayoutIssue | null, moved: LintItem): Misfit {
+  if (issue === null) return null;
+  const key = `${issue.rule}:${issue.ids.join(',')}`;
+  const room = drag.ctx.plan.rooms.find((candidate) => candidate.roomId === moved.roomId);
+  if (issue.rule !== 'on-floor' || !moved.quad || !room) return { key, off: null };
+  const centre = moved.placement.position;
+  const off = { x: 0, z: 0 };
+  for (const corner of moved.quad) {
+    if (pointInPolygon(corner, room.polygon)) continue;
+    off.x += corner.x - centre.x;
+    off.z += corner.z - centre.z;
+  }
+  return { key, off };
+}
+
+/**
+ * Whether two illegal neighbours a lattice `step` apart may hold a window
+ * between them that both miss: they run into different things, or both
+ * cross the outline and the step leads from a pose that pokes out behind
+ * it to one that pokes out ahead (in a passage, from over the west wall to
+ * over the east one), never along one wall.
+ */
+function windowBetween(here: NonNullable<Misfit>, next: NonNullable<Misfit>, step: Vec2): boolean {
+  if (here.key !== next.key) return true;
+  if (!here.off || !next.off) return false;
+  return here.off.x * step.x + here.off.z * step.z < 0 && next.off.x * step.x + next.off.z * step.z > 0;
+}
+
+/**
+ * Whether an illegal pose next to the room's edge (no lattice neighbour that
+ * way) may hold a window toward it. Not when it already pokes through the
+ * outline on that side: further on only crosses it more.
+ */
+function towardEdge(here: NonNullable<Misfit>, step: Vec2): boolean {
+  return !here.off || here.off.x * step.x + here.off.z * step.z <= 0;
+}
 
 /**
  * A legality field as quads: four corners per cell (`positions`, xyz, in
@@ -79,6 +140,8 @@ type Grid = {
   readonly ok: Uint8Array;
   /** The plan points judged, row by row (the cell centres on a floor, a coarser lattice on a top). */
   readonly rows: readonly (readonly Vec2[])[];
+  /** One point of that lattice and its spacing along `u` and `v`, metres. */
+  readonly lattice: { readonly origin: Vec2; readonly probe: number };
 };
 
 function centreOf(grid: Grid, i: number, j: number): Vec2 {
@@ -110,16 +173,14 @@ function roomLattice(room: RoomFace, step: number): RoomLattice {
       inside[j * nu + i] = pointInPolygon({ x: bbox.minX + (i + 0.5) * step, z: bbox.minZ + (j + 0.5) * step }, polygon) ? 1 : 0;
     }
   }
-  // The poses judged: a lattice PROBES_PER_CELL times finer than the cells, so a
-  // place an object only just fits (a sofa between a wardrobe and a door zone)
-  // is not missed between two probes; their footprints paint the cells.
-  const probe = step / PROBES_PER_CELL;
+  // The poses judged: the cell centres in the room. Where the legal poses end
+  // between two of them, and the places an object only just fits, are found
+  // from there (`fill`).
   const rows: Vec2[][] = [];
-  for (let b = 0; b < nv * PROBES_PER_CELL; b += 1) {
+  for (let j = 0; j < nv; j += 1) {
     const row: Vec2[] = [];
-    for (let a = 0; a < nu * PROBES_PER_CELL; a += 1) {
-      const point = { x: bbox.minX + (a + 0.5) * probe, z: bbox.minZ + (b + 0.5) * probe };
-      if (pointInPolygon(point, polygon)) row.push(point);
+    for (let i = 0; i < nu; i += 1) {
+      if (inside[j * nu + i] === 1) row.push({ x: bbox.minX + (i + 0.5) * step, z: bbox.minZ + (j + 0.5) * step });
     }
     if (row.length > 0) rows.push(row);
   }
@@ -143,6 +204,7 @@ function roomGrid(room: RoomFace, y: number, step: number): Grid {
     inside,
     ok: new Uint8Array(nu * nv),
     rows,
+    lattice: { origin: { x: room.bbox.minX + step / 2, z: room.bbox.minZ + step / 2 }, probe: step },
   };
 }
 
@@ -182,6 +244,7 @@ function topGrid(host: LintItem, y: number): Grid | null {
     inside: new Uint8Array(nu * nv).fill(1),
     ok: new Uint8Array(nu * nv),
     rows,
+    lattice: { origin: { x: box.x, z: box.z }, probe: TOP_PROBE_M },
   };
 }
 
@@ -250,17 +313,51 @@ function coverOf(item: LintItem): readonly Vec2[] {
   return obbQuad({ x, z, hx: item.dims[0] / 2, hz: item.dims[2] / 2, angle: item.angle });
 }
 
+/** The lattice index of `point` on `grid`'s probe lattice, as a key. */
+function latticeKey(grid: Grid, point: Vec2): string {
+  const dx = point.x - grid.lattice.origin.x;
+  const dz = point.z - grid.lattice.origin.z;
+  const a = Math.round((dx * grid.u.x + dz * grid.u.z) / grid.lattice.probe);
+  const b = Math.round((dx * grid.v.x + dz * grid.v.z) / grid.lattice.probe);
+  return `${a},${b}`;
+}
+
 /**
  * Judges one pose per lattice point of every grid (narrowed per grid and per
  * row), and rasterises each legal footprint onto the grid of the surface it
- * stands on.
+ * stands on. From every legal lattice pose it then walks toward each illegal
+ * neighbour by halving the step (`EDGE_HALVINGS`), so the edge of the field
+ * is where the legal poses end, not where the lattice last met one; and
+ * between two illegal neighbours that fail for different reasons it looks
+ * for a place the object only just fits (`SLIVER_SAMPLES`).
  */
 function fill(drag: DragContext, item: LintItem, grids: readonly Grid[], floorY: number): void {
   const byKey = new Map(grids.map((grid) => [grid.key, grid]));
   const floors = grids.filter((grid) => grid.y === floorY);
   // A wall snap pulls a pose up to `WALL_SNAP_M` onto its face: inside the slack, so only a snap that turned it re-judges.
   const reach = Math.hypot(item.dims[0], item.dims[2]) / 2 + TOUCH_PAD_M + (drag.facts.wallSnap ? WALL_SNAP_M : 0);
+  /** Judges the pose at `point` and paints its footprint when it is legal. */
+  const paint = (row: DragContext, point: Vec2): Misfit => {
+    const {
+      placed,
+      misfit,
+      item: moved,
+    } = probePose(row, {
+      kind: 'plan',
+      point,
+      rotationY: item.angle,
+      y: item.placement.position.y,
+      snap: true,
+    });
+    if (misfit !== null) return misfitOf(row, misfit, moved);
+    const legal = coverOf(moved);
+    const target = placed.host === null ? floors : [byKey.get(placed.host)].filter((found): found is Grid => found !== undefined);
+    for (const surface of target) rasterise(surface, legal);
+    return null;
+  };
   for (const grid of grids) {
+    const verdicts = new Map<string, Misfit>();
+    const judged: Array<{ row: DragContext; point: Vec2; misfit: Misfit }> = [];
     for (const rowCentres of grid.rows) {
       let minX = Infinity;
       let maxX = -Infinity;
@@ -273,24 +370,83 @@ function fill(drag: DragContext, item: LintItem, grids: readonly Grid[], floorY:
         maxZ = Math.max(maxZ, centre.z);
       }
       // A row of cells meets a fraction of the room's neighbours: narrow once per row
-      // (`probePose` judges a pose the wall snap carried out of the box against its own surroundings).
+      // (`probePose` judges a pose whose body left the box, carried out by the wall snap or by a
+      // search toward a neighbour, against its own surroundings).
       const row = narrowDrag(drag, { minX: minX - reach, maxX: maxX + reach, minZ: minZ - reach, maxZ: maxZ + reach });
       for (const point of rowCentres) {
-        const {
-          placed,
-          ok,
-          item: moved,
-        } = probePose(row, {
-          kind: 'plan',
-          point,
-          rotationY: item.angle,
-          y: item.placement.position.y,
-          snap: true,
-        });
-        if (!ok) continue;
-        const legal = coverOf(moved);
-        const target = placed.host === null ? floors : [byKey.get(placed.host)].filter((found): found is Grid => found !== undefined);
-        for (const surface of target) rasterise(surface, legal);
+        const misfit = paint(row, point);
+        verdicts.set(latticeKey(grid, point), misfit);
+        judged.push({ row, point, misfit });
+      }
+    }
+    const { probe } = grid.lattice;
+    const at = (point: Vec2, step: Vec2, share: number): Vec2 => ({
+      x: point.x + step.x * probe * share,
+      z: point.z + step.z * probe * share,
+    });
+    const steps = [grid.u, { x: -grid.u.x, z: -grid.u.z }, grid.v, { x: -grid.v.x, z: -grid.v.z }];
+    const snaps = drag.facts.wallSnap;
+    /** Halves from the legal pose at `from` toward one step along `step`, painting every legal pose met; the share of the step reached. */
+    const toLastLegal = (row: DragContext, from: Vec2, step: Vec2): number => {
+      let low = 0;
+      let high = 1;
+      for (let halving = 0; halving < EDGE_HALVINGS; halving += 1) {
+        const middle = (low + high) / 2;
+        if (paint(row, at(from, step, middle)) === null) low = middle;
+        else high = middle;
+      }
+      return low;
+    };
+    /**
+     * Looks at `shares` of the step from `point` along `step`, then walks
+     * sideways from the middle legal pose met to the last legal one each way:
+     * a window found between two lattice points is narrow along the step and
+     * may reach across it, where the lattice never looked.
+     */
+    const look = (row: DragContext, point: Vec2, step: Vec2, shares: readonly number[]): void => {
+      const legal = shares.filter((share) => paint(row, at(point, step, share)) === null);
+      if (legal.length === 0) return;
+      const middle = at(point, step, legal[Math.floor(legal.length / 2)]!);
+      for (const side of steps) if (side.x * step.x + side.z * step.z === 0) toLastLegal(row, middle, side);
+    };
+    const sliver = Array.from({ length: SLIVER_SAMPLES - 1 }, (_, index) => (index + 1) / SLIVER_SAMPLES);
+    for (const { row, point, misfit } of judged) {
+      for (const step of steps) {
+        const next = verdicts.get(latticeKey(grid, at(point, step, 1)));
+        if (misfit === null) {
+          if (next === null) continue;
+          // Legal at 0, not at 1 (or off the lattice): halve toward the last legal pose.
+          const reached = toLastLegal(row, point, step);
+          if (reached === 0) continue;
+          // A corner of the field cut off both ways (the floor's outline ahead,
+          // an object to the side) holds legal poses no straight walk from a
+          // lattice point meets: walk sideways from the farthest one as well,
+          // wherever the lattice neighbour that way is not legal.
+          const farthest = at(point, step, reached);
+          for (const side of steps) {
+            if (side.x * step.x + side.z * step.z !== 0) continue;
+            if (verdicts.get(latticeKey(grid, at(point, side, 1))) === null) continue;
+            toLastLegal(row, farthest, side);
+          }
+        } else if (next === undefined && snaps && !towardEdge(misfit, step)) {
+          // Through the outline on this side already, so only the wall snap
+          // can still help: a pose whose back comes within `WALL_SNAP_M` of
+          // the face is pulled onto it, and that band, on a 0.2 m floor grid
+          // narrower than the step but wider than half of it, holds one of
+          // these two.
+          look(row, point, step, [0.5, 1]);
+        } else if (
+          next === undefined
+            ? towardEdge(misfit, step)
+            : next !== null && (step === grid.u || step === grid.v) && windowBetween(misfit, next, step)
+        ) {
+          // Two neighbours that fail for different reasons (one bumps the
+          // nightstand, the next the wardrobe or a door's clear zone, or they
+          // cross opposite walls), or a point next to the room's edge where
+          // the lattice has no neighbour, may hold a window between them that
+          // both miss: look at every eighth of the step, once per pair.
+          look(row, point, step, sliver);
+        }
       }
     }
   }
