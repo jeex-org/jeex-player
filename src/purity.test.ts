@@ -149,6 +149,8 @@ const PURE_MODULES = [
   'lighting/lighting-standard',
   'lighting/environment-recipe',
   'lighting/lighting-three',
+  'lighting/shadow-fit',
+  'lighting/sun-direction',
   ...SCHEMA_MODULES,
 ];
 

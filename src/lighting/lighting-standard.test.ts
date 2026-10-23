@@ -26,8 +26,8 @@ function neutral(value: number): number {
 }
 
 describe('LIGHTING_STANDARD', () => {
-  test('is version 1 and frozen at every depth', () => {
-    expect(LIGHTING_STANDARD_VERSION).toBe(1);
+  test('is version 2 and frozen at every depth', () => {
+    expect(LIGHTING_STANDARD_VERSION).toBe(2);
     const walk = (value: unknown, path: string): void => {
       if (typeof value !== 'object' || value === null) return;
       expect({ path, frozen: Object.isFrozen(value) }).toEqual({ path, frozen: true });
@@ -49,7 +49,29 @@ describe('LIGHTING_STANDARD', () => {
     write(() => ((LIGHTING_STANDARD.apartment.sun as { intensity: number }).intensity = 99));
     write(() => ((LIGHTING_STANDARD.apartment.sun.position as unknown as number[])[0] = 99));
     write(() => ((RECIPE.panels[0] as { radiance: number }).radiance = 99));
+    write(() => ((LIGHTING_STANDARD.apartment.sun.presets.noon as { elevation: number }).elevation = 99));
+    write(() => ((LIGHTING_STANDARD.apartment.sun.fit as { depthPadding: number }).depthPadding = 99));
     expect(JSON.stringify(LIGHTING_STANDARD)).toBe(before);
+  });
+
+  test('publishes the three sun presets with exactly their angles', () => {
+    expect(LIGHTING_STANDARD.apartment.sun.presets).toEqual({
+      morning: { azimuth: 90, elevation: 20 },
+      noon: { azimuth: 180, elevation: 55 },
+      evening: { azimuth: 270, elevation: 20 },
+    });
+  });
+
+  test('publishes the shadow fit tuning', () => {
+    expect(LIGHTING_STANDARD.apartment.sun.fit).toEqual({
+      lateralPadding: 0.25,
+      depthPadding: 0.5,
+      minNear: 0.1,
+      depthOffset: 0.002,
+      normalBiasTexels: 0.5,
+      normalBiasMin: 0.002,
+      normalBiasMax: 0.02,
+    });
   });
 
   test('the engine revision is the one this repository builds with', () => {
