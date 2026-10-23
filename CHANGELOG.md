@@ -216,6 +216,14 @@ as described under [Versioning](#versioning).
 
 ### Fixed
 
+- **Tintable library scans draw at their real brightness.** A tint map
+  written by the `luma-mid@1` recipe is normalised to a mid-grey mean, and
+  the tint was multiplied in without undoing that, so a scan in its own
+  colour drew about 4.6 times too dark in linear light (a mid tone came out
+  at about half its brightness). The tint is now scaled
+  by the recipe's gain (the inverse of mid grey in linear light) on the
+  first frame and once the map has arrived; natural scans and tintable
+  paints are unchanged.
 - **A viewer taken off the page without `dispose()` stops drawing.** Its
   render loop kept drawing into the detached canvas on every frame, which on
   a software rasteriser could stall the next page load in the same browser

@@ -170,6 +170,19 @@ describe('library materials on a real context', () => {
     expect(mean(rows, 2)).toBeLessThan(0.02);
   });
 
+  test('tint brightness: a mid-grey tint map in the scan’s own colour draws like that colour as a plain map', async () => {
+    const tintable = scan(['albedoTint'], {
+      colourMode: 'tintable',
+      tint: { recipe: 'luma-mid@1', suggestedColours: [{ name: 'Natural', hex: '#9a8d7a' }] },
+    });
+    const natural = scan(['albedo']);
+    const grey = image(() => [128, 128, 128, 255]);
+    const beige = image(() => [0x9a, 0x8d, 0x7a, 255]);
+    const tinted = render(await loaded(drawOf(tintable, '#9a8d7a'), { albedoTint: grey }), 1, 1, frontLight());
+    const plain = render(await loaded(drawOf(natural), { albedo: beige }), 1, 1, frontLight());
+    for (const channel of [0, 1, 2]) expect(Math.abs(mean(tinted, channel) - mean(plain, channel))).toBeLessThan(0.02);
+  });
+
   test('tile size: a [2, 1] scan repeats exactly twice along a 4 m wall', async () => {
     const material = scan(['albedo'], { tileM: [2, 1] });
     // Left half black, right half white: one dark-to-light edge per tile.

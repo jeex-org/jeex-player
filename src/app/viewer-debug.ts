@@ -117,7 +117,11 @@ type ViewerDebugApi = {
    * `openings`: it reports what is drawn and changes nothing.
    */
   assetModels: () => Array<{ id: string; state: string; degraded?: string; triangles: number }>;
-  /** The colour, map slots and colour-map size the shell mesh `name` is drawn with now (a library surface gains maps late); ungated. */
+  /**
+   * The colour, map slots and colour-map size the shell mesh `name` is drawn with now (a library surface gains maps late); ungated.
+   * `colour` is the material's colour factor as `#rrggbb`, each channel clamped to 1: a tintable scan's factor
+   * (tint times its recipe gain, which undoes the tint map's mid-grey mean) reads near white once its map arrives.
+   */
   surfaceMaterial: (name: string) => { colour: string; maps: string[]; mapSize: number | null } | null;
   selectedFurniture: () => string | null;
   assetVariant: (id: string) => string | null;
