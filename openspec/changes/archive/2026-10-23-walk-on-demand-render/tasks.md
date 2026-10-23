@@ -31,4 +31,4 @@ Requirement-to-check map, one browser case each, in walk and in tour (overview i
 ## 4. Docs and integration
 
 - [x] 4.1 README (rendering: walk and tour redraw on demand) and CHANGELOG (note that frame-interval telemetry now samples consecutive display draws only).
-- [ ] 4.2 Fast tier green, then the full gate once through the machine's gate queue.
+- [x] 4.2 Fast tier green, then the full gate once through the machine's gate queue.

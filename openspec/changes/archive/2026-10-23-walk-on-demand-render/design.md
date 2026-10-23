@@ -2,7 +2,7 @@
 
 ## Context
 
-See proposal.md and brainstorm.md. `render-runtime.ts` is at 690 of 700 lines and `viewer-app.ts` at its 500-line limit: new logic lives in a new module and in the existing wiring files.
+See proposal.md. `render-runtime.ts` is at 690 of 700 lines and `viewer-app.ts` at its 500-line limit: new logic lives in a new module and in the existing wiring files.
 
 ## Decisions
 
@@ -16,5 +16,5 @@ See proposal.md and brainstorm.md. `render-runtime.ts` is at 690 of 700 lines an
 ## Risks / Trade-offs
 
 1. [A missed dirty source shows a stale picture] → one browser test per change family; the counters make a miss visible.
-2. [Presentation behaviour verified by specification, not yet empirically on Safari] → the browser suite compares compositor screenshots across idle ticks on Chromium; Safari checked by the owner's device pass in the quality-tier step.
+2. [Presentation behaviour verified by specification, not yet empirically on Safari] → the browser suite compares compositor screenshots across idle ticks on Chromium; Safari is checked on a device in the quality-tier step.
 3. [Editing modes still draw every frame] → out of scope by decision.
