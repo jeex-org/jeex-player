@@ -13,7 +13,9 @@
  * Visibility invariant: the loop runs only when the canvas could actually be
  * seen. `document.hidden` and `checkVisibility()` gate it, and the frame clock
  * is re-synchronised on resume so a tab that was away for a minute does not
- * hand the hooks a one-minute delta.
+ * hand the hooks a one-minute delta. A canvas taken out of the document
+ * without `dispose()` parks the loop at its next frame, and the box observer
+ * resumes it when the canvas is connected again.
  *
  * Box invariant: the drawing buffer follows the ELEMENT's box, in device
  * pixels where the browser reports them (`devicePixelContentBoxSize`) and
@@ -249,11 +251,15 @@ export class RenderRuntime {
   private readonly onObserve = (entries: ResizeObserverEntry[]): void => {
     const entry = entries.at(-1);
     if (entry) this.box = measureEntry(entry, devicePixelRatioOf());
-    if (this.resizeHandle !== null) return;
-    this.resizeHandle = this.schedule(() => {
+    this.resizeHandle ??= this.schedule(() => {
       this.resizeHandle = null;
       this.resize();
     });
+    // The observer is also the wake signal of a loop parked on a detached
+    // canvas: an element inserted into or removed from a document is an
+    // observation (its box goes from or to nothing), so a host putting the
+    // viewer back resumes it here, after the resize queued above.
+    this.resume();
   };
 
   /**
@@ -286,10 +292,24 @@ export class RenderRuntime {
 
   /** Whether a frame drawn now could be seen by anyone. */
   private isVisible(): boolean {
+    if (this.isDetached()) return false;
     if (typeof document !== 'undefined' && this.canvas.ownerDocument.hidden) return false;
     const canvas = this.canvas as Partial<HTMLCanvasElement>;
     if (typeof canvas.checkVisibility !== 'function') return true;
     return canvas.checkVisibility({ checkVisibilityCSS: true, contentVisibilityAuto: true });
+  }
+
+  /**
+   * The canvas is not in any document: a host took the viewer off the page
+   * without `dispose()`. Nothing drawn now can be seen, and a loop drawing
+   * into a detached canvas keeps the GPU busy for nothing (on a software
+   * rasteriser it starved the next page load for about a minute), so the loop
+   * parks. Only where the box observer exists: it is what wakes the loop when
+   * the canvas is connected again (`onObserve`), and a park nothing can end
+   * would freeze a viewer that is put back.
+   */
+  private isDetached(): boolean {
+    return this.observer !== null && !this.canvas.isConnected;
   }
 
   /** Stops drawing without forgetting that the owner asked for a running loop. */
@@ -551,6 +571,12 @@ export class RenderRuntime {
   }
 
   private frame = (): void => {
+    // Checked before the next frame is asked for, so a detached canvas parks
+    // the loop instead of drawing; `onObserve` resumes it on reattach.
+    if (this.isDetached()) {
+      this.handle = null;
+      return;
+    }
     this.handle = this.schedule(this.frame);
     const now = this.now();
     const delta = Math.min(MAX_FRAME_DELTA, (now - this.lastFrame) / 1000);
