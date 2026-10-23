@@ -51,11 +51,12 @@ export type ShadowFit = {
 const ZENITH_COS = Math.cos(Math.PI / 180);
 
 function refuse(message: string): never {
-  throw new LightingError('bad-options', `shadow fit refused: ${message}`);
+  throw new LightingError('bad-options', `sun refused: ${message}`);
 }
 
-function finiteTriple(value: Triple): boolean {
-  return value.length === 3 && value.every((component) => typeof component === 'number' && Number.isFinite(component));
+/** True for three finite numbers. */
+export function finiteTriple(value: Triple): boolean {
+  return value.length === 3 && value.every((component) => Number.isFinite(component));
 }
 
 function cross(a: Triple, b: Triple): Triple {
@@ -71,21 +72,22 @@ function dot(a: Triple, b: Triple): number {
   return a[0] * b[0] + a[1] * b[1] + a[2] * b[2];
 }
 
-/** The unit sun direction, or a refusal for one that is zero, non-finite or not above the horizon. */
-function judgeDirection(direction: Triple): Triple {
-  if (!finiteTriple(direction)) refuse('the sun direction must be three finite numbers');
-  const length = Math.hypot(direction[0], direction[1], direction[2]);
-  if (length === 0) refuse('the sun direction must not be zero');
-  if (direction[1] <= 0) refuse('the sun direction must point upwards');
+/**
+ * The unit sun direction; `bad-options` for one that is non-finite or does
+ * not point above the horizon (a zero vector does neither).
+ */
+export function unitSunDirection(direction: Triple): Triple {
+  if (!finiteTriple(direction) || !(direction[1] > 0)) refuse('the direction must be finite and point upwards');
   return normalise(direction);
 }
 
 function judgeBoxes(boxes: readonly ShadowBox[]): void {
-  if (boxes.length === 0) refuse('there is nothing to fit');
-  boxes.forEach((box, index) => {
-    if (!finiteTriple(box.min) || !finiteTriple(box.max)) refuse(`box ${String(index)} has a coordinate that is not a finite number`);
-    if (box.min.some((value, axis) => value > box.max[axis]!)) refuse(`box ${String(index)} has a minimum greater than its maximum`);
-  });
+  if (boxes.length === 0) refuse('no boxes to fit');
+  for (const box of boxes) {
+    if (!finiteTriple(box.min) || !finiteTriple(box.max) || box.min.some((value, axis) => !(value <= box.max[axis]!))) {
+      refuse('every box needs finite corners, min not above max');
+    }
+  }
 }
 
 /**
@@ -98,8 +100,8 @@ function judgeBoxes(boxes: readonly ShadowBox[]): void {
  */
 export function fitShadowFrustum(boxes: readonly ShadowBox[], direction: Triple, mapSize: number): ShadowFit {
   judgeBoxes(boxes);
-  const d = judgeDirection(direction);
-  if (!Number.isInteger(mapSize) || mapSize <= 0) refuse(`the map size must be a positive integer, got ${String(mapSize)}`);
+  const d = unitSunDirection(direction);
+  if (!Number.isInteger(mapSize) || mapSize <= 0) refuse('the map size must be a positive integer');
   const tuning = LIGHTING_STANDARD.apartment.sun.fit;
 
   const up: Triple = d[1] > ZENITH_COS ? [0, 0, -1] : [0, 1, 0];

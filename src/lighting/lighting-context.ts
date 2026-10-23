@@ -33,7 +33,7 @@ import { apartmentEnvironmentIntensity, LIGHTING_STANDARD, referenceEnvironmentI
 import { generateEnvironment, toHalfFloats } from './environment-recipe.js';
 import { judgeApartmentRigOptions, type ApartmentRigOptions } from './lighting-options.schema.js';
 import type { LightingRenderer, LightingScene, LightingThree } from './lighting-three.js';
-import type { ShadowFit } from './shadow-fit.js';
+import { finiteTriple, unitSunDirection, type ShadowFit } from './shadow-fit.js';
 
 /** Which rig: material review or the player's apartment. */
 export type LightingRigKind = 'reference' | 'apartment';
@@ -172,15 +172,6 @@ class Rig implements LightingRig {
   }
 }
 
-/** True for three finite numbers. */
-function finite(value: Triple): boolean {
-  return value.length === 3 && value.every((component) => typeof component === 'number' && Number.isFinite(component));
-}
-
-function refuseSun(message: string): never {
-  throw new LightingError('bad-options', `apartment rig sun refused: ${message}`);
-}
-
 /** The apartment rig: a `Rig` whose sun the caller aims and fits. */
 class SunRig extends Rig implements ApartmentRig {
   readonly shadowMapSize: number;
@@ -209,27 +200,29 @@ class SunRig extends Rig implements ApartmentRig {
 
   setSunDirection(direction: Triple): void {
     this.refuseReleased();
-    if (!finite(direction)) refuseSun('the direction must be three finite numbers');
-    const length = Math.hypot(direction[0], direction[1], direction[2]);
-    if (length === 0) refuseSun('the direction must not be zero');
-    if (direction[1] <= 0) refuseSun('the direction must point upwards');
+    const [x, y, z] = unitSunDirection(direction);
     const target = this.sun.target.position;
     const distance = this.sun.position.distanceTo(target) || 1;
-    const scale = distance / length;
-    this.sun.position.set(target.x + direction[0] * scale, target.y + direction[1] * scale, target.z + direction[2] * scale);
+    this.sun.position.set(target.x + x * distance, target.y + y * distance, target.z + z * distance);
     this.sun.shadow.needsUpdate = true;
   }
 
   setShadowFrustum(fit: ShadowFit): void {
     this.refuseReleased();
     const planes = [fit.left, fit.right, fit.top, fit.bottom, fit.near, fit.far, fit.bias, fit.normalBias];
-    if (!finite(fit.position) || !finite(fit.target) || !finite(fit.up) || !planes.every((value) => Number.isFinite(value))) {
-      refuseSun('every value of the frustum must be a finite number');
-    }
-    if (!(fit.left < fit.right && fit.bottom < fit.top && fit.near >= 0 && fit.near < fit.far)) refuseSun('the frustum is empty');
-    if (Math.hypot(fit.up[0], fit.up[1], fit.up[2]) === 0) refuseSun('the camera up must not be zero');
-    const along = [0, 1, 2].map((axis) => fit.position[axis]! - fit.target[axis]!);
-    if (Math.hypot(along[0]!, along[1]!, along[2]!) === 0) refuseSun('the light must not stand on its target');
+    const along = [0, 1, 2].map((axis) => fit.position[axis]! - fit.target[axis]!) as unknown as Triple;
+    const sound =
+      finiteTriple(fit.position) &&
+      finiteTriple(fit.target) &&
+      finiteTriple(fit.up) &&
+      planes.every((value) => Number.isFinite(value)) &&
+      fit.left < fit.right &&
+      fit.bottom < fit.top &&
+      fit.near >= 0 &&
+      fit.near < fit.far &&
+      Math.hypot(...fit.up) > 0 &&
+      Math.hypot(...along) > 0;
+    if (!sound) throw new LightingError('bad-options', 'sun refused: the frustum must be finite and not empty');
     place(this.sun, fit.position);
     place(this.sun.target, fit.target);
     const camera = this.sun.shadow.camera;
