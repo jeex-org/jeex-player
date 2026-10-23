@@ -4,13 +4,13 @@
 
 - [ ] 1.1 `room-volumes.ts` test-first: rectilinear split, sampling/selection/projection boxes, interior probe point (L-shaped room), leaf-side ordering, 16-box limit; verify its unit test.
 - [ ] 1.2 `shell-origins.ts` test-first: shell meshes rebased (walls, skirtings, floors at +0.1 m, ceilings at −0.1 m, joints; interior parametric walls x/z only; opening frames in group frame; slab and ground untouched), world-space vertices and UVs unchanged; wired after the shell build and after `rebuildOpening` / `rebuildAll`; verify unit tests, a dollhouse full↔cutaway round trip, a `set_opening` rebuild, and that picking, export and sun-shadow tests stay green.
-- [ ] 1.3 `room-grid.ts` selection box test-first (unit) plus the analytic hemisphere grid's SH packing (unit: reproduces `mix(ground, sky, 0.5·n.y + 0.5)·I` at sample normals).
+- [ ] 1.3 `room-grid.ts` selection box test-first (unit; the exterior grid answers `true` everywhere) plus the analytic exterior grid's SH packing (unit: hemisphere reproduced exactly at sample normals; hemisphere + fill within the L2 error of a clamped cosine), grids parented in order.
 - [ ] 1.4 `box-probe-patch.ts` test-first: chunk-text test against r186 (incl. anisotropy and retroreflection branches kept), uniform states, tile-offset sampling math.
 - [ ] 1.5 `walk-rig.ts` test-first: editing/capture/walk states, exposure save/restore/re-apply after restore.
 
 ## 2. Bake, probes, controller
 
-- [ ] 2.1 `grid-bake.ts` test-first with stubs: grids in scene hidden, pass 0 then pass 1 visibility inside calls, exclusions restored in `finally` also on throw, probes-per-frame budget, order.
+- [ ] 2.1 `grid-bake.ts` test-first with stubs: grids in scene hidden, pass 0 then pass 1 visibility inside calls (exterior grid visible in pass 1), rig switched to the capture state around each slice and back after, exclusions restored in `finally` also on throw, probes-per-frame budget, order.
 - [ ] 2.2 `room-probes.ts` test-first with stubs: capture state, atlas tile layout, mirrors hidden, PMREM size check fails loudly.
 - [ ] 2.3 `walk-lighting-controller.ts` test-first with fakes: start after the chain is ready, direct look until swap, one-frame swap, restore on leaving, refresh scopes (furniture → probe, finish → grid+probe, opening → both rooms, load/rebuild/sun/restore → all), 16-box limit error, capture during bake uses the direct look, patch re-installed on new roots and materials.
 

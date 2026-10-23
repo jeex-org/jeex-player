@@ -10,7 +10,7 @@ In `walk` and `tour` everything in a room (shell, furniture, fixtures, door leav
 
 #### Scenario: Every shell mesh in its room
 - **WHEN** the scene is built or rebuilt
-- **THEN** every wall face, floor, ceiling and skirting mesh is lit by its own room's grid and its world-space vertices are unchanged
+- **THEN** every wall face, floor, ceiling and skirting mesh is lit by its own room's grid (in a concave room, by one of its sub-boxes' grids) and its world-space vertices are unchanged
 
 #### Scenario: Furniture by the wall
 - **WHEN** a cabinet stands against the bathroom wall with its origin on the floor
