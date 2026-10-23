@@ -76,8 +76,8 @@ function renderer(size = 64): THREE.WebGLRenderer {
 }
 
 /** A room grid over a unit box whose atlas holds one constant colour of irradiance. */
-function constantGrid(colour: Rgb, room: RoomBox): RoomGrid {
-  const grid = new RoomGrid(room);
+function constantGrid(colour: Rgb, volume: RoomBox): RoomGrid {
+  const grid = new RoomGrid(volume);
   const coefficients: Rgb[] = Array.from({ length: 9 }, () => [0, 0, 0] as Rgb);
   coefficients[0] = colour.map((c) => c / 0.886227) as unknown as Rgb;
   const atlas = packAtlas(coefficients, 2);
@@ -422,6 +422,31 @@ describe('room lighting on the demo apartment', { timeout: MOUNT_TIMEOUT_MS }, (
     expect(wc).toBeLessThan(living);
   });
 
+  test('a still of the live view in walk is as dark as the screen, within 2 %', async () => {
+    const draw = original(WalkPost.prototype, 'render');
+    let screen: number | null = null;
+    const spy = vi.spyOn(WalkPost.prototype, 'render').mockImplementation(function (this: WalkPost, ...args) {
+      draw.apply(this, args);
+      if (screen !== null) return;
+      const gl = lighting.renderer.getContext();
+      const width = gl.drawingBufferWidth;
+      const height = gl.drawingBufferHeight;
+      const pixels = new Uint8Array(16 * 16 * 4);
+      gl.readPixels(Math.floor(width / 2) - 8, Math.floor(height / 2) - 8, 16, 16, gl.RGBA, gl.UNSIGNED_BYTE, pixels);
+      let sum = 0;
+      for (let i = 0; i < pixels.length; i += 4)
+        sum += 0.2126 * linear(pixels[i]!) + 0.7152 * linear(pixels[i + 1]!) + 0.0722 * linear(pixels[i + 2]!);
+      screen = sum / 256;
+    });
+    await until(() => screen !== null, 'a frame on screen', 10_000);
+    spy.mockRestore();
+    const size = lighting.renderer.getDrawingBufferSize(new THREE.Vector2());
+    const { blob } = await handle.capture.still({ width: size.x, height: size.y, camera: 'live', caption: false });
+    const still = await centreLuminance(blob, 16);
+    record('stillVsScreen', { still, screen });
+    expect(Math.abs(still - screen!) / screen!).toBeLessThan(0.02);
+  });
+
   test('an edit in walk re-captures only its room’s probe, after the debounce', async () => {
     const refresh = vi.spyOn(WalkLighting.prototype, 'refresh');
     const asset = demoScene().assets.find((item) => item.room === ROOM.living)!;
@@ -433,5 +458,207 @@ describe('room lighting on the demo apartment', { timeout: MOUNT_TIMEOUT_MS }, (
     expect(refresh).not.toHaveBeenCalled();
     await until(() => refresh.mock.calls.length > 0, 'the refresh after the debounce', 10_000);
     expect(refresh.mock.calls[0]![0]).toEqual({ all: false, grids: [], probes: [ROOM.living] });
+  });
+});
+
+/* ----------------------------------------------------- reflections, measured */
+
+type Box = { x0: number; x1: number; z0: number; z1: number };
+const HEIGHT_M = 2.6;
+
+/** A closed matte room: four walls and a ceiling facing in, origins inside, casting shadows. */
+function room(scene: THREE.Scene, b: Box, open: { side: 'x1' | 'x0' } | null = null): void {
+  const material = new THREE.MeshStandardMaterial({ color: 0x9a9a9a, roughness: 0.9 });
+  const w = b.x1 - b.x0;
+  const d = b.z1 - b.z0;
+  const cx = (b.x0 + b.x1) / 2;
+  const cz = (b.z0 + b.z1) / 2;
+  const walls: Array<{ size: [number, number]; at: [number, number, number]; yaw: number; side: string }> = [
+    { size: [w, HEIGHT_M], at: [cx, HEIGHT_M / 2, b.z0 + 0.01], yaw: 0, side: 'z0' },
+    { size: [w, HEIGHT_M], at: [cx, HEIGHT_M / 2, b.z1 - 0.01], yaw: Math.PI, side: 'z1' },
+    { size: [d, HEIGHT_M], at: [b.x0 + 0.01, HEIGHT_M / 2, cz], yaw: Math.PI / 2, side: 'x0' },
+    { size: [d, HEIGHT_M], at: [b.x1 - 0.01, HEIGHT_M / 2, cz], yaw: -Math.PI / 2, side: 'x1' },
+  ];
+  for (const wall of walls) {
+    if (open?.side === wall.side) continue;
+    const mesh = new THREE.Mesh(new THREE.PlaneGeometry(...wall.size), material);
+    mesh.position.set(...wall.at);
+    mesh.rotation.y = wall.yaw;
+    mesh.castShadow = true;
+    scene.add(mesh);
+  }
+  const ceiling = new THREE.Mesh(new THREE.PlaneGeometry(w, d), material);
+  ceiling.rotation.x = Math.PI / 2;
+  ceiling.position.set(cx, HEIGHT_M - 0.01, cz);
+  ceiling.castShadow = true;
+  scene.add(ceiling);
+}
+
+/** A floor over `b`, at `roughness`, origin inside. */
+function floor(scene: THREE.Scene, b: Box, roughness: number): void {
+  const mesh = new THREE.Mesh(
+    new THREE.PlaneGeometry(b.x1 - b.x0, b.z1 - b.z0),
+    new THREE.MeshStandardMaterial({ color: 0xffffff, roughness, metalness: 1 }),
+  );
+  mesh.rotation.x = -Math.PI / 2;
+  mesh.position.set((b.x0 + b.x1) / 2, 0, (b.z0 + b.z1) / 2);
+  scene.add(mesh);
+}
+
+/** A bright emissive bar: the stripe or the window of a test room. */
+function light(scene: THREE.Scene, size: [number, number, number], at: [number, number, number]): void {
+  const mesh = new THREE.Mesh(
+    new THREE.BoxGeometry(...size),
+    new THREE.MeshStandardMaterial({ color: 0x000000, emissive: 0xffffff, emissiveIntensity: 6 }),
+  );
+  mesh.position.set(...at);
+  scene.add(mesh);
+}
+
+const square = (b: Box) => [
+  { x: b.x0, z: b.z0 },
+  { x: b.x1, z: b.z0 },
+  { x: b.x1, z: b.z1 },
+  { x: b.x0, z: b.z1 },
+];
+
+/** A renderer, the apartment rig and the room lighting over `rooms`, baked and live. */
+function lit(rooms: Array<{ id: string; box: Box }>, build: (scene: THREE.Scene) => void, size = { w: 320, h: 240 }) {
+  const gl = renderer(size.w);
+  gl.setSize(size.w, size.h, false);
+  gl.shadowMap.enabled = true;
+  const context = createLightingContext(THREE, gl);
+  const scene = new THREE.Scene();
+  context.createApartmentRig().attach(scene);
+  build(scene);
+  const lighting = new WalkLighting(gl, scene);
+  lighting.load({
+    volumes: {
+      rooms: rooms.map((r) => ({ roomId: r.id, polygon: square(r.box), halfWall: 0.05 })),
+      ceilingHeight: HEIGHT_M,
+      doors: [],
+      furniture: [],
+    },
+    furniture: null,
+  });
+  for (let frame = 0; frame < 2000 && lighting.phase !== 'live'; frame += 1) lighting.frame(true);
+  expect(lighting.phase).toBe('live');
+  const shoot = (position: THREE.Vector3Like, target: THREE.Vector3Like): { pixels: Float32Array; camera: THREE.PerspectiveCamera } => {
+    const camera = new THREE.PerspectiveCamera(60, size.w / size.h, 0.05, 50);
+    camera.position.copy(position);
+    camera.lookAt(target.x, target.y, target.z);
+    camera.updateMatrixWorld();
+    const target2 = new THREE.WebGLRenderTarget(size.w, size.h, { type: THREE.FloatType });
+    gl.setRenderTarget(target2);
+    gl.render(scene, camera);
+    const pixels = new Float32Array(size.w * size.h * 4);
+    gl.readRenderTargetPixels(target2, 0, 0, size.w, size.h, pixels);
+    gl.setRenderTarget(null);
+    target2.dispose();
+    return { pixels, camera };
+  };
+  const lum = (pixels: Float32Array, x: number, y: number): number => {
+    const i = (y * size.w + x) * 4;
+    return 0.2126 * pixels[i]! + 0.7152 * pixels[i + 1]! + 0.0722 * pixels[i + 2]!;
+  };
+  const dispose = (): void => {
+    lighting.dispose();
+    context.dispose();
+    gl.dispose();
+    gl.forceContextLoss();
+  };
+  return { gl, scene, lighting, shoot, lum, size, dispose };
+}
+
+describe('reflections from the room probes', { timeout: MOUNT_TIMEOUT_MS }, () => {
+  const A: Box = { x0: 0, x1: 4, z0: 0, z1: 4 };
+
+  test('a mirror-like floor reflects a stripe on the far wall in the stripe’s own screen column (2 px)', () => {
+    const world = lit([{ id: 'a', box: A }], (scene) => {
+      room(scene, A);
+      floor(scene, A, 0.02);
+      light(scene, [0.12, 2.2, 0.04], [2.9, 1.2, 0.04]);
+    });
+    // Pitch 0 and off the probe's point (the room centre): a vertical stripe and its reflection share a column.
+    const { pixels } = world.shoot({ x: 1.3, y: 1.3, z: 3.6 }, { x: 1.3, y: 1.3, z: 0 });
+    const brightest = (row: number): number => {
+      let best = 0;
+      for (let x = 1; x < world.size.w; x += 1) if (world.lum(pixels, x, row) > world.lum(pixels, best, row)) best = x;
+      return best;
+    };
+    const stripe = brightest(Math.round(world.size.h * 0.6));
+    const reflection = brightest(Math.round(world.size.h * 0.2));
+    record('reflectionColumns', { stripe, reflection });
+    expect(Math.abs(reflection - stripe)).toBeLessThanOrEqual(2);
+    // Re-captured twice, a probe is the same: no probe sees an earlier one.
+    const atlas = (world.lighting as unknown as { atlas: { target: THREE.WebGLRenderTarget } }).atlas.target;
+    const read = (): Uint16Array => {
+      const out = new Uint16Array(atlas.width * atlas.height * 4);
+      world.gl.readRenderTargetPixels(atlas, 0, 0, atlas.width, atlas.height, out);
+      return out;
+    };
+    world.lighting.refresh({ all: false, grids: [], probes: ['a'] });
+    const first = read();
+    world.lighting.refresh({ all: false, grids: [], probes: ['a'] });
+    const second = read();
+    expect(second.every((value, i) => value === first[i])).toBe(true);
+    world.dispose();
+  });
+
+  test('a glossy floor in a closed room without a window reflects no window of the next room', () => {
+    const lit2: Box = { x0: 4.1, x1: 8.1, z0: 0, z1: 4 };
+    const world = lit(
+      [
+        { id: 'dark', box: A },
+        { id: 'bright', box: lit2 },
+      ],
+      (scene) => {
+        room(scene, A);
+        room(scene, lit2);
+        floor(scene, A, 0.05);
+        floor(scene, lit2, 0.9);
+        light(scene, [0.04, 1.2, 2], [8.05, 1.4, 2]);
+      },
+    );
+    const { pixels } = world.shoot({ x: 1, y: 1.3, z: 2 }, { x: 4, y: 0.4, z: 2 });
+    let brightest = 0;
+    for (let y = 0; y < world.size.h * 0.35; y += 1)
+      for (let x = 0; x < world.size.w; x += 1) brightest = Math.max(brightest, world.lum(pixels, x, y));
+    record('closedRoomFloorMax', brightest);
+    expect(brightest).toBeLessThan(0.5);
+    world.dispose();
+  });
+
+  test('across an open boundary the floor’s reflection changes smoothly, no step larger than elsewhere', () => {
+    const B: Box = { x0: 4.1, x1: 8.1, z0: 0, z1: 4 };
+    const world = lit(
+      [
+        { id: 'a', box: A },
+        { id: 'b', box: B },
+      ],
+      (scene) => {
+        room(scene, A, { side: 'x1' });
+        room(scene, B, { side: 'x0' });
+        floor(scene, { x0: 0, x1: 8.1, z0: 0, z1: 4 }, 0.25);
+        light(scene, [0.04, 1.6, 3], [0.06, 1.3, 2]);
+      },
+    );
+    const { pixels, camera } = world.shoot({ x: 4.05, y: 1.5, z: 3.9 }, { x: 4.05, y: 0, z: 1.2 });
+    const steps: Array<{ x: number; step: number }> = [];
+    let previous: number | null = null;
+    for (let x = 3.2; x <= 4.9; x += 0.02) {
+      const p = new THREE.Vector3(x, 0, 2).project(camera);
+      const px = Math.round(((p.x + 1) / 2) * world.size.w);
+      const py = Math.round(((p.y + 1) / 2) * world.size.h);
+      const value = world.lum(pixels, px, py);
+      if (previous !== null) steps.push({ x, step: Math.abs(value - previous) });
+      previous = value;
+    }
+    const near = steps.filter((s) => Math.abs(s.x - 4.05) <= T.blendM / 2);
+    const far = steps.filter((s) => Math.abs(s.x - 4.05) > T.blendM / 2);
+    const max = (list: typeof steps): number => Math.max(...list.map((s) => s.step));
+    record('doorwaySteps', { near: max(near), elsewhere: max(far) });
+    expect(max(near)).toBeLessThanOrEqual(Math.max(max(far) * 1.5, 1e-3));
+    world.dispose();
   });
 });
