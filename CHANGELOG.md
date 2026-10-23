@@ -9,6 +9,29 @@ as described under [Versioning](#versioning).
 
 ### Added
 
+- **`set_site`: a scene operation for the plan's orientation and sun preset.**
+  `{ op: 'set_site', northDeg?: number | null, sun?: 'morning' | 'noon' | 'evening' | null }`
+  on schema 2.3 documents: a value sets the field, `null` clears it, an omitted
+  key keeps it; `northDeg` is normalised to [0, 360); clearing both removes
+  `site`. Refused on 2.2 documents and inside interior presets. A change of
+  `site` (by the operation or by a replaced document) reports the new touched
+  kind `site`, and the live viewer re-aims the sun without a rebuild.
+  `SetSiteOp` is exported from `jeex-viewer/ops`; the published scene schema
+  requires one of the two keys.
+
+- **Ambient occlusion and SMAA in walk and tour.** In the two modes where
+  nothing is edited, the player renders through a post-processing chain:
+  three.js GTAO (0.3 m radius, full resolution, denoised) darkens corners,
+  skirtings and the ground under furniture, SMAA smooths edges, and the PBR
+  Neutral display transform is applied once at the end. Glass, transparent
+  surfaces and invisible pick shapes cast no occlusion. Editing modes render
+  exactly as before. The chain loads on the first entry into walk or tour: a
+  separate chunk of about 50 KB gzip in the ES module and demo builds, inline
+  in `jeex-viewer.iife.js` (which grows by about 50 KB gzip). Stills and video
+  frames captured in walk or tour go through the same chain; panoramas do
+  not. Mirrors still reflect once per frame. `__viewerDebug.walkPost()` (debug
+  mounts only) reports the chain's state.
+
 - **Scene schema 2.3: `site`, the plan's orientation and a sun preset.**
   `site: { northDeg?, sun? }` says where true north lies (degrees clockwise
   from `+Z` towards `+X`) and which sun preset lights the scene: `morning`,

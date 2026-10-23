@@ -83,6 +83,16 @@ describe('generateSchema', () => {
     expect(definitions['SceneSite']?.['additionalProperties']).toBe(false);
   });
 
+  test('set_site needs northDeg or sun in the published schema too', () => {
+    const schema = generateSchema(SCENE_TARGET, FIXED_VERSION);
+    const definitions = schema['definitions'] as Record<string, Record<string, unknown>>;
+    expect(definitions['SetSiteOp']?.['anyOf']).toEqual([
+      { properties: { northDeg: {} }, required: ['northDeg'] },
+      { properties: { sun: {} }, required: ['sun'] },
+    ]);
+    expect(definitions['SetSiteOp']?.['additionalProperties']).toBe(false);
+  });
+
   test('a closed object type (no index signature) gets additionalProperties: false', () => {
     const schema = generateSchema(SCENE_TARGET, FIXED_VERSION);
     const definitions = schema['definitions'] as Record<string, { additionalProperties?: unknown }>;

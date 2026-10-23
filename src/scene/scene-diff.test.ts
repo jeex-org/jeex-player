@@ -6,7 +6,7 @@ import { draftOf, type Draft } from '../shared/committed.js';
 import { diffScenes, sameBody, sameData } from './scene-diff.js';
 import { SceneModel } from './scene-model.js';
 import { type SceneOp } from './scene-ops.js';
-import { TOUCHED_SHELL, TOUCHED_TOUR_CHECKPOINTS, touchedAsset, touchedCamera, type TouchedEntity } from './ops/context.js';
+import { TOUCHED_SHELL, TOUCHED_SITE, TOUCHED_TOUR_CHECKPOINTS, touchedAsset, touchedCamera, type TouchedEntity } from './ops/context.js';
 import type { DemoAsset, SceneData } from './types.js';
 
 const SOFA = L_SHAPE.asset.sofa;
@@ -66,6 +66,15 @@ describe('diffScenes', () => {
   test('a key the diff does not know is the plan, never silence', () => {
     const next = { ...lShapePlan, unknownFutureKey: 1 } as unknown as SceneData;
     expect(diffScenes(lShapePlan, next)).toEqual([TOUCHED_SHELL]);
+  });
+
+  test('the orientation names the site, never the plan: set, changed and removed', () => {
+    const oriented: SceneData = { ...lShapePlan, schemaVersion: '2.3', site: { northDeg: 30 } };
+    const turned: SceneData = { ...oriented, site: { northDeg: 90, sun: 'evening' } };
+    const { site: _site, ...bare } = oriented;
+    expect(diffScenes({ ...lShapePlan, schemaVersion: '2.3' }, oriented)).toEqual([TOUCHED_SITE]);
+    expect(diffScenes(oriented, turned)).toEqual([TOUCHED_SITE]);
+    expect(diffScenes(turned, bare)).toEqual([TOUCHED_SITE]);
   });
 
   test('it answers what a tour-checkpoint operation answers', () => {

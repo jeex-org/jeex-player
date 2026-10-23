@@ -622,4 +622,5 @@ const SCENE_BUILDER_TOUCHED_HANDLERS: TouchedHandlers<SceneBuilderApplyCtx> = {
   navigation: routeAsUnhandled,
   autotour: routeAsUnhandled,
   tourCheckpoints: routeAsUnhandled,
+  site: routeAsUnhandled,
 };

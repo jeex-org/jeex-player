@@ -58,21 +58,22 @@ export const HOST_BUDGET_FAIL_BYTES = 4 * 1024;
  * scene schemas — a good deal of the scene model, but still no `three` and no
  * DOM.
  *
- * The gate is set from a measured size of `jeex-viewer-ops.js` (79,666 gzip
- * bytes, 77.8 KB, from `measureBundle('dist-lib')` right after
- * `bun run build:lib`) plus 1 KB; with the sun orientation's `site` field
- * merged in the entry measures 80,286 bytes, still under the gate. Most of the entry is the scene model and its
+ * The gate is set from a measured size of `jeex-viewer-ops.js` (81,035 gzip
+ * bytes, 79.1 KB, from `measureBundle('dist-lib')` right after
+ * `bun run build:lib`) plus 1 KB. Most of the entry is the scene model and its
  * `zod/mini` schemas; the bundled bank's fixed UUID v7 literals (random hex
- * that gzip cannot fold) are a large share. The last raise, from 75,170
- * bytes, is the library materials: the manifest's `library` member with its
- * cross-field rules (about 1.9 KB), and the scene's finish values, the
- * surface table and the explicit `set_material` with its version gate (about
- * 2.2 KB), all of which a host judges and applies server-side. A future
+ * that gzip cannot fold) are a large share. The last raise, from 79,666
+ * bytes, is the sun orientation's `site` field (80,286 bytes with it) and
+ * the `set_site` operation (about 0.7 KB: its op schema, applier and preset
+ * rule), which a host judges and applies server-side. The raise before it,
+ * from 75,170 bytes, was the library materials (the manifest's `library`
+ * member, about 1.9 KB; the scene's finish values and the explicit
+ * `set_material` with its version gate, about 2.2 KB). A future
  * export that crosses it is meant to be noticed here, not discovered at
  * `npm pack` time; the fix is to re-measure and update this comment, never to
  * raise the number from memory.
  */
-export const OPS_BUDGET_FAIL_BYTES = 78 * 1024 + 818;
+export const OPS_BUDGET_FAIL_BYTES = 81_035 + 1024;
 
 /**
  * Hard limit for the `jeex-viewer/lighting` entry, gzip bytes. It carries the
@@ -105,20 +106,27 @@ const LIGHTING_BUNDLE_PREFIX = 'jeex-viewer-lighting';
 
 /**
  * File-name prefix both vite configs give every dynamic-import chunk
- * (`vite.config.ts`, `vite.lib.config.ts`). A lazy chunk is authoring, not
- * viewing: it is loaded by an action, never by opening the page.
+ * (`vite.config.ts`, `vite.lib.config.ts`). A lazy chunk is never loaded by
+ * opening the page: it waits for an action (an export, an editing tool) or for
+ * the first entry into a mode that needs it (the walk and tour chain).
  */
 export const LAZY_CHUNK_PREFIX = 'lazy-';
 /** Hard limit for a lazy chunk that names no override in `LAZY_LIMITS`, gzip bytes. */
 export const LAZY_CHUNK_FAIL_BYTES = 256 * 1024;
 /**
- * Per-lazy-chunk overrides, keyed by file-name prefix (checked after
- * `LAZY_CHUNK_PREFIX` is stripped is NOT required — match against the full
- * file name, same as `limitFor`). Empty today: no lazy chunk exists yet: it
- * is filled in as future lazy modules (the IFC writer, the RoomPlan/Sweet
- * Home importers, the glTF exporter) need a budget of their own.
+ * Per-lazy-chunk overrides, keyed by file-name prefix (matched against the
+ * full file name, same as `limitFor`).
+ *
+ * `lazy-jeex-viewer-walk-post`: the walk and tour post-processing chain
+ * (`src/render/walk-post.ts`: three's composer, GTAO, SMAA with its two
+ * embedded lookup images, the output pass), loaded on the first entry into
+ * walk or tour rather than at boot. The limit is the last measured size of the
+ * ES build's chunk (50,747 gzip bytes, from `measureBundle('dist-lib')` right
+ * after `bun run build:lib`; the demo build's is 49,596) plus 1 KB, so a
+ * second effect added to the chain is noticed here. The IIFE build cannot split
+ * code and carries the chain inline, inside the 700 KB boot budget.
  */
-export const LAZY_LIMITS: Readonly<Record<string, number>> = {};
+export const LAZY_LIMITS: Readonly<Record<string, number>> = { 'lazy-jeex-viewer-walk-post': 50_747 + 1024 };
 
 /** How the sizes are judged: as one download, or as alternatives. */
 export type BudgetMode = 'total' | 'per-file';

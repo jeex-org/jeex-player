@@ -51,7 +51,7 @@ import { createTourControls, TourEvents, type TourControls } from '../camera/tou
 import type { ViewerOptions } from './viewer-options.js';
 import { prefersReducedMotion, resolveMotionInstant, watchMotion } from './motion-wiring.js';
 import { handleCommands, type HandleCommands } from './handle-commands.js';
-import { captureCommands, poseOf, type CaptureCommands } from './capture-commands.js';
+import { captureCommands, stageCaptureDeps, type CaptureCommands } from './capture-commands.js';
 import { frameHooksFor } from './viewer-frame.js';
 import { seedForDocument } from './document-wiring.js';
 import { DoorController } from './door-controller.js';
@@ -114,14 +114,12 @@ export class ViewerApp {
    * something any other command needs.
    */
   readonly capture: CaptureCommands = captureCommands({
-    runtime: () => this.stage?.runtime,
+    ...stageCaptureDeps(() => this.stage),
     model: () => this.mount.model,
-    livePose: () => poseOf(this.stage?.director?.controller.getPose()),
     options: () => this.options,
     messages: () => this.messages,
     shellState: () => this.dollhouse.state,
     ready: () => this.booted,
-    tour: () => this.stage?.director?.tour,
   });
   /**
    * The `ViewerHandle` read/write methods (`handle-commands.ts`); built at the

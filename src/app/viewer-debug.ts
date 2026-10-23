@@ -33,7 +33,7 @@ import { planDrawingInputs } from '../assets/plan-fixtures.js';
 import type { LayoutCatalogue, LayoutIssue } from '../layout/layout-lint.js';
 // Type-only for the same reason, and lazy in its own right: `free-space.ts`
 // is a second lazy chunk that imports across into `layout-lint`'s (measured
-// sizes are on `loadLayoutModules` below).
+// sizes are on `loadLayoutModules`, `debug-layout-modules.ts`).
 import type { PlacementSuggestion } from '../layout/free-space.js';
 import type { ProjectLibraryManifest } from '../assets/project-manifest.js';
 import type { OpeningListEntry } from '../geometry/opening-builder.js';
@@ -44,11 +44,13 @@ import { FURNITURE_GROUP_NAME, type SceneBuilder } from '../geometry/scene-build
 import { countTriangles } from '../geometry/model-source.js';
 import type { TourControls, TourDebugControls } from '../camera/tour-controls.js';
 import { checkCompleteness } from '../scene/completeness.js';
-import { defaultLogger } from '../shared/logger.js';
-import type { FaceKey, SceneData, SceneReport, Vec2 } from '../scene/types.js';
+import type { FaceKey, SceneData, Vec2 } from '../scene/types.js';
+import type { SceneReport } from '../scene/scene-report.js';
 import type { ViewerSelection, ViewerSelectionTarget } from './selection.js';
 import type { SelectionDescription } from '../ui/selection-options.js';
 import type { AssetMoveDebug } from '../edit/asset-move-session.js';
+import type { WalkPostState } from './walk-post-controller.js';
+import { freeSpaceModule, layoutLintModule, loadLayoutModules } from './debug-layout-modules.js';
 
 /** What `__viewerDebug.minimap()` answers (`minimap.ts`). */
 type MinimapState = {
@@ -101,6 +103,8 @@ type ViewerDebugApi = {
   furnitureRendered: () => boolean | null;
   /** The sun: direction, its world angles, the fitted frustum and how often its cached map was drawn; `null` before a root. */
   sunShadow: () => SunShadowState | null;
+  /** The walk and tour post-processing chain: `off`, `loading`, `on` (drawing the frame) or `failed`. */
+  walkPost: () => WalkPostState;
   /**
    * What every furniture body on screen actually IS, right now: the placement
    * id, whether its body is procedural, a `dims` stand-in waiting for a GLB or
@@ -303,54 +307,6 @@ type ViewerDebugApi = {
 /** Height the `floorAt` probe starts from, metres: above any ceiling. */
 const FLOOR_PROBE_HEIGHT = 40;
 
-/**
- * Module-level caches for the lazy `layout/` imports (see the `layoutIssues`
- * doc comment on `ViewerDebugApi`): fired at most once per page load, on the
- * first `installViewerDebug` call whose host has the debug capability on. A
- * page that mounts, disposes and remounts the viewer behind `?debug=1` reuses
- * these same modules instead of importing them again.
- */
-let layoutLintModule: typeof import('../layout/layout-lint.js') | null = null;
-let freeSpaceModule: typeof import('../layout/free-space.js') | null = null;
-let layoutModulesLoading = false;
-
-/**
- * Arms BOTH lazy layout modules at once.
- *
- * Measured on the full build rather than assumed: two dynamic
- * import sites make TWO chunks — `lazy-layout-lint` (6.5 KB gzip) and
- * `lazy-free-space` (1.7 KB gzip), the second importing `lintContext` and
- * `lintLayout` from the first. So this is one arming point for two downloads
- * that are useless apart, started together instead of one waiting on the other
- * to be asked for.
- *
- * The two caches are read separately, because the two dynamic imports resolve
- * as two microtasks: each accessor answers its own empty value until ITS
- * module has landed.
- */
-function loadLayoutModules(): void {
-  if (layoutModulesLoading) return;
-  layoutModulesLoading = true;
-  // A chunk fetch CAN fail — an offline dev server, a stale hash after a
-  // redeploy — and the accessors have no error channel of their own: they
-  // would answer `[]` and `null` for the rest of the page session, and a
-  // browser check polling them would only see an opaque timeout. So the
-  // failure is reported once through the library's own sink, and the flag is
-  // released so the next `installViewerDebug` (one per document) retries; a
-  // chunk that did land by then is a module-map hit and costs nothing.
-  const armed = [import('../layout/layout-lint.js'), import('../layout/free-space.js')] as const;
-  void armed[0].then((module) => {
-    layoutLintModule = module;
-  });
-  void armed[1].then((module) => {
-    freeSpaceModule = module;
-  });
-  void Promise.all(armed).catch((cause: unknown) => {
-    layoutModulesLoading = false;
-    defaultLogger.warn('debug-layout-chunk', 'the lazy layout modules did not load; layoutIssues and suggestPlacement stay empty', cause);
-  });
-}
-
 declare global {
   interface Window {
     __appReady?: boolean;
@@ -392,6 +348,7 @@ type SceneDebug = {
   builder: () => SceneBuilder | undefined;
   editor: () => ViewerEditor | undefined;
   sun: () => SunShadow | undefined;
+  walkPost: () => WalkPostState | undefined;
   furnitureVisible: () => boolean;
   /** This instance's catalogue; `setLocale` replaces it. */
   messages: () => Messages;
@@ -517,6 +474,7 @@ export function installViewerDebug(host: ViewerDebugHost): ViewerDebugApi {
     furniture: () => host.furnitureVisible(),
     furnitureRendered: () => host.sceneRoot()?.getObjectByName(FURNITURE_GROUP_NAME)?.visible ?? null,
     sunShadow: () => host.sun()?.state() ?? null,
+    walkPost: () => host.walkPost() ?? 'off',
     assetModels: () => {
       const furniture = host.sceneRoot()?.getObjectByName(FURNITURE_GROUP_NAME);
       if (!furniture) return [];
@@ -668,24 +626,27 @@ export function installViewerDebug(host: ViewerDebugHost): ViewerDebugApi {
     // would drift the day one of them learns to cache or validate.
     const projectCatalogue = (): LayoutCatalogue | undefined => {
       const library = host.projectLibrary();
-      if (!library || !layoutLintModule) return undefined;
-      return layoutLintModule.projectLayoutCatalogue(library);
+      const lint = layoutLintModule();
+      if (!library || !lint) return undefined;
+      return lint.projectLayoutCatalogue(library);
     };
     api.layoutIssues = () => {
-      if (!layoutLintModule) return [];
+      const lint = layoutLintModule();
+      if (!lint) return [];
       // Cloned like `plan()`: committed state is frozen and never handed out.
-      return layoutLintModule
+      return lint
         .lintLayout(model().scene, model().plan, projectCatalogue())
         .map((issue) => ({ ...issue, ids: [...issue.ids], at: { ...issue.at } }));
     };
     api.suggestPlacement = (asset, roomId) => {
-      if (!freeSpaceModule || !layoutLintModule) return null;
+      const freeSpace = freeSpaceModule();
+      if (!freeSpace || !layoutLintModule()) return null;
       const catalogue = projectCatalogue();
       // The answer is the helper's own fresh object — no frozen state in it,
       // so nothing to clone (unlike `layoutIssues`, which copies `ids`/`at`).
       // The `...(x === undefined ? {} : { x })` spreads are what
       // `exactOptionalPropertyTypes` asks for, not a style choice.
-      return freeSpaceModule.suggestPlacement({
+      return freeSpace.suggestPlacement({
         scene: model().scene,
         plan: model().plan,
         asset,

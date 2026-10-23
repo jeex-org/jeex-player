@@ -27,6 +27,7 @@ import {
   TOUCHED_AUTOTOUR,
   TOUCHED_NAVIGATION,
   TOUCHED_SHELL,
+  TOUCHED_SITE,
   TOUCHED_TOUR_CHECKPOINTS,
   touchedAsset,
   touchedCamera,
@@ -69,6 +70,8 @@ const OWN_ENTITY: Partial<Record<keyof SceneData, (prev: SceneData, next: SceneD
   navigation: () => [TOUCHED_NAVIGATION],
   autotour: () => [TOUCHED_AUTOTOUR],
   tourCheckpoints: () => [TOUCHED_TOUR_CHECKPOINTS],
+  // The orientation re-aims the sun of the root on screen (`app/scene-mount.ts`); nothing is rebuilt.
+  site: () => [TOUCHED_SITE],
   presentationCamera: () => [touchedCamera('presentation')],
   walkSpawn: () => [touchedCamera('walkSpawn')],
   roomCameras: (prev, next) => {

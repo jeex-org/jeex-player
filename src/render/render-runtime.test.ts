@@ -12,6 +12,8 @@ import * as THREE from 'three';
 import { KEEP_WARM_MS, RenderRuntime, createRenderRuntime, hasWebGL, measureEntry } from './render-runtime.js';
 import { stubLighting, stubRuntime } from '../fixtures/stubs.js';
 import { apartmentEnvironmentIntensity, LIGHTING_STANDARD } from '../lighting/lighting-standard.js';
+import { scenePassOf } from '../shared/scene-pass.js';
+import type { PostProcessor } from './post-processor.js';
 
 /** A runtime built on the shared stub renderer, with the frame pump in hand. */
 function harness(
@@ -186,6 +188,68 @@ describe('frame hooks', () => {
     tick(16);
     expect(stub.renders).toBe(1);
     runtime.dispose();
+  });
+});
+
+describe('the post-processor seam', () => {
+  /** A chain that records what the runtime asks of it. */
+  function fakeChain() {
+    const calls: string[] = [];
+    const sizes: Array<[number, number, number]> = [];
+    const chain: PostProcessor = {
+      render: (scene, camera) => calls.push(`render ${scene.type} ${camera.type}`),
+      renderTo: () => calls.push('renderTo'),
+      setSize: (width, height, ratio) => sizes.push([width, height, ratio]),
+      dispose: () => calls.push('dispose'),
+    };
+    return { chain, calls, sizes };
+  }
+
+  test('without a chain the frame renders straight to the screen inside the beauty-pass scope', () => {
+    const { runtime, stub, tick } = harness();
+    const camera = new THREE.PerspectiveCamera();
+    const scopes: unknown[] = [];
+    const render = runtime.renderer.render.bind(runtime.renderer);
+    runtime.renderer.render = (scene, view) => {
+      scopes.push(scenePassOf(runtime.renderer));
+      render(scene, view);
+    };
+    runtime.setCamera(camera);
+    runtime.start();
+    tick(16);
+    expect(stub.renders).toBe(1);
+    expect(scopes).toEqual([{ target: null, scene: runtime.scene, camera }]);
+    // The scope lives only as long as the draw.
+    expect(scenePassOf(runtime.renderer)).toBeUndefined();
+    runtime.dispose();
+  });
+
+  test('an attached chain draws the frame instead of the renderer, sized to the drawing buffer', () => {
+    const { runtime, stub, tick, viewport } = harness();
+    runtime.setCamera(new THREE.PerspectiveCamera());
+    const { chain, calls, sizes } = fakeChain();
+    runtime.setPostProcessor(chain);
+    expect(sizes).toEqual([[800, 600, 1]]);
+    runtime.start();
+    tick(16);
+    expect(calls).toEqual(['render Scene PerspectiveCamera']);
+    expect(stub.renders).toBe(0);
+    viewport.clientWidth = 400;
+    runtime.resize();
+    expect(sizes.at(-1)).toEqual([400, 600, 1]);
+    runtime.setPostProcessor(null);
+    tick(16);
+    expect(stub.renders).toBe(1);
+    expect(calls).toEqual(['render Scene PerspectiveCamera']);
+    // A detached chain is not resized; it is sized again when attached.
+    viewport.clientWidth = 300;
+    runtime.resize();
+    expect(sizes.at(-1)).toEqual([400, 600, 1]);
+    runtime.setPostProcessor(chain);
+    expect(sizes.at(-1)).toEqual([300, 600, 1]);
+    // The runtime never disposes a chain it was handed: its owner does.
+    runtime.dispose();
+    expect(calls).not.toContain('dispose');
   });
 });
 
