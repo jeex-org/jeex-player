@@ -103,6 +103,15 @@ for (const viewport of [
 
     test('the chrome looks as it did', async ({ page }) => {
       await gotoUnbranded(page);
+      // No brand lockup to rest on here, so the pointer rests on the bar's own
+      // left padding: the bar stays open for the whole capture (its idle timer
+      // re-arms while hovered) and no control shows a hover style.
+      const bar = page.locator('[data-jeex="control-bar"]');
+      const box = await bar.boundingBox();
+      if (!box) throw new Error('unbranded: the control bar has no box');
+      await bar.hover({ force: true, position: { x: 3, y: box.height / 2 } });
+      await expect(bar).toHaveAttribute('data-collapsed', 'false');
+      await expect.poll(() => bar.evaluate((el) => el.matches(':hover'))).toBe(true);
       await expectChromeScreenshot(page, `unbranded-chrome-${viewport.name}.png`);
     });
 

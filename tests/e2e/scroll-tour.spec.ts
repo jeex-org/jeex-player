@@ -79,6 +79,10 @@ test('the run stays paused: scrolling scrubs, it does not start playback', async
 });
 
 test('the host page looks as it did', async ({ page }) => {
+  // Input is off here, so the bar always collapses; the baseline is of that
+  // resting state, waited for BEFORE the frames are held (the idle timer is
+  // a timeout, not a frame, and holding frames does not stop it).
+  await waitForChromeIdle(page);
   await holdFrames(page);
   await expectChromeScreenshot(page, 'scroll-tour-chrome.png');
 });
