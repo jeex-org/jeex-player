@@ -17,6 +17,8 @@ import {
   RATIO_ATTRIBUTE,
   SHADOW_ATTRIBUTE,
   SHADOW_NONE,
+  LOADING_ATTRIBUTE,
+  loadingPolicy,
   ViewerElementController,
   effectOf,
   hostBoxCss,
@@ -28,6 +30,10 @@ import type { TourControls } from '../camera/tour-controls.js';
 import type { ViewerHandle } from '../app/viewer-handle.js';
 import type { ViewerMode } from '../scene/types.js';
 import { collectLog } from '../fixtures/stubs.js';
+import type { ElementRuntime } from './element-runtime.js';
+import { createRuntimeLoader } from './element-controller.js';
+import { PENDING_TOUR_SPEEDS } from './pending-viewer.js';
+import { TOUR_SPEEDS } from '../camera/tour-player.js';
 
 type Emitted = { type: string; detail: unknown };
 
@@ -61,7 +67,22 @@ type Recorder = {
   fireTour: (event: string, payload: unknown) => void;
 };
 
-function harness(attributes: Record<string, string> = {}): { controller: ViewerElementController; record: Recorder } {
+/** How a harness starts: at once (no `whenWanted`, as a plain host object), or when the test says so. */
+type HarnessStart = {
+  /** Hold the start until `record.start()`; the cancel is counted. */
+  deferred?: boolean;
+  /** A `whenWanted` that starts at once and answers a no-op cancel, as `watchStart` does without `IntersectionObserver`. */
+  immediate?: boolean;
+  /** The runtime loader, for a test of the import itself; the default answers at once. */
+  load?: (runtime: ElementRuntime) => () => Promise<ElementRuntime>;
+  /** The started viewer's own `ready`. */
+  ready?: Promise<void>;
+};
+
+function harness(
+  attributes: Record<string, string> = {},
+  how: HarnessStart = {},
+): { controller: ViewerElementController; record: Recorder & { start: () => void; cancels: () => number } } {
   const emitted: Emitted[] = [];
   const mounted: Array<{ shadow: boolean; options: unknown }> = [];
   const loaded: SceneSource[] = [];
@@ -88,6 +109,7 @@ function harness(attributes: Record<string, string> = {}): { controller: ViewerE
 
   const handle = {
     tour,
+    ready: how.ready ?? Promise.resolve(),
     loadScene: async (source: SceneSource) => {
       loaded.push(source);
     },
@@ -101,6 +123,14 @@ function harness(attributes: Record<string, string> = {}): { controller: ViewerE
   } as unknown as ViewerHandle;
 
   let shadowAsked = false;
+  let start: (() => void) | null = null;
+  let cancels = 0;
+  const runtime: ElementRuntime = {
+    mount: (_container, options) => {
+      mounted.push({ shadow: shadowAsked, options });
+      return handle;
+    },
+  };
   const controller = new ViewerElementController(
     {
       attribute: (name) => attributes[name] ?? null,
@@ -117,11 +147,22 @@ function harness(attributes: Record<string, string> = {}): { controller: ViewerE
       setBox: (ratio) => {
         boxes.push(ratio);
       },
+      ...(how.immediate && {
+        whenWanted: (wanted: () => void) => {
+          wanted();
+          return () => undefined;
+        },
+      }),
+      ...(how.deferred && {
+        whenWanted: (wanted: () => void) => {
+          start = wanted;
+          return () => {
+            cancels += 1;
+          };
+        },
+      }),
     },
-    (_container, options) => {
-      mounted.push({ shadow: shadowAsked, options });
-      return handle;
-    },
+    how.load ? how.load(runtime) : runtime,
   );
 
   return {
@@ -137,6 +178,8 @@ function harness(attributes: Record<string, string> = {}): { controller: ViewerE
         return disposals;
       },
       open: () => [...listeners.values()].reduce((sum, set) => sum + set.size, 0),
+      start: () => start?.(),
+      cancels: () => cancels,
       fire: emit,
       fireTour: (event, payload) => emit(`tour:${event}`, payload),
     },
@@ -147,7 +190,9 @@ describe('the observed attributes', () => {
   test("are every option spelling, every compound attribute, plus the element's own `shadow` and `ratio`", () => {
     const fromSchema = Object.values(OPTION_SCHEMA).map((spec) => spec.attr);
     const fromCompound = Object.values(COMPOUND_SCHEMA).map((spec) => spec.attr);
-    expect([...OBSERVED_ATTRIBUTES].sort()).toEqual([...fromSchema, ...fromCompound, SHADOW_ATTRIBUTE, RATIO_ATTRIBUTE].sort());
+    expect([...OBSERVED_ATTRIBUTES].sort()).toEqual(
+      [...fromSchema, ...fromCompound, SHADOW_ATTRIBUTE, RATIO_ATTRIBUTE, LOADING_ATTRIBUTE].sort(),
+    );
   });
 
   test('the compound chrome attribute is observed', () => {
@@ -223,7 +268,9 @@ describe('effectOf', () => {
     expect(effectOf('src')).toBe('scene');
     expect(effectOf('view')).toBe('mode');
     expect(effectOf(RATIO_ATTRIBUTE)).toBe('box');
-    for (const attribute of OBSERVED_ATTRIBUTES.filter((name) => name !== 'src' && name !== 'view' && name !== RATIO_ATTRIBUTE)) {
+    for (const attribute of OBSERVED_ATTRIBUTES.filter(
+      (name) => name !== 'src' && name !== 'view' && name !== RATIO_ATTRIBUTE && name !== LOADING_ATTRIBUTE,
+    )) {
       expect([attribute, effectOf(attribute)]).toEqual([attribute, 'frozen']);
     }
   });
@@ -497,8 +544,9 @@ describe('disconnect', () => {
     const { controller, record } = harness();
     controller.connect();
     // Five handle events (ready, error, scene, mode, select) plus `edit`, and
-    // three of the tour's. Every one of them has to come back on disconnect.
-    expect(record.open()).toBe(9);
+    // three of the tour's, plus the handle's own wait for the first `scene`
+    // and `ready`. Every one of them has to come back on disconnect.
+    expect(record.open()).toBe(11);
     controller.disconnect();
     expect(record.disposals).toBe(1);
     expect(record.open()).toBe(0);
@@ -584,5 +632,340 @@ describe('the shadow mount box', () => {
     // Declarations, not a `style` string: a `style` attribute would need
     // `style-src-attr 'unsafe-inline'` from the host's policy.
     expect(Array.isArray(MOUNT_BOX_STYLE)).toBe(true);
+  });
+});
+
+describe('the start', () => {
+  test('the connect gives the box and the handle, and builds nothing until the viewer is wanted', () => {
+    const { controller, record } = harness({ src: '/a.json' }, { deferred: true });
+    controller.connect();
+    expect(record.mounted).toEqual([]);
+    expect(record.boxes).toEqual([null]);
+    expect(record.states).toEqual(['loading']);
+    expect(controller.viewer).not.toBeNull();
+    expect(controller.tour).not.toBeNull();
+    record.start();
+    expect(record.mounted).toHaveLength(1);
+  });
+
+  test('commands before the start are replayed in call order, and queries answer as before a first scene', async () => {
+    const { controller, record } = harness({ src: '/a.json', view: 'plan2d' }, { deferred: true });
+    controller.connect();
+    const viewer = controller.viewer!;
+    expect(viewer.getMode()).toBe('plan2d');
+    viewer.setMode('walk');
+    viewer.setMode('orbit');
+    const swapped = viewer.loadScene({ url: '/b.json' });
+    expect(viewer.getMode()).toBe('orbit');
+    expect(viewer.getScene()).toBeNull();
+    expect(viewer.focusRoom('0192a8f0-0000-7000-8000-000000000000')).toBe(false);
+    expect(viewer.tour.progress()).toBeNull();
+    expect(viewer.getState()).toMatchObject({ mode: 'orbit', sceneId: null, rev: 0, tour: null });
+    expect(record.modes).toEqual([]);
+    record.start();
+    // Replayed once the started viewer's first boot settles: a real handle
+    // drops a mode switch that arrives before its camera stack exists.
+    expect(record.modes).toEqual([]);
+    // Queries are the started viewer's from its first `scene` on; commands wait for `ready`.
+    record.fire('scene', { sceneId: 'flat-a', rev: 1 });
+    expect(record.modes).toEqual([]);
+    expect(viewer.getMode()).toBe('orbit');
+    record.fire('ready', { sceneId: 'flat-a', options: {} });
+    expect(record.modes).toEqual(['walk', 'orbit']);
+    await swapped;
+    expect(record.loaded).toEqual([{ url: '/b.json' }]);
+  });
+
+  test('a capture or an export before the start rejects not-ready, as before the first frame', async () => {
+    const { controller } = harness({ src: '/a.json' }, { deferred: true });
+    controller.connect();
+    const viewer = controller.viewer!;
+    await expect(viewer.exportGlb()).rejects.toMatchObject({ code: 'not-ready' });
+    await expect(viewer.capture.still({ width: 64, height: 64 })).rejects.toMatchObject({ code: 'not-ready' });
+    expect(() => viewer.slots.get('selection-anchor')).toThrow(expect.objectContaining({ code: 'not-ready' }));
+  });
+
+  test('a subscription made before the start hears the started viewer', () => {
+    const { controller, record } = harness({ src: '/a.json' }, { deferred: true });
+    controller.connect();
+    const heard: unknown[] = [];
+    controller.viewer!.on('mode', (mode) => heard.push(mode));
+    const off = controller.viewer!.tour.on('state', (state) => heard.push(state));
+    record.start();
+    record.fire('mode', 'walk');
+    record.fireTour('state', 'playing');
+    off();
+    record.fireTour('state', 'paused');
+    expect(heard).toEqual(['walk', 'playing']);
+  });
+
+  test('`ready` is one promise for the connection and settles with the started viewer', async () => {
+    let resolve: () => void = () => undefined;
+    const ready = new Promise<void>((done) => {
+      resolve = done;
+    });
+    const { controller, record } = harness({ src: '/a.json' }, { deferred: true, ready });
+    controller.connect();
+    const early = controller.viewer!.ready;
+    let settled = false;
+    void early.then(() => {
+      settled = true;
+    });
+    record.start();
+    expect(controller.viewer!.ready).toBe(early);
+    await Promise.resolve();
+    expect(settled).toBe(false);
+    resolve();
+    await early;
+    expect(settled).toBe(true);
+  });
+
+  test('a disconnect before the start cancels it and rejects `ready` as disposed', async () => {
+    const { controller, record } = harness({ src: '/a.json' }, { deferred: true });
+    controller.connect();
+    const viewer = controller.viewer!;
+    viewer.setMode('walk');
+    controller.disconnect();
+    expect(record.cancels()).toBe(1);
+    await expect(viewer.ready).rejects.toMatchObject({ code: 'disposed' });
+    // A start that was already on its way builds nothing for a connection that ended.
+    record.start();
+    expect(record.mounted).toEqual([]);
+    expect(record.modes).toEqual([]);
+    expect(controller.viewer).toBeNull();
+  });
+
+  test('a scene load queued before the start rejects as disposed when the element leaves first', async () => {
+    const { controller } = harness({ src: '/a.json' }, { deferred: true });
+    controller.connect();
+    const load = controller.viewer!.loadScene({ url: '/b.json' });
+    controller.disconnect();
+    await expect(load).rejects.toMatchObject({ code: 'disposed' });
+  });
+
+  test('a host dispose() before the start means no start at all', () => {
+    const { controller, record } = harness({ src: '/a.json' }, { deferred: true });
+    controller.connect();
+    controller.viewer!.dispose();
+    record.start();
+    expect(record.mounted).toEqual([]);
+  });
+
+  test('`ratio` is live before the start too, because the box is', () => {
+    const attributes: Record<string, string> = { src: '/a.json', ratio: '4:3' };
+    const { controller, record } = harness(attributes, { deferred: true });
+    controller.connect();
+    attributes['ratio'] = '1';
+    controller.attributeChanged('ratio');
+    attributes['view'] = 'walk';
+    controller.attributeChanged('view');
+    expect(record.boxes).toEqual(['4:3', '1']);
+    record.start();
+    // Attributes changed before the start are simply read at the start.
+    expect((record.mounted[0]!.options as { view?: unknown }).view).toEqual({ mode: 'walk' });
+  });
+
+  test('a move before the connect waits like a connect, it does not start', () => {
+    const { controller, record } = harness({ src: '/a.json' }, { deferred: true });
+    controller.move();
+    expect(record.mounted).toEqual([]);
+    expect(controller.viewer).not.toBeNull();
+  });
+});
+
+describe('the runtime import', () => {
+  test('happens at the start, and a disconnect while it is in flight builds nothing', async () => {
+    let answer: () => void = () => undefined;
+    let imports = 0;
+    const { controller, record } = harness(
+      { src: '/a.json' },
+      {
+        load: (runtime) => () => {
+          imports += 1;
+          return new Promise<ElementRuntime>((resolve) => {
+            answer = () => resolve(runtime);
+          });
+        },
+      },
+    );
+    controller.connect();
+    expect(imports).toBe(1);
+    controller.disconnect();
+    answer();
+    await Promise.resolve();
+    await Promise.resolve();
+    expect(record.mounted).toEqual([]);
+  });
+
+  test('a runtime that cannot be loaded says so as `jeex-error` with the `internal` code, and `ready` rejects', async () => {
+    const { controller, record } = harness({ src: '/a.json' }, { load: () => () => Promise.reject(new TypeError('network')) });
+    const logged = collectLog();
+    controller.onLog = logged.sink;
+    controller.connect();
+    const viewer = controller.viewer!;
+    await expect(viewer.ready).rejects.toMatchObject({ code: 'internal' });
+    expect(record.emitted.map((event) => event.type)).toEqual(['jeex-error']);
+    expect(record.emitted[0]!.detail).toMatchObject({ code: 'internal' });
+    expect(record.states).toEqual(['loading', 'error']);
+    expect(logged.codes()).toEqual(['runtime-load-failed']);
+  });
+});
+
+describe('the boot behind the handle', () => {
+  test('a boot that fails replays nothing; the queue waits for a Retry that reaches ready', async () => {
+    let fail: (error: unknown) => void = () => undefined;
+    const ready = new Promise<void>((_resolve, reject) => {
+      fail = reject;
+    });
+    const { controller, record } = harness({ src: '/a.json' }, { deferred: true, ready });
+    controller.connect();
+    const viewer = controller.viewer!;
+    viewer.setMode('walk');
+    const load = viewer.loadScene({ url: '/b.json' });
+    record.start();
+    record.fire('error', { code: 'scene-load', message: 'nope' });
+    fail(new Error('scene-load'));
+    await expect(viewer.ready).rejects.toThrow('scene-load');
+    expect(record.modes).toEqual([]);
+    expect(record.loaded).toEqual([]);
+    // A Retry that boots raises `ready`: the queue runs then.
+    record.fire('ready', { sceneId: 'flat-a', options: {} });
+    expect(record.modes).toEqual(['walk']);
+    expect(record.loaded).toEqual([{ url: '/b.json' }]);
+    await load;
+  });
+
+  test('a disconnect while the boot runs rejects the loads still queued', async () => {
+    const { controller, record } = harness({ src: '/a.json' }, { deferred: true, ready: new Promise<void>(() => {}) });
+    controller.connect();
+    const load = controller.viewer!.loadScene({ url: '/b.json' });
+    record.start();
+    controller.disconnect();
+    await expect(load).rejects.toMatchObject({ code: 'disposed' });
+    expect(record.disposals).toBe(1);
+  });
+
+  test('a host dispose() while the boot runs disposes the viewer and rejects the loads still queued', async () => {
+    const { controller, record } = harness({ src: '/a.json' }, { deferred: true, ready: new Promise<void>(() => {}) });
+    controller.connect();
+    record.start();
+    const load = controller.viewer!.loadScene({ url: '/b.json' });
+    controller.viewer!.dispose();
+    await expect(load).rejects.toMatchObject({ code: 'disposed' });
+    expect(record.disposals).toBe(1);
+  });
+
+  test('inside the first `scene` and `ready` the handle already answers from the running viewer', () => {
+    const { controller, record } = harness({ src: '/a.json' }, { deferred: true });
+    controller.connect();
+    const viewer = controller.viewer!;
+    viewer.setMode('walk');
+    record.start();
+    const seen: unknown[] = [];
+    viewer.on('scene', () => seen.push(['scene', record.modes.length]));
+    viewer.on('ready', () => seen.push(['ready', record.modes.length]));
+    record.fire('scene', { sceneId: 'flat-a', rev: 1 });
+    record.fire('ready', { sceneId: 'flat-a', options: {} });
+    // The queued mode is applied before any `ready` listener runs.
+    expect(seen).toEqual([
+      ['scene', 0],
+      ['ready', 1],
+    ]);
+  });
+
+  test('a tour speed the controls refuse is refused at the call, before the start too', () => {
+    const { controller } = harness({ src: '/a.json' }, { deferred: true });
+    controller.connect();
+    expect(() => controller.viewer!.tour.setSpeed(3 as never)).toThrow(expect.objectContaining({ code: 'bad-params' }));
+    expect([...PENDING_TOUR_SPEEDS]).toEqual([...TOUR_SPEEDS]);
+  });
+});
+
+describe('createRuntimeLoader', () => {
+  test('imports once for every element, and tries again after a failed import', async () => {
+    const runtime = { mount: () => ({}) as ViewerHandle } satisfies ElementRuntime;
+    let calls = 0;
+    const load = createRuntimeLoader(() => {
+      calls += 1;
+      return calls === 1 ? Promise.reject(new TypeError('network')) : Promise.resolve(runtime);
+    });
+    await expect(load()).rejects.toThrow('network');
+    expect(await load()).toBe(runtime);
+    expect(await load()).toBe(runtime);
+    expect(calls).toBe(2);
+  });
+});
+
+describe('the `loading` attribute', () => {
+  test('is lazy by default: the element waits for the start', () => {
+    const { controller, record } = harness({ src: '/a.json' }, { deferred: true });
+    controller.connect();
+    expect(record.mounted).toEqual([]);
+  });
+
+  test('`eager` starts at the connect, without waiting for the viewport', () => {
+    const { controller, record } = harness({ src: '/a.json', [LOADING_ATTRIBUTE]: 'eager' }, { deferred: true });
+    controller.connect();
+    expect(record.mounted).toHaveLength(1);
+  });
+
+  test('an unknown or empty value falls back to lazy', () => {
+    expect([loadingPolicy(null), loadingPolicy(''), loadingPolicy('soon'), loadingPolicy('lazy'), loadingPolicy('EAGER')]).toEqual([
+      'lazy',
+      'lazy',
+      'lazy',
+      'lazy',
+      'eager',
+    ]);
+    const { controller, record } = harness({ src: '/a.json', [LOADING_ATTRIBUTE]: 'soon' }, { deferred: true });
+    controller.connect();
+    expect(record.mounted).toEqual([]);
+  });
+
+  test('lazy to eager before the start starts it; a change after the start does nothing', async () => {
+    const attributes: Record<string, string> = { src: '/a.json' };
+    const { controller, record } = harness(attributes, { deferred: true });
+    const logged = collectLog();
+    controller.onLog = logged.sink;
+    controller.connect();
+    attributes[LOADING_ATTRIBUTE] = 'eager';
+    controller.attributeChanged(LOADING_ATTRIBUTE);
+    expect(record.mounted).toHaveLength(1);
+    expect(record.cancels()).toBe(1);
+    attributes[LOADING_ATTRIBUTE] = 'lazy';
+    controller.attributeChanged(LOADING_ATTRIBUTE);
+    await flushed();
+    expect(record.mounted).toHaveLength(1);
+    expect(logged.entries).toEqual([]);
+  });
+
+  test('is observed, as an element attribute of its own', () => {
+    expect(OBSERVED_ATTRIBUTES).toContain(LOADING_ATTRIBUTE);
+    expect(effectOf(LOADING_ATTRIBUTE)).toBe('start');
+  });
+});
+
+describe('a start that happens inside the wait', () => {
+  test('without IntersectionObserver, loading="eager" during the import builds no second viewer', async () => {
+    const attributes: Record<string, string> = { src: '/a.json' };
+    let answer: () => void = () => undefined;
+    let imports = 0;
+    const { controller, record } = harness(attributes, {
+      immediate: true,
+      load: (runtime) => () => {
+        imports += 1;
+        return new Promise<ElementRuntime>((resolve) => {
+          answer = () => resolve(runtime);
+        });
+      },
+    });
+    controller.connect();
+    attributes[LOADING_ATTRIBUTE] = 'eager';
+    controller.attributeChanged(LOADING_ATTRIBUTE);
+    answer();
+    await Promise.resolve();
+    await Promise.resolve();
+    expect(imports).toBe(1);
+    expect(record.mounted).toHaveLength(1);
   });
 });

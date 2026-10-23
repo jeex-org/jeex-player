@@ -110,6 +110,9 @@ test('the compound chrome attribute hides every chrome.* flag before the individ
     el.setAttribute('chrome', 'false');
     el.setAttribute('chrome-status', 'true');
     document.body.append(el);
+    // The element starts its viewer near the viewport, and it was appended
+    // below the page's own player.
+    el.scrollIntoView();
     await new Promise<void>((resolve) => {
       el.addEventListener('jeex-ready', () => resolve(), { once: true });
     });

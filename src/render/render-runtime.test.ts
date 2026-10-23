@@ -9,7 +9,7 @@
 
 import { describe, expect, test } from 'bun:test';
 import * as THREE from 'three';
-import { KEEP_WARM_MS, RenderRuntime, createRenderRuntime, hasWebGL } from './render-runtime.js';
+import { KEEP_WARM_MS, RenderRuntime, createRenderRuntime } from './render-runtime.js';
 import { measureEntry } from './viewport-box.js';
 import { stubLighting, stubRuntime } from '../fixtures/stubs.js';
 import { apartmentEnvironmentIntensity, LIGHTING_STANDARD } from '../lighting/lighting-standard.js';
@@ -920,33 +920,6 @@ describe('measureEntry', () => {
   test('a box with no area is no reading at all', () => {
     expect(measureEntry(entry({ content: { inlineSize: 0, blockSize: 400 } }), 2)).toBeNull();
     expect(measureEntry(entry({ rect: { width: 0, height: 0 } }), 2)).toBeNull();
-  });
-});
-
-describe('hasWebGL', () => {
-  test('probes once per process and hands the probe context straight back', () => {
-    const original = (globalThis as { document?: unknown }).document;
-    let created = 0;
-    let released = 0;
-    const context = {
-      getExtension: (name: string) => (name === 'WEBGL_lose_context' ? { loseContext: () => (released += 1) } : null),
-    };
-    (globalThis as { document?: unknown }).document = {
-      createElement: () => {
-        created += 1;
-        return { getContext: (id: string) => (id === 'webgl2' ? context : null) };
-      },
-    };
-    try {
-      expect(hasWebGL()).toBe(true);
-      expect(hasWebGL()).toBe(true);
-      expect(hasWebGL()).toBe(true);
-      // One canvas, one context, one `loseContext`: browsers cap a page at
-      // about sixteen contexts; guards against burning one per call.
-      expect([created, released]).toEqual([1, 1]);
-    } finally {
-      (globalThis as { document?: unknown }).document = original;
-    }
   });
 });
 

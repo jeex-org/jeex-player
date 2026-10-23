@@ -13,7 +13,8 @@
  */
 
 import * as THREE from 'three';
-import { periodicFbm, periodicNoise2D, wrapOffsets } from './texture-noise.js';
+import { wrapOffsets } from './texture-noise.js';
+import { grainTileSpec, type NoiseTileSpec } from './noise-tiles.js';
 import { createCanvas2D, type Ctx } from './canvas-2d.js';
 import { sharedTextureCache } from './texture-cache.js';
 
@@ -82,20 +83,13 @@ export function drawWrapped(ctx: Ctx, size: number, box: { x: number; y: number;
 }
 
 /**
- * Grayscale periodic-noise tile, cached and shared between finishes. Mid grey
- * (128) is neutral under `soft-light`/`overlay`, so these tiles can be laid
- * over any base colour to add grain without shifting its hue.
+ * Writes rows `from` to `to` (exclusive) of a noise tile's pixels. The one
+ * loop both the on-demand tile and the sliced prewarm (`texture-prewarm.ts`)
+ * run, so a tile drawn either way has the same pixels.
  */
-export function noiseTile(name: string, size: number, field: (x: number, y: number) => number): HTMLCanvasElement | null {
-  const key = `${name}:${size}`;
-  const hit = sharedTextureCache.canvas(key);
-  if (hit) return hit;
-  const surface = createCanvas2D(size);
-  if (!surface) return null;
-  const { canvas, ctx } = surface;
-  const image = ctx.createImageData(size, size);
-  const data = image.data;
-  for (let y = 0; y < size; y += 1) {
+export function fillNoiseRows(spec: NoiseTileSpec, data: Uint8ClampedArray, from: number, to: number): void {
+  const { size, field } = spec;
+  for (let y = from; y < to; y += 1) {
     const ny = y / size;
     for (let x = 0; x < size; x += 1) {
       const value = Math.min(255, Math.max(0, Math.round(field(x / size, ny) * 255)));
@@ -106,27 +100,30 @@ export function noiseTile(name: string, size: number, field: (x: number, y: numb
       data[index + 3] = 255;
     }
   }
-  ctx.putImageData(image, 0, 0);
-  return sharedTextureCache.putCanvas(key, canvas);
 }
 
 /**
- * Grain seeds are shared per material family rather than per finish: the noise
- * is greyscale and colour-independent, so four cached tiles cover the whole
- * catalogue instead of one per finish.
+ * Grayscale periodic-noise tile, cached and shared between finishes. Mid grey
+ * (128) is neutral under `soft-light`/`overlay`, so these tiles can be laid
+ * over any base colour to add grain without shifting its hue.
  */
-export const GRAIN_WOOD = 101;
-export const GRAIN_MINERAL = 102;
-export const GRAIN_FABRIC = 103;
-export const GRAIN_PAPER = 104;
+export function noiseTile(spec: NoiseTileSpec): HTMLCanvasElement | null {
+  const hit = sharedTextureCache.canvas(spec.key);
+  if (hit) return hit;
+  const surface = createCanvas2D(spec.size);
+  if (!surface) return null;
+  const { canvas, ctx } = surface;
+  const image = ctx.createImageData(spec.size, spec.size);
+  fillNoiseRows(spec, image.data, 0, spec.size);
+  ctx.putImageData(image, 0, 0);
+  return sharedTextureCache.putCanvas(spec.key, canvas);
+}
+
+export { GRAIN_FABRIC, GRAIN_MINERAL, GRAIN_PAPER, GRAIN_WOOD } from './noise-tiles.js';
 
 /** Fine surface grain shared by plaster, wallpaper and fabric. */
 export function grainTile(seed: number, strength: number, size = 256): HTMLCanvasElement | null {
-  return noiseTile(`grain:${seed}:${strength}:${size}`, size, (x, y) => {
-    const coarse = periodicFbm(x, y, { octaves: 4, freq: 3, gain: 0.55, seed });
-    const fine = periodicNoise2D(x, y, size / 2, seed + 91);
-    return 0.5 + (coarse - 0.5) * strength + (fine - 0.5) * strength * 0.55;
-  });
+  return noiseTile(grainTileSpec(seed, strength, size));
 }
 
 /**

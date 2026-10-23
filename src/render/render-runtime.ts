@@ -659,36 +659,6 @@ export class RenderRuntime {
     withScenePass(this.renderer, { target: null, scene: this.scene, camera }, () => this.renderer.render(this.scene, camera));
   }
 }
-
-/**
- * The answer to "can this browser give the viewer a WebGL context at all",
- * decided once per process.
- *
- * The probe COSTS a context, and browsers cap a page at about sixteen: called
- * afresh on every `mountViewer` and every Retry, it would exhaust them and
- * then refuse the real renderer. So the answer is
- * memoised — a browser does not change its mind about WebGL inside one page —
- * and the probe hands its context straight back through `WEBGL_lose_context`.
- *
- * The no-`document` case is NOT memoised: it is a statement about the
- * environment this was called in, not about the browser.
- */
-let webglSupport: boolean | null = null;
-
-export function hasWebGL(): boolean {
-  if (webglSupport !== null) return webglSupport;
-  if (typeof document === 'undefined') return false;
-  // The global on purpose, not an `ownerDocument`: this runs before any
-  // viewer root exists (`ViewerApp.init()` calls it first, ahead of every
-  // other DOM access) and the answer is memoised process-wide, not per
-  // instance — there is no element yet to take a document FROM.
-  const probe = document.createElement('canvas');
-  const context = probe.getContext('webgl2') ?? probe.getContext('webgl');
-  context?.getExtension('WEBGL_lose_context')?.loseContext();
-  webglSupport = context !== null;
-  return webglSupport;
-}
-
 export function createRenderRuntime(options: RenderRuntimeOptions): RenderRuntime {
   return new RenderRuntime(options);
 }

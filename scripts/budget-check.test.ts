@@ -12,6 +12,7 @@ import { join } from 'node:path';
 import {
   BUDGET_FAIL_BYTES,
   BUDGET_WARN_BYTES,
+  ELEMENT_BOOT_FAIL_BYTES,
   HOST_BUDGET_FAIL_BYTES,
   LAZY_CHUNK_FAIL_BYTES,
   LAZY_CHUNK_PREFIX,
@@ -171,7 +172,7 @@ describe('checkBudget total mode: boot summed, lazy always per file', () => {
 describe('checkBudget per-file mode (the library build)', () => {
   test('boot files are alternatives, so their sum is not the verdict', () => {
     const bulk = fillerBytes(500 * 1024);
-    const dir = fixtureDir({ 'jeex-viewer.js': bulk, 'jeex-viewer-element.js': bulk });
+    const dir = fixtureDir({ 'jeex-viewer.js': bulk, 'jeex-viewer.iife.js': bulk });
     const report = checkBudget(dir, 'per-file');
     expect(report.failures).toEqual([]);
   });
@@ -221,5 +222,36 @@ describe('boot is what the page reaches on open', () => {
   test('a lazy-named chunk the page loads on open fails: the name would hide boot weight', () => {
     const dir = fixtureDir({ 'main-x.js': 'import{a}from"./lazy-core-x.js";', 'lazy-core-x.js': 'export const a=1;' });
     expect(checkBudget(dir, 'total').failures).toEqual(['main-x.js is loaded on open and imports lazy-core-x.js, which is named lazy']);
+  });
+});
+
+describe('the element entry loads only its shell before its start', () => {
+  test('the entry and its static imports are held together to their own budget; a dynamic import is not counted', () => {
+    const dir = fixtureDir({
+      'jeex-viewer-element.js': 'import"./jeex-viewer-element-x.js";',
+      'jeex-viewer-element-x.js': 'const start=()=>import("./lazy-jeex-viewer-element-runtime-x.js");',
+      'lazy-jeex-viewer-element-runtime-x.js': fillerBytes(200 * 1024),
+    });
+    expect(checkBudget(dir, 'per-file').failures).toEqual([]);
+  });
+
+  test('a shell that grew past its budget fails and names the entry', () => {
+    const dir = fixtureDir({
+      'jeex-viewer-element.js': 'import"./jeex-viewer-shared-x.js";',
+      'jeex-viewer-shared-x.js': fillerBytes(ELEMENT_BOOT_FAIL_BYTES + 1024),
+    });
+    const failures = checkBudget(dir, 'per-file').failures;
+    expect(failures).toHaveLength(1);
+    expect(failures[0]).toContain('jeex-viewer-element.js loads');
+  });
+
+  test('three.js reached statically from the element entry fails by name, whatever its size', () => {
+    const dir = fixtureDir({
+      'jeex-viewer-element.js': 'import"./jeex-viewer-three.core-x.js";',
+      'jeex-viewer-three.core-x.js': 'export const a=1;',
+    });
+    expect(checkBudget(dir, 'per-file').failures).toEqual([
+      'jeex-viewer-element.js imports three.js (jeex-viewer-three.core-x.js) before its start',
+    ]);
   });
 });
