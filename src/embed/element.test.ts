@@ -165,12 +165,12 @@ describe('optionsFromAttributes', () => {
     const options = optionsFromAttributes(
       (name) =>
         (
-          ({
+          {
             view: 'walk',
             'tour-start': '0.25',
             lang: 'ru',
             src: '/scenes/flat-a.json',
-          }) as Record<string, string>
+          } as Record<string, string>
         )[name] ?? null,
     );
     expect(options).toEqual({

@@ -88,7 +88,7 @@ export function siteCommit(environment: Readonly<Record<string, string | undefin
  */
 export function stamp(html: string, sha: string | null): string {
   if (sha !== null) return html.replaceAll(SHA_PLACEHOLDER, sha);
-  const stripped = html.replace(STAMPED_ELEMENT, '');
+  const stripped = html.replaceAll(STAMPED_ELEMENT, '');
   if (stripped.includes(SHA_PLACEHOLDER)) {
     throw new Error(`site-build: ${SHA_PLACEHOLDER} found outside an element carrying data-viewer-sha`);
   }

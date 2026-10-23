@@ -133,9 +133,9 @@ function cut(text: string, limit: number): string {
  */
 export function boundDocumentText(text: string): string {
   const bounded = text
-    .replace(CONTROL, ' ')
-    .replace(URL_LIKE, '<url>')
-    .replace(LONG_TOKEN, (token) => `${cut(token, DOCUMENT_ECHO_PREFIX)}…`);
+    .replaceAll(CONTROL, ' ')
+    .replaceAll(URL_LIKE, '<url>')
+    .replaceAll(LONG_TOKEN, (token) => `${cut(token, DOCUMENT_ECHO_PREFIX)}…`);
   return bounded.length > DOCUMENT_MESSAGE_LIMIT ? `${cut(bounded, DOCUMENT_MESSAGE_LIMIT - 1)}…` : bounded;
 }
 
