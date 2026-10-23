@@ -1,6 +1,7 @@
 /**
- * The boot sequence's own three pieces, taken out of the composition root: the
- * cancellable frame wait, the loading-card step, and the opening view.
+ * The boot sequence's own pieces, taken out of the composition root: the
+ * cancellable frame wait, the loading-card step, the noise tiles drawn while
+ * the document loads, and the opening view.
  *
  * They belong together because they are all POLICY about starting up, and none
  * of them is wiring: `nextFrame` decides what a frame wait means when the host
@@ -19,6 +20,9 @@ import type { Messages } from '../ui/messages.js';
 import type { TourControls } from '../camera/tour-controls.js';
 import type { ViewerOptions } from './viewer-options.js';
 import type { ViewerMode } from '../scene/types.js';
+import { COMMON_NOISE_TILES } from '../materials/noise-tiles.js';
+import { prewarmNoiseTiles } from '../materials/texture-prewarm.js';
+import { sharedTextureCache, type TextureCache } from '../materials/texture-cache.js';
 
 /** The part of `ViewerUI` a boot step writes to. */
 type BootUI = {
@@ -80,6 +84,35 @@ export function nextFrame(signal: AbortSignal): Promise<void> {
       { once: true, signal: own.signal },
     );
   });
+}
+
+/**
+ * `load`'s answer, once the common noise tiles are drawn too.
+ *
+ * The tiles are most of the procedural texture work of a build, and drawn on
+ * demand they land inside the build's one long task. Sliced here
+ * (`texture-prewarm.ts`) they run while the document is still on its way, when
+ * the main thread has nothing else to do, and the build finds them cached.
+ */
+export async function loadWithNoiseTiles<T>(load: Promise<T>, signal: AbortSignal, cache: TextureCache = sharedTextureCache): Promise<T> {
+  // The tiles enter the shared cache before this viewer's renderer holds it,
+  // so the viewer holds it itself until it is disposed: a boot that fails and
+  // is disposed before any renderer exists still lets go of what it drew.
+  if (!signal.aborted) {
+    cache.retain();
+    // The listener's own lifetime is the hold: it ends with the release.
+    const hold = new AbortController();
+    signal.addEventListener(
+      'abort',
+      () => {
+        hold.abort();
+        cache.release();
+      },
+      { once: true, signal: hold.signal },
+    );
+  }
+  const [loaded] = await Promise.all([load, prewarmNoiseTiles(COMMON_NOISE_TILES, signal, undefined, cache)]);
+  return loaded;
 }
 
 /** The loading card's reading for one named boot step. */

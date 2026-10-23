@@ -91,6 +91,23 @@ export const OPS_BUDGET_FAIL_BYTES = 81_035 + 1024;
  */
 export const LIGHTING_BUDGET_FAIL_BYTES = 11_743 + 1024;
 
+/**
+ * The custom-element entry (`vite.lib.config.ts`) and the hard limit for it
+ * PLUS every file it imports statically, gzip bytes: what a page that pastes
+ * `<jeex-viewer>` downloads before any player is near the viewport. The viewer
+ * itself is behind the element's start (`src/embed/element-runtime.ts`, a
+ * dynamic import), and this is the number that catches it being pulled back
+ * into the element's static graph.
+ *
+ * The gate is the measured size (39,297 gzip bytes: the entry, the element's
+ * own chunk and the option reader it shares with the other entries, from
+ * `measureBundle('dist-lib')` right after `bun run build:lib`) plus 1 KB.
+ */
+export const ELEMENT_ENTRY = 'jeex-viewer-element.js';
+export const ELEMENT_BOOT_FAIL_BYTES = 39_297 + 1024;
+/** A three.js chunk's name (`jeex-viewer-three.core-<hash>.js`); none may be in the element's static graph. */
+const THREE_CHUNK = /^jeex-viewer-three\./;
+
 /** File-name prefix of the host helper's bundles (`vite.lib.config.ts`). */
 const HOST_BUNDLE_PREFIX = 'jeex-viewer-host';
 /**
@@ -213,6 +230,37 @@ export function lazyFiles(entries: readonly BundleEntry[]): Set<string> {
   return new Set(entries.filter((entry) => !boot.has(entry.name)).map((entry) => entry.name));
 }
 
+/** `start` and every file it reaches through static imports, `start` first. */
+export function staticClosure(entries: readonly BundleEntry[], start: string): BundleEntry[] {
+  const byName = new Map(entries.map((entry) => [entry.name, entry]));
+  const seen = new Map<string, BundleEntry>();
+  const queue = [start];
+  while (queue.length > 0) {
+    const entry = byName.get(queue.shift()!);
+    if (entry === undefined || seen.has(entry.name)) continue;
+    seen.set(entry.name, entry);
+    queue.push(...entry.imports);
+  }
+  return [...seen.values()];
+}
+
+/** The element entry's static graph against its budget, and against three.js; nothing when the build has no element entry. */
+function elementBootFailures(entries: readonly BundleEntry[]): string[] {
+  const closure = staticClosure(entries, ELEMENT_ENTRY);
+  if (closure.length === 0) return [];
+  const failures: string[] = [];
+  const gzip = closure.reduce((sum, entry) => sum + entry.gzipBytes, 0);
+  if (gzip > ELEMENT_BOOT_FAIL_BYTES) {
+    failures.push(
+      `${ELEMENT_ENTRY} loads ${formatBytes(gzip)} gzip before its start, over its ${formatBytes(ELEMENT_BOOT_FAIL_BYTES)} budget`,
+    );
+  }
+  for (const entry of closure) {
+    if (THREE_CHUNK.test(entry.name)) failures.push(`${ELEMENT_ENTRY} imports three.js (${entry.name}) before its start`);
+  }
+  return failures;
+}
+
 export type BudgetReport = {
   boot: { files: string[]; gzip: number };
   lazy: { files: string[]; gzip: number };
@@ -281,6 +329,7 @@ export function checkBudget(dir: string, mode: BudgetMode = 'total'): BudgetRepo
   }
 
   const bootGzip = bootEntries.reduce((sum, entry) => sum + entry.gzipBytes, 0);
+  failures.push(...elementBootFailures(entries));
 
   if (mode === 'total') {
     if (bootGzip > BUDGET_FAIL_BYTES) {

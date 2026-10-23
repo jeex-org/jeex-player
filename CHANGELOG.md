@@ -7,6 +7,40 @@ as described under [Versioning](#versioning).
 
 ## [Unreleased]
 
+### Changed
+
+- **`<jeex-viewer>` starts its viewer only when it is about to be seen.** The
+  element holds its box from `connectedCallback` and starts the viewer when it
+  comes within 100 px of the viewport, or on a pointer press or a focus inside
+  it; a browser without `IntersectionObserver` starts at once. The viewer's code
+  (three.js included) is now a `lazy-jeex-viewer-element-runtime-<hash>.js`
+  import made at that start, so the element bundle's eager download drops from
+  about 428 KB to about 39 KB gz. `el.viewer` is a handle from the connect on:
+  before the start it queues commands, answers queries as a viewer before its
+  first scene does, and its `ready` resolves with the started viewer's first
+  frame. A below-the-fold element fires `jeex-ready` only after it was scrolled
+  near, and an attribute changed before the start is applied instead of being
+  reported as read once. A failed fetch of the viewer's code fires `jeex-error`
+  with code `internal`. `mountViewer` and the iframe page start at once, as
+  before; the IIFE bundle starts deferred but still carries the whole viewer.
+- **`loading` on `<jeex-viewer>`**, spelled like `<img loading>`: `lazy` (the
+  default, and any unknown or empty value) is the deferred start above, `eager`
+  starts the viewer at connect as before. The `loading` property reflects the
+  attribute; setting `eager` on an element that has not started starts it, and
+  a change after the start does nothing.
+- **One WebGL context per viewer.** The support probe now takes its context
+  on the viewer's own canvas and the renderer keeps it, instead of a throwaway
+  probe context followed by the renderer's own. A browser with WebGL 1 but no
+  WebGL 2 now gets the "no WebGL" card (`webgl-unavailable`) instead of a
+  `scene-load` failure. `mountViewer` and the iframe page now hear that
+  `webgl-unavailable` failure, because the viewer's boot runs one microtask
+  after `mountViewer` returns, so an iframe parent receives an `error`
+  message where it got none before.
+- **The procedural noise tiles are drawn while the scene loads.** The shared
+  noise tiles behind the floor, wall and fabric textures are drawn in slices of
+  about 8 ms while the scene document is on its way, instead of inside the one
+  task that builds the scene. The pixels do not change.
+
 ### Added
 
 - **KTX2 textures.** Furniture GLBs that use `KHR_texture_basisu` and library

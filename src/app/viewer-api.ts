@@ -63,7 +63,12 @@ export function mountViewer(container: HTMLElement, options?: ViewerOptionsInput
 /** `mountViewer` for the element and the iframe page, which say how they embed it. */
 export function mountViewerAs(embedding: Embedding, container: HTMLElement, options?: ViewerOptionsInput): ViewerHandle {
   const app = new ViewerApp(container, resolveViewerOptions(options, { reducedMotion: prefersReducedMotion() }), embedding);
-  const ready = app.init();
+  // One microtask later, not inside this call: a failure `init()` reports
+  // before its first await (no WebGL) must reach the `error` listeners a host
+  // subscribes on the line after `mountViewer`. A host that disposed in between
+  // gets the same `disposed` rejection a dispose during the boot gives.
+  let disposed = false;
+  const ready = Promise.resolve().then(() => (disposed ? Promise.reject(new ViewerDisposedError()) : app.init()));
   // The error card is the user-facing report and the `error` event is the
   // machine-readable one; `ready` still rejects for a host that awaits it, so
   // this handler exists only to keep that rejection from becoming an unhandled
@@ -129,7 +134,10 @@ export function mountViewerAs(embedding: Embedding, container: HTMLElement, opti
     turnAsset: (assetId, steps) => app.handle.turnAsset(assetId, steps),
     resize: () => app.handle.resize(),
     on: (event, callback) => app.on(event, callback),
-    dispose: () => app.dispose(),
+    dispose: () => {
+      disposed = true;
+      app.dispose();
+    },
   };
   // Behind an existence check, not a version check: Explicit Resource
   // Management is Baseline LIMITED and Safari ships none of it, so
@@ -137,7 +145,7 @@ export function mountViewerAs(embedding: Embedding, container: HTMLElement, opti
   // engine that has it, `using viewer = mountViewer(...)` disposes the viewer
   // when the block ends; everywhere else the member is absent and `dispose()`
   // is what a host calls, as it always was.
-  if (typeof Symbol.dispose === 'symbol') handle[Symbol.dispose] = () => app.dispose();
+  if (typeof Symbol.dispose === 'symbol') handle[Symbol.dispose] = () => handle.dispose();
   return handle;
 }
 

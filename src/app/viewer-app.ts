@@ -29,7 +29,7 @@ import type { SceneSource } from '../scene/scene-repository.js';
 import { DocumentSource } from './document-source.js';
 import { SceneModel } from '../scene/scene-model.js';
 import { Picker } from '../geometry/picker.js';
-import { hasWebGL } from '../render/render-runtime.js';
+import { hasWebGL } from '../render/webgl-probe.js';
 import { ViewerUI, type ViewerCommands } from '../ui/viewer-ui.js';
 import { createViewerContext, ViewerDisposedError, type ViewerContext } from './viewer-context.js';
 import { ViewerPageGlobals } from './viewer-page-globals.js';
@@ -58,7 +58,7 @@ import { DoorController } from './door-controller.js';
 import { contextRecovery } from './context-recovery.js';
 import { uiCommands } from './ui-commands.js';
 import { stageWiring } from './stage-wiring.js';
-import { applyStartView, firstPicture, nextFrame, showBootStep } from './viewer-boot.js';
+import { applyStartView, firstPicture, loadWithNoiseTiles, nextFrame, showBootStep } from './viewer-boot.js';
 import { ViewerStage } from './viewer-stage.js';
 import type { Logger } from '../shared/logger.js';
 import { instanceLogger, raiseFailure } from './viewer-failure.js';
@@ -284,7 +284,7 @@ export class ViewerApp {
       // took it in the meantime.
       this.globals.claim();
       showBootStep(this.ui, this.messages, 'support');
-      if (!hasWebGL()) {
+      if (!hasWebGL(this.roots.canvas)) {
         this.fail(
           { code: 'webgl-unavailable', message: this.messages.t('error.noWebglBody') },
           this.messages.t('error.noWebglTitle'),
@@ -293,7 +293,7 @@ export class ViewerApp {
         return;
       }
       showBootStep(this.ui, this.messages, 'scene');
-      const loaded = await this.documents.boot();
+      const loaded = await loadWithNoiseTiles(this.documents.boot(), this.context.signal);
       const model = loaded.model;
       showBootStep(this.ui, this.messages, 'geometry');
       await nextFrame(this.context.signal);

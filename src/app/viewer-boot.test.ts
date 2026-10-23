@@ -8,7 +8,8 @@
  */
 
 import { afterEach, beforeEach, describe, expect, test } from 'bun:test';
-import { applyStartView, firstPicture, nextFrame } from './viewer-boot.js';
+import { applyStartView, firstPicture, loadWithNoiseTiles, nextFrame } from './viewer-boot.js';
+import { TextureCache } from '../materials/texture-cache.js';
 import { ViewerDisposedError } from './viewer-context.js';
 import { DEFAULT_VIEWER_OPTIONS, type ViewerOptions } from './viewer-options.js';
 import type { ViewerMode } from '../scene/types.js';
@@ -191,5 +192,39 @@ describe('applyStartView', () => {
       tour: { ...DEFAULT_VIEWER_OPTIONS.tour, mode: 'paused', start: 0 },
     });
     expect(calls).toEqual(['buttons:tour', 'hint:tour', 'seek:0']);
+  });
+});
+
+describe('loadWithNoiseTiles', () => {
+  /** A cached canvas, another holder that comes and goes, and what is left of the canvas before and after the dispose. */
+  async function holdAcross(load: Promise<string>): Promise<{ beforeDispose: unknown; afterDispose: unknown }> {
+    const cache = new TextureCache();
+    const controller = new AbortController();
+    const canvas = {} as HTMLCanvasElement;
+    await loadWithNoiseTiles(load, controller.signal, cache).catch(() => undefined);
+    cache.putCanvas('tile', canvas);
+    // Another holder (a sibling viewer's renderer) comes and goes; without the
+    // viewer's own hold its release would empty the cache.
+    cache.retain();
+    cache.release();
+    const beforeDispose = cache.canvas('tile');
+    controller.abort();
+    return { beforeDispose, afterDispose: cache.canvas('tile') };
+  }
+
+  test("answers the load's own value", async () => {
+    expect(await loadWithNoiseTiles(Promise.resolve('document'), new AbortController().signal, new TextureCache())).toBe('document');
+  });
+
+  test('holds the texture cache from the load until the viewer is disposed', async () => {
+    const { beforeDispose, afterDispose } = await holdAcross(Promise.resolve('document'));
+    expect(beforeDispose).not.toBeNull();
+    expect(afterDispose).toBeNull();
+  });
+
+  test('a load that fails still holds the cache until the dispose', async () => {
+    const { beforeDispose, afterDispose } = await holdAcross(Promise.reject(new Error('scene-load')));
+    expect(beforeDispose).not.toBeNull();
+    expect(afterDispose).toBeNull();
   });
 });
