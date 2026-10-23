@@ -359,12 +359,20 @@ describe('a mounted viewer redraws the sun shadow only when something changed', 
   }
 
   const draws = (): number => debug().sunShadow()?.draws ?? -1;
+  /** Frames of stillness that outlast a furniture ripple's whole stagger (about 60 frames at 60 fps). */
+  const RIPPLE_STILL_FRAMES = 90;
 
   /** Waits until the redraw count has held still for 20 frames. */
-  async function settle(): Promise<number> {
+  /**
+   * Waits until the redraw count has held still for `stillFrames` frames. A
+   * furniture ripple staggers its items over up to 760 ms and an item waiting
+   * out its delay moves nothing, so a ripple is awaited with `RIPPLE_STILL_FRAMES`:
+   * more frames than the whole stagger lasts at 60 fps.
+   */
+  async function settle(stillFrames = 20): Promise<number> {
     let last = draws();
     let still = 0;
-    for (let frame = 0; frame < 600 && still < 20; frame += 1) {
+    for (let frame = 0; frame < 900 && still < stillFrames; frame += 1) {
       await nextFrame();
       const now = draws();
       still = now === last ? still + 1 : 0;
@@ -411,10 +419,10 @@ describe('a mounted viewer redraws the sun shadow only when something changed', 
     const handle = await mount();
     const beforeHide = draws();
     handle.setFurnitureVisible(false);
-    const hidden = await settle();
+    const hidden = await settle(RIPPLE_STILL_FRAMES);
     expect(hidden).toBeGreaterThan(beforeHide);
     handle.setFurnitureVisible(true);
-    const shown = await settle();
+    const shown = await settle(RIPPLE_STILL_FRAMES);
     expect(shown).toBeGreaterThan(hidden);
 
     const width = (): number => {

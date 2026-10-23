@@ -326,7 +326,14 @@ export function prepareSunShadow(
       return true;
     },
     bounds: () => union(withFootprint([...base, ...extra])),
-    state: () => ({ direction: sun.direction, azimuth: sun.azimuth, elevation: sun.elevation, fit, draws: rig.shadowDraws }),
+    // Copies: the debug surface hands this to page code, which must not reach the live fit.
+    state: () => ({
+      direction: sun.direction,
+      azimuth: sun.azimuth,
+      elevation: sun.elevation,
+      fit: fit === null ? null : structuredClone(fit),
+      draws: rig.shadowDraws,
+    }),
     dispose() {
       if (released) return;
       released = true;

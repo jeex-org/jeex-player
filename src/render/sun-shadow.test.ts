@@ -220,6 +220,15 @@ describe('prepareSunShadow', () => {
     expect(recorder.fits.at(-1)).toEqual(fitted);
   });
 
+  test('state hands out a copy of the fit', () => {
+    const recorder = recordingRig();
+    const sun = prepareSunShadow(apartment(), scene(), plan, recorder.rig);
+    const first = sun.state().fit!;
+    (first as { left: number }).left = 999;
+    expect(sun.state().fit!.left).not.toBe(999);
+    expect(sun.state().fit).toEqual(recorder.fits.at(-1)!);
+  });
+
   test('orient changes the sun only when the site changes', () => {
     const recorder = recordingRig();
     const sun = prepareSunShadow(apartment(), scene({ sun: 'noon' }), plan, recorder.rig);

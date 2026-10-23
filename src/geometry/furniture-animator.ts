@@ -65,6 +65,11 @@ export class FurnitureAnimator {
   /** Groups whose pose an animation wrote since the last `takeMoved`. */
   private readonly touched = new Set<THREE.Group>();
 
+  /** Whether a show/hide ripple or a swap is still in flight, delays included. */
+  get busy(): boolean {
+    return this.toggle !== null || this.swaps.length > 0;
+  }
+
   /**
    * The groups an animation moved, scaled, removed or settled since the last
    * call, final frames included; the sun's cached shadow follows them

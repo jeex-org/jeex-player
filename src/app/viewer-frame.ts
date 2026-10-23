@@ -52,8 +52,11 @@ export function frameHooksFor(deps: FrameHookDeps): readonly FrameHook[] {
       const sun = deps.mount.sunShadow;
       if (sun && doorsMoved) sun.markDirty();
       for (const group of furnitureMoved) sun?.include(group);
-      if (furnitureWasMoving && furnitureMoved.length === 0) sun?.settle();
-      furnitureWasMoving = furnitureMoved.length > 0;
+      // Settled only once the animation is over: an item still waiting out its
+      // ripple delay moves nothing for a while, and that is not the end.
+      const furnitureMoving = furnitureMoved.length > 0 || deps.animator.busy;
+      if (furnitureWasMoving && !furnitureMoving) sun?.settle();
+      furnitureWasMoving = furnitureMoving;
       // The map follows whatever the mode ended up being — a button, a room
       // focus or a manual grab mid-tour all land here on the next frame.
       stage?.syncMinimap();
