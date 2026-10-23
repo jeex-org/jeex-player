@@ -21,16 +21,16 @@
 ## 4. Shadow-only casters
 
 - [x] 4.1 Create `src/shared/render-layers.ts`; move the floor ring's number there; verify the floor ring tests.
-- [ ] 4.2 Write `src/render/shadow-layer-pass.ts` and a browser component test proving a shadow-only caster darkens a receiver with the adapter and not without it; verify that test file through the heavy queue.
+- [x] 4.2 Write `src/render/shadow-layer-pass.ts` and a browser component test proving a shadow-only caster darkens a receiver with the adapter and not without it; verify that test file through the heavy queue.
 - [x] 4.2a Make the adapter restore the camera mask when the shadow pass throws and be reinstalled exactly once after a context restore; verify unit tests with a stub renderer.
 - [x] 4.3 Write `src/geometry/ceiling-casters.ts` (closed slabs per non-loggia room, owned material, dispose) test-first; verify its unit test (closed volume, outline overlap, layers, flags).
-- [ ] 4.4 Change the dollhouse to move cut-away walls and hidden ceilings by layers, keep visible caps from casting; verify dollhouse tests and a picking test through a cut-away wall.
+- [x] 4.4 Change the dollhouse to move cut-away walls and hidden ceilings by layers, keep visible caps from casting; verify dollhouse tests and a picking test through a cut-away wall.
 
 ## 5. Fitted, cached sun shadow in the player
 
 - [x] 5.1 Write `src/render/sun-shadow.ts` (`prepareSunShadow` returning cleanup; bounds by tag; `refit`, `markDirty`, `include`, `endPreview`) test-first with stub objects; verify its unit test (ground excluded, door sweeps included, include grows only past the fit, endPreview refits).
-- [ ] 5.2 Wire it: render runtime installs the adapter and creates the rig with `shadowCache: true`; scene mount calls `prepareSunShadow` on load, rebuild, revision and model swap; context recovery reinstalls; every offscreen build in `capture-commands.ts` calls `prepareSunShadow` and its cleanup; exports skip shadow-only meshes; verify the affected unit tests, a default-state still from an overview whose ceilings block the sun, through the heavy queue, a cache-isolation test (dirty both the live and a capture rig, render the capture first and check the live rig still redraws, then the reverse), and that `render-runtime.ts` and `viewer-app.ts` stay under their line limits.
-- [ ] 5.3 Wire every row of the mutation matrix below; expose the sun shadow redraw count on the debug surface (two-file change with its test); verify a browser test per row, through the heavy queue.
+- [x] 5.2 Wire it: render runtime installs the adapter and creates the rig with `shadowCache: true`; scene mount calls `prepareSunShadow` on load, rebuild, revision and model swap; context recovery reinstalls; every offscreen build in `capture-commands.ts` calls `prepareSunShadow` and its cleanup; exports skip shadow-only meshes; verify the affected unit tests, a default-state still from an overview whose ceilings block the sun, through the heavy queue, a cache-isolation test (dirty both the live and a capture rig, render the capture first and check the live rig still redraws, then the reverse), and that `render-runtime.ts` and `viewer-app.ts` stay under their line limits.
+- [x] 5.3 Wire every row of the mutation matrix below; expose the sun shadow redraw count on the debug surface (two-file change with its test); verify a browser test per row, through the heavy queue.
 - [ ] 5.4 Browser test for «Casters that are not seen»: overview patches only under openings, no caster in still, panorama or mirror, none in GLB/USDZ export, picking through a cut-away wall, glass passes light; verify through the heavy queue.
 
 ### Mutation matrix (task 5.3)

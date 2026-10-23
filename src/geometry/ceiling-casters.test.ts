@@ -114,3 +114,21 @@ describe('buildCeilingCasters', () => {
     expect(casters.group.children.length).toBe(0);
   });
 });
+
+describe('glass never casts', () => {
+  test('every see-through mesh of the demo apartment (panes, glass inserts) leaves the sun through', async () => {
+    const { SceneBuilder } = await import('./scene-builder.js');
+    const { apartmentScene } = await import('../demo/scene-data.js');
+    const builder = new SceneBuilder(apartmentScene, solvePlan(apartmentScene));
+    const { root } = builder.build();
+    const glass: THREE.Mesh[] = [];
+    root.traverse((object) => {
+      if (!(object instanceof THREE.Mesh)) return;
+      const material = object.material as THREE.MeshPhysicalMaterial;
+      if ((material.transparent && material.opacity > 0) || material.transmission > 0) glass.push(object);
+    });
+    expect(glass.length).toBeGreaterThan(0);
+    expect(glass.filter((mesh) => mesh.castShadow).map((mesh) => mesh.name)).toEqual([]);
+    builder.dispose();
+  });
+});
