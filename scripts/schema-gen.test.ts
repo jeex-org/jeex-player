@@ -24,7 +24,15 @@ import {
   writeSchemas,
 } from './schema-gen.js';
 import { UUID_V7_PATTERN } from '../src/scene/types.js';
-import { OPENING_HINGES, OPENING_SHAPES, OPENING_SWINGS, OPENING_TYPES, ROOM_KINDS, WALL_ROLES } from '../src/scene/schema-sets.js';
+import {
+  OPENING_HINGES,
+  OPENING_SHAPES,
+  OPENING_SWINGS,
+  OPENING_TYPES,
+  ROOM_KINDS,
+  SITE_SUNS,
+  WALL_ROLES,
+} from '../src/scene/schema-sets.js';
 
 const FIXED_VERSION = '9.9.9-schema-test';
 const SCENE_TARGET = SCENE_SCHEMA_TARGET;
@@ -58,10 +66,21 @@ describe('generateSchema', () => {
       OpeningShape: OPENING_SHAPES,
       OpeningHinge: OPENING_HINGES,
       OpeningSwing: OPENING_SWINGS,
+      SiteSun: SITE_SUNS,
     };
     for (const [name, values] of Object.entries(expected)) {
       expect(definitions[name]?.enum).toEqual([...values]);
     }
+  });
+
+  test('a 2.2 document may not carry site: the version conditional is on SceneData', () => {
+    const schema = generateSchema(SCENE_TARGET, FIXED_VERSION);
+    const definitions = schema['definitions'] as Record<string, Record<string, unknown>>;
+    expect(definitions['SceneData']?.['not']).toEqual({
+      properties: { schemaVersion: { const: '2.2' }, site: {} },
+      required: ['schemaVersion', 'site'],
+    });
+    expect(definitions['SceneSite']?.['additionalProperties']).toBe(false);
   });
 
   test('a closed object type (no index signature) gets additionalProperties: false', () => {
@@ -127,8 +146,8 @@ describe('the UUID v7 grammar in the scene schema', () => {
     }
   });
 
-  test('a document may declare 2.2 and nothing else', () => {
-    expect(definitions()['SchemaVersion']?.const).toBe('2.2');
+  test('a document may declare 2.2 or 2.3 and nothing else', () => {
+    expect((definitions()['SchemaVersion'] as { enum?: unknown }).enum).toEqual(['2.2', '2.3']);
   });
 });
 

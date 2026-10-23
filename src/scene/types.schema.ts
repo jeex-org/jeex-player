@@ -154,6 +154,28 @@ const storeySchema = z.object({
   elevation: z.optional(z.number()),
 });
 
+/**
+ * `site` (schema 2.3). Strict, unlike its neighbours: a misspelt key
+ * (`north_deg`) would otherwise orient nothing, in silence. Whether the
+ * document's version may carry it is the documents' own refinement below.
+ */
+const siteSchema = z.strictObject(
+  { northDeg: z.optional(z.number()), sun: z.optional(z.enum(['morning', 'noon', 'evening'])) },
+  {
+    error: (issue) =>
+      issue.code === 'unrecognized_keys' ? `site carries an unknown key: ${issue.keys.join(', ')}` : 'site must be an object',
+  },
+);
+
+/** A 2.2 document carries no `site`: the field is 2.3's. */
+const siteNeedsItsVersion = z.refine(
+  (scene: unknown) => {
+    const { schemaVersion, site } = scene as { schemaVersion?: unknown; site?: unknown };
+    return site === undefined || schemaVersion !== '2.2';
+  },
+  { error: "site needs schemaVersion '2.3'; a 2.2 document carries no site", path: ['site'] },
+);
+
 /* ------------------------------------------------------- plan entities --- */
 
 const planNodeSchema = z.object({ id: uuidSchema, p: vec2Schema });
@@ -443,23 +465,26 @@ const autotourSchema = z.object({
  * `z.number()` here means FINITE number in Zod 4.6 — `NaN` and both infinities
  * are refused — which is what `shape.ts` spells as `Number.isFinite`.
  */
-const sceneShapeSchema = z.object({
-  schemaVersion: schemaVersionSchema,
-  units: z.optional(lengthUnitSchema),
-  storey: z.optional(storeySchema),
-  id: uuidSchema,
-  name: nonEmptySchema,
-  ceilingHeight: z.number().check(z.gte(2)),
-  nodes: z.array(z.unknown()).check(z.minLength(3)),
-  walls: z.array(z.unknown()).check(z.minLength(4)),
-  rooms: z.array(z.unknown()).check(z.minLength(1)),
-  materials: z.optional(z.array(z.unknown())),
-  assets: z.array(z.unknown()),
-  presentationCamera: cameraPoseSchema,
-  roomCameras: z.record(z.string(), cameraPoseSchema),
-  navigation: navigationSchema,
-  autotour: z.object({ path: z.array(vec3Schema), gaze: z.array(z.unknown()) }),
-});
+const sceneShapeSchema = z
+  .object({
+    schemaVersion: schemaVersionSchema,
+    units: z.optional(lengthUnitSchema),
+    storey: z.optional(storeySchema),
+    id: uuidSchema,
+    name: nonEmptySchema,
+    ceilingHeight: z.number().check(z.gte(2)),
+    nodes: z.array(z.unknown()).check(z.minLength(3)),
+    walls: z.array(z.unknown()).check(z.minLength(4)),
+    rooms: z.array(z.unknown()).check(z.minLength(1)),
+    materials: z.optional(z.array(z.unknown())),
+    assets: z.array(z.unknown()),
+    presentationCamera: cameraPoseSchema,
+    roomCameras: z.record(z.string(), cameraPoseSchema),
+    navigation: navigationSchema,
+    site: z.optional(siteSchema),
+    autotour: z.object({ path: z.array(vec3Schema), gaze: z.array(z.unknown()) }),
+  })
+  .check(siteNeedsItsVersion);
 
 /**
  * The whole document of schema 2.2, key for key in `SceneData`'s own
@@ -471,28 +496,31 @@ const sceneShapeSchema = z.object({
  * are its consumers; the entity schemas above stay private, since an export
  * without an importer is dead weight `knip` should be catching.
  */
-export const sceneSchema = z.object({
-  schemaVersion: schemaVersionSchema,
-  units: z.optional(lengthUnitSchema),
-  storey: z.optional(storeySchema),
-  id: uuidSchema,
-  name: nonEmptySchema,
-  ceilingHeight: z.number().check(z.gte(2)),
-  nodes: z.array(planNodeSchema).check(z.minLength(3)),
-  walls: z.array(wallSchema).check(z.minLength(4)),
-  rooms: z.array(roomSchema).check(z.minLength(1)),
-  materials: z.optional(z.array(materialDefinitionSchema)),
-  assetLibrary: z.optional(uuidSchema),
-  assets: z.array(demoAssetSchema),
-  presentationCamera: cameraPoseSchema,
-  roomCameras: z.record(uuidSchema, cameraPoseSchema),
-  navigation: navigationSchema,
-  finishes: z.optional(sceneFinishesSchema),
-  interiors: z.optional(z.array(interiorPresetSchema)),
-  walkSpawn: z.optional(cameraPoseSchema),
-  autotour: autotourSchema,
-  tourCheckpoints: z.optional(z.array(tourCheckpointSchema)),
-});
+export const sceneSchema = z
+  .object({
+    schemaVersion: schemaVersionSchema,
+    units: z.optional(lengthUnitSchema),
+    storey: z.optional(storeySchema),
+    id: uuidSchema,
+    name: nonEmptySchema,
+    ceilingHeight: z.number().check(z.gte(2)),
+    nodes: z.array(planNodeSchema).check(z.minLength(3)),
+    walls: z.array(wallSchema).check(z.minLength(4)),
+    rooms: z.array(roomSchema).check(z.minLength(1)),
+    materials: z.optional(z.array(materialDefinitionSchema)),
+    assetLibrary: z.optional(uuidSchema),
+    assets: z.array(demoAssetSchema),
+    presentationCamera: cameraPoseSchema,
+    roomCameras: z.record(uuidSchema, cameraPoseSchema),
+    navigation: navigationSchema,
+    finishes: z.optional(sceneFinishesSchema),
+    interiors: z.optional(z.array(interiorPresetSchema)),
+    walkSpawn: z.optional(cameraPoseSchema),
+    site: z.optional(siteSchema),
+    autotour: autotourSchema,
+    tourCheckpoints: z.optional(z.array(tourCheckpointSchema)),
+  })
+  .check(siteNeedsItsVersion);
 
 /** A schema's own path step in this project's vocabulary; a symbol key cannot occur in JSON, and is named rather than dropped. */
 function pathStep(step: PropertyKey): string | number {

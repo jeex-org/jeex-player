@@ -13,9 +13,10 @@
 
 import { fail } from './context.js';
 import { isUuidV7, SCHEMA_VERSIONS } from '../types.js';
+import { isMemberOf, SITE_SUNS } from '../schema-sets.js';
 import type { SceneData } from '../types.js';
 
-/** The document versions this build reads: 2.2 alone (`SCHEMA_VERSIONS`). */
+/** The document versions this build reads: 2.2 and 2.3 (`SCHEMA_VERSIONS`). */
 const READABLE_VERSIONS: ReadonlySet<unknown> = new Set(SCHEMA_VERSIONS);
 
 /**
@@ -66,7 +67,31 @@ function checkStorey(scene: Partial<SceneData>): void {
 }
 
 /**
- * Refuses anything that is not a schema-2.2 document with every required field
+ * `site` (schema 2.3): an object with at most `northDeg`, a finite number of
+ * degrees, and `sun`, one of the presets. A 2.2 document carries none: the
+ * field is new in 2.3, and an older producer that writes it is mistaken about
+ * the version it writes.
+ */
+function checkSite(scene: Partial<SceneData>): void {
+  const site = (scene as { site?: unknown }).site;
+  if (site === undefined) return;
+  if (scene.schemaVersion === '2.2') fail('site-invalid', 'site', "site needs schemaVersion '2.3'; a 2.2 document carries no site");
+  if (typeof site !== 'object' || site === null || Array.isArray(site)) fail('site-invalid', 'site', 'Scene site must be an object');
+  for (const key of Object.keys(site)) {
+    if (key !== 'northDeg' && key !== 'sun') fail('site-invalid', `site.${key}`, `site.${key} is not a field of the scene site`);
+  }
+  const { northDeg, sun } = site as { northDeg?: unknown; sun?: unknown };
+  if (northDeg !== undefined && (typeof northDeg !== 'number' || !Number.isFinite(northDeg))) {
+    const shown = typeof northDeg === 'number' ? String(northDeg) : typeof northDeg;
+    fail('site-invalid', 'site.northDeg', `site.northDeg must be a finite number of degrees, got ${shown}`);
+  }
+  if (sun !== undefined && !isMemberOf(SITE_SUNS, sun)) {
+    fail('site-invalid', 'site.sun', `site.sun must be one of ${SITE_SUNS.join(', ')}`);
+  }
+}
+
+/**
+ * Refuses anything that is not a schema-2.2 or 2.3 document with every required field
  * present and of the right container kind, and narrows it to `SceneData`.
  */
 export function assertSceneShape(input: unknown): asserts input is SceneData {
@@ -89,6 +114,7 @@ export function assertSceneShape(input: unknown): asserts input is SceneData {
   }
   checkUnits(scene);
   checkStorey(scene);
+  checkSite(scene);
 
   if (!scene.id || !scene.name) fail('scene-identity-missing', 'id', 'Scene id and name are required');
   if (!isUuidV7(scene.id)) {

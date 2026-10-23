@@ -17,7 +17,7 @@
  * Pure module: no `three`, no DOM.
  */
 
-import type { OpeningHinge, OpeningShape, OpeningSwing, OpeningType, RoomKind, WallRole } from './types.js';
+import type { OpeningHinge, OpeningShape, OpeningSwing, OpeningType, RoomKind, SiteSun, WallRole } from './types.js';
 
 export const OPENING_TYPES = ['door', 'window', 'passage'] as const satisfies readonly OpeningType[];
 export const ROOM_KINDS = ['room', 'loggia'] as const satisfies readonly RoomKind[];
@@ -25,6 +25,7 @@ export const WALL_ROLES = ['bearing', 'partition', 'facade'] as const satisfies 
 export const OPENING_SHAPES = ['flat', 'arch'] as const satisfies readonly OpeningShape[];
 export const OPENING_HINGES = ['a', 'b'] as const satisfies readonly OpeningHinge[];
 export const OPENING_SWINGS = ['in', 'out'] as const satisfies readonly OpeningSwing[];
+export const SITE_SUNS = ['morning', 'noon', 'evening'] as const satisfies readonly SiteSun[];
 
 /** True when `value` is a member of the closed set `set`, narrowed to it. */
 export function isMemberOf<T extends string>(set: readonly T[], value: unknown): value is T {

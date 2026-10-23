@@ -2,20 +2,20 @@
 
 ## 1. Standard: sun direction and shadow fit (pure, TDD)
 
-- [ ] 1.1 Add presets, fit tuning and the legacy direction to `LIGHTING_STANDARD.apartment.sun`, raise `LIGHTING_STANDARD_VERSION` to 2; verify `lighting-standard.test.ts` pins the values and the version.
-- [ ] 1.2 Write `src/lighting/sun-direction.ts` test-first: preset scenarios of the spec, north rotation, modulo 360, legacy default, world azimuth/elevation; verify `bun test src/lighting/sun-direction.test.ts`.
-- [ ] 1.3 Write `src/lighting/shadow-fit.ts` test-first: every corner inside with padding for random upward directions and the zenith, smaller plan and bigger map give finer texels, light upstream, near ≥ minimum, up vector rule, bias rule, every `bad-options` case of the spec, and a fit applied to a real three `DirectionalLight` whose clip-space projection contains every corner; verify its test file.
-- [ ] 1.4 Export both from the `jeex-viewer/lighting` entry and its type declarations; verify the lighting entry check and the export-surface test.
+- [x] 1.1 Add presets, fit tuning and the legacy direction to `LIGHTING_STANDARD.apartment.sun`, raise `LIGHTING_STANDARD_VERSION` to 2; verify `lighting-standard.test.ts` pins the values and the version.
+- [x] 1.2 Write `src/lighting/sun-direction.ts` test-first: preset scenarios of the spec, north rotation, modulo 360, legacy default, world azimuth/elevation; verify `bun test src/lighting/sun-direction.test.ts`.
+- [x] 1.3 Write `src/lighting/shadow-fit.ts` test-first: every corner inside with padding for random upward directions and the zenith, smaller plan and bigger map give finer texels, light upstream, near ≥ minimum, up vector rule, bias rule, every `bad-options` case of the spec, and a fit applied to a real three `DirectionalLight` whose clip-space projection contains every corner; verify its test file.
+- [x] 1.4 Export both from the `jeex-viewer/lighting` entry and its type declarations; verify the lighting entry check and the export-surface test.
 
 ## 2. Apartment rig API
 
-- [ ] 2.1 Add the `shadowCache` rig option to `lighting-options.schema.ts`; return a typed `ApartmentRig` with `shadowMapSize`, `setSunDirection`, `setShadowFrustum`, `markShadowDirty`; caching only with the option; judge input before change; verify `lighting-context.test.ts` covers each scenario of the modified «Apartment rig» and «Rig options» requirements, including an uncached consumer whose moved caster shows in the next render.
-- [ ] 2.2 Update the delta's published-description test (presets and tuning visible and frozen); verify `bun test src/lighting`.
+- [x] 2.1 Add the `shadowCache` rig option to `lighting-options.schema.ts`; return a typed `ApartmentRig` with `shadowMapSize`, `setSunDirection`, `setShadowFrustum`, `markShadowDirty`; caching only with the option; judge input before change; verify `lighting-context.test.ts` covers each scenario of the modified «Apartment rig» and «Rig options» requirements, including an uncached consumer whose moved caster shows in the next render.
+- [x] 2.2 Update the delta's published-description test (presets and tuning visible and frozen); verify `bun test src/lighting`.
 
 ## 3. Scene orientation field (schema 2.3)
 
-- [ ] 3.1 Add `site` to `SceneData`, the zod schema, the shape validator and the compile-time agreement check; join or add version 2.3 (keep 2.2 readable); reject `site` in a 2.2 document in both the runtime validator and the generated JSON Schema (version-conditional); verify the validator tests for every scenario of `scene-site-orientation`, with field paths in the messages.
-- [ ] 3.2 Regenerate the published JSON Schema and extend its test with the valid and invalid examples; verify `scripts/schema-gen.test.ts` and the schema gate.
+- [x] 3.1 Add `site` to `SceneData`, the zod schema, the shape validator and the compile-time agreement check; join or add version 2.3 (keep 2.2 readable); reject `site` in a 2.2 document in both the runtime validator and the generated JSON Schema (version-conditional); verify the validator tests for every scenario of `scene-site-orientation`, with field paths in the messages.
+- [x] 3.2 Regenerate the published JSON Schema and extend its test with the valid and invalid examples; verify `scripts/schema-gen.test.ts` and the schema gate.
 - [ ] 3.3 Document `site` in the README's scene format section and the CHANGELOG; verify the docs tests and spelling check pass.
 
 ## 4. Shadow-only casters

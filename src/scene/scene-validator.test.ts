@@ -131,11 +131,16 @@ describe('scene validator — schema version', () => {
   });
 
   test('rejects a version this build does not know', () => {
-    const invalid = { ...draftOf(lShapePlan), schemaVersion: '2.3' };
+    const invalid = { ...draftOf(lShapePlan), schemaVersion: '2.4' };
     const error = errorOf(() => validateScene(invalid, CATALOGUE_REGISTRIES));
     expect(error.rule).toBe('schema-version-unsupported');
-    expect(error.message).toContain("expected '2.2'");
-    expect(error.detail).toEqual({ schemaVersion: '2.3' });
+    expect(error.message).toContain("expected '2.2' or '2.3'");
+    expect(error.detail).toEqual({ schemaVersion: '2.4' });
+  });
+
+  test('reads a 2.3 document as it reads 2.2', () => {
+    const scene: SceneData = { ...draftOf(lShapePlan), schemaVersion: '2.3' };
+    expect(validateScene(scene, CATALOGUE_REGISTRIES)).toBe(scene);
   });
 
   test.each(['2.0', '2.1'])('refuses a %s document: its asset references are composite strings, and nothing converts them', (version) => {
@@ -150,6 +155,45 @@ describe('scene validator — schema version', () => {
     delete (scene as { units?: unknown }).units;
     delete (scene as { storey?: unknown }).storey;
     expect(warningsOf((log) => validateScene(scene, CATALOGUE_REGISTRIES, log))).toEqual([]);
+  });
+});
+
+describe('scene validator — site orientation (schema 2.3)', () => {
+  const withSite = (site: unknown, schemaVersion = '2.3'): unknown => ({ ...draftOf(lShapePlan), schemaVersion, site });
+
+  test('accepts a site with north and a preset, a site with either, and an empty site', () => {
+    for (const site of [{ northDeg: 30, sun: 'evening' }, { northDeg: -400.5 }, { sun: 'morning' }, {}]) {
+      const scene = withSite(site);
+      expect(validateScene(scene, CATALOGUE_REGISTRIES)).toBe(scene as SceneData);
+    }
+  });
+
+  test('a 2.2 document without a site validates as before', () => {
+    expect(validateScene(lShapePlan, CATALOGUE_REGISTRIES)).toBe(lShapePlan);
+  });
+
+  test.each([
+    ['an unknown key', { north_deg: 30 }, 'site.north_deg'],
+    ['a NaN north', { northDeg: Number.NaN }, 'site.northDeg'],
+    ['an infinite north', { northDeg: Number.POSITIVE_INFINITY }, 'site.northDeg'],
+    ['a string north', { northDeg: '30' }, 'site.northDeg'],
+    ['an unknown preset', { sun: 'night' }, 'site.sun'],
+    ['null', null, 'site'],
+    ['an array', [], 'site'],
+    ['a number', 5, 'site'],
+  ])('refuses %s, naming the field', (_name, site, path) => {
+    const error = errorOf(() => validateScene(withSite(site), CATALOGUE_REGISTRIES));
+    expect(error.rule).toBe('site-invalid');
+    expect(error.path).toBe(path);
+    expect(error.message).toContain(path);
+  });
+
+  test('refuses a site in a 2.2 document, naming the field and the version', () => {
+    const error = errorOf(() => validateScene(withSite({ northDeg: 0 }, '2.2'), CATALOGUE_REGISTRIES));
+    expect(error.rule).toBe('site-invalid');
+    expect(error.path).toBe('site');
+    expect(error.message).toContain('2.3');
+    expect(error.message).toContain('2.2');
   });
 });
 
