@@ -18,7 +18,7 @@ The player SHALL render through the post-processing chain while the camera mode 
 
 ### Requirement: Chain contents
 
-The chain SHALL apply, in order, ground-truth ambient occlusion (world-space radius 0.3 m, half-resolution, denoised), SMAA and the lighting standard's display transform, rendering the scene in linear half-float colour without multisampling and tone mapping it exactly once.
+The chain SHALL apply, in order, ground-truth ambient occlusion (world-space radius 0.3 m, at the drawing-buffer resolution, denoised without crossing depth breaks), SMAA and the lighting standard's display transform, rendering the scene in linear half-float colour without multisampling and tone mapping it exactly once.
 
 #### Scenario: Corner darkening
 - **WHEN** a walk view shows a floor-to-wall corner and an open patch of the same floor
@@ -94,11 +94,11 @@ Stills and video frames captured while the camera mode is `walk` or `tour` SHALL
 
 ### Requirement: Resources and resize
 
-The chain SHALL follow the renderer's size and pixel ratio, keep its occlusion buffer at half resolution, be rebuilt after a GPU context restore and release every GPU resource it owns when the viewer is disposed.
+The chain SHALL follow the renderer's size and pixel ratio, keep its occlusion buffer at the drawing-buffer size, be rebuilt after a GPU context restore and release every GPU resource it owns when the viewer is disposed.
 
 #### Scenario: Resize
 - **WHEN** the viewer is resized in `walk`
-- **THEN** the chain's targets match the new drawing-buffer size and the occlusion buffer is half of it
+- **THEN** the chain's targets match the new drawing-buffer size and so does the occlusion buffer
 
 #### Scenario: Dispose
 - **WHEN** the viewer is disposed after using `walk`

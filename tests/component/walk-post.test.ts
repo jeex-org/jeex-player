@@ -25,7 +25,8 @@ import { InlineSceneRepository, mountViewer } from '../../src/app/viewer-api.js'
 import type { ViewerHandle } from '../../src/app/viewer-handle.js';
 import { lShapePlan } from '../../src/fixtures/plan-l-shape.js';
 import { L_SHAPE } from '../../src/fixtures/plan-l-shape-ids.js';
-import type { SceneOp } from '../../src/scene/types.js';
+import { FINISH } from '../../src/materials/finish-ids.js';
+import type { SceneData, SceneOp } from '../../src/scene/types.js';
 import type { SunShadowState } from '../../src/render/sun-shadow.js';
 import { closeContainers, nextFrame, openContainer, until } from './support.js';
 
@@ -305,15 +306,15 @@ describe('captures, resize and disposal', () => {
     expect(Math.abs(first[index]! - liveBefore[0])).toBeLessThanOrEqual(TWO_PERCENT);
   });
 
-  test('resize: targets follow the drawing buffer, the occlusion buffer is half of it', async () => {
+  test('resize: targets follow the drawing buffer, the occlusion buffer follows it', async () => {
     const gl = renderer();
     const { scene, camera } = room();
     const chain = await chainOn(gl, scene, camera);
     chain.setSize(200, 100, 1.5);
     expect([chain.composer.renderTarget1.width, chain.composer.renderTarget1.height]).toEqual([300, 150]);
     expect([chain.composer.renderTarget2.width, chain.composer.renderTarget2.height]).toEqual([300, 150]);
-    expect([chain.occlusion.gtaoRenderTarget.width, chain.occlusion.gtaoRenderTarget.height]).toEqual([150, 75]);
-    expect([chain.occlusion.pdRenderTarget.width, chain.occlusion.pdRenderTarget.height]).toEqual([150, 75]);
+    expect([chain.occlusion.gtaoRenderTarget.width, chain.occlusion.gtaoRenderTarget.height]).toEqual([300, 150]);
+    expect([chain.occlusion.pdRenderTarget.width, chain.occlusion.pdRenderTarget.height]).toEqual([300, 150]);
   });
 
   test('dispose releases every pass, target and material, and the GPU memory returns to its level before', async () => {
@@ -484,6 +485,8 @@ type Debug = {
   mode: () => string | undefined;
   walkPost: () => string;
   sunShadow: () => SunShadowState | null;
+  presets: () => Array<{ id: string; active: boolean }>;
+  applyPreset: (id: string) => { error?: unknown };
   applyOps: (ops: SceneOp[]) => { rev?: number; error?: unknown };
 };
 
@@ -498,13 +501,25 @@ async function frames(count: number): Promise<void> {
 describe('a mounted viewer in walk and tour', { timeout: MOUNT_TIMEOUT_MS }, () => {
   async function mount(): Promise<ViewerHandle> {
     const handle = mountViewer(openContainer(WIDTH * 2, HEIGHT * 2), {
-      scene: { repository: new InlineSceneRepository(structuredClone(lShapePlan)) },
+      scene: { repository: new InlineSceneRepository(withPreset()) },
       tour: { mode: 'off' },
       debug: true,
     });
     disposers.push(() => handle.dispose());
     await handle.ready;
     return handle;
+  }
+
+  /** `plan-l-shape` with one interior preset that moves the table: a preset swap that changes a caster. */
+  function withPreset(): SceneData {
+    const scene = structuredClone(lShapePlan);
+    const preset = {
+      id: '01a12ffa-de52-7ebf-9129-0a91479080cc',
+      name: 'Table by the window',
+      swatch: [FINISH.oak, FINISH.sand] as const,
+      ops: [{ op: 'move_object', assetId: L_SHAPE.asset.table, position: { x: 2, y: 0, z: 1.5 } }] as const,
+    };
+    return { ...scene, interiors: [preset] };
   }
 
   const draws = (): number => debug().sunShadow()?.draws ?? -1;
@@ -577,5 +592,25 @@ describe('a mounted viewer in walk and tour', { timeout: MOUNT_TIMEOUT_MS }, () 
     const moved = debug().applyOps([{ op: 'move_object', assetId: L_SHAPE.asset.table, position: { x: 8, y: 0, z: 2 } }]);
     expect(moved.error).toBeUndefined();
     expect(await settle()).toBeGreaterThan(beforeEdit);
+
+    const beforeWall = draws();
+    const wall = debug().applyOps([{ op: 'set_wall', wallId: L_SHAPE.wall.wPart, thickness: 0.15 }]);
+    expect(wall.error).toBeUndefined();
+    const afterWall = await settle();
+    expect(afterWall).toBeGreaterThan(beforeWall);
+    await frames(30);
+    expect(draws()).toBe(afterWall);
+    expect(debug().walkPost()).toBe('on');
+
+    const preset = debug()
+      .presets()
+      .find((entry) => !entry.active)!;
+    const beforePreset = draws();
+    expect(debug().applyPreset(preset.id).error).toBeUndefined();
+    const afterPreset = await settle();
+    expect(afterPreset).toBeGreaterThan(beforePreset);
+    await frames(30);
+    expect(draws()).toBe(afterPreset);
+    expect(debug().walkPost()).toBe('on');
   });
 });

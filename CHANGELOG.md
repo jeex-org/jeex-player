@@ -11,7 +11,7 @@ as described under [Versioning](#versioning).
 
 - **Ambient occlusion and SMAA in walk and tour.** In the two modes where
   nothing is edited, the player renders through a post-processing chain:
-  three.js GTAO (0.3 m radius, half resolution, denoised) darkens corners,
+  three.js GTAO (0.3 m radius, full resolution, denoised) darkens corners,
   skirtings and the ground under furniture, SMAA smooths edges, and the PBR
   Neutral display transform is applied once at the end. Glass, transparent
   surfaces and invisible pick shapes cast no occlusion. Editing modes render
