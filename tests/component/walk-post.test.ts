@@ -486,6 +486,7 @@ describe('the runtime and the controller with real loads', () => {
 type Debug = {
   mode: () => string | undefined;
   walkPost: () => string;
+  walkLighting: () => { state: string };
   sunShadow: () => SunShadowState | null;
   presets: () => Array<{ id: string; active: boolean }>;
   applyPreset: (id: string) => { error?: unknown };
@@ -549,6 +550,8 @@ describe('a mounted viewer in walk and tour', { timeout: MOUNT_TIMEOUT_MS }, () 
     await until(() => debug().walkPost() === 'off', 'detached in orbit', 60_000);
     handle.setMode('walk');
     await until(() => debug().walkPost() === 'on', 'the chain in walk', 60_000);
+    // The room lighting bakes after the chain is attached; captures compared byte for byte wait for it.
+    await until(() => debug().walkLighting().state === 'live', 'the room lighting in walk', 120_000);
 
     const settled = await settle();
     await frames(30);
