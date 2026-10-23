@@ -35,3 +35,15 @@ on `zod ^4.6.5`, which resolves to the patched release the project already uses.
 | Package | Version  | Was      | Command                  |
 | ------- | -------- | -------- | ------------------------ |
 | `knip`  | `6.42.1` | `6.34.0` | `npm view knip version`  |
+
+## 2026-10-24: fast-uri for four advisories
+
+`bun audit` reported GHSA-w74x-v6f9-j3xg, GHSA-wjr9-j795-jxcr (moderate), GHSA-xhq7-xmqj-769h
+and GHSA-333x-w4r6-6crp (low) against `fast-uri` before 3.1.9, reached only through the dev
+dependency `ajv > fast-uri@3.1.8`. `ajv` asks for `fast-uri ^3.0.1`, so the fix stays inside that
+range and changes the lockfile only (`bun audit fix`). The `latest` tag is the 4 line, which
+`ajv` does not accept; 3.1.9 is the newest release of the 3 line (the `three` tag).
+
+| Package    | Version | Was     | Command                                 |
+| ---------- | ------- | ------- | --------------------------------------- |
+| `fast-uri` | `3.1.9` | `3.1.8` | `npm view fast-uri version dist-tags`   |

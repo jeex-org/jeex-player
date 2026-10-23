@@ -143,7 +143,9 @@ test('the host page and the framed chrome look as they did', async ({ page }) =>
   // retried until the test timed out.
   const frame = page.frameLocator('#stage iframe');
   await frame.locator('[data-jeex="brand-lockup"]').hover({ force: true });
-  await expect(frame.locator('[data-jeex="control-bar"]')).toHaveAttribute('data-collapsed', 'false');
+  const bar = frame.locator('[data-jeex="control-bar"]');
+  await expect(bar).toHaveAttribute('data-collapsed', 'false');
+  await expect.poll(() => bar.evaluate((el) => el.matches(':hover'))).toBe(true);
   await expectChromeScreenshot(page, 'embed-iframe-chrome.png');
 });
 

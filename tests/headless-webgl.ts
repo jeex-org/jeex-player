@@ -42,7 +42,7 @@
  *   nothing. Gate timings with it: Vitest browser tier about 65 s
  *   against about 6 min on SwiftShader, Playwright about 1 min against about
  *   20 min. The `linux` screenshot baselines pass on both renderers unchanged:
- *   the chrome baselines mask the canvas, and the canvas baselines'
+ *   the chrome baselines leave the canvas unpainted, and the canvas baselines'
  *   `CANVAS_DIFF_RATIO` absorbs the rasteriser difference. Measured on a
  *   native Linux host with an NVIDIA GPU: 60 fps (rAF-capped, ~3700 uncapped)
  *   with correct pixels in the headless shell, renderer

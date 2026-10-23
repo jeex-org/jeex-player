@@ -104,9 +104,14 @@ test('the mini-map is on screen in walk and gone in orbit', async ({ page }) => 
 });
 
 test('the chrome looks as it did', async ({ page }) => {
-  // Woken first, so the baseline is of the bar and not of the reveal pill it
-  // collapses to after 4.2 s of idle.
-  await viewerRoot(page).hover({ position: { x: 10, y: 10 } });
+  // The pointer RESTS ON the brand lockup (no hover style of its own), so the
+  // bar's idle timer keeps re-arming and the baseline is of the open bar
+  // however long the capture takes, never of the reveal pill it collapses to
+  // after 4.2 s of idle (same reasoning as `embed-iframe.spec.ts`).
+  await page.locator('[data-jeex="brand-lockup"]').hover({ force: true });
+  const bar = page.locator('[data-jeex="control-bar"]');
+  await expect(bar).toHaveAttribute('data-collapsed', 'false');
+  await expect.poll(() => bar.evaluate((el) => el.matches(':hover'))).toBe(true);
   await expectChromeScreenshot(page, 'index-chrome.png');
 });
 

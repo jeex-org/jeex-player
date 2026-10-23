@@ -1,0 +1,20 @@
+/*
+  The stylesheet a CHROME baseline is taken under (`expectChromeScreenshot` in
+  `support.ts`). Playwright injects it for the capture only, into every frame
+  and every open shadow root.
+
+  Every canvas keeps its box but paints nothing: the viewer's flat backdrop
+  shows where the scene, the plan drawing and the mini-map drawing were, all
+  three of which depend on the camera. Transitions and animations are off, so
+  a capture never lands half way through a fade.
+*/
+canvas {
+  visibility: hidden !important;
+}
+
+*,
+*::before,
+*::after {
+  transition: none !important;
+  animation: none !important;
+}

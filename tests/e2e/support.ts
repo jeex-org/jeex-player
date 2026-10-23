@@ -3,7 +3,8 @@
  * scan and its ratchet, and the two screenshot shapes.
  */
 
-import { writeFileSync } from 'node:fs';
+import { readFileSync, writeFileSync } from 'node:fs';
+import { fileURLToPath } from 'node:url';
 import { expect, test, type APIRequestContext, type FrameLocator, type Locator, type Page, type TestInfo } from '@playwright/test';
 import AxeBuilder from '@axe-core/playwright';
 import { scaled } from './time-scale.js';
@@ -12,14 +13,27 @@ import { scaled } from './time-scale.js';
 export const WCAG_TAGS = ['wcag2a', 'wcag2aa', 'wcag22aa'];
 
 /**
- * Screenshot tolerance for the CHROME region.
+ * Screenshot tolerance for a CHROME baseline, in pixels.
  *
- * The chrome is CSS over an opaque backdrop and is masked away from the canvas,
- * so the only movement is font rasterisation. Measured on macOS
- * Chromium: 0 differing pixels between consecutive runs; the budget below is
- * headroom for a CI runner's different font stack, not an observed number.
+ * The chrome is CSS over the viewer's flat backdrop and the canvas paints
+ * nothing in the shot (`still-chrome.css`), so a capture repeats to the pixel:
+ * measured in the gate's environment, 0 differing pixels between runs and
+ * between two different camera views, and the same baselines pass with the
+ * scene on the NVIDIA renderer and on SwiftShader. The count, not a
+ * share of the page, is what keeps the baseline sharp: a 2 px change of the
+ * control bar's padding changed 635 to 3,137 pixels of these pages (the
+ * smallest on the unbranded bar at 1280x720), all of which a 2 % share
+ * (18,432 pixels of a 1280x720 page) let through. 100 pixels is headroom for a
+ * rasteriser step on a glyph edge, far below any change of a control.
  */
-export const CHROME_DIFF_RATIO = 0.02;
+export const CHROME_DIFF_PIXELS = 100;
+
+/**
+ * Tolerance of the host-CSS comparison (`host-css.spec.ts`): two shots of the
+ * same chrome in one page with a host sheet on and off, compared by its own
+ * per-channel step rather than by `toHaveScreenshot`.
+ */
+export const HOST_CSS_DIFF_RATIO = 0.02;
 
 /**
  * Screenshot tolerance for a CANVAS baseline.
@@ -41,8 +55,9 @@ export const CANVAS_DIFF_RATIO = 0.35;
  * `toHaveScreenshot` does not compare once: it captures the target repeatedly
  * until two consecutive captures are identical, and only then diffs against the
  * baseline. Every page here holds a live WebGL2 canvas painting through
- * SwiftShader, so a single capture costs seconds — and masking the canvas hides
- * it from the COMPARISON, not from the capture. Under 15 s the assertion can
+ * SwiftShader, so a single capture costs seconds — and leaving the canvas
+ * unpainted in a chrome shot hides it from the COMPARISON, not from the
+ * render loop that each capture waits behind. Under 15 s the assertion can
  * therefore run out of budget before it ever reaches a verdict, and the failure
  * reads `Timeout 15000ms exceeded` with no pixel numbers at all.
  *
@@ -322,18 +337,60 @@ export async function holdFrames(page: Page): Promise<void> {
 }
 
 /**
- * A baseline of the page's CHROME with the scene masked out.
+ * The stylesheet a CHROME baseline is taken under (`still-chrome.css`): every
+ * `<canvas>` keeps its box but paints nothing, so the viewer's own flat
+ * backdrop shows where the 3D picture was, and transitions and animations are
+ * off.
  *
- * The canvas is masked rather than cropped around: the chrome is positioned
- * over it, so a crop would lose the very thing being compared. Playwright
- * paints the mask a flat colour, which makes the comparison deterministic
- * without hiding a single control.
+ * Not Playwright's `mask`: it paints an overlay over each matched element's
+ * whole box, and the scene canvas fills the viewer, so the overlay covered the
+ * very chrome being compared and every chrome baseline was a flat magenta
+ * rectangle that matched any chrome at all. A `mask` locator also stops at an
+ * iframe, so a framed viewer's picture was in its baseline unmasked.
+ *
+ * `toHaveScreenshot` takes it as `stylePath` (its inline `style` option is
+ * silently ignored by the assertion); Playwright injects it for the capture
+ * only, into every frame and every open shadow root, so the one file reaches
+ * a light-DOM viewer, a `<jeex-viewer>` element and a viewer in an iframe.
+ * `STILL_CHROME_CSS` is the same text for a plain `screenshot()`.
+ */
+export const STILL_CHROME_CSS_PATH = fileURLToPath(new URL('./still-chrome.css', import.meta.url));
+export const STILL_CHROME_CSS = readFileSync(STILL_CHROME_CSS_PATH, 'utf8');
+
+/**
+ * Waits until every frame of the page has its fonts: a capture taken while a
+ * face is still loading shows the fallback metrics, which move every label.
+ * Playwright waits for the fonts of the frame it captures only, not of an
+ * iframe inside it.
+ */
+async function waitForFonts(page: Page): Promise<void> {
+  for (const frame of page.frames()) {
+    await frame.evaluate(async () => {
+      await document.fonts.ready;
+    });
+  }
+}
+
+/**
+ * A baseline of the page's CHROME, with the scene left unpainted
+ * (`STILL_CHROME_CSS`).
+ *
+ * The whole page rather than a crop: the chrome is positioned over the canvas,
+ * and on the embed pages the host's own copy around the viewer is part of what
+ * is compared. The layout is stable when Playwright takes two identical
+ * captures in a row, which `toHaveScreenshot` does before it compares.
+ *
+ * The caller puts the chrome into ONE deterministic state first: the control
+ * bar collapses on a 4.2 s idle timer, so a test that wants it open parks the
+ * pointer on the bar (its timer re-arms while the bar is hovered), and one that
+ * wants it collapsed waits for `waitForChromeIdle`.
  */
 export async function expectChromeScreenshot(page: Page, name: string): Promise<void> {
   allowOneScreenshot();
+  await waitForFonts(page);
   await expect(page).toHaveScreenshot(name, {
-    mask: [page.locator('canvas')],
-    maxDiffPixelRatio: CHROME_DIFF_RATIO,
+    stylePath: STILL_CHROME_CSS_PATH,
+    maxDiffPixels: CHROME_DIFF_PIXELS,
     animations: 'disabled',
     caret: 'hide',
     timeout: SCREENSHOT_TIMEOUT_MS,

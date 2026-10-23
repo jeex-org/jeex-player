@@ -9,6 +9,7 @@
 
 import { expect, test, type Locator, type Page } from '@playwright/test';
 import { expectCanvasScreenshot, expectChromeScreenshot, expectNoNewA11yViolations, modeButton, waitForBoot } from './support.js';
+import { scaled } from './time-scale.js';
 
 /** The color-contrast finding (.stage-label) is fixed. */
 const A11Y_BUDGET = 0;
@@ -92,8 +93,17 @@ test('disposing the first leaves the second rendering and takes the globals with
 });
 
 test('the chrome of both viewers looks as it did', async ({ page }) => {
-  await stage(page, 'stage-a').hover({ position: { x: 10, y: 10 } });
-  await stage(page, 'stage-b').hover({ position: { x: 10, y: 10 } });
+  // One pointer, two bars, so each is put in a state that holds: the first
+  // viewer's bar open under the pointer resting on its brand lockup (its idle
+  // timer re-arms while hovered), the second's collapsed to its reveal pill
+  // on its own idle timer. The baseline shows both states side by side.
+  await stage(page, 'stage-a').locator('[data-jeex="brand-lockup"]').hover({ force: true });
+  await expect(stage(page, 'stage-b').locator('[data-jeex="control-bar"]')).toHaveAttribute('data-collapsed', 'true', {
+    timeout: scaled(15_000),
+  });
+  const barA = stage(page, 'stage-a').locator('[data-jeex="control-bar"]');
+  await expect(barA).toHaveAttribute('data-collapsed', 'false');
+  await expect.poll(() => barA.evaluate((el) => el.matches(':hover'))).toBe(true);
   await expectChromeScreenshot(page, 'embed-two-chrome.png');
 });
 
