@@ -8,7 +8,7 @@ Authors want the apartment's interior light warmer or colder, like choosing LED 
 
 - A colour temperature for the interior's artificial light (the asset bank's lamps and the walk ambient floor), 2700–6500 K in 100 K steps, or «Original» (today's look, the default). Daylight, the sky, the studio environment and material previews do not change.
 - A settings panel in the viewer's own UI, opened by a settings button attached next to «Interior style»; hidden unless the host turns it on. Its first setting is the light temperature.
-- Host contract: mount options `settings` and `lighting.temperature`, attributes `settings` and `light-temperature`, query parameters, `setLightTemperature`, the value in the viewer state, a `lightTemperatureChange` event, and the same through the iframe protocol.
+- Host contract: mount options `settings` and `lighting.temperature`, attributes `settings` and `light-temperature`, query parameters, `setLightTemperature`, the value in the viewer state, a `lightTemperature` event, and the same through the iframe protocol.
 - In walk and tour, direct sunlight inside rooms is scaled so floors no longer clip; the editing look is unchanged.
 
 ## Capabilities

@@ -46,7 +46,7 @@ A host SHALL set the temperature by the mount option `lighting.temperature`, the
 
 ### Requirement: Reporting the temperature
 
-The viewer SHALL report the temperature as `getState().lightTemperature` and with the event `lightTemperature` (`{ temperature: number | null, source: 'host' | 'panel' }`; element event `jeex-light-temperature`, iframe event of the same name) on every change, never on an unchanged value.
+The viewer SHALL report the temperature as `getState().lightTemperature` and with the event `lightTemperature` (`{ temperature: number | null, source: 'host' | 'panel' }`; element event `jeex-light-temperature`, iframe protocol event key `lightTemperature` in the embed event map) on every change, never on an unchanged value.
 
 #### Scenario: Panel change reported
 - **WHEN** the viewer's user moves the panel's slider to 5000
