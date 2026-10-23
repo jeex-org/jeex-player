@@ -7,9 +7,13 @@
  * turned into a refresh scope (`walk-lighting-scope.ts`).
  */
 
-import type * as THREE from 'three';
+import * as THREE from 'three';
 import type { SceneModel } from '../scene/scene-model.js';
 import type { WalkDocument } from '../render/walk-lighting/walk-lighting.js';
+import type { Rect, VolumeInput } from '../render/walk-lighting/room-volumes.js';
+import { doorSwings } from '../plan/door-swing.js';
+import { openingFrameWidth } from '../assets/opening-frame.js';
+import { FURNITURE_GROUP_NAME } from '../geometry/scene-builder.js';
 import type { WalkLightingController } from './walk-lighting-controller.js';
 import { refreshScope, type ScopeLookups } from './walk-lighting-scope.js';
 import { pointInPolygon } from '../plan/plan-geometry.js';
@@ -34,6 +38,34 @@ function lookupsOf(model: SceneModel): ScopeLookups {
   };
 }
 
+/** The rooms, the doors and the furniture footprints of `model` built under `root`, as the volumes read them. */
+function volumeInput(model: SceneModel, root: THREE.Object3D): VolumeInput {
+  const { plan, scene } = model;
+  const thickness = new Map(plan.centrelines.map((line) => [line.wallId, line.thickness]));
+  const rooms = plan.rooms.map((room) => ({
+    roomId: room.roomId,
+    polygon: room.polygon,
+    halfWall: Math.max(0, ...room.loop.map((face) => (thickness.get(face.wallId) ?? 0) / 2)),
+  }));
+  const roomsOfWall = new Map<string, string[]>();
+  for (const face of plan.faces.values()) {
+    if (face.roomId !== null) roomsOfWall.set(face.wallId, [...(roomsOfWall.get(face.wallId) ?? []), face.roomId]);
+  }
+  // The room a door leaf swings into is listed first: a frame on the centreline belongs to it.
+  const doors = doorSwings(scene, plan, openingFrameWidth).flatMap((swing) => {
+    if (swing.roomId === null) return [];
+    const other = (roomsOfWall.get(swing.wallId) ?? []).find((room) => room !== swing.roomId) ?? null;
+    return [{ into: swing.roomId, other }];
+  });
+  const furniture: Rect[] = [];
+  const box = new THREE.Box3();
+  for (const item of root.getObjectByName(FURNITURE_GROUP_NAME)?.children ?? []) {
+    box.setFromObject(item);
+    if (!box.isEmpty()) furniture.push({ minX: box.min.x, maxX: box.max.x, minZ: box.min.z, maxZ: box.max.z });
+  }
+  return { rooms, ceilingHeight: scene.ceilingHeight, doors, furniture };
+}
+
 /**
  * Hands `controller` the document of `model` built under `root`, and every
  * later non-plan commit of it as an edit; answers the unsubscribe.
@@ -55,7 +87,7 @@ export function wireWalkLighting(
   return {
     document: () => {
       const built = root();
-      return built ? { plan: model.plan, scene: model.scene, root: built } : null;
+      return built ? { volumes: volumeInput(model, built), furniture: built.getObjectByName(FURNITURE_GROUP_NAME) ?? null } : null;
     },
     off,
   };

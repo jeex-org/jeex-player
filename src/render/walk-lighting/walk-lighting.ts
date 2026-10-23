@@ -22,13 +22,8 @@
  */
 
 import * as THREE from 'three';
-import type { SceneData } from '../../scene/types.js';
-import type { SolvedPlan } from '../../plan/plan-solver.js';
-import { doorSwings } from '../../plan/door-swing.js';
-import { openingFrameWidth } from '../../assets/opening-frame.js';
-import { FURNITURE_GROUP_NAME } from '../../geometry/scene-builder.js';
 import { LIGHTING_STANDARD } from '../../lighting/lighting-standard.js';
-import { roomVolumes, type Rect, type RoomVolumes, type VolumeInput } from './room-volumes.js';
+import { roomVolumes, type RoomVolumes, type VolumeInput } from './room-volumes.js';
 import { createExteriorGrid, RoomGrid } from './room-grid.js';
 import { GridBake } from './grid-bake.js';
 import { ProbeAtlas, RoomProbes } from './room-probes.js';
@@ -37,8 +32,12 @@ import { WalkRig } from './walk-rig.js';
 import { WALK_LIGHTING_TUNING as T } from './walk-lighting-tuning.js';
 import type { LightProbeGridWebGL } from 'three/addons/lighting/LightProbeGridWebGL.js';
 
-/** The document the lighting is built for. */
-export type WalkDocument = { plan: SolvedPlan; scene: SceneData; root: THREE.Object3D };
+/**
+ * The document the lighting is built for, as the application reads it
+ * (`app/walk-lighting-wiring.ts`): the rooms, doors and furniture footprints
+ * the volumes are made of, and the furniture group a grid probe must not see.
+ */
+export type WalkDocument = { volumes: VolumeInput; furniture: THREE.Object3D | null };
 /** What an edit asks to refresh: everything, or the grids and probes of some rooms. */
 export type RefreshScope = { all: boolean; grids: readonly string[]; probes: readonly string[] };
 export type WalkLightingPhase = 'baking' | 'probes' | 'live';
@@ -57,10 +56,11 @@ export type WalkLightingStats = {
 type Mirror = THREE.Object3D & { isReflector?: boolean };
 
 /** The furniture group, every mirror and every transmissive mesh under `scene`: what a grid probe must not see. */
-function bakeExclusions(scene: THREE.Object3D): THREE.Object3D[] {
-  const out: THREE.Object3D[] = [];
+function bakeExclusions(scene: THREE.Object3D, furniture: THREE.Object3D | null): THREE.Object3D[] {
+  const out: THREE.Object3D[] = furniture ? [furniture] : [];
   scene.traverse((object) => {
-    if (object.name === FURNITURE_GROUP_NAME || (object as Mirror).isReflector === true) {
+    if (object === furniture) return;
+    if ((object as Mirror).isReflector === true) {
       out.push(object);
       return;
     }
@@ -80,33 +80,6 @@ function mirrorsOf(scene: THREE.Object3D): THREE.Object3D[] {
   return out;
 }
 
-/** The plan, the doors and the furniture footprints as the volumes read them. */
-function volumeInput(doc: WalkDocument): VolumeInput {
-  const thickness = new Map(doc.plan.centrelines.map((line) => [line.wallId, line.thickness]));
-  const rooms = doc.plan.rooms.map((room) => ({
-    roomId: room.roomId,
-    polygon: room.polygon,
-    halfWall: Math.max(0, ...room.loop.map((face) => (thickness.get(face.wallId) ?? 0) / 2)),
-  }));
-  const roomsOfWall = new Map<string, string[]>();
-  for (const face of doc.plan.faces.values()) {
-    if (face.roomId !== null) roomsOfWall.set(face.wallId, [...(roomsOfWall.get(face.wallId) ?? []), face.roomId]);
-  }
-  const doors = doorSwings(doc.scene, doc.plan, openingFrameWidth).flatMap((swing) => {
-    if (swing.roomId === null) return [];
-    const other = (roomsOfWall.get(swing.wallId) ?? []).find((room) => room !== swing.roomId) ?? null;
-    return [{ into: swing.roomId, other }];
-  });
-  const furniture: Rect[] = [];
-  const group = doc.root.getObjectByName(FURNITURE_GROUP_NAME);
-  const box = new THREE.Box3();
-  for (const item of group?.children ?? []) {
-    box.setFromObject(item);
-    if (!box.isEmpty()) furniture.push({ minX: box.min.x, maxX: box.max.x, minZ: box.min.z, maxZ: box.max.z });
-  }
-  return { rooms, ceilingHeight: doc.scene.ceilingHeight, doors, furniture };
-}
-
 /** The bytes a grid's atlas and its bounce snapshot take on the GPU (RGBA float). */
 const gridBytes = (grid: RoomGrid): number => grid.resolution.x * grid.resolution.y * 7 * (grid.resolution.z + 2) * 16 * 2;
 
@@ -120,6 +93,7 @@ export class WalkLighting {
   /** The grids' parent: room grids in grid order, the exterior grid last (three takes the first that contains an origin). */
   private readonly parent = new THREE.Group();
   private volumes: RoomVolumes | null = null;
+  private furniture: THREE.Object3D | null = null;
   private grids: RoomGrid[] = [];
   private exterior: LightProbeGridWebGL | null = null;
   private atlas: ProbeAtlas | null = null;
@@ -145,11 +119,12 @@ export class WalkLighting {
    * throws when the plan has more room boxes than the lighting takes.
    */
   load(doc: WalkDocument): void {
-    const result = roomVolumes(volumeInput(doc));
+    const result = roomVolumes(doc.volumes);
     if (!result.ok) throw new Error(result.error);
     this.release();
     const volumes = result.volumes;
     this.volumes = volumes;
+    this.furniture = doc.furniture;
     this.grids = volumes.boxes.map((box) => new RoomGrid(box));
     this.exterior = createExteriorGrid(LIGHTING_STANDARD.apartment, volumes.bounds);
     for (const grid of [...this.grids, this.exterior]) {
@@ -241,7 +216,7 @@ export class WalkLighting {
       targets,
       exterior: this.exterior!,
       rig: this.rig,
-      exclusions: () => bakeExclusions(scene),
+      exclusions: () => bakeExclusions(scene, this.furniture),
       probesPerFrame,
       cubemapSize: T.gridCubemapSize,
     });

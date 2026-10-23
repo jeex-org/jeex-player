@@ -52,6 +52,10 @@ export function debugHostFor(model: SceneModel, deps: DebugPartsDeps): ViewerDeb
     editor: () => deps.mount.editor,
     sun: () => deps.mount.sunShadow,
     walkPost: () => stage()?.walkPost.state(),
+    walkLighting: () => {
+      const lighting = stage()?.walkLighting;
+      return lighting ? { state: lighting.state(), stats: lighting.stats() } : undefined;
+    },
     furnitureVisible: () => deps.furnitureVisible(),
     messages: () => deps.messages(),
     projectLibrary: () => deps.projectLibrary(),

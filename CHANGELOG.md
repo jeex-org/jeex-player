@@ -48,6 +48,18 @@ as described under [Versioning](#versioning).
   `purpose` is refused (`room-purpose-needs-schema-2-4`), an unknown value as
   `room-purpose-unknown`. The demo apartment now ships as 2.4 with a purpose
   on every room.
+- **Room lighting in walk and tour.** Each room is lit by its own baked
+  light-probe grid (one bounce through doorways) and reflects itself through a
+  box-projected reflection probe; the sky light, the fill and the
+  environment's diffuse term no longer reach through walls in those two
+  modes, so a windowless room is darker than a room with a window. The bake
+  runs on entry over several frames with the direct look meanwhile, then
+  switches in one frame; edits refresh only the rooms they touch. Editing
+  modes render exactly as before. Shell meshes (walls, floors, ceilings,
+  skirtings, joints) now have their origins inside their rooms; their
+  world-space vertices are unchanged. The walk chunk grows by about 10 KB
+  gzip. `__viewerDebug.walkLighting()` reports the phase and the measured
+  bake.
 
 - **`set_site`: a scene operation for the plan's orientation and sun preset.**
   `{ op: 'set_site', northDeg?: number | null, sun?: 'morning' | 'noon' | 'evening' | null }`

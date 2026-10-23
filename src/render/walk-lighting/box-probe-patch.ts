@@ -54,6 +54,8 @@ export const ENGINE_CHUNK_ANCHORS = Object.freeze({
 /** The uniforms every patched material shares. */
 export type WalkUniforms = {
   jeexDiffuse: { value: number };
+  /** What light outside the rooms is scaled by: the inverse of the walk exposure in walk, so facades keep the editing look. */
+  jeexOutside: { value: number };
   jeexBoxProbes: { value: number };
   jeexBoxCount: { value: number };
   jeexSelMin: { value: THREE.Vector3[] };
@@ -83,6 +85,7 @@ function placeholder(): THREE.Texture {
 export function createWalkUniforms(): WalkUniforms {
   return {
     jeexDiffuse: { value: 1 },
+    jeexOutside: { value: 1 },
     jeexBoxProbes: { value: 0 },
     jeexBoxCount: { value: 0 },
     jeexSelMin: { value: vectors() },
@@ -102,6 +105,7 @@ export function createWalkUniforms(): WalkUniforms {
 export function setUniformState(uniforms: WalkUniforms, state: UniformState): void {
   uniforms.jeexDiffuse.value = state === 'editing' ? 1 : 0;
   uniforms.jeexBoxProbes.value = state === 'walk' ? 1 : 0;
+  uniforms.jeexOutside.value = state === 'walk' ? 1 / T.walkExposure : 1;
 }
 
 /** Where each room's tile sits in the atlas, and the atlas size. */
@@ -138,6 +142,7 @@ const PARS = /* glsl */ `
 #if defined( USE_ENVMAP ) && defined( ENVMAP_TYPE_CUBE_UV )
 #define JEEX_MAX_BOXES ${T.maxBoxes}
 uniform float jeexDiffuse;
+uniform float jeexOutside;
 uniform float jeexBoxProbes;
 uniform int jeexBoxCount;
 uniform vec3 jeexSelMin[ JEEX_MAX_BOXES ];
@@ -194,9 +199,9 @@ vec3 jeexProbeSample( vec3 direction, float roughness, vec2 tile ) {
 	float mip = clamp( roughnessToMip( roughness ), cubeUV_m0, CUBEUV_MAX_MIP );
 	float mipF = fract( mip );
 	float mipInt = floor( mip );
-	vec3 near = jeexBilinear( direction, mipInt, tile );
-	if ( mipF == 0.0 ) return near;
-	return mix( near, jeexBilinear( direction, mipInt + 1.0, tile ), mipF );
+	vec3 lower = jeexBilinear( direction, mipInt, tile );
+	if ( mipF == 0.0 ) return lower;
+	return mix( lower, jeexBilinear( direction, mipInt + 1.0, tile ), mipF );
 }
 
 vec3 jeexRadiance( const in vec3 viewDir, const in vec3 normal, const in float roughness ) {
@@ -205,6 +210,8 @@ vec3 jeexRadiance( const in vec3 viewDir, const in vec3 normal, const in float r
 	vec3 reflectVec = reflect( - viewDir, normal );
 	reflectVec = normalize( mix( reflectVec, normal, pow4( roughness ) ) );
 	reflectVec = transformDirectionByInverseViewMatrix( reflectVec, viewMatrix );
+	// A hair off zero, so a ray along an axis never divides zero by zero.
+	vec3 reciprocal = 1.0 / ( reflectVec + vec3( 1e-6 ) );
 	vec3 sum = vec3( 0.0 );
 	float total = 0.0;
 	for ( int i = 0; i < JEEX_MAX_BOXES; i ++ ) {
@@ -212,9 +219,9 @@ vec3 jeexRadiance( const in vec3 viewDir, const in vec3 normal, const in float r
 		float weight = smoothstep( - jeexBlend, jeexBlend, jeexInside( jeexLookup, i ) );
 		if ( weight <= 0.0 ) continue;
 		vec3 from = clamp( jeexWorldPos, jeexBoxMin[ i ], jeexBoxMax[ i ] );
-		vec3 far = max( ( jeexBoxMax[ i ] - from ) / reflectVec, ( jeexBoxMin[ i ] - from ) / reflectVec );
-		float distance = max( min( min( far.x, far.y ), far.z ), 0.0 );
-		vec3 direction = from + reflectVec * distance - jeexProbe[ i ];
+		vec3 exits = max( ( jeexBoxMax[ i ] - from ) * reciprocal, ( jeexBoxMin[ i ] - from ) * reciprocal );
+		float travel = max( min( min( exits.x, exits.y ), exits.z ), 0.0 );
+		vec3 direction = from + reflectVec * travel - jeexProbe[ i ];
 		sum += weight * jeexProbeSample( direction, roughness, jeexTile[ i ] );
 		total += weight;
 	}
@@ -258,9 +265,17 @@ ${maps}
 `;
 }
 
+/** Light outside the rooms scaled against the walk exposure, just before three writes the fragment. */
+const OUTSIDE = /* glsl */ `
+#if defined( USE_ENVMAP ) && defined( ENVMAP_TYPE_CUBE_UV )
+	outgoingLight *= mix( jeexOutside, 1.0, jeexInRoom );
+#endif
+#include <opaque_fragment>`;
+
 /** The fragment shader of a standard or physical material with the walk patch in place of its lighting includes. */
 export function patchFragmentShader(source: string): string {
   return source
+    .replace('#include <opaque_fragment>', OUTSIDE)
     .replace('#include <envmap_physical_pars_fragment>', `#include <envmap_physical_pars_fragment>\n${PARS}`)
     .replace('#include <lights_fragment_begin>', beginChunk())
     .replace('#include <lights_fragment_maps>', mapsChunk());

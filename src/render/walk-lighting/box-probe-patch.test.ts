@@ -11,6 +11,7 @@ import {
   setUniformState,
 } from './box-probe-patch.js';
 import type { RoomBox } from './room-volumes.js';
+import { WALK_LIGHTING_TUNING } from './walk-lighting-tuning.js';
 
 describe('the r186 chunks the patch rewrites', () => {
   test('still read exactly as the patch expects', () => {
@@ -31,6 +32,7 @@ describe('patchFragmentShader', () => {
     expect(physical).toContain('#include <lights_fragment_end>');
     expect(physical).toContain('#include <envmap_physical_pars_fragment>');
     expect(physical).toContain('uniform sampler2D jeexAtlas;');
+    expect(physical).toContain('outgoingLight *= mix( jeexOutside, 1.0, jeexInRoom );');
   });
 
   test('routes diffuse, specular and clearcoat through the switches, keeps anisotropy and retroreflection', () => {
@@ -82,8 +84,10 @@ describe('uniform states', () => {
     expect([uniforms.jeexDiffuse.value, uniforms.jeexBoxProbes.value]).toEqual([0, 0]);
     setUniformState(uniforms, 'walk');
     expect([uniforms.jeexDiffuse.value, uniforms.jeexBoxProbes.value]).toEqual([0, 1]);
+    // Facades keep the editing look under the walk exposure.
+    expect(uniforms.jeexOutside.value).toBeCloseTo(1 / WALK_LIGHTING_TUNING.walkExposure, 9);
     setUniformState(uniforms, 'editing');
-    expect([uniforms.jeexDiffuse.value, uniforms.jeexBoxProbes.value]).toEqual([1, 0]);
+    expect([uniforms.jeexDiffuse.value, uniforms.jeexBoxProbes.value, uniforms.jeexOutside.value]).toEqual([1, 0, 1]);
   });
 
   test('room boxes fill the arrays with their tiles and probe points', () => {
