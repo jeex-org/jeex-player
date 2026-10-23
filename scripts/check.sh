@@ -190,6 +190,10 @@ echo "== npm run build:lib"
 npm run build:lib
 echo "== npm run check:budget:lib"
 npm run check:budget:lib
+echo "== built library embeds (Playwright, tests/built)"
+# Reads the dist-lib the step above wrote: every embed shape must find the
+# Basis transcoder beside its own file.
+bun run test:built
 echo "== check:pkg"
 # `publint`/`attw` read the built `dist-lib`: needs `npm run build:lib` above,
 # so it stays full-only along with the build itself.

@@ -45,6 +45,7 @@ import { createProjectTextures, type TextureEnv } from './project-textures.js';
 
 // What the composition root reads the texture environment of its renderer with, through the one door it already uses.
 export { textureEnvOf } from './project-textures.js';
+export { createKtx2Support } from '../materials/ktx2.js';
 
 type SceneMountDeps = {
   /**
@@ -191,7 +192,10 @@ export class SceneMount {
     this.last = { model, options, variants, sourceKey };
     this.sourceKey = sourceKey;
     this.currentModel = model;
-    const builder = new SceneBuilder(model.scene, model.plan, options);
+    // The viewer's KTX2 transcoder (one per viewer: started by the first KTX2 asset, kept across a
+    // context restore and a retry, ended with the viewer), so a `KHR_texture_basisu` GLB can load.
+    const ktx2 = this.deps.textureEnv?.()?.ktx2;
+    const builder = new SceneBuilder(model.scene, model.plan, ktx2 === undefined ? options : { ...options, ktx2 });
     this.currentBuilder = builder;
     const built = builder.build();
     this.adopt(built);

@@ -15,14 +15,26 @@ import type { FinishSurface, Vec2 } from '../scene/types.js';
 import type { LibraryFacts } from './finish-types.js';
 import type { LibraryThreeMaterial } from './library-material.js';
 
-/** Metres → texture space: turn by `degrees` counter-clockwise, then `1 / tileM` per axis. */
-export function libraryTextureMatrix(tileM: readonly [number, number], degrees: number): THREE.Matrix3 {
+/**
+ * Metres → texture space: turn by `degrees` counter-clockwise, then `1 / tileM`
+ * per axis.
+ *
+ * `flipV` is for a KTX2 material. A WebP map is decoded top row up, so its
+ * texture v runs up the picture; a KTX2 map is uploaded as stored, first row
+ * (the top of the picture) at v = 0, and a compressed texture cannot be
+ * flipped at upload. Negating the v row draws the same picture the same way
+ * up; with repeat wrapping `-v` and `1 - v` sample the same texel, and a
+ * reflection keeps the sampling footprint, so mip selection and anisotropy are
+ * unchanged.
+ */
+export function libraryTextureMatrix(tileM: readonly [number, number], degrees: number, flipV = false): THREE.Matrix3 {
   const turn = (degrees * Math.PI) / 180;
   const cos = Math.cos(turn);
   const sin = Math.sin(turn);
   const [u, v] = tileM;
   // A point at angle `turn` in metres lands on the texture's u axis: rotate by -turn.
-  return new THREE.Matrix3().set(cos / u, sin / u, 0, -sin / v, cos / v, 0, 0, 0, 1);
+  const sign = flipV ? -1 : 1;
+  return new THREE.Matrix3().set(cos / u, sin / u, 0, (sign * -sin) / v, (sign * cos) / v, 0, 0, 0, 1);
 }
 
 /** The direction of the longest outline edge, degrees counter-clockwise from +u; a tie goes to the lower edge index. */

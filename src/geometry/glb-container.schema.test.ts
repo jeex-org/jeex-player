@@ -10,6 +10,7 @@ describe('glbDocumentSchema', () => {
       images: [{ bufferView: 0, mimeType: 'image/png' }, { uri: 'tex/wood.png' }],
       buffers: [{ byteLength: 64 }, { uri: 'data.bin', byteLength: 8 }],
       meshes: [],
+      extensionsUsed: ['KHR_texture_basisu'],
     };
     expect(isGlbDocumentShape(document)).toBe(true);
   });
@@ -25,6 +26,7 @@ describe('glbDocumentSchema', () => {
     ['images that are not an array', { images: { uri: 'a.png' } }],
     ['an image that is not an object', { images: ['a.png'] }],
     ['a buffer uri that is not a string', { buffers: [{ uri: 7 }] }],
+    ['extensionsUsed that is not a list of names', { extensionsUsed: 'KHR_texture_basisu' }],
   ])('%s is refused', (_name, value) => {
     expect(isGlbDocumentShape(value)).toBe(false);
   });
@@ -32,7 +34,7 @@ describe('glbDocumentSchema', () => {
   test('the hand-written GlbDocument and the schema agree both ways', () => {
     // Compile-time: if the two drift apart, `BothWays` collapses to `false` and
     // the next line stops compiling.
-    type SchemaShape = Pick<z.infer<typeof glbDocumentSchema>, 'images' | 'buffers'>;
+    type SchemaShape = Pick<z.infer<typeof glbDocumentSchema>, 'images' | 'buffers' | 'extensionsUsed'>;
     type BothWays = SchemaShape extends GlbDocument ? (GlbDocument extends SchemaShape ? true : false) : false;
     const agree: BothWays = true;
     expect(agree).toBe(true);

@@ -40,6 +40,26 @@ describe('libraryTextureMatrix', () => {
     expect(at(matrix, 0, 2)).toEqual([1, 0]);
     expect(at(matrix, 1, 0)).toEqual([0, -1]);
   });
+
+  test('a KTX2 material reverses the vertical texture axis and keeps everything else, for any rotation and tile', () => {
+    for (const [tile, degrees] of [
+      [[2, 1], 0],
+      [[0.5, 1.5], 30],
+      [[1, 3], 90],
+      [[2, 1], -135],
+    ] as const) {
+      const plain = libraryTextureMatrix(tile, degrees);
+      const flipped = libraryTextureMatrix(tile, degrees, true);
+      for (const [u, v] of [
+        [1, 0],
+        [0, 1],
+        [2.5, -0.7],
+      ] as const) {
+        const [pu, pv] = at(plain, u, v);
+        expect(at(flipped, u, v)).toEqual([pu, -pv + 0]);
+      }
+    }
+  });
 });
 
 describe('the grain angle', () => {

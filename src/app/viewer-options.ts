@@ -216,7 +216,7 @@ export type ViewerOptions = {
    */
   onLog?: LogSink | undefined;
   /**
-   * Turns a library material's logical texture path (`tex/<versionId>/<role>.<px>.webp`)
+   * Turns a library material's logical texture path (`tex/<versionId>/<role>.<px>.webp` or `.ktx2`)
    * into the URL to fetch, for a host that serves its maps itself (signed or
    * `blob:` URLs); called lazily, once per size loaded, and answering an
    * absolute `http(s)` or `blob:` URL, else that surface stays flat. Absent:

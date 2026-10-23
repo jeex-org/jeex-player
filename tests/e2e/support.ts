@@ -4,7 +4,7 @@
  */
 
 import { writeFileSync } from 'node:fs';
-import { expect, test, type FrameLocator, type Locator, type Page, type TestInfo } from '@playwright/test';
+import { expect, test, type APIRequestContext, type FrameLocator, type Locator, type Page, type TestInfo } from '@playwright/test';
 import AxeBuilder from '@axe-core/playwright';
 import { scaled } from './time-scale.js';
 
@@ -410,4 +410,48 @@ export async function waitForCameraStill(page: Page, tolerance = 1e-3, timeout =
       { timeout },
     )
     .toBe(true);
+}
+
+/** The library project's folder on the dev server. */
+const LIBRARY_PROJECT_BASE = '/tests/fixtures/project-library/';
+
+/**
+ * Serves the library project with its scan shipped as KTX2: every map of the
+ * scan is listed once, at 256 px, as `tex/<versionId>/<role>.256.ktx2`, and
+ * each such request is answered with the committed fixture of that role
+ * (`tests/fixtures/ktx2/`). Answers how many times the page asked for each
+ * transcoder file and for each KTX2 map.
+ */
+export async function serveKtx2LibraryProject(
+  page: Page,
+  request: APIRequestContext,
+): Promise<{ transcoder: () => { js: number; wasm: number }; maps: () => string[] }> {
+  const manifest = (await (await request.get(`${LIBRARY_PROJECT_BASE}project.json`)).json()) as {
+    library: { materials: { library?: { versionId: string; kind: string; maps: Record<string, { files: Record<string, string> }> } }[] };
+  };
+  for (const material of manifest.library.materials) {
+    const library = material.library;
+    if (library?.kind !== 'scan') continue;
+    for (const [role, map] of Object.entries(library.maps)) map.files = { '256': `tex/${library.versionId}/${role}.256.ktx2` };
+  }
+  // By pathname: a glob would also match the page's own `?project=` query.
+  await page.route(
+    (url) => url.pathname === `${LIBRARY_PROJECT_BASE}project.json`,
+    (route) => route.fulfill({ json: manifest }),
+  );
+  await page.route(
+    (url) => url.pathname.startsWith(`${LIBRARY_PROJECT_BASE}tex/`) && url.pathname.endsWith('.ktx2'),
+    (route) => {
+      const role = new URL(route.request().url()).pathname.split('/').pop()!.split('.')[0]!;
+      return route.fulfill({ path: `tests/fixtures/ktx2/${role}.256.ktx2`, contentType: 'image/ktx2' });
+    },
+  );
+  const sent: string[] = [];
+  page.on('request', (made) => sent.push(new URL(made.url()).pathname));
+  const named = (suffix: string) =>
+    sent.filter((path) => path.includes('/lazy-jeex-viewer-basis-transcoder-') && path.endsWith(suffix)).length;
+  return {
+    transcoder: () => ({ js: named('.js'), wasm: named('.wasm') }),
+    maps: () => sent.filter((path) => path.startsWith(`${LIBRARY_PROJECT_BASE}tex/`) && path.endsWith('.ktx2')),
+  };
 }

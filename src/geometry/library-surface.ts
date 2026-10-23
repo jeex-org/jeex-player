@@ -10,7 +10,7 @@
  */
 
 import type * as THREE from 'three';
-import { attachLibraryMaps, createLibraryMaterial, type LibraryThreeMaterial } from '../materials/library-material.js';
+import { attachLibraryMaps, createLibraryMaterial, libraryMapFormat, type LibraryThreeMaterial } from '../materials/library-material.js';
 import { applyLibraryTransform, libraryAngle, libraryTextureMatrix } from '../materials/library-uv.js';
 import type { LibraryDraw } from '../materials/room-finish.js';
 import type { LibraryMapRole, LibraryMapSize } from '../materials/finish-types.js';
@@ -63,7 +63,7 @@ export class LibrarySurface {
     if (this.released) return;
     attachLibraryMaps(this.material, this.draw, views);
     const angle = libraryAngle(library.facts, this.surface, this.outline, this.draw.rotation);
-    applyLibraryTransform(this.material, libraryTextureMatrix(library.facts.tileM, angle));
+    applyLibraryTransform(this.material, libraryTextureMatrix(library.facts.tileM, angle, libraryMapFormat(library) === 'ktx2'));
   }
 
   /** Gives back every view this surface holds and frees its material; its maps are the source's, not freed here. */

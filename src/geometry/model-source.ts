@@ -27,11 +27,16 @@
  */
 
 import * as THREE from 'three';
+import type { GLTFLoader as GLTFLoaderType } from 'three/addons/loaders/GLTFLoader.js';
 import type { AssetDims } from '../assets/asset-types.js';
 import { ViewerLibError } from '../shared/errors.js';
 import { MAX_MODEL_BYTES } from '../shared/limits.js';
 import { ByteLimitError, readCapped } from '../shared/capped-read.js';
 import { readGlbContainer } from './glb-container.js';
+import type { Ktx2Support } from '../materials/ktx2.js';
+
+/** The glTF extension that stores textures as KTX2 (Basis Universal). */
+const BASISU = 'KHR_texture_basisu';
 
 /** One placement's ask: which file, for which catalogue entry, at which size. */
 export type ModelRequest = {
@@ -81,6 +86,11 @@ export type ModelSourceOptions = {
   credentials?: RequestCredentials;
   /** Largest single container this source will read, bytes; `MAX_MODEL_BYTES` when absent. */
   maxBytes?: number;
+  /**
+   * The viewer's KTX2 transcoder (`materials/ktx2.ts`). Asked only for a GLB
+   * that lists `KHR_texture_basisu`; absent, such a GLB is refused.
+   */
+  ktx2?: Ktx2Support | undefined;
 };
 
 /** A source that holds GPU resources of its own; the creator frees them. */
@@ -106,7 +116,10 @@ export function countTriangles(object: THREE.Object3D): number {
   return Math.round(total);
 }
 
-type LoaderModule = { parseAsync: (data: ArrayBuffer, path: string) => Promise<{ scene: THREE.Group }> };
+type LoaderModule = {
+  parseAsync: (data: ArrayBuffer, path: string) => Promise<{ scene: THREE.Group }>;
+  setKTX2Loader: (loader: Parameters<GLTFLoaderType['setKTX2Loader']>[0]) => unknown;
+};
 
 /**
  * Builds a `GLTFLoader` against ONE manager. Every parse gets its own loader:
@@ -231,12 +244,26 @@ function stripStageObjects(scene: THREE.Group): string[] {
   return [...new Set(warnings)];
 }
 
-/** Frees every geometry and material reachable from a parsed GLB scene. */
+/** Frees every geometry, material and texture reachable from a parsed GLB scene. */
 function disposeScene(scene: THREE.Object3D): void {
   scene.traverse((child) => {
     if (!(child instanceof THREE.Mesh)) return;
     child.geometry.dispose();
-    for (const material of Array.isArray(child.material) ? child.material : [child.material]) material.dispose();
+    for (const material of Array.isArray(child.material) ? child.material : [child.material]) {
+      // A material's `dispose` leaves its textures alone: they are freed here, once each.
+      for (const value of Object.values(material as unknown as Record<string, unknown>)) {
+        if (value instanceof THREE.Texture) value.dispose();
+      }
+      material.dispose();
+    }
+  });
+}
+
+/** The refusal of a GLB whose KTX2 textures could not be transcoded. */
+function transcoderRefusal(url: string, cause?: unknown): ViewerLibError {
+  return new ViewerLibError('scene-load', `model ${url} needs the KTX2 transcoder, which could not decode its textures`, {
+    detail: { url, reason: 'ktx2-transcoder' },
+    ...(cause === undefined ? {} : { cause }),
   });
 }
 
@@ -300,15 +327,38 @@ export function createGltfModelSource(options: ModelSourceOptions = {}): Disposa
     // exists to build one loader per manager — see `LoaderFactory`).
     const manager = new THREE.LoadingManager();
     manager.setURLModifier(modelResourceModifier(folder, base));
+    const loader = (await factory)(manager);
+    // KTX2 textures: the transcoder is started BEFORE the parse, because once
+    // a KTX2 loader is set three turns a texture that fails into a silent
+    // `null` and the model would load untextured. The parse view records any
+    // error a texture reports during the parse, for the same reason. Its
+    // images are fetched by the transcoder's own manager (embedded ones as
+    // `blob:` URLs); every URI the container names was judged by the scan
+    // above.
+    let transcoder: Awaited<ReturnType<Ktx2Support['forParse']>> | undefined;
+    if (container.extensionsUsed?.includes(BASISU) === true) {
+      if (options.ktx2 === undefined) throw transcoderRefusal(url);
+      try {
+        transcoder = await options.ktx2.forParse();
+      } catch (cause) {
+        throw transcoderRefusal(url, cause);
+      }
+      loader.setKTX2Loader(transcoder.loader);
+    }
     // What the container check cannot see — a document whose accessors read a
     // buffer it does not have — still fails inside the loader; that failure is
     // wrapped here so a host never receives a bare three.js error.
     let gltf: { scene: THREE.Group };
     try {
-      gltf = await (await factory)(manager).parseAsync(bytes, path);
+      gltf = await loader.parseAsync(bytes, path);
     } catch (cause) {
       if (cause instanceof ViewerLibError) throw cause;
       throw new ViewerLibError('scene-load', `model ${url} could not be parsed`, { cause, detail: { url, reason: 'glb-parse' } });
+    }
+    const failed = transcoder?.error();
+    if (failed !== undefined) {
+      disposeScene(gltf.scene);
+      throw transcoderRefusal(url, failed);
     }
     return { scene: gltf.scene, warnings: stripStageObjects(gltf.scene), bytes: bytes.byteLength };
   }

@@ -16,6 +16,7 @@
  */
 
 import * as THREE from 'three';
+import type { Ktx2Support } from '../materials/ktx2.js';
 import { sameFace, type DemoAsset, type FaceKey, type FinishRef, type SceneData } from '../scene/types.js';
 import { AssetLoader, type AssetLoaderOptions, type ModelState, type ModelUrlResolver } from './asset-loader.js';
 import type { AsyncModelSource } from './model-source.js';
@@ -88,6 +89,8 @@ export type SceneBuilderOptions = {
   textures?: LibraryTextures | undefined;
   /** `'omit'` for the files of a baked project. */
   credentials?: RequestCredentials | undefined;
+  /** The viewer's KTX2 transcoder, for GLBs that use `KHR_texture_basisu`; such GLBs are refused without it. */
+  ktx2?: Ktx2Support | undefined;
   /** Where `asset-defect` and `project-budget` are reported; the console when absent. */
   log?: Logger | undefined;
 };
@@ -176,6 +179,7 @@ export class SceneBuilder {
       resolveFinish: this.options.resolveFinish,
       projectMaterials: this.options.projectMaterials,
       credentials: this.options.credentials,
+      ktx2: this.options.ktx2,
       log: this.log,
     };
     return new AssetLoader(this.scene.materials ?? [], options);

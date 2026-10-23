@@ -64,7 +64,7 @@ Styles are injected automatically by every integration path. The CSS file exists
 
 ## Paste into any site
 
-Serve the whole `dist-lib/` directory from one origin (the ES entries import hashed sibling chunks, so a single file is not enough; every URL inside it is relative). Below, `https://viewer.example/embed/v1/` stands for that directory and `scene` for a scene or project JSON URL with `access-control-allow-origin`. Each form is plain HTML: no inline script, no stylesheet, nothing a CMS block has to allow beyond the tag itself.
+Serve the whole `dist-lib/` directory from one origin (the ES entries import hashed sibling chunks, so a single file is not enough; every URL inside it is relative). It includes the KTX2 transcoder pair, `lazy-jeex-viewer-basis-transcoder-<hash>.js` and `.wasm`: serve `.wasm` too, as `application/wasm`, and when the player is loaded from another origin than the page (a CDN, for example), send `Access-Control-Allow-Origin` for both files (see [KTX2 textures](#ktx2-textures)). Below, `https://viewer.example/embed/v1/` stands for that directory and `scene` for a scene or project JSON URL with `access-control-allow-origin`. Each form is plain HTML: no inline script, no stylesheet, nothing a CMS block has to allow beyond the tag itself.
 
 1. Custom element, ES module (modern browsers, the lightest download):
 
@@ -689,6 +689,7 @@ default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; c
 - **`connect-src`** must cover wherever `scene.url` is fetched from. A scene on another origin also needs CORS from that origin. It must also allow the [telemetry](#telemetry) endpoint (`https://telemetry.jeex.org`, or your `analytics-endpoint`); without it the sends are refused silently and the player works as before.
 - **Trusted Types** (`require-trusted-types-for 'script'`) needs nothing from the host: the viewer builds every node with `createElement`/`append`/`textContent` and assigns no string to `innerHTML` anywhere, so it needs no policy of its own and cannot fall foul of a host's `trusted-types` allowlist. `src/html-sinks.test.ts` holds every production module to that (no `innerHTML`/`outerHTML`/`srcdoc` assignment, `insertAdjacentHTML`, `eval`, string timers or script elements; its allowlist is empty), and the e2e `trusted-types.spec.ts` mounts two viewers under an enforcing page.
 - The viewer bundles three.js and loads no script at runtime, so `script-src 'self'` is enough for the ES-module and custom-element paths. The iframe path additionally needs `frame-src` for the viewer's origin.
+- **KTX2 textures** (only for documents that use them, see [KTX2 textures](#ktx2-textures)): the transcoder runs in a worker built from a `blob:` URL and compiles WebAssembly, so the page needs `worker-src blob:` and `script-src 'wasm-unsafe-eval'`, and `connect-src` must cover the player's folder, where the transcoder files are fetched from. The two files are fetched with `fetch()`, so a player folder on another origin than the page must also answer them with `Access-Control-Allow-Origin`. Without any of this KTX2 furniture keeps its procedural body and KTX2 room maps stay flat.
 
 ## iframe permissions and origin
 
@@ -809,7 +810,7 @@ project.json                       the manifest: scene, library, materials, righ
 scene.json                         the scene document (schema 2.2)
 obj/<versionId>.glb                one file per placed variant version
 tex/<material>_<map>.ktx2          pbr materials only
-tex/<versionId>/<role>.<px>.webp   library materials: one file per map role and size
+tex/<versionId>/<role>.<px>.webp   library materials: one file per map role and size (or .ktx2)
 prev/<id>.webp                     variant and finish previews
 poster.webp                        a still for cards and OpenGraph
 video/<preset>.mp4                 optional
@@ -904,7 +905,7 @@ type LibraryMaterial = {
   maps: Partial<Record<'albedo' | 'albedoTint' | 'normal' | 'roughness' | 'ao' | 'arm', {
     colourSpace: 'srgb' | 'linear';
     convention?: 'opengl';           // on `normal` only
-    files: Partial<Record<'128' | '256' | '384' | '512' | '768', string>>;   // `tex/<versionId>/<role>.<px>.webp`
+    files: Partial<Record<'128' | '256' | '384' | '512' | '768', string>>;   // `tex/<versionId>/<role>.<px>.webp` or `.ktx2`
   }>>;
 };
 
@@ -929,7 +930,7 @@ A `library` material is the shape a catalogue bake writes for a scanned texture 
 - A `natural` scan ships `albedo` and no `albedoTint`, a `tintable` one `albedoTint` and no `albedo`; `normal` is optional; a scan has a `tileM`.
 - Surface maps are either `arm` or `roughness` (with `ao` optional), never `arm` beside `roughness` or `ao`; `ao` alone is refused.
 - `albedo` and `albedoTint` are `srgb`, every other role `linear`; `convention` appears only on `normal`.
-- Every map of one material lists the same sizes, at least one, from 128, 256, 384, 512 and 768; each file is exactly `tex/<versionId>/<role>.<px>.webp` with the material's own version, the map's role and the size it is listed under.
+- Every map of one material lists the same sizes, at least one, from 128, 256, 384, 512 and 768; each file is exactly `tex/<versionId>/<role>.<px>.webp` or `tex/<versionId>/<role>.<px>.ktx2` with the material's own version, the map's role and the size it is listed under, and every file of one material uses the same of the two.
 - A `parameters` material has `maps: {}`, `tileM: null` and a `pbr.baseColour`, and its `averageColour` equals that base colour (compared without case).
 - No texture path appears twice in a manifest, and a manifest lists at most 512 texture files (`MAX_PROJECT_TEXTURE_FILES`), every role and size counted.
 
@@ -968,7 +969,7 @@ handle.project(): ProjectInfo | null;   // null for a bare scene
 
 ### Library materials
 
-A `library` material ([its shape](#project-format)) dresses room floors, walls, ceilings, facades and baseboards with a scanned texture set or a parameter-only material, drawn from the bake's own folder: `tex/<versionId>/<role>.<px>.webp`, one file per map role and listed size.
+A `library` material ([its shape](#project-format)) dresses room floors, walls, ceilings, facades and baseboards with a scanned texture set or a parameter-only material, drawn from the bake's own folder: `tex/<versionId>/<role>.<px>.webp` (or `.ktx2`, see [KTX2 textures](#ktx2-textures)), one file per map role and listed size.
 
 - **First frame.** Every library surface is drawn flat at once, with no network in the first frame: `averageColour` for a natural material, `averageColour` times the tint in linear light for a tintable scan, the tint itself for a tintable paint. The maps are fetched afterwards, and a surface takes them as they arrive. A tintable material is tinted with its finish value's `colour`, else its first suggested colour; a natural one ignores `colour`.
 - **Size by device.** One size per map per document, by the WebGL context's capability class (whether or not telemetry is on): 256 px on a low device, 512 on a mid one, 768 on a high one, or the nearest size the material lists (the smaller on a tie). Without a WebGL context nothing is fetched.
@@ -1005,6 +1006,16 @@ A GLB is also judged INSIDE the container: every `images[].uri` and `buffers[].u
 
 Before any of that, the container's own structure is checked against glTF 2.0: the `glTF` magic and version 2, a header length equal to the bytes received, chunks that fit, exactly one JSON chunk and it first, a BIN chunk only in second place (chunks of other types after those are ignored, as the specification requires). A container that fails is refused as `scene-load` with `detail.reason` naming the defect (`glb-header`, `glb-magic`, `glb-version`, `glb-length`, `glb-chunk`, `glb-json-first`, `glb-chunk-order`, `glb-json`; `glb-parse` when the structure is sound but the loader cannot build the document). Like every model failure, inside a mounted viewer it leaves the placement's procedural body (`modelState: 'failed'`).
 
+### KTX2 textures
+
+Furniture GLBs that store their textures as KTX2 (`KHR_texture_basisu`, Basis Universal ETC1S or UASTC) and library room maps shipped as `.ktx2` are decoded by three's Basis transcoder into the compressed formats the device's GPU reports, so they stay compressed in GPU memory.
+
+- **Where the transcoder lives.** Every build ships it as two files next to the player's own files: `lazy-jeex-viewer-basis-transcoder-<hash>.js` (about 15 KB gzip) and `.wasm` (about 245 KB gzip), named by one hash of both. The player fetches them from the folder of the file it runs from: the module's own URL for the ES entry, the custom element and the iframe page, the script's own URL for `jeex-viewer.iife.js`. Serve the whole `dist-lib/` folder, `.wasm` included, as `application/wasm`. The files are fetched with `fetch()`: when the player's folder is on another origin than the page (the classic IIFE from a CDN, for example), that origin must send `Access-Control-Allow-Origin` for both, or KTX2 GLBs keep their procedural bodies and KTX2 maps stay flat.
+- **Hosts that bundle the ES module themselves.** There is no option to name another folder. Such a host copies the two files next to the bundle that contains the player, and that works only when its bundler keeps `import.meta.url` as the bundle's real URL at run time (Vite, Rollup and esbuild ESM builds do). It does not work when the bundler rewrites `import.meta.url` (webpack 5 turns it into a `file://` path) or under the host's own Vite dev server, which pre-bundles the package into `node_modules/.vite/deps`: there the transcoder is not found, KTX2 GLBs keep their procedural bodies and KTX2 maps stay flat, each with a warning. Such hosts use the iframe page or the custom element served from `dist-lib/` instead.
+- **When.** Only when a document first needs KTX2: a GLB that lists `KHR_texture_basisu`, or a `.ktx2` map. A WebP-only document fetches neither file. One transcoder per viewer, with one worker; the files are fetched once.
+- **Failure.** A KTX2 GLB whose textures cannot be transcoded is refused as `scene-load` with `detail.reason: 'ktx2-transcoder'` and keeps its procedural body; a KTX2 room map that cannot be had stays flat with a `texture-ktx2` warning.
+- **Room maps.** A `.ktx2` map must be one square 2D image of its listed size with a Basis payload and the default KTX orientation (first row at the top of the picture, as in glTF); it is drawn with the mip levels it carries, never generated ones, in the colour space of its role, the same way up as a WebP map.
+
 ### Log codes
 
 None of these is a failure; all of them arrive through `onLog` (see [Logging](#logging)):
@@ -1015,6 +1026,8 @@ None of these is a failure; all of them arrive through `onLog` (see [Logging](#l
 | `project-budget` | The 96 MB total was reached; the remaining models are not downloaded |
 | `pbr-textures-deferred` | A `pbr` material was accepted and drawn flat (its `roughness` and `metalness`, the neutral fallback colour): KTX2 texture loading is not in this version |
 | `texture-location`, `texture-fetch`, `texture-decode`, `texture-size-mismatch` | A library map could not be located, fetched or decoded, or its pixel size is not its listed size; that surface keeps its flat colour |
+| `texture-ktx2` | A `.ktx2` library map is not a single square Basis Universal image of its listed size in the default orientation, or could not be transcoded; that surface keeps its flat colour |
+| `texture-colour-space` | A KTX2 map's container states another transfer function than its role; it is drawn as its role says |
 | `texture-too-large`, `texture-budget`, `texture-deadline` | A library map hit one of the [texture limits](#library-materials); the surfaces still waiting keep their flat colours |
 | `unknown-generator:<kind>` | A material named a parametric texture this build does not have; it is drawn flat in the entry's own `tone` |
 

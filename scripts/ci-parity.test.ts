@@ -58,6 +58,7 @@ const MAPPING: ReadonlyArray<readonly [string, string]> = [
   ['npm run check:budget', 'budget (demo)'],
   ['npm run build:lib', 'build (library)'],
   ['npm run check:budget:lib', 'budget (library)'],
+  ['built library embeds (Playwright, tests/built)', 'built library embeds (Playwright, tests/built)'],
   ['size-check', 'module size'],
   ['source hygiene (spelling, headers)', 'source hygiene (spelling, headers)'],
   ['check:arch', 'layer policy and cycles'],

@@ -58,6 +58,7 @@ const FULL_ONLY_LABELS = [
   'e2e tests (Playwright)',
   'npm run build:lib',
   'npm run check:budget:lib',
+  'built library embeds (Playwright, tests/built)',
   'check:pkg',
   'site build',
   'bun audit',

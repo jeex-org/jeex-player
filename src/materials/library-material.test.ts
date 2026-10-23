@@ -1,6 +1,6 @@
 import { describe, expect, test } from 'bun:test';
 import * as THREE from 'three';
-import { attachLibraryMaps, createLibraryMaterial } from './library-material.js';
+import { attachLibraryMaps, createLibraryMaterial, libraryMapFormat } from './library-material.js';
 import type { LibraryDraw } from './room-finish.js';
 import type { LibraryMaterial, LibraryPbr, ProjectMaterial } from './finish-types.js';
 import { NATURAL_SCAN, PAINT, TINTABLE_SCAN } from '../fixtures/library-materials.js';
@@ -18,6 +18,25 @@ function withPbr(material: ProjectMaterial, pbr: LibraryPbr): LibraryDraw {
   const library = libraryOf(material);
   return { id: material.id, material: { ...library, facts: { ...library.facts, pbr } }, rotation: 0 };
 }
+
+/** `drawn` with every file of its material shipped as KTX2. */
+function asKtx2(drawn: LibraryDraw): LibraryDraw {
+  const maps = Object.fromEntries(
+    Object.entries(drawn.material.maps).map(([role, map]) => [
+      role,
+      { ...map, files: Object.fromEntries(Object.entries(map.files).map(([size, path]) => [size, path.replace(/\.webp$/, '.ktx2')])) },
+    ]),
+  );
+  return { ...drawn, material: { ...drawn.material, maps } };
+}
+
+describe('libraryMapFormat', () => {
+  test('the extension every file of the material shares; WebP for a material with no maps', () => {
+    expect(libraryMapFormat(libraryOf(NATURAL_SCAN))).toBe('webp');
+    expect(libraryMapFormat(asKtx2(draw(NATURAL_SCAN)).material)).toBe('ktx2');
+    expect(libraryMapFormat(libraryOf(PAINT))).toBe('webp');
+  });
+});
 
 /** The linear mean a `luma-mid@1` tint map is normalised to: sRGB 0.5, as the catalogue writes it. */
 const MID_GREY_LINEAR = new THREE.Color().setRGB(0.5, 0.5, 0.5, THREE.SRGBColorSpace).r;
@@ -223,6 +242,23 @@ describe('attachLibraryMaps', () => {
     const weave = createLibraryMaterial(draw(TINTABLE_SCAN));
     attachLibraryMaps(weave, draw(TINTABLE_SCAN), { normal: view() });
     expect([weave.normalScale.x, weave.normalScale.y]).toEqual([0.8, 0.8]);
+  });
+
+  test('a KTX2 normal map has its vertical scale negated after the strength, because its texture axis is reversed', () => {
+    const ktx2 = asKtx2(draw(TINTABLE_SCAN));
+    const weave = createLibraryMaterial(ktx2);
+    attachLibraryMaps(weave, ktx2, { normal: view() });
+    expect([weave.normalScale.x, weave.normalScale.y]).toEqual([0.8, -0.8]);
+  });
+
+  test('a KTX2 albedoTint gets exactly the colour factor and first-frame colour of a WebP one', () => {
+    const webp = draw(TINTABLE_SCAN, '#ff0000');
+    const ktx2 = asKtx2(webp);
+    const [first, firstKtx2] = [createLibraryMaterial(webp), createLibraryMaterial(ktx2)];
+    expect(hexOf(firstKtx2)).toBe(hexOf(first));
+    attachLibraryMaps(first, webp, { albedoTint: view() });
+    attachLibraryMaps(firstKtx2, ktx2, { albedoTint: view() });
+    expect(firstKtx2.color.equals(first.color)).toBe(true);
   });
 
   test('attaching nothing new changes nothing', () => {
