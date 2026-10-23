@@ -25,7 +25,7 @@ export { FetchSceneRepository, InlineSceneRepository } from '../scene/scene-repo
 export { SceneValidationError, ViewerLibError, isViewerLibError } from '../shared/errors.js';
 export { checkCompleteness } from '../scene/completeness.js';
 export type { CompletenessRule } from '../scene/completeness.js';
-export type { SceneReport, SceneReportEntry, SceneReportSeverity } from '../scene/types.js';
+export type { SceneReport, SceneReportEntry, SceneReportSeverity } from '../scene/scene-report.js';
 export { SHELL_PARTS, THEME_PROPERTIES } from '../ui/viewer-shell.js';
 // `MissingSlotError` alongside the names: `ViewerSlots.get` is documented to
 // throw it, and a host cannot key on a class this barrel does not publish —

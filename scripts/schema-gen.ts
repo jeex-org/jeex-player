@@ -162,6 +162,7 @@ export function generateSchema(target: SchemaTarget, version: string = packageVe
     forbidSiteBeforeItsVersion(schema, target.type);
     annotateFinishValues(schema);
     forbidLibraryFinishesBeforeTheirVersion(schema, target.type);
+    requireSetSiteField(schema);
   }
   return schema;
 }
@@ -261,6 +262,24 @@ function forbidLibraryFinishesBeforeTheirVersion(schema: Record<string, unknown>
         },
       },
     },
+  ];
+}
+
+/**
+ * A FOURTH post-generation step: `set_site` carries `northDeg` or `sun`, at
+ * least one of them. Both are optional in the type, which cannot say «at
+ * least one», so this writes the rule the Zod twin judges with
+ * (`types.schema.ts`, the `set_site` refinement) onto `definitions.SetSiteOp`.
+ * The scene schema reaches the op through `InteriorPreset.ops`; the viewer
+ * options schema has no such definition and is left alone.
+ */
+function requireSetSiteField(schema: Record<string, unknown>): void {
+  const definitions = schema['definitions'] as Record<string, SchemaNode> | undefined;
+  const definition = definitions?.['SetSiteOp'];
+  if (definition === undefined) return;
+  definition['anyOf'] = [
+    { properties: { northDeg: {} }, required: ['northDeg'] },
+    { properties: { sun: {} }, required: ['sun'] },
   ];
 }
 

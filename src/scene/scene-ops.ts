@@ -39,6 +39,7 @@ import type {
   SetMaterialSurfaceOp,
   SetMaterialTargetOp,
 } from './types.js';
+import { applySetSite } from './ops/site.js';
 import { faceKey, isFaceKey, sameFace } from './types.js';
 import { finishMaterialOf, finishRefProblem } from './finish-value.js';
 import {
@@ -100,6 +101,7 @@ export {
   OpError,
   TOUCHED_FACADE,
   TOUCHED_SHELL,
+  TOUCHED_SITE,
   faceText,
   isTouchedAsset,
   isTouchedOpening,
@@ -301,6 +303,8 @@ function dispatchOp(scene: Draft<SceneData>, op: SceneOp, registries: SceneRegis
       return applyRemoveWall(scene, op);
     case 'split_wall':
       return applySplitWall(scene, op);
+    case 'set_site':
+      return applySetSite(scene, op);
     default: {
       const unknown = op as { op?: unknown };
       throw new OpError(`Unknown operation ${String(unknown.op)}`);

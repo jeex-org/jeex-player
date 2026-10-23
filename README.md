@@ -34,6 +34,7 @@ This document is the integration reference.
 - [Scene document](#scene-document)
 - [Project format](#project-format)
 - [Scene operations entry (`jeex-viewer/ops`)](#scene-operations-entry-jeex-viewerops)
+- [Rendering in walk and tour](#rendering-in-walk-and-tour)
 - [Lighting standard (`jeex-viewer/lighting`)](#lighting-standard-jeex-viewerlighting)
 - [Development](#development)
 
@@ -769,8 +770,8 @@ Rules the validator enforces:
 - Words stay words: `set_material` aliases (`floors`, `walls`, `facade`), furniture `type` words (`'sofa'`), slot names, kinds. The built-in bank's own library id (`starter:interior-v1`) is code vocabulary and never appears in a document.
 - `Opening.center` is measured along the wall centreline from node `a`. Omitted `sill`/`head` mean the defaults for the kind (window 0.9 / 2.2, door 0 / 2.1); `head` must stay 0.05 m under the ceiling.
 - Finish UUIDs resolve through the built-in catalogue; `materials` only adds or overrides.
-- `site` (schema 2.3 only) ties the sun to the plan. `northDeg` is the world azimuth of true north, in degrees clockwise seen from above, from `+Z` towards `+X`, read modulo 360 (absent: 0); `sun` is a preset (absent: `noon`). The presets are artistic, northern hemisphere, not astronomical: `morning` shines from 90° (east of north) at 20° elevation, `noon` from 180° at 55°, `evening` from 270° at 20°. The sun's world azimuth is `northDeg + preset azimuth`. A document without `site` keeps the sun of earlier versions. `site` is a strict object: any other key (`north_deg`), a `northDeg` that is not a finite number or another `sun` is refused as `site-invalid` naming the field, and so is `site` in a 2.2 document.
-- An interior preset dresses what exists: it may not carry an operation that creates an entity (`add_node`, `add_wall`, `split_wall`, `add_room`, `add_opening`, `place_object`).
+- `site` (schema 2.3 only) ties the sun to the plan. `northDeg` is the world azimuth of true north, in degrees clockwise seen from above, from `+Z` towards `+X`, read modulo 360 (absent: 0); `sun` is a preset (absent: `noon`). The presets are artistic, northern hemisphere, not astronomical: `morning` shines from 90° (east of north) at 20° elevation, `noon` from 180° at 55°, `evening` from 270° at 20°. The sun's world azimuth is `northDeg + preset azimuth`. A document without `site` keeps the sun of earlier versions. An editor writes `site` with the `set_site` operation (below), which never leaves an empty `site` behind. `site` is a strict object: any other key (`north_deg`), a `northDeg` that is not a finite number or another `sun` is refused as `site-invalid` naming the field, and so is `site` in a 2.2 document.
+- An interior preset dresses what exists: it may not carry an operation that creates an entity (`add_node`, `add_wall`, `split_wall`, `add_room`, `add_opening`, `place_object`), and it may not change the orientation (`set_site`, refused as `interior-preset-op-site`).
 
 ### Scene finishes
 
@@ -1031,7 +1032,7 @@ if (!isApplyOk(result)) console.error(result.error, result.message, result.issue
 
 The full export list:
 
-- **Op vocabulary** — `applyOp`, `OpError`, `floorFinishOf`, `roomWallFinishOf`, `facadeFinishOf`, `faceFinishOf`, `TOUCHED_SHELL`, `TOUCHED_FACADE`, `isTouchedAsset` (types: `OpOutcome`, `TouchedEntity` — what an op touched, as `{ kind, … }` with faces as `FaceKey` — `SceneOp`, `InteriorPreset`, plus every member of the union by its own name — `SetRoomOp`, `PlaceObjectOp`, … — so an editor panel can be typed to one operation). The twenty-seven operations:
+- **Op vocabulary** — `applyOp`, `OpError`, `floorFinishOf`, `roomWallFinishOf`, `facadeFinishOf`, `faceFinishOf`, `TOUCHED_SHELL`, `TOUCHED_FACADE`, `isTouchedAsset` (types: `OpOutcome`, `TouchedEntity` — what an op touched, as `{ kind, … }` with faces as `FaceKey` — `SceneOp`, `InteriorPreset`, plus every member of the union by its own name — `SetRoomOp`, `PlaceObjectOp`, … — so an editor panel can be typed to one operation). The twenty-eight operations:
 
 | Operation | What it does |
 |---|---|
@@ -1062,6 +1063,7 @@ The full export list:
 | `set_navigation` | Replaces the walk-mode waypoints wholesale. |
 | `set_autotour` | Updates the tour's `path`, `gaze`, `zones` and `speed` (clamped into `TOUR_SPEED`); every `at` has to index the effective path. |
 | `set_tour_checkpoints` | Replaces the tour cameras wholesale, in tour order (each `{ id, position, yaw, pitch, name? }`, ids from the caller); an empty list falls back to the authored `autotour`. |
+| `set_site` | Schema 2.3: sets or clears the plan's orientation and sun preset (`{ northDeg?: number \| null, sun?: 'morning' \| 'noon' \| 'evening' \| null }`, at least one key). A value sets the field, `null` clears it, an omitted key keeps it; `northDeg` is stored normalised to [0, 360). Clearing both removes `site`, so the sun returns to that of documents without orientation. Refused on a 2.2 document (the version is never raised by an operation) and inside interior presets. Touches `site`: the live sun is re-aimed and its shadow refitted, nothing is rebuilt. |
 
 `set_material` has two forms, told apart by their key; an operation carrying both `surface` and `target` is refused.
 
@@ -1091,6 +1093,15 @@ Every operation is atomic inside its batch: `applyOp` mutates a draft and answer
 - **Identifiers** — `UUID_V7_PATTERN` and `isUuidV7` (the validator's own check; the entry exports no generator), `faceKey`, `sameFace`, `isFaceKey` (types `FaceKey`, `FaceFinish`, `FinishRef`, `SetMaterialAlias`, `SetMaterialSurfaceOp`, `TopologyRemap`, `TopologyRemapEntry`, and `NewIdRefusal`: the `OpError.detail.reason` a creating op refuses an id with, `invalid_id` or `duplicate_id`), and `CATALOGUE_ID_BY_SLUG` (types `CatalogueIdBySlug`, `CatalogueSlugTable`), the shipped catalogue's readable slug → UUID table.
 
 A name not on this list is not public, whatever module it lives in — the same façade rule every other library entry follows (`src/embed/ops.test.ts` pins the export surface, sorted, against exactly this list). Nothing above renders anything or touches a document: `src/purity.test.ts` and `.dependency-cruiser.cjs` hold `embed/ops.ts` to the same "no `three`, no DOM" invariant as the rest of the pure layer.
+
+## Rendering in walk and tour
+
+In `walk` and `tour`, the modes where a visitor looks around and nothing is edited, the player renders through a post-processing chain: ambient occlusion (three.js `GTAOPass`, 0.3 m world radius, full resolution, denoised without blurring across depth breaks) darkens corners, skirtings and the ground under furniture, and SMAA smooths the edges. The scene is rendered in linear high dynamic range and the lighting standard's display transform (PBR Neutral, exposure, sRGB) is applied once, in the chain's last pass. Window glass, other transparent or transmissive surfaces and invisible pick shapes cast no occlusion. `plan2d`, `plan3d` and `orbit` render straight to the screen exactly as before, and pay nothing for the chain.
+
+- **Loading:** the chain is fetched on the first entry into `walk` or `tour`. The ES module build and the demo emit it as a separate chunk of about 50 KB gzip that a page which never enters those modes never downloads; until it arrives the view renders as in the other modes. The classic-script build (`jeex-viewer.iife.js`) cannot split code and carries it inline. A chunk that fails to load leaves the view rendering directly and emits one `error` event; the next entry into `walk` or `tour` tries again.
+- **Captures:** stills and video frames (`capture.still`, `capture.pair`, `capture.frames`) taken while the viewer is in `walk` or `tour` go through the same chain at the capture's size, so they match the screen; two captures of an unchanged scene are identical. Panoramas are rendered as before, without it.
+- **Mirrors** reflect the room once per frame, with or without the chain.
+- **Resources:** the chain follows the viewer's size and pixel ratio, is kept while you switch to an editing mode and back, is rebuilt after a lost GPU context and releases all its GPU memory when the viewer is disposed.
 
 ## Lighting standard (`jeex-viewer/lighting`)
 
@@ -1122,7 +1133,7 @@ lighting.dispose(); // disposes its rigs and the environment; never your rendere
 - **Version:** `LIGHTING_STANDARD_VERSION` (now 1) rises with every intentional change of the look; put it into the cache key of any preview you store. `LIGHTING_STANDARD` describes the standard as frozen data.
 - **Lost GPU context:** the entry installs no listeners. Stop rendering on `webglcontextlost`; on `webglcontextrestored`, dispose the old context and create a new one and new rigs for your scenes (a regenerated environment cannot be recovered from the old one).
 - **Your content's own lights** (a lamp model with a point light) are left as they are.
-- **Captures:** a still or a panorama applies the display transform to the whole frame, while the live view leaves a background texture, fog and content marked as not tone mapped out of it; lit surfaces agree between the two.
+- **Captures:** a still or a panorama applies the display transform to the whole frame, and so does the live view in `walk` and `tour` (see «Rendering in walk and tour»), while the live view of the editing modes leaves a background texture, fog and content marked as not tone mapped out of it; lit surfaces agree between them.
 
 ## Development
 

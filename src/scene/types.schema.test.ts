@@ -1024,6 +1024,12 @@ const RULE_CASES: readonly RuleCase[] = [
       ),
   },
   {
+    // Orientation is not decoration: a preset may not turn the plan or change its sun.
+    rule: 'interior-preset-op-site',
+    kind: 'semantic',
+    document: () => brokenScene((scene) => put(scene, 'interiors', [{ ...soundPreset(), ops: [{ op: 'set_site', sun: 'evening' }] }])),
+  },
+  {
     rule: 'interior-preset-op-failed',
     kind: 'semantic',
     document: () =>
@@ -1183,5 +1189,52 @@ describe('the shell operations pass the op schema', () => {
     expect(z.safeParse(sceneOpSchema, { op: 'add_node', id: 'n9', p: { x: 1, z: 2 } }).success).toBe(false);
     expect(z.safeParse(sceneOpSchema, { op: 'add_wall', a: NODE.n1, b: NODE.n2, thickness: 0.2 }).success).toBe(false);
     expect(z.safeParse(sceneOpSchema, { op: 'remove_wall', wallId: 'w-part' }).success).toBe(false);
+  });
+});
+
+/* ------------------------------------------------------------ set_site --- */
+
+describe('set_site in the op schema', () => {
+  const issues = (op: unknown): string[] => sceneOpsIssues([op]).map((issue) => issue.message);
+
+  test('a value, a null and either key alone parse', () => {
+    const ops: SceneOp[] = [
+      { op: 'set_site', northDeg: -90, sun: 'evening' },
+      { op: 'set_site', northDeg: null },
+      { op: 'set_site', sun: null },
+      { op: 'set_site', sun: 'morning' },
+      { op: 'set_site', northDeg: 720, sun: null },
+    ];
+    expect(sceneOpsIssues(ops)).toEqual([]);
+  });
+
+  test('an operation with neither key is refused', () => {
+    expect(issues({ op: 'set_site' })).toEqual(['set_site needs northDeg or sun']);
+  });
+
+  test('a bad value is refused naming its field', () => {
+    for (const northDeg of [Number.NaN, Number.POSITIVE_INFINITY, Number.NEGATIVE_INFINITY, '90']) {
+      expect(issues({ op: 'set_site', northDeg })).toEqual(['set_site northDeg must be a finite number or null']);
+    }
+    expect(issues({ op: 'set_site', sun: 'night' })).toEqual(["set_site sun must be 'morning', 'noon', 'evening' or null"]);
+  });
+
+  test('an unknown key is refused: a misspelt field would orient nothing', () => {
+    expect(issues({ op: 'set_site', north_deg: 90 })).toContain('set_site carries an unknown key: north_deg');
+  });
+});
+
+describe('set_site inside an interior preset', () => {
+  test('is refused once, as interior-preset-op-site, before any dry run could refuse it again on a 2.2 document', () => {
+    const scene = brokenScene((draft) => put(draft, 'interiors', [{ ...soundPreset(), ops: [{ op: 'set_site', sun: 'evening' }] }]));
+    const refusals: unknown[] = [];
+    try {
+      validateScene(scene, CATALOGUE_REGISTRIES);
+    } catch (error) {
+      refusals.push(error);
+    }
+    expect(refusals).toHaveLength(1);
+    expect(refusals[0]).toBeInstanceOf(SceneValidationError);
+    expect((refusals[0] as SceneValidationError).rule).toBe('interior-preset-op-site');
   });
 });

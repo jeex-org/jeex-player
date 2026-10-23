@@ -15,6 +15,7 @@ import {
   HOST_BUDGET_FAIL_BYTES,
   LAZY_CHUNK_FAIL_BYTES,
   LAZY_CHUNK_PREFIX,
+  LAZY_LIMITS,
   OPS_BUDGET_FAIL_BYTES,
   LIGHTING_BUDGET_FAIL_BYTES,
   checkBudget,
@@ -48,6 +49,8 @@ describe('constants', () => {
     expect(HOST_BUDGET_FAIL_BYTES).toBe(4 * 1024);
     expect(LAZY_CHUNK_FAIL_BYTES).toBe(256 * 1024);
     expect(LAZY_CHUNK_PREFIX).toBe('lazy-');
+    // The walk and tour chain: its last measured size plus 1 KB.
+    expect(LAZY_LIMITS).toEqual({ 'lazy-jeex-viewer-walk-post': 50_747 + 1024 });
     expect(formatBytes(700 * 1024)).toBe('700.0 KB');
   });
 
@@ -58,7 +61,7 @@ describe('constants', () => {
   });
 
   test('the ops entry keeps a budget of its own, distinct from the unrelated opening-frame chunk', () => {
-    expect(OPS_BUDGET_FAIL_BYTES).toBe(78 * 1024 + 818);
+    expect(OPS_BUDGET_FAIL_BYTES).toBe(81_035 + 1024);
     expect(limitFor('jeex-viewer-ops.js')).toBe(OPS_BUDGET_FAIL_BYTES);
     // `dist-lib/` also carries `jeex-viewer-opening-frame-<hash>.js`, an `es`
     // build chunk that shares the `jeex-viewer-op` prefix with the ops entry

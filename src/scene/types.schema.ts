@@ -495,7 +495,24 @@ export const sceneOpSchema = z.discriminatedUnion('op', [
     at: z.number(),
     nodeId: uuidSchema,
     ids: z.tuple([uuidSchema, uuidSchema]),
-  }),
+  }), // Strict like `site` itself, and every refusal names its field; the
+  // applier (`scene/ops/site.ts`) repeats the checks for a caller that
+  // skipped this schema.
+  z
+    .strictObject(
+      {
+        op: z.literal('set_site'),
+        northDeg: z.optional(z.nullable(z.number({ error: 'set_site northDeg must be a finite number or null' }))),
+        sun: z.optional(
+          z.nullable(z.enum(['morning', 'noon', 'evening'], { error: "set_site sun must be 'morning', 'noon', 'evening' or null" })),
+        ),
+      },
+      {
+        error: (issue) =>
+          issue.code === 'unrecognized_keys' ? `set_site carries an unknown key: ${issue.keys.join(', ')}` : 'set_site must be an object',
+      },
+    )
+    .check(z.refine((op) => op.northDeg !== undefined || op.sun !== undefined, { error: 'set_site needs northDeg or sun' })),
 ]);
 
 const interiorPresetSchema = z.object({

@@ -37,6 +37,7 @@ import {
   type ProjectLibrary,
   type SceneOp,
   type SetRoomOp,
+  type SetSiteOp,
 } from './ops.js';
 
 /** A project library's own ids, as its bake minted them. */
@@ -62,6 +63,14 @@ describe('jeex-viewer/ops entry', () => {
     expect(result.rev).toBe(baseRev + 1);
     expect(model.rev).toBe(baseRev + 1);
     expect(model.scene.ceilingHeight).toBe(nextHeight);
+  });
+
+  test('a set_site op typed through the entry orients a 2.3 document', () => {
+    const model = new SceneModel({ ...apartmentScene, schemaVersion: '2.3' }, CATALOGUE_REGISTRIES);
+    const orient: SetSiteOp = { op: 'set_site', northDeg: 400, sun: 'morning' };
+    const result = model.apply({ baseRev: model.rev, ops: [orient] });
+    if (!isApplyOk(result)) throw new Error(`expected the op to be accepted, got ${JSON.stringify(result)}`);
+    expect(model.scene.site).toEqual({ northDeg: 40, sun: 'morning' });
   });
 
   test('applyOp mutates a draft directly, the low-level half of the same vocabulary', () => {

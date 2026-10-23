@@ -55,6 +55,12 @@ export function checkInteriorPresets(ctx: ValidationContext): void {
     }
     for (const [opIndex, op] of preset.ops.entries()) {
       const name: unknown = (op as { op?: unknown } | null)?.op;
+      // Orientation is not decoration: a preset dresses the flat, it never turns it or moves its sun.
+      if (name === 'set_site') {
+        ctx.fail('interior-preset-op-site', `${path}.ops[${opIndex}]`, `Interior preset ${id} may not change the site (set_site)`, {
+          op: name,
+        });
+      }
       if (typeof name === 'string' && CREATING_OPS.has(name)) {
         ctx.fail('interior-preset-op-creates', `${path}.ops[${opIndex}]`, `Interior preset ${id} may not create entities (${name})`, {
           op: name,

@@ -83,7 +83,8 @@ export type TouchedEntity =
   | { readonly kind: 'camera'; readonly target: SetCameraTarget }
   | { readonly kind: 'navigation' }
   | { readonly kind: 'autotour' }
-  | { readonly kind: 'tourCheckpoints' };
+  | { readonly kind: 'tourCheckpoints' }
+  | { readonly kind: 'site' };
 
 /** The facade's finish changed. */
 export const TOUCHED_FACADE: TouchedEntity = Object.freeze({ kind: 'facade' });
@@ -92,6 +93,8 @@ export const TOUCHED_SHELL: TouchedEntity = Object.freeze({ kind: 'shell' });
 export const TOUCHED_NAVIGATION: TouchedEntity = Object.freeze({ kind: 'navigation' });
 export const TOUCHED_AUTOTOUR: TouchedEntity = Object.freeze({ kind: 'autotour' });
 export const TOUCHED_TOUR_CHECKPOINTS: TouchedEntity = Object.freeze({ kind: 'tourCheckpoints' });
+/** The plan's orientation or sun preset (`site`) changed: the sun is re-aimed, nothing is rebuilt. */
+export const TOUCHED_SITE: TouchedEntity = Object.freeze({ kind: 'site' });
 
 export const touchedFloor = (room: string): TouchedEntity => ({ kind: 'floor', room });
 export const touchedRoomWalls = (room: string): TouchedEntity => ({ kind: 'walls', room });
@@ -136,6 +139,7 @@ export function sameTouched(a: TouchedEntity, b: TouchedEntity): boolean {
     case 'navigation':
     case 'autotour':
     case 'tourCheckpoints':
+    case 'site':
       return b.kind === a.kind;
   }
 }

@@ -53,6 +53,7 @@ import type { SceneState } from '../render/offscreen-scene.js';
 import type { SceneModel } from '../scene/scene-model.js';
 import { isTourSpeed, TOUR_SPEEDS, type TourPlayer, type TourSpeed, type TourState } from '../camera/tour-player.js';
 import type { CameraPose } from '../scene/types.js';
+import type { PostProcessor } from '../render/post-processor.js';
 import type * as THREE from 'three';
 
 /**
@@ -116,6 +117,8 @@ export type FrameCaptureDeps = {
   withRoot: <T>(take: (root: THREE.Object3D) => Promise<T>) => Promise<T>;
   /** The disclosure caption text for one artefact, or `null` when none is wanted. */
   captionFor: (wanted: boolean | undefined) => string | null;
+  /** The live walk and tour chain every frame renders through, like a still; absent or `null` for the direct path. */
+  post?: PostProcessor | null | undefined;
 };
 
 /** Pixel size for `height` at `aspect`, validated the way every capture edge is (`still-capture.ts`). */
@@ -194,7 +197,7 @@ export async function captureFrames(deps: FrameCaptureDeps, request: FramesReque
         deps.tour.seekTime(timeS);
         const pose = deps.livePose();
         if (pose === null) throw new ViewerLibError('not-ready', 'capture: the live camera does not exist yet');
-        const shot = await captureStill(deps.runtime.renderer, root, { width, height, pose });
+        const shot = await captureStill(deps.runtime.renderer, root, { width, height, pose, post: deps.post });
         const blob = text === null ? shot.blob : await stampCaption(shot.blob, text, Math.max(1, shot.width / CAPTION_REFERENCE_PX));
         provenance ??= provenanceFor(deps.model.scene, deps.model.rev, 'frame', state, { camera: pose });
         await request.onFrame({ index, timeS, blob });
