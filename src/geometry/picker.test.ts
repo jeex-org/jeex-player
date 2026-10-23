@@ -12,6 +12,7 @@
 import { describe, expect, test } from 'bun:test';
 import * as THREE from 'three';
 import { Picker, visibleThroughHierarchy } from './picker.js';
+import { SHADOW_ONLY_LAYER } from '../shared/render-layers.js';
 import { GLOW_GROUP_NAME } from './selection-glow.js';
 import { faceKey, type FaceKey } from '../scene/types.js';
 
@@ -175,6 +176,18 @@ describe('pickSurface', () => {
     const root = scene(near, far);
     const picker = new Picker(canvas());
     picker.register(root);
+    expect(picker.pickSurface(CENTRE.x, CENTRE.y, camera())?.face).toEqual(LIVING_W2);
+  });
+
+  test('a wall the dollhouse cut away (off layer 0, on the shadow-only layer) lets the pick through', () => {
+    const near = wallQuad(2, KITCHEN_W1);
+    near.layers.enable(SHADOW_ONLY_LAYER);
+    near.layers.disable(0);
+    const far = wallQuad(0, LIVING_W2);
+    const root = scene(near, far);
+    const picker = new Picker(canvas());
+    picker.register(root);
+    expect(near.visible).toBe(true);
     expect(picker.pickSurface(CENTRE.x, CENTRE.y, camera())?.face).toEqual(LIVING_W2);
   });
 

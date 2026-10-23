@@ -5,6 +5,7 @@ import { solvePlan } from '../plan/plan-solver.js';
 import { lShapePlan } from '../fixtures/plan-l-shape.js';
 import { metadataTable } from '../scene/metadata-table.js';
 import { exportGraph } from './export-graph.js';
+import { buildCeilingCasters } from '../geometry/ceiling-casters.js';
 import { faceKey, isFaceKey, sameFace, type FaceKey } from '../scene/types.js';
 
 /** A fresh, throwaway build of the fixture plan, the way an export snapshots one. */
@@ -204,6 +205,25 @@ describe('exportGraph', () => {
       });
       expect(sawCeiling).toBe(true);
     } finally {
+      builder.dispose();
+    }
+  });
+
+  test('shadow-only casters never reach an export', () => {
+    const { root, builder } = buildFixture();
+    const plan = solvePlan(lShapePlan);
+    const casters = buildCeilingCasters(lShapePlan, plan);
+    try {
+      root.add(casters.group);
+      const clone = exportGraph(root, metadataTable(lShapePlan, plan));
+      let shadowOnly = 0;
+      clone.traverse((object) => {
+        if (object.userData['shadowOnly'] === true) shadowOnly += 1;
+      });
+      expect(shadowOnly).toBe(0);
+      expect(casters.group.children.length).toBeGreaterThan(0);
+    } finally {
+      casters.dispose();
       builder.dispose();
     }
   });

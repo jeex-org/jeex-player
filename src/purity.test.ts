@@ -129,6 +129,7 @@ const PURE_MODULES = [
   'embed/protocol',
   'embed/ops',
   'shared/sha1',
+  'shared/render-layers',
   'shared/uuid',
   'scene/guid',
   'scene/finish-remap',
@@ -149,6 +150,8 @@ const PURE_MODULES = [
   'lighting/lighting-standard',
   'lighting/environment-recipe',
   'lighting/lighting-three',
+  'lighting/shadow-fit',
+  'lighting/sun-direction',
   ...SCHEMA_MODULES,
 ];
 

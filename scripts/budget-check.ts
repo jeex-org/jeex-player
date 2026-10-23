@@ -75,13 +75,14 @@ export const OPS_BUDGET_FAIL_BYTES = 74 * 1024 + 418;
  * code and the `zod/mini` schema of the rig options — the last of which is
  * most of the bytes.
  *
- * The gate is the last measured size of `jeex-viewer-lighting.js` (9,750 gzip
- * bytes, 9.5 KB, from `measureBundle('dist-lib')` right after
- * `bun run build:lib`) plus 1 KB. A three.js that slipped into the entry would
- * be two orders of magnitude over it; `scripts/lighting-entry-check.ts` is
- * the gate that says so by name.
+ * The gate is the last measured size of `jeex-viewer-lighting.js` (11,743
+ * gzip bytes, 11.5 KB, from `measureBundle('dist-lib')` right after
+ * `bun run build:lib`, once the entry gained the sun direction, the shadow
+ * frustum fit and the controllable apartment rig; 9,750 before) plus 1 KB. A
+ * three.js that slipped into the entry would be two orders of magnitude over
+ * it; `scripts/lighting-entry-check.ts` is the gate that says so by name.
  */
-export const LIGHTING_BUDGET_FAIL_BYTES = 10 * 1024 + 534;
+export const LIGHTING_BUDGET_FAIL_BYTES = 11_743 + 1024;
 
 /** File-name prefix of the host helper's bundles (`vite.lib.config.ts`). */
 const HOST_BUNDLE_PREFIX = 'jeex-viewer-host';

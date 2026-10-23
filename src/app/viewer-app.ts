@@ -218,7 +218,7 @@ export class ViewerApp {
       usage: this.usage,
     });
     this.mount = new SceneMount({
-      scene: () => this.stage?.runtime.scene,
+      runtime: () => this.stage?.runtime,
       picker: this.picker,
       dollhouse: this.dollhouse,
       animator: this.animator,

@@ -101,11 +101,21 @@ function cloneNode(source: THREE.Object3D, index: RowIndex): THREE.Object3D {
   return clone;
 }
 
-/** Recursively clones `source`, dropping pick-proxy helpers and tagging every node a row names. */
+/**
+ * A caster that exists only for the sun's shadow (`geometry/ceiling-casters.ts`):
+ * on the shadow-only layer, never drawn, and not part of the flat. An export
+ * builds its own root and never meets one; a graph that does carry one (a
+ * live root handed in) still leaves it out.
+ */
+function isShadowOnly(object: THREE.Object3D): boolean {
+  return object.userData['shadowOnly'] === true;
+}
+
+/** Recursively clones `source`, dropping pick-proxy helpers and shadow-only casters, and tagging every node a row names. */
 function cloneTree(source: THREE.Object3D, index: RowIndex): THREE.Object3D {
   const clone = cloneNode(source, index);
   for (const child of source.children) {
-    if (isPickProxy(child)) continue;
+    if (isPickProxy(child) || isShadowOnly(child)) continue;
     clone.add(cloneTree(child, index));
   }
   return clone;

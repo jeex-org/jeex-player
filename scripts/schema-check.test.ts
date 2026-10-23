@@ -138,6 +138,13 @@ describe('the Zod schema and the published JSON Schema accept the same documents
     ],
     ['a 1.x document, whose ids are not UUIDs', () => ({ ...draftOf(lShapePlan), schemaVersion: '1.2' })],
     ['a version this build does not read', () => ({ ...draftOf(lShapePlan), schemaVersion: '2.1' })],
+    ['a site in a 2.2 document', () => ({ ...draftOf(lShapePlan), site: { northDeg: 0 } })],
+    ['a site with an unknown key', () => ({ ...draftOf(lShapePlan), schemaVersion: '2.3', site: { north_deg: 30 } })],
+    ['a site north that is a string', () => ({ ...draftOf(lShapePlan), schemaVersion: '2.3', site: { northDeg: '30' } })],
+    ['a site sun that is no preset', () => ({ ...draftOf(lShapePlan), schemaVersion: '2.3', site: { sun: 'night' } })],
+    ['a site that is null', () => ({ ...draftOf(lShapePlan), schemaVersion: '2.3', site: null })],
+    ['a site that is an array', () => ({ ...draftOf(lShapePlan), schemaVersion: '2.3', site: [] })],
+    ['a site that is a number', () => ({ ...draftOf(lShapePlan), schemaVersion: '2.3', site: 5 })],
     [
       'a wall id that is not a UUID v7',
       () => {
@@ -197,6 +204,17 @@ describe('the Zod schema and the published JSON Schema accept the same documents
       },
     ],
   ];
+
+  test('schema 2.3 documents with a site, an empty site or none: both accept them', () => {
+    for (const site of [{ northDeg: 30, sun: 'evening' }, { sun: 'morning' }, {}, undefined]) {
+      const scene = { ...draftOf(lShapePlan), schemaVersion: '2.3', ...(site === undefined ? {} : { site }) };
+      expect({ site, ajv: validateSceneSchema(scene), zod: z.safeParse(sceneSchema, scene).success }).toEqual({
+        site,
+        ajv: true,
+        zod: true,
+      });
+    }
+  });
 
   test('a schema 2.1 placement mirrored on x and z: both accept it', () => {
     const scene = draftOf(apartmentScene);

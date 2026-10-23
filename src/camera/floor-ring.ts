@@ -13,6 +13,7 @@
  */
 
 import * as THREE from 'three';
+import { FLOOR_RING_LAYER } from '../shared/render-layers.js';
 import type { SurfacePick } from '../geometry/picker.js';
 
 /** Ring radii and lift off the floor, metres; the lift keeps it out of z-fighting. */
@@ -25,14 +26,6 @@ const RENDER_ORDER = 10;
 
 /** The name the ring carries in the scene graph, for a debugger reading it. */
 export const FLOOR_RING_NAME = 'jeex-floor-ring';
-
-/**
- * The render layer the ring lives on. Only the viewer's own camera enables it
- * (`app/viewer-stage.ts`): a still, a panorama or any other capture renders
- * the live scene with a camera of its own on layer 0 and never shows the
- * cursor that happened to be under the pointer.
- */
-export const FLOOR_RING_LAYER = 1;
 
 /**
  * Where the ring goes, or `null` for hidden: `floor` is the navigable floor

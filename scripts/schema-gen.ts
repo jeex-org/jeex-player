@@ -66,7 +66,7 @@
  * from `types.ts`, never restated, and `schema-gen.test.ts` proves that every
  * definition with an `id` property is in the table.
  *
- * The THIRD schema is not generated from types at all: the telemetry send
+ * The telemetry schema is not generated from types at all: the telemetry send
  * schema (`src/telemetry/telemetry.schema.ts`) is a Zod schema and the runtime
  * judge of every send, so `generateTelemetrySchema` converts it with Zod's own
  * `toJSONSchema`, which is exact for it (strict objects, enums, patterns,
@@ -158,6 +158,7 @@ export function generateSchema(target: SchemaTarget, version: string = packageVe
   if (target.name === SCENE_SCHEMA_TARGET.name && target.type === SCENE_SCHEMA_TARGET.type) {
     allowPublishedSchemaKey(schema, target.type);
     annotateUuidFields(schema);
+    forbidSiteBeforeItsVersion(schema, target.type);
   }
   return schema;
 }
@@ -176,6 +177,21 @@ function allowPublishedSchemaKey(schema: Record<string, unknown>, typeName: stri
     throw new Error(`schema-gen: expected definitions.${typeName}.properties to exist`);
   }
   properties['$schema'] = { type: 'string' };
+}
+
+/**
+ * A THIRD post-generation step: `site` belongs to schema 2.3, and a 2.2
+ * document must not carry it. A TypeScript type cannot say «this field only
+ * with that version», so the generated `SceneData` accepts `site` beside either
+ * version; this writes the conditional the Zod twin judges with
+ * (`types.schema.ts`, `siteNeedsItsVersion`) onto `definitions[typeName]`:
+ * if `schemaVersion` is `'2.2'`, then `site` is not present.
+ */
+function forbidSiteBeforeItsVersion(schema: Record<string, unknown>, typeName: string): void {
+  const definitions = schema['definitions'] as Record<string, { properties?: Record<string, unknown>; [key: string]: unknown }> | undefined;
+  const definition = definitions?.[typeName];
+  if (definition?.properties?.['site'] === undefined) throw new Error(`schema-gen: expected definitions.${typeName}.properties.site`);
+  definition['not'] = { properties: { schemaVersion: { const: '2.2' }, site: {} }, required: ['schemaVersion', 'site'] };
 }
 
 /**

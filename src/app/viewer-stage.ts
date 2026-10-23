@@ -31,7 +31,7 @@ import { Minimap } from '../ui/minimap.js';
 import { ScrollHint } from '../ui/scroll-hint.js';
 import { cameraMarker } from '../render/viewport-projection.js';
 import { CAMERA_TUNING, FAR_PLANE_M, NEAR_PLANE_M } from '../camera/camera-tuning.js';
-import { FLOOR_RING_LAYER } from '../camera/floor-ring.js';
+import { FLOOR_RING_LAYER } from '../shared/render-layers.js';
 import type { AnchorScene } from './slot-anchor.js';
 import type { Messages } from '../ui/messages.js';
 import type { SceneModel } from '../scene/scene-model.js';

@@ -452,7 +452,7 @@ type CaptureCommands = {
 };
 
 type Provenance = {
-  generator: 'jeex-viewer'; version: string; sceneId: string; rev: number; schemaVersion: '2.2';
+  generator: 'jeex-viewer'; version: string; sceneId: string; rev: number; schemaVersion: '2.2' | '2.3';
   state: 'current' | 'default'; kind: 'still' | 'panorama' | 'plan' | 'frame';
   createdAt: string;                  // ISO 8601
   disclosure: 'rendered-3d';          // a JEEX artefact is a rendering, never a photograph
@@ -722,11 +722,11 @@ The repository ships no server, so the header is a deployment fact, not a runtim
 
 ## Scene document
 
-Schema `2.2`, and only 2.2: a `2.0` or `2.1` document is refused, never converted (2.1 added a placement's `mirror` and made `scale` positive; 2.2 split a placement's catalogue reference into the fields `asset` and `library`, so the earlier `library:asset` string means nothing to this build and its producer rewrites it). The full shape is the published JSON Schema (`dist-lib/schema/scene.schema.json`, written by `bun run build:lib`, imported as `jeex-viewer/schema/scene.json`, see below); the rules it cannot express are listed under it. Minimal shape:
+Schema `2.3` or `2.2`: a `2.0` or `2.1` document is refused, never converted (2.1 added a placement's `mirror` and made `scale` positive; 2.2 split a placement's catalogue reference into the fields `asset` and `library`, so the earlier `library:asset` string means nothing to this build and its producer rewrites it). 2.3 adds the optional `site`; a 2.2 document reads exactly as before and may not carry `site`. The full shape is the published JSON Schema (`dist-lib/schema/scene.schema.json`, written by `bun run build:lib`, imported as `jeex-viewer/schema/scene.json`, see below); the rules it cannot express are listed under it. Minimal shape:
 
 ```ts
 type SceneData = {
-  schemaVersion: '2.2';
+  schemaVersion: '2.3' | '2.2';
   id: string;                          // every id in the document is a UUID v7
   name: string;                        // shown as the brand context line
   ceilingHeight: number;               // metres
@@ -742,6 +742,7 @@ type SceneData = {
   roomCameras: Record<string, { position: Vec3; target: Vec3 }>;   // keyed by room UUID
   navigation: { points: Vec3[] };
   walkSpawn?: { position: Vec3; target: Vec3 };
+  site?: { northDeg?: number; sun?: 'morning' | 'noon' | 'evening' };   // schema 2.3: orientation and sun preset
   autotour: { speed?: number; path: Vec3[]; gaze: TourGazeKey[]; zones?: TourSpeedZone[] };
   finishes?: {                         // painted state; what the viewer exports
     rooms?: Record<string, { floor?: string; walls?: string }>;   // keyed by room UUID
@@ -766,6 +767,7 @@ Rules the validator enforces:
 - Words stay words: `set_material` aliases (`floors`, `walls`, `facade`), furniture `type` words (`'sofa'`), slot names, kinds. The built-in bank's own library id (`starter:interior-v1`) is code vocabulary and never appears in a document.
 - `Opening.center` is measured along the wall centreline from node `a`. Omitted `sill`/`head` mean the defaults for the kind (window 0.9 / 2.2, door 0 / 2.1); `head` must stay 0.05 m under the ceiling.
 - Finish UUIDs resolve through the built-in catalogue; `materials` only adds or overrides.
+- `site` (schema 2.3 only) ties the sun to the plan. `northDeg` is the world azimuth of true north, in degrees clockwise seen from above, from `+Z` towards `+X`, read modulo 360 (absent: 0); `sun` is a preset (absent: `noon`). The presets are artistic, northern hemisphere, not astronomical: `morning` shines from 90° (east of north) at 20° elevation, `noon` from 180° at 55°, `evening` from 270° at 20°. The sun's world azimuth is `northDeg + preset azimuth`. A document without `site` keeps the sun of earlier versions. `site` is a strict object: any other key (`north_deg`), a `northDeg` that is not a finite number or another `sun` is refused as `site-invalid` naming the field, and so is `site` in a 2.2 document.
 - An interior preset dresses what exists: it may not carry an operation that creates an entity (`add_node`, `add_wall`, `split_wall`, `add_room`, `add_opening`, `place_object`).
 
 The demo document `src/demo/scene-data.ts` (an invented two-bedroom flat with a study: nine rooms, a curved bay and a loggia, furnished throughout) exercises every feature and is the reference for authoring.
@@ -1023,8 +1025,9 @@ rig.detach(); // restores what the scene had, unless you changed it meanwhile
 lighting.dispose(); // disposes its rigs and the environment; never your renderer, scenes or materials
 ```
 
-- **Errors:** `LightingError` with `code`: `engine-revision` (three.js other than r186), `colour-management` (three's colour management off or a working space other than linear sRGB; the standard never changes those globals), `bad-options` (a shadow map size that is not a power of two from 256 to 4096, or an unknown option), `rig-attached` (a rig already on another scene), `scene-has-rig` (a scene already carrying another rig), `disposed`.
+- **Errors:** `LightingError` with `code`: `engine-revision` (three.js other than r186), `colour-management` (three's colour management off or a working space other than linear sRGB; the standard never changes those globals), `bad-options` (a shadow map size that is not a power of two from 256 to 4096, a `shadowCache` that is not a boolean, an unknown option, or a refused sun direction or frustum), `rig-attached` (a rig already on another scene), `scene-has-rig` (a scene already carrying another rig), `disposed`.
 - **One rig per scene:** attaching the same rig again does nothing; detaching a rig that is not attached does nothing.
+- **The apartment sun:** `createApartmentRig({ shadowMapSize?, shadowCache? })` returns an `ApartmentRig`. `rig.shadowMapSize` is the map size actually allocated (lowered to the renderer's maximum). `rig.setSunDirection(direction)` aims the sun (`direction` points from the scene towards the sun and must point upwards); `rig.setShadowFrustum(fit)` puts the sun, its target, the shadow camera's up vector and planes and both biases where a fit says. `fitShadowFrustum(boxes, direction, mapSize)` fits an orthographic frustum to world boxes (`{ min, max }` triples) with the standard's padding and bias rules; `sunDirection({ northDeg?, sun? })` turns an orientation into a direction and its world azimuth and elevation (`sunDirection()` is the default direction, `LEGACY_SUN_DIRECTION`). With `shadowCache: true` the sun's shadow map is drawn on the first render and afterwards only after `rig.markShadowDirty()` or a setter; without it (the default) the map is redrawn on every render, as for any light. `rig.shadowDraws` counts the draws. A zero, non-finite or downward direction, or a frustum with a non-finite or empty extent, is refused as `bad-options` and changes nothing.
 - **Version:** `LIGHTING_STANDARD_VERSION` (now 1) rises with every intentional change of the look; put it into the cache key of any preview you store. `LIGHTING_STANDARD` describes the standard as frozen data.
 - **Lost GPU context:** the entry installs no listeners. Stop rendering on `webglcontextlost`; on `webglcontextrestored`, dispose the old context and create a new one and new rigs for your scenes (a regenerated environment cannot be recovered from the old one).
 - **Your content's own lights** (a lamp model with a point light) are left as they are.

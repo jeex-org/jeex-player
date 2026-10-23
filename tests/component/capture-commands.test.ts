@@ -213,7 +213,7 @@ describe('the «as is» lighting', () => {
     await capture.still({ width: 64, height: 64, state: 'default' });
     expect(seen).toHaveLength(1);
     const [record] = seen;
-    expect(record!.options).toEqual({ shadowMapSize: runtime.shadowMapSize });
+    expect(record!.options).toEqual({ shadowMapSize: runtime.shadowMapSize, shadowCache: true });
     expect(record!.scene).not.toBe(runtime.scene);
     // Sky, sun, fill — the live scene's own values — and only the sun casts.
     expect([record!.lights, record!.shadows]).toEqual([3, 1]);

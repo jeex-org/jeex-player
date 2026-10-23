@@ -67,6 +67,8 @@ export class DoorAnimator {
   private readonly deps: DoorAnimatorDeps;
   private readonly forward = new THREE.Vector3();
   private readonly position = new THREE.Vector3();
+  /** Whether a leaf moved since the last `takeMoved`. */
+  private moved = false;
 
   constructor(deps: DoorAnimatorDeps) {
     this.deps = deps;
@@ -122,6 +124,14 @@ export class DoorAnimator {
     if (!group) return;
     const t = this.deps.states.get(openingId)?.t ?? 1;
     for (const leaf of doorLeavesOf(group)) applyToLeaf(leaf, t);
+    this.moved = true;
+  }
+
+  /** Whether any leaf was put somewhere since the last call (every frame of a motion and its final pose). */
+  takeMoved(): boolean {
+    const moved = this.moved;
+    this.moved = false;
+    return moved;
   }
 
   /**
