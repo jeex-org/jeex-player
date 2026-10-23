@@ -123,6 +123,8 @@ describe('the chain over a small room', () => {
     const chain = await chainOn(gl, scene, camera);
     chain.render(scene, camera, 0);
     const processed = { corner: grey(pixel(gl, corner.x, corner.y)), open: pixel(gl, open.x, open.y) };
+    // A black frame here once read as 0/0 when three browser files ran together: name the context's state if it recurs.
+    expect({ contextLost: gl.getContext().isContextLost(), open: grey(processed.open) > 0 }).toEqual({ contextLost: false, open: true });
 
     expect(processed.corner / grey(processed.open)).toBeLessThan(direct.corner / grey(direct.open) - 0.05);
     for (let channel = 0; channel < 3; channel += 1) {
