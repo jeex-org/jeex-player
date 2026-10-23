@@ -13,12 +13,12 @@
  *
  * - geometry and the computed values that make the look, element by element,
  *   read in ONE synchronous pass per state (no timer can fire in between);
- * - the pixels of the viewer box with the scene canvas masked, at the chrome
- *   tolerance of every other chrome baseline (`CHROME_DIFF_RATIO`).
+ * - the pixels of the viewer box with the scene canvas unpainted, within
+ *   2 % of the pixels (`HOST_CSS_DIFF_RATIO`).
  */
 
 import { expect, test, type Page } from '@playwright/test';
-import { CHROME_DIFF_RATIO, holdFrames, viewerRoot, waitForBoot } from './support.js';
+import { HOST_CSS_DIFF_RATIO, holdFrames, STILL_CHROME_CSS, viewerRoot, waitForBoot } from './support.js';
 import { scaled } from './time-scale.js';
 
 const VIEWPORTS = [
@@ -120,7 +120,7 @@ async function readBothStates(page: Page): Promise<{ hostile: Reading; clean: Re
 }
 
 /**
- * The viewer box as PNG bytes, with the scene canvas left unpainted
+ * The viewer box as PNG bytes, under the chrome baselines' stylesheet
  * (`stillChrome`). Not Playwright's `mask`: it paints an overlay over the
  * canvas's whole box, and the canvas fills the viewer, so the overlay would
  * cover the very chrome being compared.
@@ -130,20 +130,21 @@ async function shot(page: Page): Promise<Buffer> {
 }
 
 /**
- * Makes the chrome hold still for a comparison: no transition or animation
- * (a colour transition would still show the previous state right after the
- * host sheet flips), and the scene canvas keeps its box but paints nothing,
- * so the backdrop behind it is the same flat colour in every shot. The same
- * in both states, so it cannot hide a difference the host's CSS made.
+ * Makes the chrome hold still for a comparison, with the chrome baselines'
+ * own stylesheet (`STILL_CHROME_CSS`): no transition or animation (a colour
+ * transition would still show the previous state right after the host sheet
+ * flips), and the scene canvas keeps its box but paints nothing, so the
+ * backdrop behind it is the same flat colour in every shot. Appended for the
+ * rest of the test rather than per capture, because the computed-style
+ * readings must see it too. The same in both states, so it cannot hide a
+ * difference the host's CSS made.
  */
 async function stillChrome(page: Page): Promise<void> {
-  await page.evaluate(() => {
+  await page.evaluate((css) => {
     const still = document.createElement('style');
-    still.textContent =
-      '.jeex-viewer *, .jeex-viewer *::before, .jeex-viewer *::after { transition: none !important; animation: none !important; }';
+    still.textContent = css;
     document.head.append(still);
-    for (const canvas of document.querySelectorAll<HTMLCanvasElement>('.jeex-viewer canvas')) canvas.style.visibility = 'hidden';
-  });
+  }, STILL_CHROME_CSS);
 }
 
 /** Share of pixels whose channels differ by more than a font-rasterisation step, decoded in the page. */
@@ -212,7 +213,7 @@ for (const viewport of VIEWPORTS) {
       const { ratio, size } = await diffRatio(page, withHostile, withoutHostile);
       await test.info().attach('hostile.png', { body: withHostile, contentType: 'image/png' });
       await test.info().attach('clean.png', { body: withoutHostile, contentType: 'image/png' });
-      expect(ratio, `differing pixels in the ${size} viewer box`).toBeLessThanOrEqual(CHROME_DIFF_RATIO);
+      expect(ratio, `differing pixels in the ${size} viewer box`).toBeLessThanOrEqual(HOST_CSS_DIFF_RATIO);
     });
   });
 }

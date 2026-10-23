@@ -85,7 +85,12 @@ test('taking the element out of the DOM disposes the viewer and the page globals
 });
 
 test('the chrome looks as it did', async ({ page }) => {
-  await page.locator('#viewer').hover({ position: { x: 10, y: 10 } });
+  // Pointer parked on the brand lockup inside the shadow root, so the bar stays
+  // open for the whole capture (see `index.spec.ts`).
+  await page.locator('#viewer [data-jeex="brand-lockup"]').hover({ force: true });
+  const bar = page.locator('#viewer [data-jeex="control-bar"]');
+  await expect(bar).toHaveAttribute('data-collapsed', 'false');
+  await expect.poll(() => bar.evaluate((el) => el.matches(':hover'))).toBe(true);
   await expectChromeScreenshot(page, 'embed-element-chrome.png');
 });
 

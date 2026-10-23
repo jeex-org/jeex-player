@@ -17,7 +17,7 @@ When the viewer is mounted into the host document's light DOM, UNLAYERED host ru
 #### Scenario: Pixels of the chrome
 
 - **WHEN** the same page is photographed with the scene canvas left unpainted, with the host sheet enabled and disabled, at 390×844 and at 1280×800
-- **THEN** the two pictures differ in no more than the chrome tolerance of the other chrome baselines (2 % of the pixels)
+- **THEN** the two pictures differ in no more than 2 % of the pixels
 
 ### Requirement: Deliberate host styling keeps working
 
