@@ -128,7 +128,11 @@ describe('walk and tour draw on demand', { timeout: MOUNT_TIMEOUT_MS }, () => {
     // The swing lasts wall-clock time, so its tick count is the frame rate's; every one of them draws.
     expect(motion.draws).toBeGreaterThanOrEqual(1);
     expect(motion.draws).toBeGreaterThanOrEqual(motion.ticks - 1);
-    expect(debug().doors().find((record) => record.id === door.id)!.phase).not.toBe('opening');
+    expect(
+      debug()
+        .doors()
+        .find((record) => record.id === door.id)!.phase,
+    ).not.toBe('opening');
   });
 
   test('the furniture ripple draws while it runs and rests after it, both ways', async () => {
@@ -166,10 +170,10 @@ describe('walk and tour draw on demand', { timeout: MOUNT_TIMEOUT_MS }, () => {
     });
     const asset = demoScene().assets[0]!;
     const edited = await follow(() => {
-      const result = debug().applyOps([
+      const result = debug().applyOps!([
         { op: 'move_object', assetId: asset.id, position: { x: asset.position.x + 0.05, y: asset.position.y, z: asset.position.z } },
       ]);
-      expect(result.error).toBeUndefined();
+      expect('error' in result ? result.error : undefined).toBeUndefined();
     });
     expect(edited.draws).toBeGreaterThanOrEqual(1);
     // The debounce is wall-clock time; the refresh lands on a tick after it.
@@ -227,7 +231,15 @@ describe('walk and tour draw on demand', { timeout: MOUNT_TIMEOUT_MS }, () => {
 
   test('a video clip draws the restored live view once, then the view rests', async () => {
     await rest('before the clip');
-    const result = await handle.capture.frames({ aspect: '16:9', height: 60, fps: 24, from: 0, to: 0.1, caption: false, onFrame: () => undefined });
+    const result = await handle.capture.frames({
+      aspect: '16:9',
+      height: 60,
+      fps: 24,
+      from: 0,
+      to: 0.1,
+      caption: false,
+      onFrame: () => undefined,
+    });
     expect(result.frames).toBeGreaterThan(0);
     const after = await ticks(3);
     expect(after.draws).toBeGreaterThanOrEqual(1);

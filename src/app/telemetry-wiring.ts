@@ -37,7 +37,7 @@ import type { ViewerOptions } from './viewer-options.js';
 import type { ViewerStage } from './viewer-stage.js';
 import type { ProjectInfo } from './project-wiring.js';
 
-/** How often the camera's room is looked up, in ms of drawn time. */
+/** How often the camera's room is looked up, in ms of frame-loop time (drawn or not). */
 const ROOM_SAMPLE_MS = 1000;
 
 const ROOM_MODES: ReadonlySet<ViewerMode> = new Set<ViewerMode>(['walk', 'tour']);

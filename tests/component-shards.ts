@@ -64,7 +64,7 @@ export const COMPONENT_FILE_COST_S: Readonly<Record<string, number>> = {
   'project-mark.test.ts': 24,
   'project-mount.test.ts': 73,
   'provenance.test.ts': 1,
-  'render-on-demand.test.ts': 68,
+  'render-on-demand.test.ts': 87,
   'render-runtime-lighting.test.ts': 1,
   'selection-highlight.test.ts': 1,
   'selection-panel.test.ts': 1,
