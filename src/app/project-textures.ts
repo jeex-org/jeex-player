@@ -14,6 +14,7 @@ import type { LibraryTextures } from '../geometry/library-surface.js';
 import type { Logger } from '../shared/logger.js';
 import type * as THREE from 'three';
 import { gpuClass } from '../telemetry/device.js';
+import type { Ktx2Support } from '../materials/ktx2.js';
 
 /** What the running viewer knows about drawing textures; `null` from the caller without a WebGL context. */
 export type TextureEnv = {
@@ -27,6 +28,8 @@ export type TextureEnv = {
   /** For tests: the page's `fetch` and `createImageBitmap` when absent. */
   readonly fetch?: TextureFetch | undefined;
   readonly decode?: ((blob: Blob, options: ImageBitmapOptions) => Promise<DecodedImage>) | undefined;
+  /** The viewer's KTX2 transcoder, for `.ktx2` maps and `KHR_texture_basisu` GLBs. */
+  readonly ktx2?: Ktx2Support | undefined;
 };
 
 /** A deferred texture source for the project whose manifest folder is `baseUrl`. */
@@ -39,6 +42,7 @@ export function createProjectTextures(baseUrl: string, env: TextureEnv): Library
     ...(env.resolveTexture !== undefined && { resolveTexture: env.resolveTexture }),
     ...(env.fetch !== undefined && { fetch: env.fetch }),
     ...(env.decode !== undefined && { decode: env.decode }),
+    ...(env.ktx2 !== undefined && { transcode: (bytes: ArrayBuffer) => env.ktx2!.transcode(bytes) }),
   });
   return { source, device: env.device };
 }
@@ -53,10 +57,11 @@ export function textureEnvOf(
   renderer: THREE.WebGLRenderer | undefined,
   resolveTexture: TextureEnv['resolveTexture'],
   log: Logger,
+  ktx2?: TextureEnv['ktx2'],
 ): TextureEnv | null {
   if (renderer === undefined) return null;
   const gl = renderer.getContext();
   const webgl2 = typeof WebGL2RenderingContext !== 'undefined' && gl instanceof WebGL2RenderingContext;
   const device = gpuClass(gl, webgl2);
-  return { device, maxAnisotropy: renderer.capabilities.getMaxAnisotropy(), log, resolveTexture };
+  return { device, maxAnisotropy: renderer.capabilities.getMaxAnisotropy(), log, resolveTexture, ktx2 };
 }

@@ -26,6 +26,7 @@ const resourceSchema = z.looseObject({ uri: z.optional(z.string()) });
 export const glbDocumentSchema = z.looseObject({
   images: z.optional(z.readonly(z.array(resourceSchema))),
   buffers: z.optional(z.readonly(z.array(resourceSchema))),
+  extensionsUsed: z.optional(z.readonly(z.array(z.string()))),
 });
 
 /** Whether `value` has the shape the resource scan reads; the value itself is not touched. */

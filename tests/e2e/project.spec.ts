@@ -23,7 +23,7 @@
 
 import { expect, test } from '@playwright/test';
 import { LIBRARY_PROJECT_FIXTURE, PROJECT_FIXTURE } from '../fixtures/project/fixture-ids.js';
-import { waitForBoot } from './support.js';
+import { serveKtx2LibraryProject, waitForBoot } from './support.js';
 import { scaled } from './time-scale.js';
 
 /** The bake the dev server serves as static files; every request must stay inside it. */
@@ -184,6 +184,25 @@ test('a library project is ready flat, before any texture arrives, and then draw
   // One size per map, each fetched once; the paint has no map at all.
   expect(requested).toHaveLength(3);
   expect(new Set(requested.map((path) => path.replace(/^.*\/(\w+)\.\d+\.webp$/, '$1')))).toEqual(new Set(['albedo', 'normal', 'arm']));
+  // WebP only: the KTX2 transcoder is never asked for.
+  const transcoder = await page.evaluate(() =>
+    performance.getEntriesByType('resource').filter((entry) => entry.name.includes('lazy-jeex-viewer-basis-transcoder-')),
+  );
+  expect(transcoder).toEqual([]);
+  expect(await page.evaluate(() => (window.__projectLog ?? []).map((entry) => entry.code))).toEqual([]);
+});
+
+test('a library project shipped as KTX2 draws its maps through the transcoder, fetched once per file', async ({ page, request }) => {
+  const served = await serveKtx2LibraryProject(page, request);
+  await page.goto(LIBRARY_PROJECT);
+  await waitForBoot(page, 'window.__appReady === true');
+  await page.waitForFunction((floor) => (window.__viewerDebug!.surfaceMaterial(floor)?.maps.length ?? 0) > 0, LIVING_FLOOR, {
+    timeout: MAPS_TIMEOUT_MS,
+  });
+  const drawn = await page.evaluate((floor) => window.__viewerDebug!.surfaceMaterial(floor), LIVING_FLOOR);
+  expect(drawn).toEqual({ colour: '#ffffff', maps: ['map', 'normalMap', 'aoMap', 'roughnessMap', 'metalnessMap'], mapSize: 256 });
+  expect(served.maps()).toHaveLength(3);
+  expect(served.transcoder()).toEqual({ js: 1, wasm: 1 });
   expect(await page.evaluate(() => (window.__projectLog ?? []).map((entry) => entry.code))).toEqual([]);
 });
 

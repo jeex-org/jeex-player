@@ -6,7 +6,17 @@
 
 import { describe, expect, test } from 'bun:test';
 import type * as THREE from 'three';
-import { LinearFilter, LinearMipmapLinearFilter, NoColorSpace, RepeatWrapping, SRGBColorSpace } from 'three';
+import { readFileSync } from 'node:fs';
+import { resolve as resolvePath } from 'node:path';
+import {
+  CompressedTexture,
+  LinearFilter,
+  LinearMipmapLinearFilter,
+  NoColorSpace,
+  RepeatWrapping,
+  RGBA_BPTC_Format,
+  SRGBColorSpace,
+} from 'three';
 import { collectLogger } from '../fixtures/stubs.js';
 import { MAX_PROJECT_TEXTURE_BYTES, MAX_TEXTURE_FILE_BYTES, TEXTURE_FETCH_DEADLINE_MS } from '../shared/limits.js';
 import { TextureSource, type TextureRequest, type TextureSourceOptions } from './texture-source.js';
@@ -468,5 +478,133 @@ describe('texture work waits for the first frame', () => {
     const { source, fetched } = harness();
     await source.acquire(request(), {});
     expect(fetched.length).toBe(1);
+  });
+});
+
+describe('KTX2 maps', () => {
+  /** The committed KTX2 fixture `name`, as the network would answer it. */
+  const fixture = (name: string): Uint8Array =>
+    new Uint8Array(readFileSync(resolvePath(import.meta.dirname, '../../tests/fixtures/ktx2', name)));
+
+  /** A KTX2 request for `role` at 256 px. */
+  const ktx2Request = (role: TextureRequest['role'] = 'albedo', size: TextureRequest['size'] = '256'): TextureRequest => ({
+    versionId: VERSION,
+    role,
+    size,
+    path: `tex/${VERSION}/${role}.${size}.ktx2`,
+  });
+
+  /** A source whose network answers `file` and whose transcoder answers a compressed texture of `levels` levels. */
+  function ktx2Harness(file: string, levels = 9, overrides: Partial<TextureSourceOptions> = {}) {
+    const transcoded: ArrayBuffer[] = [];
+    const decoded: number[] = [];
+    const fetched: string[] = [];
+    const logger = collectLogger();
+    const bytes = fixture(file);
+    const source = new TextureSource({
+      baseUrl: BASE,
+      log: logger.log,
+      maxAnisotropy: 16,
+      fetch: async (url) => {
+        fetched.push(url);
+        return new Response(bytes.slice());
+      },
+      decode: async () => {
+        decoded.push(1);
+        throw new Error('a KTX2 map never reaches the image decoder');
+      },
+      transcode: async (given) => {
+        transcoded.push(given);
+        const mipmaps = Array.from({ length: levels }, (_, level) => ({
+          data: new Uint8Array(16),
+          width: 256 >> level,
+          height: 256 >> level,
+        }));
+        return new CompressedTexture(mipmaps, 256, 256, RGBA_BPTC_Format);
+      },
+      ...overrides,
+    });
+    return { source, transcoded, decoded, fetched, logger };
+  }
+
+  test('a .ktx2 map is transcoded, never decoded as an image, into a compressed view of the file’s own levels', async () => {
+    const { source, transcoded, decoded } = ktx2Harness('albedo.256.ktx2');
+    const view = await source.acquire(ktx2Request(), {});
+    expect(view).toBeInstanceOf(CompressedTexture);
+    expect(transcoded).toHaveLength(1);
+    expect(decoded).toEqual([]);
+    const compressed = view as CompressedTexture;
+    expect(compressed.mipmaps).toHaveLength(9);
+    expect(compressed.format).toBe(RGBA_BPTC_Format);
+    expect([compressed.generateMipmaps, compressed.minFilter, compressed.magFilter]).toEqual([
+      false,
+      LinearMipmapLinearFilter,
+      LinearFilter,
+    ]);
+    expect([compressed.wrapS, compressed.wrapT, compressed.anisotropy, compressed.flipY]).toEqual([
+      RepeatWrapping,
+      RepeatWrapping,
+      8,
+      false,
+    ]);
+    expect(compressed.colorSpace).toBe(SRGBColorSpace);
+  });
+
+  test('a single-level file is drawn with linear minification', async () => {
+    const { source } = ktx2Harness('albedo.256.ktx2', 1);
+    const view = await source.acquire(ktx2Request(), {});
+    expect(view?.minFilter).toBe(LinearFilter);
+  });
+
+  test('a data role is drawn as data whatever the container says; a container that disagrees with its role warns', async () => {
+    const normal = ktx2Harness('normal.256.ktx2');
+    expect((await normal.source.acquire(ktx2Request('normal'), {}))?.colorSpace).toBe(NoColorSpace);
+    expect(normal.logger.codes()).toEqual([]);
+    // The linear normal fixture served as a colour map: drawn as sRGB, by its role, with a warning.
+    const wrong = ktx2Harness('normal.256.ktx2');
+    expect((await wrong.source.acquire(ktx2Request('albedo'), {}))?.colorSpace).toBe(SRGBColorSpace);
+    expect(wrong.logger.codes()).toEqual(['texture-colour-space']);
+  });
+
+  test('a container of another size is refused before the transcoder is asked, with a warning', async () => {
+    const { source, transcoded, logger } = ktx2Harness('orientation.128.ktx2');
+    expect(await source.acquire(ktx2Request(), {})).toBeNull();
+    expect(transcoded).toEqual([]);
+    expect(logger.codes()).toEqual(['texture-ktx2']);
+    expect(logger.messages()[0]).toContain('is 128 x 128, not 256 x 256');
+  });
+
+  test('bytes that are no KTX2, no transcoder, and a transcoder that fails each leave the map flat with a warning', async () => {
+    const notKtx2 = harness({ transcode: async () => new CompressedTexture([], 256, 256) });
+    expect(await notKtx2.source.acquire(ktx2Request(), {})).toBeNull();
+    expect(notKtx2.logger.codes()).toEqual(['texture-ktx2']);
+    const none = ktx2Harness('albedo.256.ktx2', 9, { transcode: undefined });
+    expect(await none.source.acquire(ktx2Request(), {})).toBeNull();
+    expect(none.logger.codes()).toEqual(['texture-ktx2']);
+    const failing = ktx2Harness('albedo.256.ktx2', 9, { transcode: () => Promise.reject(new Error('worker')) });
+    expect(await failing.source.acquire(ktx2Request(), {})).toBeNull();
+    expect(failing.logger.codes()).toEqual(['texture-ktx2']);
+  });
+
+  test('two owners share one transcoded source; one release keeps the other; the last release and a reacquire transcode again without a fetch', async () => {
+    const { source, transcoded, fetched } = ktx2Harness('albedo.256.ktx2');
+    const [first, second, third] = [{}, {}, {}];
+    const [a, b] = await Promise.all([source.acquire(ktx2Request(), first), source.acquire(ktx2Request(), second)]);
+    expect(a).not.toBe(b);
+    expect(a?.source).toBe(b?.source);
+    expect((a as CompressedTexture).mipmaps).toBe((b as CompressedTexture).mipmaps);
+    expect([fetched.length, transcoded.length]).toEqual([1, 1]);
+    source.release(first);
+    expect(await source.acquire(ktx2Request(), third)).not.toBeNull();
+    expect(transcoded.length).toBe(1);
+    source.release(second);
+    source.release(third);
+    const spent = source.spent;
+    const again = await source.acquire(ktx2Request(), {});
+    expect(again).toBeInstanceOf(CompressedTexture);
+    expect([fetched.length, source.spent]).toEqual([1, spent]);
+    // The kept bytes are whole, and the transcoder got them again.
+    expect(transcoded.length).toBe(2);
+    expect(transcoded[1]!.byteLength).toBe(fixture('albedo.256.ktx2').byteLength);
   });
 });

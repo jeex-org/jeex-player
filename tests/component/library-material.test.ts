@@ -14,6 +14,7 @@ import * as THREE from 'three';
 import { afterEach, describe, expect, test } from 'vitest';
 import { attachLibraryMaps, createLibraryMaterial, type LibraryThreeMaterial } from '../../src/materials/library-material.js';
 import { applyLibraryTransform, libraryAngle, libraryTextureMatrix } from '../../src/materials/library-uv.js';
+import { createKtx2Support, type Ktx2Support } from '../../src/materials/ktx2.js';
 import { TextureSource } from '../../src/materials/texture-source.js';
 import type { LibraryDraw } from '../../src/materials/room-finish.js';
 import type { LibraryMapRole, LibraryMaterial, LibraryPbr } from '../../src/materials/finish-types.js';
@@ -26,9 +27,11 @@ const MAP = 128;
 
 const opened: THREE.WebGLRenderer[] = [];
 const sources: TextureSource[] = [];
+const transcoders: Ktx2Support[] = [];
 
 afterEach(() => {
   for (const source of sources.splice(0)) source.dispose();
+  for (const transcoder of transcoders.splice(0)) transcoder.dispose();
   for (const renderer of opened.splice(0)) {
     renderer.dispose();
     renderer.forceContextLoss();
@@ -271,5 +274,72 @@ describe('library materials on a real context', () => {
     const rows = render(await loaded(drawOf(material), { albedo: marked }), 1, 1, frontLight());
     expect(mean(rows, 0, 0, SIZE, 0, SIZE / 4)).toBeGreaterThan(0.5);
     expect(mean(rows, 0, 0, SIZE, SIZE / 2, SIZE)).toBeLessThan(0.05);
+  });
+});
+
+describe('KTX2 library maps on a real context', () => {
+  /** A scan whose maps are the named KTX2 fixtures at 128 px, its material and views wired the way a room surface wires them. */
+  async function loadedKtx2(roles: Partial<Record<LibraryMapRole, string>>): Promise<LibraryThreeMaterial> {
+    const detector = new THREE.WebGLRenderer({ canvas: document.createElement('canvas') });
+    opened.push(detector);
+    const ktx2 = createKtx2Support({ renderer: () => detector });
+    transcoders.push(ktx2);
+    const listed = Object.keys(roles) as LibraryMapRole[];
+    const webp = scan(listed);
+    const material: LibraryMaterial = {
+      ...webp,
+      maps: Object.fromEntries(
+        Object.entries(webp.maps).map(([role, map]) => [role, { ...map, files: { '128': `tex/${VERSION}/${role}.128.ktx2` } }]),
+      ),
+    };
+    const drawn = drawOf(material);
+    const source = new TextureSource({
+      baseUrl: 'https://fixture.test/',
+      log: createLogger(() => undefined),
+      maxAnisotropy: 1,
+      fetch: async (url) => fetch(`/tests/fixtures/ktx2/${roles[new URL(url).pathname.split('/')[3]!.split('.')[0] as LibraryMapRole]}`),
+      transcode: (bytes) => ktx2.transcode(bytes),
+    });
+    sources.push(source);
+    const built = createLibraryMaterial(drawn);
+    const views: Partial<Record<LibraryMapRole, THREE.Texture>> = {};
+    for (const role of listed) {
+      const view = await source.acquire({ versionId: VERSION, role, size: '128', path: `tex/${VERSION}/${role}.128.ktx2` }, built);
+      if (view) views[role] = view;
+    }
+    expect(Object.keys(views)).toEqual(listed);
+    attachLibraryMaps(built, drawn, views);
+    // What `LibrarySurface` does for a KTX2 material on a wall: the v axis reversed.
+    applyLibraryTransform(built, libraryTextureMatrix([1, 1], 0, true));
+    return built;
+  }
+
+  test('orientation: the KTX2 mark in the top row of the picture stands at the top of the tile, like its WebP twin', async () => {
+    const rows = render(await loadedKtx2({ albedo: 'orientation.128.ktx2' }), 1, 1, frontLight());
+    expect(mean(rows, 0, 0, SIZE, 0, SIZE / 4)).toBeGreaterThan(0.5);
+    expect(mean(rows, 0, 0, SIZE, SIZE / 2, SIZE)).toBeLessThan(0.05);
+  });
+
+  test('normal direction: a KTX2 normal map leaning up the picture is lit brighter from above than from below', async () => {
+    const lit = async (side: 1 | -1): Promise<number> => {
+      const built = await loadedKtx2({ albedo: 'white.128.ktx2', normal: 'normal-up.128.ktx2' });
+      const light = new THREE.DirectionalLight('#ffffff', 2);
+      light.position.set(0, side * 4, 1);
+      return mean(render(built, 1, 1, [light]), 0);
+    };
+    expect(await lit(1)).toBeGreaterThan((await lit(-1)) + 0.1);
+  });
+
+  test('normal direction: the WebP twin of that normal map leans the same way', async () => {
+    const material = scan(['albedo', 'normal'], { pbr: { roughness: 1 } });
+    const white = image(() => [255, 255, 255, 255]);
+    const up = image(() => [128, 204, 230, 255]);
+    const lit = async (side: 1 | -1): Promise<number> => {
+      const built = await loaded(drawOf(material), { albedo: white, normal: up });
+      const light = new THREE.DirectionalLight('#ffffff', 2);
+      light.position.set(0, side * 4, 1);
+      return mean(render(built, 1, 1, [light]), 0);
+    };
+    expect(await lit(1)).toBeGreaterThan((await lit(-1)) + 0.1);
   });
 });

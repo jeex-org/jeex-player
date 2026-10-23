@@ -2,6 +2,7 @@ import { defineConfig } from 'vite';
 import { fileURLToPath } from 'node:url';
 import { CSS_TARGET } from './vite.css-target.ts';
 import { readPackageVersion } from './scripts/config-input.ts';
+import { basisTranscoder } from './scripts/basis-transcoder-plugin.ts';
 
 /** The two pages the demo build ships; `embed.html` is what an iframe host points at. */
 const PAGES = {
@@ -26,6 +27,8 @@ const E2E_SERVER = process.env['JEEX_E2E_SERVER'] === '1';
 
 export default defineConfig({
   base: './',
+  // The Basis transcoder beside the chunks, under `assets/` (`scripts/basis-transcoder-plugin.ts`).
+  plugins: [basisTranscoder('assets/')],
   // The dev server listens on 3700. The repository's other configs use 3701
   // for e2e (`playwright.config.ts`, override with `JEEX_E2E_PORT`) and 3702
   // for the component tests (`vitest.config.ts`, override with

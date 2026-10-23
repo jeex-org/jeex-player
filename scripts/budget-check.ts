@@ -126,7 +126,27 @@ export const LAZY_CHUNK_FAIL_BYTES = 256 * 1024;
  * second effect added to the chain is noticed here. The IIFE build cannot split
  * code and carries the chain inline, inside the 700 KB boot budget.
  */
-export const LAZY_LIMITS: Readonly<Record<string, number>> = { 'lazy-jeex-viewer-walk-post': 50_747 + 1024 };
+export const LAZY_LIMITS: Readonly<Record<string, number>> = {
+  'lazy-jeex-viewer-walk-post': 50_747 + 1024,
+  // three's KTX2 loader with its container parser and Zstd decoder
+  // (`src/materials/ktx2.ts`), loaded by the first KTX2 asset: 25,052 gzip
+  // bytes in the ES build (24,175 in the demo build) from `measureBundle`
+  // after the builds, plus 1 KB.
+  'lazy-jeex-viewer-KTX2Loader': 25_052 + 1024,
+  // The Basis transcoder's JS wrapper (`scripts/basis-transcoder-plugin.ts`),
+  // three's file byte for byte: 15,259 gzip bytes, plus 1 KB.
+  'lazy-jeex-viewer-basis-transcoder-': 15_259 + 1024,
+};
+
+/**
+ * Per-file limits of the `.wasm` files, keyed like `LAZY_LIMITS`. A `.wasm`
+ * file is never imported by a script, so it is always lazy.
+ *
+ * `lazy-jeex-viewer-basis-transcoder-`: the Basis transcoder's wasm, three's
+ * file byte for byte, fetched by the first KTX2 asset: 248,951 gzip bytes
+ * (three 0.186.1) plus 1 KB. A three upgrade that grows it is noticed here.
+ */
+export const LAZY_WASM_LIMITS: Readonly<Record<string, number>> = { 'lazy-jeex-viewer-basis-transcoder-': 248_951 + 1024 };
 
 /** How the sizes are judged: as one download, or as alternatives. */
 export type BudgetMode = 'total' | 'per-file';
@@ -141,15 +161,15 @@ export function limitFor(name: string): number {
 
 /** The hard limit that applies to one built LAZY file, addressed by its name. */
 function lazyLimitFor(name: string): number {
-  for (const [prefix, bytes] of Object.entries(LAZY_LIMITS)) {
+  for (const [prefix, bytes] of Object.entries(name.endsWith('.wasm') ? LAZY_WASM_LIMITS : LAZY_LIMITS)) {
     if (name.startsWith(prefix)) return bytes;
   }
   return LAZY_CHUNK_FAIL_BYTES;
 }
 
-/** Whether `name` is a lazy (dynamic-import) chunk rather than a boot file. */
+/** Whether `name` is a lazy (dynamic-import) chunk rather than a boot file; every `.wasm` file is. */
 function isLazyChunk(name: string): boolean {
-  return name.startsWith(LAZY_CHUNK_PREFIX);
+  return name.startsWith(LAZY_CHUNK_PREFIX) || name.endsWith('.wasm');
 }
 
 export type BundleEntry = {
@@ -204,7 +224,7 @@ export function formatBytes(bytes: number): string {
   return `${(bytes / 1024).toFixed(1)} KB`;
 }
 
-/** Gzip sizes of every `.js` file directly under `dir`, largest first. */
+/** Gzip sizes of every `.js` and `.wasm` file directly under `dir`, largest first. */
 export function measureBundle(dir: string): BundleEntry[] {
   let names: string[];
   try {
@@ -214,7 +234,7 @@ export function measureBundle(dir: string): BundleEntry[] {
   }
   const entries: BundleEntry[] = [];
   for (const name of names) {
-    if (!name.endsWith('.js')) continue;
+    if (!name.endsWith('.js') && !name.endsWith('.wasm')) continue;
     const path = join(dir, name);
     if (!statSync(path).isFile()) continue;
     const source = readFileSync(path);
@@ -222,7 +242,7 @@ export function measureBundle(dir: string): BundleEntry[] {
       name,
       bytes: source.byteLength,
       gzipBytes: gzipSync(source).byteLength,
-      imports: staticImports(source.toString('utf8')),
+      imports: name.endsWith('.wasm') ? [] : staticImports(source.toString('utf8')),
     });
   }
   return entries.sort((left, right) => right.gzipBytes - left.gzipBytes);

@@ -16,6 +16,7 @@ import {
   LAZY_CHUNK_FAIL_BYTES,
   LAZY_CHUNK_PREFIX,
   LAZY_LIMITS,
+  LAZY_WASM_LIMITS,
   OPS_BUDGET_FAIL_BYTES,
   LIGHTING_BUDGET_FAIL_BYTES,
   checkBudget,
@@ -50,7 +51,13 @@ describe('constants', () => {
     expect(LAZY_CHUNK_FAIL_BYTES).toBe(256 * 1024);
     expect(LAZY_CHUNK_PREFIX).toBe('lazy-');
     // The walk and tour chain: its last measured size plus 1 KB.
-    expect(LAZY_LIMITS).toEqual({ 'lazy-jeex-viewer-walk-post': 50_747 + 1024 });
+    expect(LAZY_LIMITS).toEqual({
+      'lazy-jeex-viewer-walk-post': 50_747 + 1024,
+      // The KTX2 loader chunk and the transcoder's JS wrapper: measured plus 1 KB.
+      'lazy-jeex-viewer-KTX2Loader': 25_052 + 1024,
+      'lazy-jeex-viewer-basis-transcoder-': 15_259 + 1024,
+    });
+    expect(LAZY_WASM_LIMITS).toEqual({ 'lazy-jeex-viewer-basis-transcoder-': 248_951 + 1024 });
     expect(formatBytes(700 * 1024)).toBe('700.0 KB');
   });
 
@@ -76,7 +83,7 @@ describe('constants', () => {
 });
 
 describe('measureBundle', () => {
-  test('measures only .js files, largest gzip first', () => {
+  test('measures only .js and .wasm files, largest gzip first', () => {
     // Compressible, repetitive source text here (not `fillerBytes`'s random
     // bytes): the point of this fixture is that gzip actually shrinks it,
     // which the last assertion below checks.
@@ -90,6 +97,23 @@ describe('measureBundle', () => {
     expect(entries.map((entry) => entry.name)).toEqual(['large.js', 'small.js']);
     expect(entries[0]!.gzipBytes).toBeGreaterThan(entries[1]!.gzipBytes);
     expect(entries[0]!.gzipBytes).toBeLessThan(entries[0]!.bytes);
+  });
+
+  test('measures .wasm files too, always lazy and judged per file against their own limit', () => {
+    const dir = fixtureDir({
+      'jeex-viewer.js': 'a'.repeat(200),
+      'lazy-jeex-viewer-basis-transcoder-abcd1234.wasm': fillerBytes(LAZY_WASM_LIMITS['lazy-jeex-viewer-basis-transcoder-'] ?? 0),
+    });
+    const entries = measureBundle(dir);
+    expect(entries.map((entry) => entry.name)).toContain('lazy-jeex-viewer-basis-transcoder-abcd1234.wasm');
+    const report = checkBudget(dir, 'per-file');
+    expect(report.lazy.files).toEqual(['lazy-jeex-viewer-basis-transcoder-abcd1234.wasm']);
+    expect(report.failures).toEqual([expect.stringContaining('lazy-jeex-viewer-basis-transcoder-abcd1234.wasm is')]);
+  });
+
+  test('the KTX2 loader chunk and the transcoder pair have limits of their own', () => {
+    expect(Object.keys(LAZY_LIMITS)).toEqual(expect.arrayContaining(['lazy-jeex-viewer-KTX2Loader', 'lazy-jeex-viewer-basis-transcoder-']));
+    expect(Object.keys(LAZY_WASM_LIMITS)).toEqual(['lazy-jeex-viewer-basis-transcoder-']);
   });
 
   test('a missing or empty directory is an error, not a silent pass', () => {

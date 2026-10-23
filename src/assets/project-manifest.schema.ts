@@ -32,7 +32,7 @@
  * catalogue's scanned texture set or parameter-only material: strict at every
  * depth, with its cross-field rules (colour map by colour mode, `arm` or
  * `roughness`, colour space by role, one size set per material, the exact
- * `tex/<versionId>/<role>.<px>.webp` path of every file) checked on the
+ * `tex/<versionId>/<role>.<px>.<webp|ktx2>` path of every file, one format per material) checked on the
  * member and two manifest-wide ones (no texture path twice, at most
  * `MAX_PROJECT_TEXTURE_FILES` listed) on the root. Like the rest, they judge:
  * the defaults the format names (metalness 0, roughness 1, alpha `opaque`,
@@ -327,9 +327,26 @@ type LibraryShape = z.infer<typeof libraryMaterialSchema>;
 /** One listed map of a library material. */
 type LibraryMapShape = z.infer<typeof libraryMapSchema>;
 
-/** The one file name a map of `role` at `size` may have: `tex/<versionId>/<role>.<px>.webp`. */
-function libraryMapPath(versionId: string, role: LibraryMapRole, size: string): string {
-  return `tex/${versionId}/${role}.${size}.webp`;
+/** The two image formats a library map may be shipped in. */
+const LIBRARY_MAP_EXTENSIONS = ['webp', 'ktx2'] as const;
+type LibraryMapExtension = (typeof LIBRARY_MAP_EXTENSIONS)[number];
+
+/** The one file name a map of `role` at `size` may have: `tex/<versionId>/<role>.<px>.<ext>`. */
+function libraryMapPath(versionId: string, role: LibraryMapRole, size: string, extension: LibraryMapExtension): string {
+  return `tex/${versionId}/${role}.${size}.${extension}`;
+}
+
+/**
+ * The format of a material: the extension of its first listed file when that
+ * is one of the two, else WebP. Every other file must use the same, so one
+ * texture transform serves every map of the material.
+ */
+function libraryMapExtension(listed: readonly [LibraryMapRole, LibraryMapShape][]): LibraryMapExtension {
+  const first = listed.flatMap(([, map]) =>
+    LIBRARY_MAP_SIZES.flatMap((size) => (map.files[size] === undefined ? [] : [map.files[size]])),
+  )[0];
+  const extension = first?.slice(first.lastIndexOf('.') + 1);
+  return LIBRARY_MAP_EXTENSIONS.find((candidate) => candidate === extension) ?? 'webp';
 }
 
 /** The listed maps of a library material, role and map, in `LIBRARY_MAP_ROLES` order. */
@@ -372,6 +389,7 @@ function checkLibraryMaterial(library: LibraryShape, issue: (message: string, pa
   if (maps.arm !== undefined && maps.ao !== undefined) issue('must not ship beside arm', ['maps', 'ao']);
   if (maps.ao !== undefined && maps.roughness === undefined && maps.arm === undefined) issue('ships only beside roughness', ['maps', 'ao']);
   let sizeSet: string | undefined;
+  const extension = libraryMapExtension(listed);
   for (const [role, map] of listed) {
     const space = COLOUR_ROLES.has(role) ? 'srgb' : 'linear';
     if (map.colourSpace !== space) issue(`must be ${space} for ${role}`, ['maps', role, 'colourSpace']);
@@ -379,7 +397,7 @@ function checkLibraryMaterial(library: LibraryShape, issue: (message: string, pa
     const sizes = LIBRARY_MAP_SIZES.filter((size) => map.files[size] !== undefined);
     if (sizes.length === 0) issue('must list at least one size', ['maps', role, 'files']);
     for (const size of sizes) {
-      const expected = libraryMapPath(library.versionId, role, size);
+      const expected = libraryMapPath(library.versionId, role, size, extension);
       if (map.files[size] !== expected) issue(`must be ${expected}`, ['maps', role, 'files', size]);
     }
     const set = sizes.join(',');

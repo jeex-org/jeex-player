@@ -29,3 +29,10 @@ declare module '*.css';
  * through exactly one point, `src/shared/version.ts`.
  */
 declare const __JEEX_VIEWER_VERSION__: string;
+
+/**
+ * The content hash of the Basis transcoder pair the build emits beside the
+ * bundles (`scripts/basis-transcoder-plugin.ts`, `define`). Absent under
+ * `bun test`; read through exactly one point, `src/materials/ktx2.ts`.
+ */
+declare const __JEEX_BASIS_TRANSCODER__: string | undefined;

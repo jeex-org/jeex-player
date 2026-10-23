@@ -16,6 +16,7 @@
  */
 
 import * as THREE from 'three';
+import type { Ktx2Support } from '../materials/ktx2.js';
 import { effectiveAsset } from '../scene/types.js';
 import { documentLibraryOf } from '../scene/registries.js';
 import type { DemoAsset, MaterialDefinition } from '../scene/types.js';
@@ -100,6 +101,8 @@ export type AssetLoaderOptions = {
   log?: Logger | undefined;
   /** `'omit'` for the files of a baked project; the platform default when absent. */
   credentials?: RequestCredentials | undefined;
+  /** The viewer's KTX2 transcoder, for GLBs that use `KHR_texture_basisu`. */
+  ktx2?: Ktx2Support | undefined;
 };
 
 /**
@@ -165,7 +168,10 @@ export class AssetLoader {
     this.catalogue = options.catalogue;
     this.catalogueLibrary = options.catalogueLibrary;
     this.resolveFinish = options.resolveFinish;
-    this.sourceOptions = options.credentials === undefined ? {} : { credentials: options.credentials };
+    this.sourceOptions = {
+      ...(options.credentials !== undefined && { credentials: options.credentials }),
+      ...(options.ktx2 !== undefined && { ktx2: options.ktx2 }),
+    };
   }
 
   /** The one place `resolveAsset` is called from, so both callers speak the same bank. */

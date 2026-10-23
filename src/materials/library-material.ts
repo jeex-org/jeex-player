@@ -12,7 +12,7 @@
  */
 
 import * as THREE from 'three';
-import type { LibraryMapRole, LibraryPbr, LibraryTint } from './finish-types.js';
+import type { LibraryMapRole, LibraryMaterial, LibraryPbr, LibraryTint } from './finish-types.js';
 import type { LibraryDraw } from './room-finish.js';
 
 /** A library material's THREE material: standard, or physical when a field needs it. */
@@ -109,6 +109,17 @@ function applyPhysical(material: THREE.MeshPhysicalMaterial, pbr: LibraryPbr): v
   if (pbr.attenuationColour !== undefined) material.attenuationColor.set(pbr.attenuationColour);
 }
 
+/** The image format a library material's maps are shipped in. */
+export type LibraryMapFormat = 'webp' | 'ktx2';
+
+/** The format every file of `material` shares (one per material, by the manifest rules); WebP when it lists none. */
+export function libraryMapFormat(material: Pick<LibraryMaterial, 'maps'>): LibraryMapFormat {
+  for (const map of Object.values(material.maps)) {
+    for (const path of Object.values(map?.files ?? {})) return path?.endsWith('.ktx2') ? 'ktx2' : 'webp';
+  }
+  return 'webp';
+}
+
 /** The views a material's maps arrived as, by role. */
 export type LibraryMapViews = { readonly [role in LibraryMapRole]?: THREE.Texture };
 
@@ -147,7 +158,11 @@ export function attachLibraryMaps(material: LibraryThreeMaterial, draw: LibraryD
   if (views.normal !== undefined) {
     material.normalMap = views.normal;
     const strength = facts.normalStrength ?? 1;
-    material.normalScale.set(strength, strength);
+    // A KTX2 material samples with its v axis reversed (`libraryTextureMatrix`),
+    // and three builds the tangent frame from those coordinates: the green
+    // channel then points down the picture unless its scale is negated, the
+    // compensation three's own glTF loader applies to meshes without tangents.
+    material.normalScale.set(strength, libraryMapFormat(draw.material) === 'ktx2' ? -strength : strength);
   }
   if (mapSignature(material) !== before) material.needsUpdate = true;
 }

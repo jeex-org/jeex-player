@@ -45,7 +45,7 @@ import type { Messages } from '../ui/messages.js';
 import { FullscreenController } from '../ui/fullscreen-controller.js';
 import { Dollhouse } from '../geometry/dollhouse.js';
 import { FurnitureAnimator } from '../geometry/furniture-animator.js';
-import { SceneMount, textureEnvOf } from './scene-mount.js';
+import { SceneMount, createKtx2Support, textureEnvOf } from './scene-mount.js';
 import { editsWiring } from './edits-wiring.js';
 import { createTourControls, TourEvents, type TourControls } from '../camera/tour-controls.js';
 import type { ViewerOptions } from './viewer-options.js';
@@ -134,6 +134,7 @@ export class ViewerApp {
   private readonly animator = new FurnitureAnimator();
   private readonly doors: DoorController;
   private readonly mount: SceneMount;
+  private readonly ktx2 = createKtx2Support({ renderer: () => this.stage?.runtime.renderer });
   /** The renderer, camera, view modes, map and director; `undefined` before boot. */
   private stage?: ViewerStage | undefined;
   private furnitureVisible = true;
@@ -231,7 +232,7 @@ export class ViewerApp {
       onError: (error) => this.events.emit('error', error),
       onModelsSettled: (model, result) => this.telemetry.modelsSettled(model, result),
       usage: this.usage,
-      textureEnv: () => textureEnvOf(this.stage?.runtime.renderer, this.options.resolveTexture, this.log),
+      textureEnv: () => textureEnvOf(this.stage?.runtime.renderer, this.options.resolveTexture, this.log, this.ktx2),
     });
     this.telemetry = telemetryWiring({
       ...embedding,
@@ -487,6 +488,7 @@ export class ViewerApp {
     if (this.released) return;
     this.released = true;
     this.teardown();
+    this.ktx2.dispose();
     this.telemetry.dispose();
     this.tourEvents.clear();
     this.events.clear();

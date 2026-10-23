@@ -7,6 +7,8 @@ import { FinishRegistry } from '../assets/asset-finishes.js';
 import { ARCHETYPE, VARIANT } from '../assets/catalogue-ids.js';
 import { FINISH } from '../materials/finish-ids.js';
 import { ViewerLibError, isViewerLibError } from '../shared/errors.js';
+import type { Ktx2Support } from '../materials/ktx2.js';
+import type { KTX2Loader } from 'three/addons/loaders/KTX2Loader.js';
 
 /**
  * The model source and the body preparation, against the committed fixture
@@ -92,6 +94,114 @@ describe('createGltfModelSource', () => {
     const failure = await source(request, new AbortController().signal).catch((error: unknown) => error);
     expect(isViewerLibError(failure) && failure.code).toBe('scene-load');
     source.dispose();
+  });
+});
+
+// ------------------------------------------------ KHR_texture_basisu GLBs ---
+
+const BASISU = readFileSync('tests/fixtures/project/obj/box-sofa-basisu@1.0.0.glb');
+const BASISU_URL = 'https://cdn.example.com/interior-v1/obj/box-sofa-basisu.glb';
+
+/** A transport serving the basisu fixture. */
+const basisuFetch = (async () =>
+  new Response(BASISU.buffer.slice(BASISU.byteOffset, BASISU.byteOffset + BASISU.byteLength), { status: 200 })) as unknown as typeof fetch;
+
+/**
+ * A transcoder stand-in: `start` decides whether it starts, `fail` whether a
+ * texture it is asked for reports an error; every texture it hands out is
+ * recorded so the test can see it disposed.
+ */
+function stubKtx2(options: { start?: boolean; fail?: boolean } = {}): {
+  support: Ktx2Support;
+  starts: () => number;
+  textures: THREE.CompressedTexture[];
+} {
+  let starts = 0;
+  const textures: THREE.CompressedTexture[] = [];
+  const support: Ktx2Support = {
+    async forParse() {
+      starts += 1;
+      if (options.start === false) throw new Error('transcoder 404');
+      let first: unknown;
+      const loader = {
+        load(_url: string, onLoad: (texture: THREE.CompressedTexture) => void, _progress: unknown, onError: (error: unknown) => void) {
+          if (options.fail === true) {
+            first ??= new Error('transcode failed');
+            onError(first);
+            return;
+          }
+          const texture = new THREE.CompressedTexture([], 16, 16);
+          textures.push(texture);
+          onLoad(texture);
+        },
+      } as unknown as KTX2Loader;
+      return { loader, error: () => first };
+    },
+    transcode: () => Promise.reject(new Error('unused')),
+    dispose: () => undefined,
+  };
+  return { support, starts: () => starts, textures };
+}
+
+const basisuRequest: ModelRequest = { ...request, url: BASISU_URL };
+
+describe('GLBs with KHR_texture_basisu', () => {
+  test('load with the transcoder: the frame wears the KTX2 texture', async () => {
+    const ktx2 = stubKtx2();
+    const source = createGltfModelSource({ fetch: basisuFetch, ktx2: ktx2.support });
+    const outcome = await source(basisuRequest, new AbortController().signal);
+    const maps: THREE.Texture[] = [];
+    outcome.group.traverse((child) => {
+      if (child instanceof THREE.Mesh && (child.material as THREE.MeshStandardMaterial).map)
+        maps.push((child.material as THREE.MeshStandardMaterial).map!);
+    });
+    expect(maps).toHaveLength(1);
+    expect(maps[0]).toBe(ktx2.textures[0]);
+    expect(ktx2.starts()).toBe(1);
+    source.dispose();
+  });
+
+  test('a GLB without the extension never asks for the transcoder', async () => {
+    const ktx2 = stubKtx2();
+    const source = createGltfModelSource({ fetch: countingFetch().fetch, ktx2: ktx2.support });
+    await source(request, new AbortController().signal);
+    expect(ktx2.starts()).toBe(0);
+    source.dispose();
+  });
+
+  test.each([
+    ['no transcoder at all', undefined],
+    ['a transcoder that cannot start', { start: false }],
+    ['a texture the transcoder reports an error for', { fail: true }],
+  ])('%s refuses the model with reason ktx2-transcoder, so the procedural body stays', async (_name, stub) => {
+    const ktx2 = stub === undefined ? undefined : stubKtx2(stub);
+    const source = createGltfModelSource({ fetch: basisuFetch, ...(ktx2 !== undefined && { ktx2: ktx2.support }) });
+    const failure = await source(basisuRequest, new AbortController().signal).catch((error: unknown) => error);
+    expect(isViewerLibError(failure) && failure.code).toBe('scene-load');
+    expect((failure as ViewerLibError).detail).toMatchObject({ url: BASISU_URL, reason: 'ktx2-transcoder' });
+    source.dispose();
+  });
+
+  test('a refused parse is not cached: the next placement tries again', async () => {
+    const ktx2 = stubKtx2({ start: false });
+    const source = createGltfModelSource({ fetch: basisuFetch, ktx2: ktx2.support });
+    await source(basisuRequest, new AbortController().signal).catch(() => undefined);
+    await source(basisuRequest, new AbortController().signal).catch(() => undefined);
+    expect(ktx2.starts()).toBe(2);
+    source.dispose();
+  });
+
+  test('dispose frees the textures of every parsed model, not only its geometries and materials', async () => {
+    const ktx2 = stubKtx2();
+    const source = createGltfModelSource({ fetch: basisuFetch, ktx2: ktx2.support });
+    await source(basisuRequest, new AbortController().signal);
+    let disposed = 0;
+    ktx2.textures[0]!.addEventListener('dispose', () => (disposed += 1));
+    source.dispose();
+    await new Promise((resolve) => {
+      setTimeout(resolve, 0);
+    });
+    expect(disposed).toBe(1);
   });
 });
 

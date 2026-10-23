@@ -17,13 +17,14 @@ import { linkedAbortController } from '../shared/abort.js';
 import { ByteLimitError, readCapped } from '../shared/capped-read.js';
 import { MAX_PROJECT_TEXTURE_BYTES, MAX_TEXTURE_FILE_BYTES, MAX_TEXTURE_PARALLEL, TEXTURE_FETCH_DEADLINE_MS } from '../shared/limits.js';
 import type { LibraryMapRole, LibraryMapSize } from './finish-types.js';
+import { KTX2_TRANSFER_SRGB, ktx2MapProblem, readKtx2Facts } from './ktx2-container.js';
 
 /** One map file of one library material at one size. */
 export type TextureRequest = {
   readonly versionId: string;
   readonly role: LibraryMapRole;
   readonly size: LibraryMapSize;
-  /** The logical path the manifest lists: `tex/<versionId>/<role>.<px>.webp`. */
+  /** The logical path the manifest lists: `tex/<versionId>/<role>.<px>.<webp|ktx2>`. */
   readonly path: string;
 };
 
@@ -46,6 +47,11 @@ export type TextureSourceOptions = {
   readonly fetch?: TextureFetch;
   /** `createImageBitmap` when absent. */
   readonly decode?: (blob: Blob, options: ImageBitmapOptions) => Promise<DecodedImage>;
+  /**
+   * The viewer's KTX2 transcoder (`Ktx2Support.transcode`), for `.ktx2` maps;
+   * absent, such a map stays flat with a warning.
+   */
+  readonly transcode?: ((bytes: ArrayBuffer) => Promise<THREE.CompressedTexture>) | undefined;
   /** Schedules `run` after `ms` and answers its cancel; `setTimeout` when absent (tests drive a clock by hand). */
   readonly schedule?: (run: () => void, ms: number) => () => void;
   /** Jobs in flight at once; `MAX_TEXTURE_PARALLEL` when absent. */
@@ -74,6 +80,23 @@ class TextureDeadline extends Error {
   }
 }
 
+/** What a KTX2 map transcoded to: the mip payload and the GPU format every view of it uploads. */
+type CompressedPayload = {
+  readonly mipmaps: THREE.CompressedTextureMipmap[];
+  readonly format: THREE.CompressedPixelFormat;
+  readonly type: THREE.TextureDataType;
+};
+
+/**
+ * One decoded map: the `Source` every view shares (one GPU upload), the
+ * compressed payload when it came from a KTX2 file, and how to let it go.
+ */
+type DecodedMap = {
+  readonly source: THREE.TextureSource<{ readonly width: number; readonly height: number }>;
+  readonly compressed: CompressedPayload | null;
+  close(): void;
+};
+
 /**
  * One map of the document: its encoded bytes (fetched once, kept for the
  * document's lifetime), its decoded image while anyone holds it, the owners
@@ -81,9 +104,9 @@ class TextureDeadline extends Error {
  */
 type TextureEntry = {
   readonly bytes: Promise<ArrayBuffer | null>;
-  image: Promise<THREE.TextureSource<DecodedImage> | null> | null;
+  image: Promise<DecodedMap | null> | null;
   /** The image once decoded and held, so a release closes it at once. */
-  decoded: THREE.TextureSource<DecodedImage> | null;
+  decoded: DecodedMap | null;
   readonly holders: Set<object>;
   readonly views: Map<object, THREE.Texture[]>;
 };
@@ -189,8 +212,8 @@ export class TextureSource {
       const image = entry.image;
       entry.image = null;
       // Closed at once when it is decoded, else the moment the decode lands.
-      if (entry.decoded === null) void image.then((source) => source?.data.close());
-      else entry.decoded.data.close();
+      if (entry.decoded === null) void image.then((decoded) => decoded?.close());
+      else entry.decoded.close();
       entry.decoded = null;
     }
     this.held.delete(owner);
@@ -209,9 +232,14 @@ export class TextureSource {
   }
 
   /** The decoded image of `entry`, remembered on it once it lands while it is still the entry's current one. */
-  private async imageOf(entry: TextureEntry, request: TextureRequest): Promise<THREE.TextureSource<DecodedImage> | null> {
+  private async imageOf(entry: TextureEntry, request: TextureRequest): Promise<DecodedMap | null> {
     const bytes = await entry.bytes;
-    const image = bytes === null ? null : await this.decodeImage(request, bytes);
+    const image =
+      bytes === null
+        ? null
+        : request.path.endsWith('.ktx2')
+          ? await this.transcodeMap(request, bytes)
+          : await this.decodeImage(request, bytes);
     if (image !== null && entry.holders.size > 0) entry.decoded = image;
     return image;
   }
@@ -222,16 +250,31 @@ export class TextureSource {
    * space of its role. Its transform is the material's to set; the image
    * upload is shared by every view of it.
    */
-  private viewOf(image: THREE.TextureSource<DecodedImage>, role: LibraryMapRole): THREE.Texture {
-    const view = new THREE.Texture();
-    view.source = image;
+  private viewOf(image: DecodedMap, role: LibraryMapRole): THREE.Texture {
+    const { compressed } = image;
+    // A compressed view carries the shared payload itself (three uploads a
+    // compressed texture from its `mipmaps`), and generates no mipmaps: it
+    // samples the levels the file supplies, trilinearly when there are several.
+    const view =
+      compressed === null
+        ? new THREE.Texture()
+        : new THREE.CompressedTexture(
+            compressed.mipmaps,
+            image.source.data.width,
+            image.source.data.height,
+            compressed.format,
+            compressed.type,
+          );
+    view.source = image.source;
     view.wrapS = THREE.RepeatWrapping;
     view.wrapT = THREE.RepeatWrapping;
-    view.generateMipmaps = true;
-    view.minFilter = THREE.LinearMipmapLinearFilter;
+    view.generateMipmaps = compressed === null;
+    view.minFilter = compressed !== null && compressed.mipmaps.length <= 1 ? THREE.LinearFilter : THREE.LinearMipmapLinearFilter;
     view.magFilter = THREE.LinearFilter;
     view.anisotropy = Math.max(1, Math.min(MAX_VIEW_ANISOTROPY, this.options.maxAnisotropy));
-    // The image is decoded top row up already, and an `ImageBitmap` ignores `flipY` anyway.
+    // A WebP image is decoded top row up already, and an `ImageBitmap` ignores
+    // `flipY` anyway; a compressed one cannot be flipped, and its material
+    // reverses v instead (`libraryTextureMatrix`).
     view.flipY = false;
     view.colorSpace = role === 'albedo' || role === 'albedoTint' ? THREE.SRGBColorSpace : THREE.NoColorSpace;
     // `version`, not `needsUpdate`: the setter also bumps the shared `Source`, which
@@ -312,7 +355,7 @@ export class TextureSource {
    * and a normal map reads with a positive scale; with no colour conversion
    * and no premultiplication, so a data map reaches the shader as written.
    */
-  private async decodeImage(request: TextureRequest, bytes: ArrayBuffer): Promise<THREE.TextureSource<DecodedImage> | null> {
+  private async decodeImage(request: TextureRequest, bytes: ArrayBuffer): Promise<DecodedMap | null> {
     const { log } = this.options;
     let image: DecodedImage;
     try {
@@ -335,7 +378,48 @@ export class TextureSource {
       );
       return null;
     }
-    return new THREE.TextureSource(image);
+    return { source: new THREE.TextureSource(image), compressed: null, close: () => image.close() };
+  }
+
+  /**
+   * The bytes of a KTX2 map as a compressed image of its named size, or
+   * `null` with a warning. The container is judged before the transcoder is
+   * asked (`ktx2-container.ts`): a wrong file costs no worker time. The
+   * colour space stays the role's; a container whose transfer function says
+   * otherwise is drawn by its role all the same, and named in a warning.
+   */
+  private async transcodeMap(request: TextureRequest, bytes: ArrayBuffer): Promise<DecodedMap | null> {
+    const { log, transcode } = this.options;
+    const path = request.path;
+    const facts = readKtx2Facts(bytes);
+    const problem = facts === null ? 'is not a KTX2 container' : ktx2MapProblem(facts, Number(request.size));
+    if (problem !== null || facts === null) {
+      log.warn('texture-ktx2', `Texture ${path} ${problem ?? 'is not a KTX2 container'}; the surface stays flat`, { path });
+      return null;
+    }
+    if (transcode === undefined) {
+      log.warn('texture-ktx2', `Texture ${path} needs the KTX2 transcoder, which this viewer does not have; the surface stays flat`, {
+        path,
+      });
+      return null;
+    }
+    let texture: THREE.CompressedTexture;
+    try {
+      texture = await transcode(bytes);
+    } catch (cause) {
+      log.warn('texture-ktx2', `Texture ${path} could not be transcoded; the surface stays flat`, { path, cause });
+      return null;
+    }
+    const colour = request.role === 'albedo' || request.role === 'albedoTint';
+    if (colour !== (facts.transfer === KTX2_TRANSFER_SRGB)) {
+      log.warn('texture-colour-space', `Texture ${path} is stored as ${colour ? 'linear' : 'sRGB'} data; it is drawn as its role says`, {
+        path,
+        role: request.role,
+      });
+    }
+    const payload: CompressedPayload = { mipmaps: texture.mipmaps ?? [], format: texture.format, type: texture.type };
+    const size = Number(request.size);
+    return { source: new THREE.TextureSource({ width: size, height: size }), compressed: payload, close: () => texture.dispose() };
   }
 
   /** The warning a failed job leaves behind; a job the budget stopped says nothing (the budget said it once). */
