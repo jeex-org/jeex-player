@@ -22,6 +22,9 @@ export const LIGHTING_STANDARD_VERSION = 1;
 /** A three-component vector as plain data. */
 export type Triple = readonly [number, number, number];
 
+/** A sun position as angles: azimuth clockwise from north, elevation above the horizon, degrees. */
+export type SunAngles = { readonly azimuth: number; readonly elevation: number };
+
 /** One soft rectangular panel of the environment, in azimuth and elevation. */
 export type EnvironmentPanel = {
   /** Centre azimuth, degrees, `atan2(z, x)`. */
@@ -140,6 +143,35 @@ export const LIGHTING_STANDARD = deepFreeze({
         far: 60,
         bias: -0.0002,
         normalBias: 0.02,
+      },
+      /**
+       * The sun positions a scene's `site.sun` names: artistic, northern
+       * hemisphere, not astronomical. Azimuth from north, clockwise seen from
+       * above; the north itself is the scene's `site.northDeg`.
+       */
+      presets: {
+        morning: { azimuth: 90, elevation: 20 },
+        noon: { azimuth: 180, elevation: 55 },
+        evening: { azimuth: 270, elevation: 20 },
+      } satisfies Record<string, SunAngles>,
+      /**
+       * How a shadow frustum is fitted to the apartment (`shadow-fit.ts`):
+       * padding across the light and along it, metres; the nearest the near
+       * plane may be, metres; the depth offset the bias is made of, metres
+       * (`bias = -depthOffset / (far - near)`); and the normal bias in world
+       * texels, clamped to `[normalBiasMin, normalBiasMax]` metres.
+       * Calibrated by eye on the demo apartment at the legacy direction and
+       * the three presets (2048 map, 7 to 10 mm texels): no acne on walls or
+       * floors and no visible gap between an object and its shadow.
+       */
+      fit: {
+        lateralPadding: 0.25,
+        depthPadding: 0.5,
+        minNear: 0.1,
+        depthOffset: 0.002,
+        normalBiasTexels: 0.5,
+        normalBiasMin: 0.002,
+        normalBiasMax: 0.02,
       },
     },
     fill: { colour: '#bed7de', intensity: 0.4, position: [-14, 8, 14] as Triple },

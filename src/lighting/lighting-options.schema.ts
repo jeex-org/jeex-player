@@ -17,7 +17,7 @@ const SHADOW = LIGHTING_STANDARD.apartment.sun.shadow;
 
 const isPowerOfTwo = (value: number): boolean => Number.isInteger(Math.log2(value));
 
-/** `{ shadowMapSize? }`, strict: an unknown key is refused. */
+/** `{ shadowMapSize?, shadowCache? }`, strict: an unknown key is refused. */
 export const apartmentRigOptionsSchema = z.strictObject(
   {
     shadowMapSize: z.optional(
@@ -29,6 +29,8 @@ export const apartmentRigOptionsSchema = z.strictObject(
           z.refine(isPowerOfTwo, { error: 'must be a power of two' }),
         ),
     ),
+    /** Redraw the sun's shadow map only when the rig is told it is dirty; default false (live). */
+    shadowCache: z.optional(z.boolean({ error: 'must be a boolean' })),
   },
   { error: (issue) => (issue.code === 'unrecognized_keys' ? 'is not an option of the apartment rig' : 'options must be an object') },
 );

@@ -298,6 +298,44 @@ describe('sceneSchema — the documents this build already reads', () => {
   });
 });
 
+describe('sceneSchema — site (schema 2.3)', () => {
+  const at = (site: unknown, schemaVersion = '2.3'): unknown => ({ ...withField(lShapePlan, 'site', site), schemaVersion });
+
+  test('a 2.3 document with a valid site, or none, is a whole scene document', () => {
+    for (const site of [{ northDeg: 30, sun: 'evening' }, {}, { sun: 'noon' }, undefined]) {
+      expect(documentPaths(at(site))).toEqual([]);
+      expect(pathsOf(at(site))).toEqual([]);
+    }
+  });
+
+  test.each([
+    ['an unknown key', { north_deg: 30 }, 'site'],
+    ['a NaN north', { northDeg: Number.NaN }, 'site.northDeg'],
+    ['a string north', { northDeg: '30' }, 'site.northDeg'],
+    ['an infinite north', { northDeg: Number.NEGATIVE_INFINITY }, 'site.northDeg'],
+    ['an unknown preset', { sun: 'night' }, 'site.sun'],
+    ['null', null, 'site'],
+    ['an array', [], 'site'],
+    ['a number', 5, 'site'],
+  ])('%s is refused at its field', (_name, site, path) => {
+    expect(documentPaths(at(site))).toEqual([path]);
+    expect(pathsOf(at(site))).toEqual([path]);
+  });
+
+  test('an unknown key is named in the message', () => {
+    const result = z.safeParse(sceneSchema, at({ north_deg: 30 }));
+    expect(result.success).toBe(false);
+    expect(result.error?.issues[0]?.message).toContain('north_deg');
+  });
+
+  test('a 2.2 document carrying a site is refused at site, naming the version', () => {
+    expect(documentPaths(at({ northDeg: 0 }, '2.2'))).toEqual(['site']);
+    expect(pathsOf(at({ northDeg: 0 }, '2.2'))).toEqual(['site']);
+    const result = z.safeParse(sceneSchema, at({ northDeg: 0 }, '2.2'));
+    expect(result.error?.issues[0]?.message).toContain('2.3');
+  });
+});
+
 describe('sceneSchema — UUID v7 ids and face keys', () => {
   test('a v4 UUID is refused where an entity id belongs', () => {
     const v4 = '3b241101-e2bb-4255-8caf-4136c566a962';
@@ -393,6 +431,11 @@ const RULE_CASES: readonly RuleCase[] = [
   { rule: 'schema-version-unsupported', kind: 'structural', document: () => brokenScene((scene) => put(scene, 'schemaVersion', '2.1')) },
   { rule: 'units-unsupported', kind: 'structural', document: () => brokenScene((scene) => put(scene, 'units', 'ft')) },
   { rule: 'storey-invalid', kind: 'structural', document: () => brokenScene((scene) => put(scene, 'storey', { name: '' })) },
+  {
+    rule: 'site-invalid',
+    kind: 'structural',
+    document: () => brokenScene((scene) => Object.assign(scene, { schemaVersion: '2.3', site: { sun: 'night' } })),
+  },
   { rule: 'scene-identity-missing', kind: 'structural', document: () => brokenScene((scene) => put(scene, 'id', '')) },
   { rule: 'ceiling-height-invalid', kind: 'structural', document: () => brokenScene((scene) => put(scene, 'ceilingHeight', 1.5)) },
   { rule: 'nodes-too-few', kind: 'structural', document: () => brokenScene((scene) => put(scene, 'nodes', scene.nodes.slice(0, 2))) },

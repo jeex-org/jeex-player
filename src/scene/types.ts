@@ -781,13 +781,20 @@ export type InteriorPreset = {
  * refused with «use mirror»). 2.2 split a placement's catalogue reference into
  * fields — `asset` is a bare UUID and `library` names its library — so the
  * composite `library:asset` string of 2.0 and 2.1 is gone. That changes what
- * an existing field means, so 2.2 is the ONLY version read: an older document
- * is refused, never reinterpreted, and its producer converts it.
+ * an existing field means, so an older document is refused, never
+ * reinterpreted, and its producer converts it. 2.3 adds the optional `site`;
+ * 2.2 stays readable and may not carry it.
  */
-export type SchemaVersion = '2.2';
+export type SchemaVersion = '2.2' | '2.3';
 
 /** The versions a reader accepts, oldest first; the last is what a writer writes (a document is never re-versioned by an op). */
-export const SCHEMA_VERSIONS = ['2.2'] as const satisfies readonly SchemaVersion[];
+export const SCHEMA_VERSIONS = ['2.2', '2.3'] as const satisfies readonly SchemaVersion[];
+
+/** The sun presets a `site` may name (schema 2.3). */
+export type SiteSun = 'morning' | 'noon' | 'evening';
+
+/** Where the plan faces (schema 2.3): `northDeg` is true north's world azimuth, degrees clockwise from +Z towards +X; absent 0. `sun` absent is `noon`. */
+export type SceneSite = { readonly northDeg?: number; readonly sun?: SiteSun };
 
 /**
  * The only length unit this schema speaks. Explicit on the document, so an
@@ -839,6 +846,8 @@ export type SceneData = {
   readonly interiors?: readonly InteriorPreset[];
   /** Where walk mode drops the camera when it starts outside the plan. */
   readonly walkSpawn?: CameraPose;
+  /** Orientation and sun preset (schema 2.3); absent: the sun keeps its legacy direction. */
+  readonly site?: SceneSite;
   /**
    * One continuous camera run: dollhouse overview arc → dive to the entrance →
    * eye-level walkthrough through doorways → rise back to the overview.

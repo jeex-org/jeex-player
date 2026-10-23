@@ -27,12 +27,13 @@
  * caller's to answer, by disposing this context and creating a new one.
  */
 
-import type { DataTexture, PMREMGenerator, WebGLRenderTarget, Group, Texture } from 'three';
+import type { DataTexture, DirectionalLight, PMREMGenerator, WebGLRenderTarget, Group, Texture } from 'three';
 import { LightingError } from './lighting-error.js';
 import { apartmentEnvironmentIntensity, LIGHTING_STANDARD, referenceEnvironmentIntensity, type Triple } from './lighting-standard.js';
 import { generateEnvironment, toHalfFloats } from './environment-recipe.js';
 import { judgeApartmentRigOptions, type ApartmentRigOptions } from './lighting-options.schema.js';
 import type { LightingRenderer, LightingScene, LightingThree } from './lighting-three.js';
+import { finiteTriple, unitSunDirection, type ShadowFit } from './shadow-fit.js';
 
 /** Which rig: material review or the player's apartment. */
 export type LightingRigKind = 'reference' | 'apartment';
@@ -50,12 +51,33 @@ export type LightingRig = {
   dispose(): void;
 };
 
+/**
+ * The apartment rig, with its sun under the caller's control.
+ *
+ * Until a setter runs the sun keeps the standard's position, target and
+ * frustum. With the `shadowCache` option the sun's shadow map is drawn on the
+ * first render and afterwards only after `markShadowDirty` or a setter; without
+ * it three redraws the map on every render, as for any light.
+ */
+export type ApartmentRig = LightingRig & {
+  /** The sun's shadow map size actually allocated: the asked size, lowered to the renderer's maximum. */
+  readonly shadowMapSize: number;
+  /** Aims the sun: `direction` points from the scene towards the sun, any length, upwards; the target stays. */
+  setSunDirection(direction: Triple): void;
+  /** Puts the sun, its target, the shadow camera's up and planes and both biases where `fit` says. */
+  setShadowFrustum(fit: ShadowFit): void;
+  /** Asks for the cached shadow map to be redrawn on the next render. */
+  markShadowDirty(): void;
+  /** How many times the sun's shadow map has been drawn: a probe for a caller's own cache tests. */
+  readonly shadowDraws: number;
+};
+
 /** The standard bound to one renderer. */
 export type LightingContext = {
   /** The rig of material swatches and asset review: environment and one white key. */
   createReferenceRig(): LightingRig;
   /** The rig of the player's scenes: environment, sky, shadow-casting sun and fill. */
-  createApartmentRig(options?: ApartmentRigOptions): LightingRig;
+  createApartmentRig(options?: ApartmentRigOptions): ApartmentRig;
   /** Whether `dispose` has run. */
   readonly disposed: boolean;
   /** Disposes every rig of this context, then the environment; idempotent. */
@@ -88,7 +110,7 @@ class Rig implements LightingRig {
   private readonly forget: (rig: Rig) => void;
   private attached: LightingScene | null = null;
   private saved: Saved | null = null;
-  private released = false;
+  protected released = false;
 
   constructor(kind: LightingRigKind, group: Group, environment: Texture, intensity: number, forget: (rig: Rig) => void) {
     this.kind = kind;
@@ -150,6 +172,83 @@ class Rig implements LightingRig {
   }
 }
 
+/** The apartment rig: a `Rig` whose sun the caller aims and fits. */
+class SunRig extends Rig implements ApartmentRig {
+  readonly shadowMapSize: number;
+  private readonly sun: DirectionalLight;
+  private draws = 0;
+
+  constructor(group: Group, environment: Texture, intensity: number, forget: (rig: Rig) => void, sun: DirectionalLight, size: number) {
+    super('apartment', group, environment, intensity, forget);
+    this.sun = sun;
+    this.shadowMapSize = size;
+    // three r186 calls a directional shadow's `updateMatrices` from the shadow
+    // pass alone, once per light it actually draws: counting the calls counts
+    // the draws without reaching into the renderer.
+    const shadow = sun.shadow;
+    // Every argument goes on: three passes more than the typed one.
+    const update = shadow.updateMatrices.bind(shadow) as (...args: unknown[]) => void;
+    shadow.updateMatrices = (...args: unknown[]) => {
+      this.draws += 1;
+      update(...args);
+    };
+  }
+
+  get shadowDraws(): number {
+    return this.draws;
+  }
+
+  setSunDirection(direction: Triple): void {
+    this.refuseReleased();
+    const [x, y, z] = unitSunDirection(direction);
+    const target = this.sun.target.position;
+    const distance = this.sun.position.distanceTo(target) || 1;
+    this.sun.position.set(target.x + x * distance, target.y + y * distance, target.z + z * distance);
+    this.sun.shadow.needsUpdate = true;
+  }
+
+  setShadowFrustum(fit: ShadowFit): void {
+    this.refuseReleased();
+    const planes = [fit.left, fit.right, fit.top, fit.bottom, fit.near, fit.far, fit.bias, fit.normalBias];
+    const along = [0, 1, 2].map((axis) => fit.position[axis]! - fit.target[axis]!) as unknown as Triple;
+    const sound =
+      finiteTriple(fit.position) &&
+      finiteTriple(fit.target) &&
+      finiteTriple(fit.up) &&
+      planes.every((value) => Number.isFinite(value)) &&
+      fit.left < fit.right &&
+      fit.bottom < fit.top &&
+      fit.near >= 0 &&
+      fit.near < fit.far &&
+      Math.hypot(...fit.up) > 0 &&
+      Math.hypot(...along) > 0;
+    if (!sound) throw new LightingError('bad-options', 'sun refused: the frustum must be finite and not empty');
+    place(this.sun, fit.position);
+    place(this.sun.target, fit.target);
+    const camera = this.sun.shadow.camera;
+    camera.up.set(fit.up[0], fit.up[1], fit.up[2]);
+    camera.left = fit.left;
+    camera.right = fit.right;
+    camera.top = fit.top;
+    camera.bottom = fit.bottom;
+    camera.near = fit.near;
+    camera.far = fit.far;
+    camera.updateProjectionMatrix();
+    this.sun.shadow.bias = fit.bias;
+    this.sun.shadow.normalBias = fit.normalBias;
+    this.sun.shadow.needsUpdate = true;
+  }
+
+  markShadowDirty(): void {
+    this.refuseReleased();
+    this.sun.shadow.needsUpdate = true;
+  }
+
+  private refuseReleased(): void {
+    if (this.released) throw new LightingError('disposed', 'the apartment rig was disposed');
+  }
+}
+
 /** `object.position` set from a frozen triple. */
 function place(object: { position: { set(x: number, y: number, z: number): unknown } }, at: Triple): void {
   object.position.set(at[0], at[1], at[2]);
@@ -184,7 +283,7 @@ class Context implements LightingContext {
     return this.adopt('reference', group, referenceEnvironmentIntensity());
   }
 
-  createApartmentRig(options?: ApartmentRigOptions): LightingRig {
+  createApartmentRig(options?: ApartmentRigOptions): ApartmentRig {
     this.refuseDisposed();
     const verdict = judgeApartmentRigOptions(options);
     if (!verdict.ok) throw new LightingError('bad-options', verdict.message);
@@ -212,6 +311,12 @@ class Context implements LightingContext {
     camera.far = shadow.far;
     sunLight.shadow.bias = shadow.bias;
     sunLight.shadow.normalBias = shadow.normalBias;
+    // Per light, never the renderer's global gate: a capture rig and the live
+    // rig each keep their own map and their own dirtiness.
+    if (verdict.value.shadowCache === true) {
+      sunLight.shadow.autoUpdate = false;
+      sunLight.shadow.needsUpdate = true;
+    }
     group.add(sunLight, sunLight.target);
 
     const fillLight = new this.three.DirectionalLight(fill.colour, fill.intensity);
@@ -219,7 +324,9 @@ class Context implements LightingContext {
     fillLight.castShadow = false;
     place(fillLight, fill.position);
     group.add(fillLight, fillLight.target);
-    return this.adopt('apartment', group, apartmentEnvironmentIntensity());
+    const rig = new SunRig(group, this.target.texture, apartmentEnvironmentIntensity(), (gone) => this.rigs.delete(gone), sunLight, size);
+    this.rigs.add(rig);
+    return rig;
   }
 
   dispose(): void {

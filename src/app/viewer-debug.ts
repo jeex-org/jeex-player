@@ -18,6 +18,7 @@
  * exfiltrate the document through the global.
  */
 
+import type { SunShadow, SunShadowState } from '../render/sun-shadow.js';
 import * as THREE from 'three';
 import { projectToViewport } from '../render/viewport-projection.js';
 import type { Messages } from '../ui/messages.js';
@@ -98,6 +99,8 @@ type ViewerDebugApi = {
    * guards against a shell rebuild introducing one.
    */
   furnitureRendered: () => boolean | null;
+  /** The sun: direction, its world angles, the fitted frustum and how often its cached map was drawn; `null` before a root. */
+  sunShadow: () => SunShadowState | null;
   /**
    * What every furniture body on screen actually IS, right now: the placement
    * id, whether its body is procedural, a `dims` stand-in waiting for a GLB or
@@ -386,6 +389,7 @@ type SceneDebug = {
   sceneRoot: () => THREE.Object3D | undefined;
   builder: () => SceneBuilder | undefined;
   editor: () => ViewerEditor | undefined;
+  sun: () => SunShadow | undefined;
   furnitureVisible: () => boolean;
   /** This instance's catalogue; `setLocale` replaces it. */
   messages: () => Messages;
@@ -510,6 +514,7 @@ export function installViewerDebug(host: ViewerDebugHost): ViewerDebugApi {
     rooms: () => model().scene.rooms.map((room) => room.id),
     furniture: () => host.furnitureVisible(),
     furnitureRendered: () => host.sceneRoot()?.getObjectByName(FURNITURE_GROUP_NAME)?.visible ?? null,
+    sunShadow: () => host.sun()?.state() ?? null,
     assetModels: () => {
       const furniture = host.sceneRoot()?.getObjectByName(FURNITURE_GROUP_NAME);
       if (!furniture) return [];

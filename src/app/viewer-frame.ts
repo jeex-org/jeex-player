@@ -33,6 +33,8 @@ type FrameHookDeps = {
 
 /** The hooks a mounted viewer runs, in the order they must run in. */
 export function frameHooksFor(deps: FrameHookDeps): readonly FrameHook[] {
+  /** Whether the furniture moved on the previous frame: the first still frame after motion settles the sun. */
+  let furnitureWasMoving = false;
   return [
     (_delta, now) => {
       const stage = deps.stage();
@@ -41,6 +43,20 @@ export function frameHooksFor(deps: FrameHookDeps): readonly FrameHook[] {
       // After the camera hook: the tour's auto-open and the HUD anchor both
       // read the pose of the frame that is about to be drawn.
       deps.doors.update(now);
+      // After both animations: what they moved this frame is what the cached
+      // sun shadow must redraw (`render/sun-shadow.ts`); drained every frame.
+      const doorsMoved = deps.doors.takeMoved();
+      const furnitureMoved = deps.animator.takeMoved();
+      // A model upgrade swapped bodies since the last frame: one refit for all of them.
+      deps.mount.flushSunRefit();
+      const sun = deps.mount.sunShadow;
+      if (sun && doorsMoved) sun.markDirty();
+      for (const group of furnitureMoved) sun?.include(group);
+      // Settled only once the animation is over: an item still waiting out its
+      // ripple delay moves nothing for a while, and that is not the end.
+      const furnitureMoving = furnitureMoved.length > 0 || deps.animator.busy;
+      if (furnitureWasMoving && !furnitureMoving) sun?.settle();
+      furnitureWasMoving = furnitureMoving;
       // The map follows whatever the mode ended up being — a button, a room
       // focus or a manual grab mid-tour all land here on the next frame.
       stage?.syncMinimap();

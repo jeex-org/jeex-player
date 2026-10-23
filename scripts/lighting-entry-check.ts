@@ -129,25 +129,40 @@ export function entryGraph(dir: string, entry: string): string[] {
 export const CONSUMER_SOURCE = `import * as THREE from 'three';
 import {
   createLightingContext,
+  fitShadowFrustum,
+  LEGACY_SUN_DIRECTION,
   LIGHTING_ERROR_CODES,
   LIGHTING_STANDARD,
   LIGHTING_STANDARD_VERSION,
   LightingError,
+  sunDirection,
+  type ApartmentRig,
   type ApartmentRigOptions,
   type LightingContext,
   type LightingErrorCode,
   type LightingRig,
   type LightingThree,
+  type ShadowBox,
+  type ShadowFit,
+  type SunDirection,
+  type SunOrientation,
 } from 'jeex-viewer/lighting';
 
 export function light(canvas: HTMLCanvasElement): { context: LightingContext; rigs: LightingRig[]; key: string } {
   const renderer = new THREE.WebGLRenderer({ canvas });
   const engine: LightingThree = THREE;
   const context = createLightingContext(engine, renderer);
-  const options: ApartmentRigOptions = { shadowMapSize: 1024 };
+  const options: ApartmentRigOptions = { shadowMapSize: 1024, shadowCache: true };
   const scene = new THREE.Scene();
-  const apartment = context.createApartmentRig(options);
+  const apartment: ApartmentRig = context.createApartmentRig(options);
   apartment.attach(scene);
+  const site: SunOrientation = { northDeg: 30, sun: 'evening' };
+  const sun: SunDirection = site.sun === undefined ? sunDirection(null) : sunDirection(site);
+  const boxes: ShadowBox[] = [{ min: [0, 0, 0], max: [8, 2.7, 6] }];
+  const fit: ShadowFit = fitShadowFrustum(boxes, sun.direction, apartment.shadowMapSize);
+  apartment.setSunDirection(LEGACY_SUN_DIRECTION);
+  apartment.setShadowFrustum(fit);
+  apartment.markShadowDirty();
   const reference = context.createReferenceRig();
   const revision: string = LIGHTING_STANDARD.engineRevision;
   const intensity: number = LIGHTING_STANDARD.apartment.sun.intensity;

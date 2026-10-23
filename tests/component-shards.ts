@@ -66,6 +66,8 @@ export const COMPONENT_FILE_COST_S: Readonly<Record<string, number>> = {
   'selection-panel.test.ts': 1,
   'selection.test.ts': 18,
   'still-capture.test.ts': 1,
+  'sun-shadow-motion.test.ts': 297,
+  'sun-shadow.test.ts': 36,
   'swatch-preview.test.ts': 20,
   'target-sizes.test.ts': 1,
   'tour-bar.test.ts': 1,

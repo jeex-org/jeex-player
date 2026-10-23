@@ -12,6 +12,8 @@ import { createLightingContext, type LightingContext } from './lighting-context.
 import { LightingError, type LightingErrorCode } from './lighting-error.js';
 import { apartmentEnvironmentIntensity, LIGHTING_STANDARD, referenceEnvironmentIntensity } from './lighting-standard.js';
 import type { LightingRenderer, LightingThree } from './lighting-three.js';
+import { fitShadowFrustum } from './shadow-fit.js';
+import { sunDirection } from './sun-direction.js';
 
 type Ledger = {
   textures: THREE.DataTexture[];
@@ -389,5 +391,157 @@ describe('disposal', () => {
     lighting.dispose();
     expect(disposed).toBe(0);
     expect(scene.children).toHaveLength(1);
+  });
+});
+
+describe('the apartment rig sun', () => {
+  function sunOf(scene: THREE.Scene): THREE.DirectionalLight {
+    return lightsOf(scene).find((light) => light.castShadow) as THREE.DirectionalLight;
+  }
+
+  function attached(options?: Parameters<LightingContext['createApartmentRig']>[0], maxTextureSize?: number) {
+    const { three } = engine();
+    const lighting = createLightingContext(three, stubRenderer(maxTextureSize));
+    const scene = new THREE.Scene();
+    const rig = lighting.createApartmentRig(options);
+    rig.attach(scene);
+    return { rig, scene, sun: sunOf(scene) };
+  }
+
+  /** Everything a setter must leave alone: the other lights and the environment. */
+  function others(scene: THREE.Scene): string {
+    const lights = lightsOf(scene)
+      .filter((light) => !light.castShadow)
+      .map((light) => [light.type, light.intensity, light.position.toArray(), light.color.getHexString()]);
+    return JSON.stringify({ lights, environment: scene.environment?.uuid, intensity: scene.environmentIntensity });
+  }
+
+  test('reports its effective shadow map size: 2048 by default, lowered to the renderer maximum', () => {
+    expect(attached().rig.shadowMapSize).toBe(2048);
+    expect(attached({ shadowMapSize: 512 }).rig.shadowMapSize).toBe(512);
+    expect(attached({ shadowMapSize: 4096 }, 2048).rig.shadowMapSize).toBe(2048);
+  });
+
+  test('shadows stay live unless caching is asked for', () => {
+    const { sun } = attached();
+    expect(sun.shadow.autoUpdate).toBe(true);
+    expect(attached({ shadowCache: false }).sun.shadow.autoUpdate).toBe(true);
+  });
+
+  test('a cached sun is drawn on the first render and afterwards only when told', () => {
+    const { rig, sun } = attached({ shadowCache: true });
+    expect(sun.shadow.autoUpdate).toBe(false);
+    expect(sun.shadow.needsUpdate).toBe(true);
+    // What three does after it drew the map.
+    sun.shadow.needsUpdate = false;
+    rig.markShadowDirty();
+    expect(sun.shadow.needsUpdate).toBe(true);
+    sun.shadow.needsUpdate = false;
+    rig.setSunDirection([0, 1, 0]);
+    expect(sun.shadow.needsUpdate).toBe(true);
+    sun.shadow.needsUpdate = false;
+    rig.setShadowFrustum(fitShadowFrustum([{ min: [0, 0, 0], max: [5, 3, 5] }], [0, 1, 0], rig.shadowMapSize));
+    expect(sun.shadow.needsUpdate).toBe(true);
+  });
+
+  test('counts the draws of its shadow map', () => {
+    const { rig, sun } = attached({ shadowCache: true });
+    expect(rig.shadowDraws).toBe(0);
+    sun.shadow.updateMatrices(sun);
+    sun.shadow.updateMatrices(sun);
+    expect(rig.shadowDraws).toBe(2);
+  });
+
+  test('a non-boolean cache option is refused as bad-options', () => {
+    const { lighting } = context();
+    expect(codeOf(() => lighting.createApartmentRig({ shadowCache: 'yes' } as never))).toBe('bad-options');
+  });
+
+  test('setting the sun direction moves the light along the opposite of it and leaves the rest alone', () => {
+    const { rig, scene, sun } = attached();
+    const before = others(scene);
+    const target = sun.target.position.clone();
+    const direction = sunDirection({ northDeg: 30, sun: 'evening' }).direction;
+    rig.setSunDirection(direction);
+    const travel = sun.target.position.clone().sub(sun.position).normalize();
+    travel.toArray().forEach((value, axis) => expect(value).toBeCloseTo(-direction[axis]!, 9));
+    expect(sun.target.position.toArray()).toEqual(target.toArray());
+    expect(others(scene)).toBe(before);
+  });
+
+  test('setting the frustum puts the light, its target, the camera up and the planes where the fit says', () => {
+    const { rig, sun } = attached();
+    const boxes = [
+      { min: [0, 0, 0], max: [9, 2.7, 7] },
+      { min: [-2, -0.2, 3], max: [1, 1, 12] },
+    ] as const;
+    const direction = sunDirection({ northDeg: 0, sun: 'noon' }).direction;
+    const fit = fitShadowFrustum(boxes, direction, rig.shadowMapSize);
+    rig.setShadowFrustum(fit);
+    const camera = sun.shadow.camera;
+    expect(sun.position.toArray()).toEqual([...fit.position]);
+    expect(sun.target.position.toArray()).toEqual([...fit.target]);
+    expect(camera.up.toArray()).toEqual([...fit.up]);
+    expect([camera.left, camera.right, camera.top, camera.bottom, camera.near, camera.far]).toEqual([
+      fit.left,
+      fit.right,
+      fit.top,
+      fit.bottom,
+      fit.near,
+      fit.far,
+    ]);
+    expect(sun.shadow.bias).toBe(fit.bias);
+    expect(sun.shadow.normalBias).toBe(fit.normalBias);
+    const fresh = new THREE.OrthographicCamera(fit.left, fit.right, fit.top, fit.bottom, fit.near, fit.far);
+    expect(camera.projectionMatrix.toArray()).toEqual(fresh.projectionMatrix.toArray());
+    sun.updateMatrixWorld(true);
+    sun.target.updateMatrixWorld(true);
+    sun.shadow.updateMatrices(sun);
+    const clip = new THREE.Matrix4().multiplyMatrices(camera.projectionMatrix, camera.matrixWorldInverse);
+    for (const box of boxes) {
+      for (const x of [box.min[0], box.max[0]])
+        for (const y of [box.min[1], box.max[1]])
+          for (const z of [box.min[2], box.max[2]]) {
+            const ndc = new THREE.Vector3(x, y, z).applyMatrix4(clip);
+            for (const axis of ndc.toArray()) expect(Math.abs(axis)).toBeLessThanOrEqual(1 + 1e-9);
+          }
+    }
+  });
+
+  test('a bad direction or frustum is refused as bad-options and the sun is unchanged', () => {
+    const { rig, sun } = attached();
+    const snapshot = (): string =>
+      JSON.stringify([
+        sun.position.toArray(),
+        sun.target.position.toArray(),
+        sun.shadow.camera.toJSON(),
+        sun.shadow.bias,
+        sun.shadow.normalBias,
+      ]);
+    const before = snapshot();
+    const good = fitShadowFrustum([{ min: [0, 0, 0], max: [4, 3, 4] }], [0, 1, 0], 2048);
+    const refusals: Array<() => unknown> = [
+      () => rig.setSunDirection([0, 0, 0]),
+      () => rig.setSunDirection([Number.NaN, 1, 0]),
+      () => rig.setSunDirection([0, -1, 0]),
+      () => rig.setSunDirection([1, 0, 0]),
+      () => rig.setShadowFrustum({ ...good, left: Number.NaN }),
+      () => rig.setShadowFrustum({ ...good, left: good.right }),
+      () => rig.setShadowFrustum({ ...good, top: good.bottom - 1 }),
+      () => rig.setShadowFrustum({ ...good, near: good.far }),
+      () => rig.setShadowFrustum({ ...good, position: [0, Number.POSITIVE_INFINITY, 0] }),
+      () => rig.setShadowFrustum({ ...good, up: [0, 0, 0] }),
+      () => rig.setShadowFrustum({ ...good, position: good.target }),
+      () => rig.setShadowFrustum({ ...good, bias: Number.NaN }),
+    ];
+    for (const run of refusals) expect(codeOf(run)).toBe('bad-options');
+    expect(snapshot()).toBe(before);
+  });
+
+  test('a disposed rig refuses its setters', () => {
+    const { rig } = attached();
+    rig.dispose();
+    expect(codeOf(() => rig.setSunDirection([0, 1, 0]))).toBe('disposed');
+    expect(codeOf(() => rig.markShadowDirty())).toBe('disposed');
   });
 });

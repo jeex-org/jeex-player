@@ -6,7 +6,8 @@
 
 import { describe, expect, test } from 'bun:test';
 import * as THREE from 'three';
-import { FLOOR_RING_LAYER, FLOOR_RING_NAME, FloorRing, floorRingPoint } from './floor-ring.js';
+import { FLOOR_RING_NAME, FloorRing, floorRingPoint } from './floor-ring.js';
+import { FLOOR_RING_LAYER } from '../shared/render-layers.js';
 
 const FLOOR = new THREE.Vector3(2, 0, 3);
 const yes = (): boolean => true;

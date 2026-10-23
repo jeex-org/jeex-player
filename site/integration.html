@@ -120,7 +120,7 @@ bun run build:lib    <span class="c"># dist-lib/: the library, the custom elemen
       <section class="step-doc" id="your-scene" aria-labelledby="scene-title">
         <p class="eyebrow">Step 03</p>
         <h2 id="scene-title">Supply your own scene.</h2>
-        <p>The player renders a scene document (schema 2.2: walls, openings, rooms, furniture, finishes) or a baked project folder whose root is a <code>project.json</code>. It does not create scenes. The URL you give it must hold to these rules:</p>
+        <p>The player renders a scene document (schema 2.3 or 2.2: walls, openings, rooms, furniture, finishes) or a baked project folder whose root is a <code>project.json</code>. It does not create scenes. The URL you give it must hold to these rules:</p>
         <ul class="ticks">
           <li>CORS from wherever it is served <span>&mdash; the fetch comes from the viewer's origin, without credentials</span></li>
           <li>A <code>Content-Type</code> that includes <code>application/json</code></li>
@@ -236,7 +236,7 @@ viewer.tour.play();</pre>
           <li><a href="https://github.com/jeex-org/jeex-player/blob/main/README.md#errors">Errors<span>codes to branch on</span></a></li>
           <li><a href="https://github.com/jeex-org/jeex-player/blob/main/README.md#3-iframe-with-postmessage">iframe with postMessage<span>the host helper and the wire protocol</span></a></li>
           <li><a href="https://github.com/jeex-org/jeex-player/blob/main/README.md#scene-sources">Scene sources<span>URL, document, repository</span></a></li>
-          <li><a href="https://github.com/jeex-org/jeex-player/blob/main/README.md#scene-document">Scene document<span>schema 2.2 and its rules</span></a></li>
+          <li><a href="https://github.com/jeex-org/jeex-player/blob/main/README.md#scene-document">Scene document<span>schema 2.3 and its rules</span></a></li>
           <li><a href="https://github.com/jeex-org/jeex-player/blob/main/README.md#project-format">Project format<span>the baked project folder</span></a></li>
           <li><a href="https://github.com/jeex-org/jeex-player/blob/main/README.md#theming">Theming<span>the ten custom properties and the parts</span></a></li>
           <li><a href="https://github.com/jeex-org/jeex-player/blob/main/README.md#languages">Languages<span>catalogues and your own locale</span></a></li>

@@ -62,12 +62,32 @@ export class FurnitureAnimator {
   private toggle: Toggle | null = null;
   private group: THREE.Group | null = null;
   private readonly swaps: SwapJob[] = [];
+  /** Groups whose pose an animation wrote since the last `takeMoved`. */
+  private readonly touched = new Set<THREE.Group>();
+
+  /** Whether a show/hide ripple or a swap is still in flight, delays included. */
+  get busy(): boolean {
+    return this.toggle !== null || this.swaps.length > 0;
+  }
+
+  /**
+   * The groups an animation moved, scaled, removed or settled since the last
+   * call, final frames included; the sun's cached shadow follows them
+   * (`render/sun-shadow.ts`).
+   */
+  takeMoved(): THREE.Group[] {
+    const groups = [...this.touched];
+    this.touched.clear();
+    return groups;
+  }
 
   /** Adopts every direct child group of the furniture container at its current pose. */
   attach(container: THREE.Group | null): void {
     // A rebuild replaces the whole furniture group: any swap still running
     // would animate objects that are no longer in the scene.
     this.settleSwaps();
+    // The settled groups belong to the root being replaced: nobody downstream may measure them.
+    this.touched.clear();
     this.items.clear();
     this.toggle = null;
     this.group = container;
@@ -158,6 +178,7 @@ export class FurnitureAnimator {
   dispose(): void {
     this.settleSwaps();
     this.items.clear();
+    this.touched.clear();
     this.toggle = null;
     this.group = null;
   }
@@ -176,13 +197,22 @@ export class FurnitureAnimator {
       const base = this.items.get(item.group);
       if (base) base.progress = progress;
       const shown = Math.max(0.001, progress);
-      item.group.scale.setScalar(item.baseScale * shown);
+      const scale = item.baseScale * shown;
       // Pop-in: the item hops slightly above its spot and settles back down.
       const hop = anim.hide ? 0 : Math.sin(clamped * Math.PI) * HOP_M * clamped;
-      item.group.position.y = item.baseY - TOGGLE_DIP_M * (1 - Math.min(1, Math.max(0, eased))) + hop;
+      const y = item.baseY - TOGGLE_DIP_M * (1 - Math.min(1, Math.max(0, eased))) + hop;
+      // Only a pose that changed is news: an item waiting out its delay is not.
+      if (item.group.scale.x === scale && item.group.position.y === y) continue;
+      item.group.scale.setScalar(scale);
+      item.group.position.y = y;
+      this.touched.add(item.group);
     }
     if (finished) {
-      if (anim.hide) container.visible = false;
+      if (anim.hide) {
+        container.visible = false;
+        // Hiding the container changes what casts even where no pose did.
+        for (const item of anim.items) this.touched.add(item.group);
+      }
       this.toggle = null;
     }
   }
@@ -222,6 +252,7 @@ export class FurnitureAnimator {
     for (let index = this.swaps.length - 1; index >= 0; index -= 1) {
       const job = this.swaps[index]!;
       const t = (now - job.start) / SWAP_DURATION_MS;
+      this.touched.add(job.oldGroup).add(job.newGroup);
       if (t < SWAP_OUT_SHARE) {
         const k = Math.min(1, t / SWAP_OUT_SHARE);
         job.oldGroup.scale.setScalar(Math.max(0.001, job.oldBaseScale) * (1 - k));
@@ -260,6 +291,7 @@ export class FurnitureAnimator {
   }
 
   private settle(job: SwapJob): void {
+    this.touched.add(job.oldGroup).add(job.newGroup);
     if (!job.removed) {
       job.oldGroup.removeFromParent();
       job.removed = true;

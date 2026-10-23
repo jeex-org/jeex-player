@@ -7,6 +7,7 @@
  * getters project the model rather than the stubs.
  */
 
+import type { SunShadow } from '../render/sun-shadow.js';
 import { CATALOGUE_REGISTRIES } from '../assets/catalogue-registries.js';
 import { afterEach, beforeEach, describe, expect, test } from 'bun:test';
 import * as THREE from 'three';
@@ -75,6 +76,7 @@ const READ_ONLY_KEYS = [
   'selectedOpening',
   'selection',
   'selectionPoint',
+  'sunShadow',
   'toggleDoor',
   'wallFinish',
   'wallJoints',
@@ -112,6 +114,7 @@ function host(overrides: Partial<ViewerDebugHost> = {}): ViewerDebugHost {
     renderCamera: () => undefined,
     viewport: () => ({ clientWidth: 800, clientHeight: 600 }),
     sceneRoot: () => undefined,
+    sun: () => undefined,
     director: () => stubDirector(),
     editor: () => stubEditor(),
     builder: () => stubBuilder(),
@@ -270,6 +273,13 @@ describe('the getters project the model', () => {
     expect(api.navigable(-1, -1)).toEqual({ standable: false, reachable: false });
     expect(api.focusRoom(L_SHAPE.room.a)).toBe(true);
     expect(api.focusRoom(FAKE.ghostRoom)).toBe(false);
+  });
+
+  test('sunShadow is null before a root and the sun state after', () => {
+    expect(installViewerDebug(host()).sunShadow()).toBeNull();
+    const state = { direction: [0, 1, 0] as const, azimuth: 0, elevation: 90, fit: null, draws: 3 };
+    const sun = { state: () => state } as unknown as SunShadow;
+    expect(installViewerDebug(host({ sun: () => sun })).sunShadow()).toEqual(state);
   });
 
   test('furnitureRendered reads the built group, not the toggle the app believes', () => {
