@@ -1,6 +1,7 @@
 import { describe, expect, test } from 'bun:test';
 import {
   DEFAULT_ASSET_ROTATION_Y,
+  SCHEMA_VERSIONS,
   UUID_V7_PATTERN,
   WALL_LIMITS,
   DEFAULT_ASSET_SCALE,
@@ -17,8 +18,9 @@ import {
   isPlanMode,
   isUuidV7,
   sameFace,
+  schemaVersionBefore,
 } from './types.js';
-import type { DemoAsset, Opening, Room } from './types.js';
+import type { DemoAsset, Opening, Room, SchemaVersion } from './types.js';
 
 /**
  * The schema's vocabularies with behaviour: the door-like predicate, the UUID
@@ -218,5 +220,28 @@ describe('optional fields with defaults', () => {
 describe('WALL_LIMITS', () => {
   test('carries the three numeric limits of the wall schema', () => {
     expect(WALL_LIMITS).toEqual({ minThickness: 0.05, maxThickness: 0.6, minCentrelineLength: 0.5 });
+  });
+});
+
+describe('schemaVersionBefore', () => {
+  test('the readable versions, oldest first, are 2.2, 2.3 and 2.4', () => {
+    expect([...SCHEMA_VERSIONS]).toEqual(['2.2', '2.3', '2.4']);
+  });
+
+  test('an older version comes before its floor', () => {
+    expect(schemaVersionBefore('2.2', '2.4')).toBe(true);
+    expect(schemaVersionBefore('2.3', '2.4')).toBe(true);
+    expect(schemaVersionBefore('2.2', '2.3')).toBe(true);
+  });
+
+  test('the floor itself and a newer version do not', () => {
+    expect(schemaVersionBefore('2.4', '2.4')).toBe(false);
+    expect(schemaVersionBefore('2.4', '2.3')).toBe(false);
+    expect(schemaVersionBefore('2.3', '2.2')).toBe(false);
+  });
+
+  test('a version the list does not know is not before anything', () => {
+    expect(schemaVersionBefore('2.5' as SchemaVersion, '2.4')).toBe(false);
+    expect(schemaVersionBefore('1.0' as SchemaVersion, '2.2')).toBe(false);
   });
 });

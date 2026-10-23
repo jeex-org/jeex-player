@@ -2,6 +2,7 @@ import { CATALOGUE_REGISTRIES } from '../assets/catalogue-registries.js';
 import { describe, expect, test } from 'bun:test';
 import { draftOf } from '../shared/committed.js';
 import { bayPlan, lShapePlan } from '../fixtures/plan-l-shape.js';
+import { effectiveRoom } from './types.js';
 import type { MaterialDefinition, PlanNode, Room, SceneData, Wall } from './types.js';
 import type { Draft } from '../shared/committed.js';
 import type { InteriorPreset } from './scene-ops.js';
@@ -133,11 +134,11 @@ describe('scene validator — schema version', () => {
   });
 
   test('rejects a version this build does not know', () => {
-    const invalid = { ...draftOf(lShapePlan), schemaVersion: '2.4' };
+    const invalid = { ...draftOf(lShapePlan), schemaVersion: '2.5' };
     const error = errorOf(() => validateScene(invalid, CATALOGUE_REGISTRIES));
     expect(error.rule).toBe('schema-version-unsupported');
-    expect(error.message).toContain("expected '2.2' or '2.3'");
-    expect(error.detail).toEqual({ schemaVersion: '2.4' });
+    expect(error.message).toContain("expected '2.2' or '2.3' or '2.4'");
+    expect(error.detail).toEqual({ schemaVersion: '2.5' });
   });
 
   test('reads a 2.3 document as it reads 2.2', () => {
@@ -196,6 +197,95 @@ describe('scene validator — site orientation (schema 2.3)', () => {
     expect(error.path).toBe('site');
     expect(error.message).toContain('2.3');
     expect(error.message).toContain('2.2');
+  });
+});
+
+describe('scene validator — room purpose (schema 2.4)', () => {
+  /** The L-shape fixture declared as `version`, with `purpose` written on its first room. */
+  const withPurpose = (purpose: unknown, version: SceneData['schemaVersion'] = '2.4'): unknown => {
+    const scene = draftOf(lShapePlan);
+    (scene as { schemaVersion: string }).schemaVersion = version;
+    (roomById(scene, ROOM.a) as { purpose?: unknown }).purpose = purpose;
+    return scene;
+  };
+
+  test('a 2.4 document with a known value is valid, and the purpose reads back as it was written', () => {
+    const scene = withPurpose('kitchen-living') as SceneData;
+    expect(validateScene(scene, CATALOGUE_REGISTRIES)).toBe(scene);
+    expect(scene.rooms[0]!.purpose).toBe('kitchen-living');
+  });
+
+  test.each(['dining', 'Kitchen', '', 5])(
+    'a 2.4 document with the unknown value %j is refused at that room purpose, naming the value',
+    (purpose) => {
+      const error = errorOf(() => validateScene(withPurpose(purpose), CATALOGUE_REGISTRIES));
+      expect(error.rule).toBe('room-purpose-unknown');
+      expect(error.path).toBe('rooms[0].purpose');
+      expect(error.detail).toEqual({ purpose });
+      expect(error.message).toContain(`has unknown purpose ${String(purpose)}`);
+    },
+  );
+
+  test('an absent purpose means not declared: a 2.4 document without one is valid, nothing substitutes a default', () => {
+    const scene = draftOf(lShapePlan);
+    (scene as { schemaVersion: string }).schemaVersion = '2.4';
+    expect(validateScene(scene, CATALOGUE_REGISTRIES)).toBe(scene);
+    for (const room of scene.rooms) expect(room.purpose).toBeUndefined();
+  });
+
+  test('a purpose is refused for the version first: a 2.3 document with an out-of-vocabulary value names 2.4, not the value', () => {
+    const error = errorOf(() => validateScene(withPurpose('dining', '2.3'), CATALOGUE_REGISTRIES));
+    expect(error.rule).toBe('room-purpose-needs-schema-2-4');
+    expect(error.path).toBe('rooms[0].purpose');
+    expect(error.message).toContain('2.4');
+    expect(error.message).toContain('2.3');
+    expect(error.message).not.toContain('dining');
+  });
+
+  test.each(['2.2', '2.3'] as const)('a %s document with a purpose is refused at that room purpose, naming 2.4', (version) => {
+    const error = errorOf(() => validateScene(withPurpose('bedroom', version), CATALOGUE_REGISTRIES));
+    expect(error.rule).toBe('room-purpose-needs-schema-2-4');
+    expect(error.path).toBe('rooms[0].purpose');
+    expect(error.message).toContain(`Room ${ROOM.a} purpose needs scene schema 2.4; this document is ${version}`);
+  });
+
+  test('older documents are unchanged: a purpose-free 2.2 and 2.3 document read as before', () => {
+    for (const version of ['2.2', '2.3'] as const) {
+      const scene = draftOf(lShapePlan);
+      (scene as { schemaVersion: string }).schemaVersion = version;
+      expect(validateScene(scene, CATALOGUE_REGISTRIES)).toBe(scene);
+    }
+  });
+
+  test('2.3 features in a 2.4 document: site, a finish object, a ceiling and a trim read as in 2.3', () => {
+    const scene = draftOf(lShapePlan);
+    (scene as { schemaVersion: string }).schemaVersion = '2.4';
+    scene.site = { northDeg: 30, sun: 'evening' };
+    scene.finishes = {
+      rooms: { [ROOM.a]: { ceiling: FINISH.sand, trim: { material: LIB.paint, colour: '#ffffff' } } },
+      facade: { material: LIB.paint, rotation: 90 },
+    };
+    expect(validateScene(scene, LIBRARY_REGISTRIES)).toBe(scene);
+  });
+
+  test('a purpose is independent of kind: a loggia used as a study is valid and still has no ceiling', () => {
+    const scene = draftOf(lShapePlan);
+    (scene as { schemaVersion: string }).schemaVersion = '2.4';
+    roomById(scene, ROOM.a).kind = 'loggia';
+    roomById(scene, ROOM.a).purpose = 'study';
+    expect(validateScene(scene, CATALOGUE_REGISTRIES)).toBe(scene);
+    expect(effectiveRoom(scene.rooms[0]!).kind).toBe('loggia');
+  });
+
+  test('a purpose is independent of kind: a room kind (and none) used as a balcony is valid and keeps its ceiling', () => {
+    for (const kind of ['room', undefined] as const) {
+      const scene = draftOf(lShapePlan);
+      (scene as { schemaVersion: string }).schemaVersion = '2.4';
+      if (kind !== undefined) roomById(scene, ROOM.a).kind = kind;
+      roomById(scene, ROOM.a).purpose = 'balcony';
+      expect(validateScene(scene, CATALOGUE_REGISTRIES)).toBe(scene);
+      expect(effectiveRoom(scene.rooms[0]!).kind).toBe('room');
+    }
   });
 });
 
@@ -818,6 +908,15 @@ describe('interior presets', () => {
   test('rejects a preset with no operations', () => {
     const bad = withPresets([{ ...preset(), ops: [] }]);
     expect(() => validateScene(bad, CATALOGUE_REGISTRIES)).toThrow(`Interior preset ${EXTRA.preset} needs at least one operation`);
+  });
+
+  test('rejects a preset that changes a room purpose, naming the preset and the operation', () => {
+    const bad = preset();
+    bad.ops.push({ op: 'set_room_purpose', roomId: ROOM.a, purpose: 'kitchen' });
+    const error = errorOf(() => validateScene(withPresets([bad]), CATALOGUE_REGISTRIES));
+    expect(error.rule).toBe('interior-preset-op-purpose');
+    expect(error.message).toContain(`Interior preset ${EXTRA.preset} may not change a room's purpose (set_room_purpose)`);
+    expect(error.detail).toEqual({ op: 'set_room_purpose' });
   });
 
   test('rejects an operation on an unknown asset', () => {

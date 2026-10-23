@@ -20,7 +20,9 @@
 
 import type { Draft } from '../../shared/committed.js';
 import type { SceneRegistries } from '../registries.js';
-import type { AddRoomOp, RemoveRoomOp, Room, SceneData, SetMaterialOp, SetRoomOp, Vec2 } from '../types.js';
+import { ROOM_PURPOSES, isMemberOf } from '../schema-sets.js';
+import { schemaVersionBefore } from '../types.js';
+import type { AddRoomOp, RemoveRoomOp, Room, SceneData, SetMaterialOp, SetRoomOp, SetRoomPurposeOp, Vec2 } from '../types.js';
 import {
   OpError,
   TOUCHED_SHELL,
@@ -153,6 +155,34 @@ export function applyRemoveRoom(scene: Draft<SceneData>, op: RemoveRoomOp): OpOu
 
   const tail = notes.length === 0 ? '' : `, ${notes.join(', ')}`;
   return { summary: `Room ${op.roomId}: removed ${room.name}${tail}`, touched };
+}
+
+/**
+ * `set_room_purpose`: what a room is for, from the closed vocabulary (schema
+ * 2.4).
+ *
+ * The applier checks everything the op schema checks (`types.schema.ts`) for a
+ * caller that applies an operation without parsing it first, refuses a
+ * pre-2.4 document and never raises the version: the caller does. A purpose
+ * draws nothing — the plan, the finishes and the furniture are exactly what
+ * they were — so `touched` is empty and no revision rebuilds the scene.
+ */
+export function applySetRoomPurpose(scene: Draft<SceneData>, op: SetRoomPurposeOp): OpOutcome {
+  if (schemaVersionBefore(scene.schemaVersion, '2.4')) {
+    throw new OpError(`set_room_purpose needs scene schema 2.4; this document is ${scene.schemaVersion}`);
+  }
+  const room = findRoom(scene, op.roomId);
+  const purpose: unknown = (op as { purpose?: unknown }).purpose;
+  if (purpose !== null && !isMemberOf(ROOM_PURPOSES, purpose)) {
+    // A word is named as it was written; anything else goes through JSON, the
+    // way the id registry names a value that is not a string.
+    const named = typeof purpose === 'string' ? purpose : (JSON.stringify(purpose) ?? 'undefined');
+    throw new OpError(`Unknown room purpose ${named}`);
+  }
+  const previous = room.purpose ?? 'none';
+  if (purpose === null) delete room.purpose;
+  else room.purpose = purpose;
+  return { summary: `Room ${op.roomId}: purpose ${previous} → ${purpose ?? 'none'}`, touched: [] };
 }
 
 /** True when a `set_material` target is the room itself or one of its faces. */

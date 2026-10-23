@@ -24,6 +24,30 @@ as described under [Versioning](#versioning).
   section lists what KTX2 needs. `jeex-viewer.iife.js` grows by about 26 KB
   gzip (the loader code it carries inline).
 
+- **`set_room_purpose`: a scene operation for what a room is for.**
+  `{ op: 'set_room_purpose', roomId, purpose: RoomPurpose | null }` on schema
+  2.4 documents: a vocabulary value sets the room's `purpose`, `null` removes
+  the field, and the value the room already has (or a clear of an absent one)
+  is accepted and changes nothing. The vocabulary is closed, thirteen values
+  in `ROOM_PURPOSES`: `living`, `kitchen`, `kitchen-living`, `bedroom`,
+  `kids`, `study`, `bathroom`, `wc`, `hall`, `corridor`, `storage`,
+  `utility`, `balcony`. Refused on pre-2.4 documents (the version is never
+  raised by an operation), on an unknown room and on a value outside the
+  vocabulary; interior presets may not carry it. A purpose change draws
+  nothing: the operation's `touched` is empty, and a replaced document that
+  differs only in room purposes and `schemaVersion` diffs to no touched
+  entity. `RoomPurpose`, `SetRoomPurposeOp`, `ROOM_PURPOSES`,
+  `SCHEMA_VERSIONS` and `schemaVersionBefore` are exported from
+  `jeex-viewer/ops`; the published scene schema refuses a `purpose` in a
+  pre-2.4 document.
+
+- **Scene schema 2.4: `Room.purpose`.** An optional field on every room,
+  from the closed vocabulary above; absent means not declared, with no
+  default, and no rule reads it against `kind` (a loggia may be a study, a
+  room a balcony). 2.2 and 2.3 documents stay readable; one that carries a
+  `purpose` is refused (`room-purpose-needs-schema-2-4`), an unknown value as
+  `room-purpose-unknown`. The demo apartment now ships as 2.4 with a purpose
+  on every room.
 
 - **`set_site`: a scene operation for the plan's orientation and sun preset.**
   `{ op: 'set_site', northDeg?: number | null, sun?: 'morning' | 'noon' | 'evening' | null }`
@@ -232,6 +256,11 @@ as described under [Versioning](#versioning).
 
 ### Fixed
 
+- **The IIFE build reads its own folder only from a real script element.**
+  The folder the Basis transcoder is fetched from comes from
+  `document.currentScript` in the IIFE build; a page could shadow that
+  property with any element it names `currentScript`. Anything but an
+  `HTMLScriptElement` is now ignored.
 - A disposed model source now frees the textures of the GLBs it parsed, not
   only their geometries and materials.
 

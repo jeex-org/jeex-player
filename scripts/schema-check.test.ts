@@ -157,6 +157,30 @@ describe('the Zod schema and the published JSON Schema accept the same documents
     ['a site that is an array', () => ({ ...draftOf(lShapePlan), schemaVersion: '2.3', site: [] })],
     ['a site that is a number', () => ({ ...draftOf(lShapePlan), schemaVersion: '2.3', site: 5 })],
     [
+      'a room purpose in a 2.2 document (2.4 only)',
+      () => {
+        const scene = draftOf(lShapePlan);
+        (scene.rooms[0] as unknown as Record<string, unknown>)['purpose'] = 'bedroom';
+        return scene;
+      },
+    ],
+    [
+      'a room purpose in a 2.3 document (2.4 only)',
+      () => {
+        const scene = draftOf({ ...lShapePlan, schemaVersion: '2.3' });
+        (scene.rooms[0] as unknown as Record<string, unknown>)['purpose'] = 'bedroom';
+        return scene;
+      },
+    ],
+    [
+      'a room purpose outside the vocabulary',
+      () => {
+        const scene = draftOf({ ...lShapePlan, schemaVersion: '2.4' });
+        (scene.rooms[0] as unknown as Record<string, unknown>)['purpose'] = 'dining';
+        return scene;
+      },
+    ],
+    [
       'a wall id that is not a UUID v7',
       () => {
         const scene = draftOf(lShapePlan);
@@ -283,6 +307,23 @@ describe('the Zod schema and the published JSON Schema accept the same documents
     const scene = draftOf(apartmentScene);
     (scene.assets[0] as unknown as Record<string, unknown>)['mirror'] = { x: true, z: true };
     expect({ ajv: validateSceneSchema(scene), zod: z.safeParse(sceneSchema, scene).success }).toEqual({ ajv: true, zod: true });
+  });
+
+  test('a schema 2.4 document with room purposes: both accept it, and the same room in a 2.3 document both refuse', () => {
+    const withPurpose = (schemaVersion: string): unknown => {
+      const scene = draftOf({ ...lShapePlan, schemaVersion }) as unknown as Record<string, unknown>;
+      const rooms = scene['rooms'] as Record<string, unknown>[];
+      rooms[0]!['purpose'] = 'kitchen';
+      return scene;
+    };
+    expect({ ajv: validateSceneSchema(withPurpose('2.4')), zod: z.safeParse(sceneSchema, withPurpose('2.4')).success }).toEqual({
+      ajv: true,
+      zod: true,
+    });
+    expect({ ajv: validateSceneSchema(withPurpose('2.3')), zod: z.safeParse(sceneSchema, withPurpose('2.3')).success }).toEqual({
+      ajv: false,
+      zod: false,
+    });
   });
 
   for (const [name, build] of REFUSED) {

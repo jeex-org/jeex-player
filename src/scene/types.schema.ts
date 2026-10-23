@@ -1,5 +1,5 @@
 /**
- * The scene document of schemas 2.2 and 2.3 as a `zod/mini` schema: the whole thing —
+ * The scene document of schemas 2.2, 2.3 and 2.4 as a `zod/mini` schema: the whole thing —
  * every entity `types.ts` declares, in the order it declares them — plus the
  * cheap SHAPE gate that only proves the containers.
  *
@@ -38,8 +38,8 @@
  * a table, `types.schema.test.ts`'s «rule → structural/semantic», derived from
  * the validator's own sources so a new rule cannot land unclassified.
  *
- * The closed sets (`OpeningType`, `RoomKind`, `WallRole`, `OpeningShape`,
- * `OpeningHinge`, `OpeningSwing`) are spelled here as literals rather than
+ * The closed sets (`OpeningType`, `RoomKind`, `RoomPurpose`, `WallRole`,
+ * `OpeningShape`, `OpeningHinge`, `OpeningSwing`) are spelled here as literals rather than
  * read from `scene/schema-sets.ts`: that module sits in the `scene` layer,
  * which is ABOVE `scene/types` in the layer order (`.dependency-cruiser.cjs`),
  * so this file may not import it. What binds them to their unions instead is
@@ -89,9 +89,9 @@
  */
 
 import { z } from 'zod/mini';
-import { HEX_COLOUR_PATTERN, SCHEMA_VERSIONS, UUID_V7_PATTERN } from './types.js';
+import { HEX_COLOUR_PATTERN, SCHEMA_VERSIONS, UUID_V7_PATTERN, schemaVersionBefore } from './types.js';
 import type { SchemaIssue } from '../shared/schema-issues.js';
-import type { SceneData } from './types.js';
+import type { SchemaVersion, SceneData } from './types.js';
 
 /**
  * The document version this build reads (`SchemaVersion`). A 1.x document is
@@ -107,7 +107,7 @@ export const schemaVersionSchema = z.literal(SCHEMA_VERSIONS, {
       : `Unsupported scene schema; expected ${SCHEMA_VERSIONS.map((version) => `'${version}'`).join(' or ')}`,
 });
 
-/** The only unit the schema speaks (`types.ts:465`); absent means metres. */
+/** The only unit the schema speaks (`types.ts` `LengthUnit`); absent means metres. */
 const lengthUnitSchema = z.literal('m', { error: "Unsupported scene units; expected 'm'" });
 
 /**
@@ -171,7 +171,7 @@ export const cameraPoseSchema = z.object({ position: vec3Schema, target: vec3Sch
 /** Longest storey name the schema accepts, in characters (`shape.ts`). */
 const MAX_STOREY_NAME = 64;
 
-/** `Storey` (`types.ts:474`): both fields optional, and what IS there has to be usable. */
+/** `Storey` (`types.ts`): both fields optional, and what IS there has to be usable. */
 const storeySchema = z.object({
   name: z.optional(z.string().check(z.minLength(1), z.maxLength(MAX_STOREY_NAME))),
   elevation: z.optional(z.number()),
@@ -222,6 +222,28 @@ const siteNeedsItsVersion = z.refine(
   { error: "site needs schemaVersion '2.3'; a 2.2 document carries no site", path: ['site'] },
 );
 
+/**
+ * A pre-2.4 document carries no room `purpose`: the field is 2.4's. The issue
+ * lands at the first room that carries one, with the same sentence the runtime
+ * validator refuses with. The version is asked first only for a value INSIDE
+ * the vocabulary: an out-of-vocabulary value is refused by the room enum
+ * before this refinement runs (at the same path), and the version-first order
+ * for every value belongs to `checkRooms`. An unknown version gets no issue
+ * here either — the version literal above refuses it first.
+ */
+const purposeNeedsItsVersion = z.superRefine((scene: { schemaVersion?: unknown; rooms?: unknown }, ctx) => {
+  if (typeof scene.schemaVersion !== 'string' || !schemaVersionBefore(scene.schemaVersion as SchemaVersion, '2.4')) return;
+  const rooms = Array.isArray(scene.rooms) ? scene.rooms : [];
+  const at = rooms.findIndex((room) => (room as { purpose?: unknown } | null)?.purpose !== undefined);
+  if (at < 0) return;
+  const room = rooms[at] as { id?: unknown; purpose?: unknown };
+  ctx.addIssue({
+    code: 'custom',
+    message: `Room ${String(room.id)} purpose needs scene schema 2.4; this document is ${scene.schemaVersion}`,
+    path: ['rooms', at, 'purpose'],
+  });
+});
+
 /* ------------------------------------------------------- plan entities --- */
 
 const planNodeSchema = z.object({ id: uuidSchema, p: vec2Schema });
@@ -264,6 +286,25 @@ const roomSchema = z.object({
   floorMaterial: z.string(),
   accent: z.optional(z.string()),
   kind: z.optional(z.enum(['room', 'loggia'])),
+  // The `RoomPurpose` vocabulary, spelled as literals like every closed set
+  // here; whether a document's version may carry it is the refinement below.
+  purpose: z.optional(
+    z.enum([
+      'living',
+      'kitchen',
+      'kitchen-living',
+      'bedroom',
+      'kids',
+      'study',
+      'bathroom',
+      'wc',
+      'hall',
+      'corridor',
+      'storage',
+      'utility',
+      'balcony',
+    ]),
+  ),
   polygon: z.optional(z.array(vec2Schema)),
 });
 
@@ -330,7 +371,7 @@ const sceneFinishesSchema = z.object({
   facade: z.optional(finishRefSchema),
 });
 
-/** The op vocabulary (`types.ts:385-433`), discriminated by `op` the way a preset's batch is read. */
+/** The op vocabulary (`SceneOp`, `types.ts`), discriminated by `op` the way a preset's batch is read. */
 export const sceneOpSchema = z.discriminatedUnion('op', [
   // `set_material` has two forms, told apart by `surface` (absent in the
   // legacy form, which may not carry it) and each forbidding the other's key,
@@ -426,6 +467,31 @@ export const sceneOpSchema = z.discriminatedUnion('op', [
     accent: z.optional(z.string()),
   }),
   z.object({ op: z.literal('remove_room'), roomId: uuidSchema }),
+  // The purpose is a vocabulary value or `null`, and the key is REQUIRED: an
+  // operation that names neither a value nor a clear says nothing. Whether the
+  // document's version may take the operation is the applier's refusal
+  // (`ops/rooms.ts`), like every version rule of an op.
+  z.object({
+    op: z.literal('set_room_purpose'),
+    roomId: uuidSchema,
+    purpose: z.nullable(
+      z.enum([
+        'living',
+        'kitchen',
+        'kitchen-living',
+        'bedroom',
+        'kids',
+        'study',
+        'bathroom',
+        'wc',
+        'hall',
+        'corridor',
+        'storage',
+        'utility',
+        'balcony',
+      ]),
+    ),
+  }),
   // Furniture.
   z.object({
     op: z.literal('place_object'),
@@ -572,8 +638,8 @@ const sceneShapeSchema = z
   .check(siteNeedsItsVersion);
 
 /**
- * The whole document of schemas 2.2 and 2.3, key for key in `SceneData`'s own
- * declaration order (`types.ts:477-522`) — which is also the order
+ * The whole document of schemas 2.2, 2.3 and 2.4, key for key in `SceneData`'s own
+ * declaration order (`types.ts`) — which is also the order
  * `validate/shape.ts` walks, so the FIRST issue of a document broken in
  * several places is the one the hand-written gate would have reported.
  *
@@ -605,7 +671,7 @@ export const sceneSchema = z
     autotour: autotourSchema,
     tourCheckpoints: z.optional(z.array(tourCheckpointSchema)),
   })
-  .check(siteNeedsItsVersion, finishesNeedTheirVersion);
+  .check(siteNeedsItsVersion, finishesNeedTheirVersion, purposeNeedsItsVersion);
 
 /** A schema's own path step in this project's vocabulary; a symbol key cannot occur in JSON, and is named rather than dropped. */
 function pathStep(step: PropertyKey): string | number {

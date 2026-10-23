@@ -24,6 +24,8 @@ import { draftOf } from '../shared/committed.js';
 import {
   CATALOGUE_ID_BY_SLUG,
   CATALOGUE_REGISTRIES,
+  ROOM_PURPOSES,
+  SCHEMA_VERSIONS,
   SceneModel,
   applyOp,
   isApplyOk,
@@ -32,11 +34,14 @@ import {
   parseSceneDocument,
   parseSceneOps,
   registriesFromLibrary,
+  schemaVersionBefore,
   type OpeningVariantOption,
   type PlaceObjectOp,
   type ProjectLibrary,
+  type RoomPurpose,
   type SceneOp,
   type SetRoomOp,
+  type SetRoomPurposeOp,
   type SetSiteOp,
 } from './ops.js';
 
@@ -66,7 +71,14 @@ describe('jeex-viewer/ops entry', () => {
   });
 
   test('a set_site op typed through the entry orients a 2.3 document', () => {
-    const model = new SceneModel({ ...apartmentScene, schemaVersion: '2.3' }, CATALOGUE_REGISTRIES);
+    // An explicit OLDER document: the demo is 2.4 and carries purposes, which a
+    // 2.3 document may not, so the purposes are stripped with the version.
+    const older = {
+      ...apartmentScene,
+      schemaVersion: '2.3' as const,
+      rooms: apartmentScene.rooms.map(({ purpose: _purpose, ...room }) => room),
+    };
+    const model = new SceneModel(older, CATALOGUE_REGISTRIES);
     const orient: SetSiteOp = { op: 'set_site', northDeg: 400, sun: 'morning' };
     const result = model.apply({ baseRev: model.rev, ops: [orient] });
     if (!isApplyOk(result)) throw new Error(`expected the op to be accepted, got ${JSON.stringify(result)}`);
@@ -141,6 +153,32 @@ describe('jeex-viewer/ops entry', () => {
     expect(CATALOGUE_ID_BY_SLUG.finish['oak']).toBe(FINISH.oak);
   });
 
+  test('a host builds a purpose picker and version checks without its own copy of the vocabulary', () => {
+    // The 13 values, in spec order, and the readable versions in reading order.
+    expect([...ROOM_PURPOSES]).toEqual([
+      'living',
+      'kitchen',
+      'kitchen-living',
+      'bedroom',
+      'kids',
+      'study',
+      'bathroom',
+      'wc',
+      'hall',
+      'corridor',
+      'storage',
+      'utility',
+      'balcony',
+    ]);
+    expect([...SCHEMA_VERSIONS]).toEqual(['2.2', '2.3', '2.4']);
+    expect(schemaVersionBefore('2.3', '2.4')).toBe(true);
+    expect(schemaVersionBefore('2.4', '2.4')).toBe(false);
+    // The operation type is nameable on its own, like every union member.
+    const mark: SetRoomPurposeOp = { op: 'set_room_purpose', roomId: DEMO.room.kitchen, purpose: 'kitchen' };
+    const purposes: RoomPurpose[] = ['living', 'balcony'];
+    expect([mark.op, purposes.length]).toEqual(['set_room_purpose', 2]);
+  });
+
   test('the export surface is exactly the documented list, sorted', async () => {
     // Verbatim against the header comment of `ops.ts`: one entry per name it
     // promises. Type-only exports (`OpOutcome`, `SceneOp`, `ApplyBatch`, …)
@@ -180,7 +218,12 @@ describe('jeex-viewer/ops entry', () => {
       'sceneShapeIssues',
       'OPENING_TYPES',
       'ROOM_KINDS',
+      'ROOM_PURPOSES',
       'WALL_ROLES',
+      // The schema-version vocabulary a host checks a document's version with,
+      // and the one version-order test the 2.4 rules are written with.
+      'SCHEMA_VERSIONS',
+      'schemaVersionBefore',
       'CATALOGUE_REGISTRIES',
       // What format converters take from the viewer through this entry:
       // plan geometry, the graph, openings, tolerances, errors and the id vocabulary.

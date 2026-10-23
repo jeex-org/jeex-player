@@ -77,6 +77,25 @@ describe('diffScenes', () => {
     expect(diffScenes(turned, bare)).toEqual([TOUCHED_SITE]);
   });
 
+  test('a purpose change draws nothing, on its own and with the version raise that lets it in', () => {
+    const withPurpose = (version: SceneData['schemaVersion'], name = 'Room A'): SceneData => ({
+      ...lShapePlan,
+      schemaVersion: version,
+      rooms: lShapePlan.rooms.map((room, index) => (index === 0 ? { ...room, name, purpose: 'kitchen' } : room)),
+    });
+    // Purpose only: the rooms differ in purposes, the version does not move.
+    expect(diffScenes({ ...lShapePlan, schemaVersion: '2.4' }, withPurpose('2.4'))).toEqual([]);
+    // Purpose plus the 2.3 → 2.4 raise a first pick takes on an older project.
+    expect(diffScenes({ ...lShapePlan, schemaVersion: '2.3' }, withPurpose('2.4'))).toEqual([]);
+    // A purpose beside a real change is still that change.
+    expect(diffScenes({ ...lShapePlan, schemaVersion: '2.4' }, withPurpose('2.4', 'Cookhouse'))).toEqual([TOUCHED_SHELL]);
+  });
+
+  test('a version raise without a purpose draws nothing, and one back is nothing too', () => {
+    expect(diffScenes(lShapePlan, { ...lShapePlan, schemaVersion: '2.4' })).toEqual([]);
+    expect(diffScenes({ ...lShapePlan, schemaVersion: '2.3' }, lShapePlan)).toEqual([]);
+  });
+
   test('it answers what a tour-checkpoint operation answers', () => {
     const next = edited((draft) => {
       draft.tourCheckpoints = [];

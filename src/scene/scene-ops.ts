@@ -64,7 +64,7 @@ import {
   applyRotateObject,
   applySetObject,
 } from './ops/assets.js';
-import { applyAddRoom, applyRemoveRoom, applySetRoom } from './ops/rooms.js';
+import { applyAddRoom, applyRemoveRoom, applySetRoom, applySetRoomPurpose } from './ops/rooms.js';
 import {
   applyAddNode,
   applyAddWall,
@@ -277,6 +277,8 @@ function dispatchOp(scene: Draft<SceneData>, op: SceneOp, registries: SceneRegis
       return applySetRoom(scene, op);
     case 'remove_room':
       return applyRemoveRoom(scene, op);
+    case 'set_room_purpose':
+      return applySetRoomPurpose(scene, op);
     case 'place_object':
       return applyPlaceObject(scene, op, registries);
     case 'move_object':

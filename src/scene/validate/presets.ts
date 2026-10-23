@@ -61,6 +61,17 @@ export function checkInteriorPresets(ctx: ValidationContext): void {
           op: name,
         });
       }
+      // A purpose is not decoration either: a preset dresses the flat, it never says what a room is for.
+      if (name === 'set_room_purpose') {
+        ctx.fail(
+          'interior-preset-op-purpose',
+          `${path}.ops[${opIndex}]`,
+          `Interior preset ${id} may not change a room's purpose (set_room_purpose)`,
+          {
+            op: name,
+          },
+        );
+      }
       if (typeof name === 'string' && CREATING_OPS.has(name)) {
         ctx.fail('interior-preset-op-creates', `${path}.ops[${opIndex}]`, `Interior preset ${id} may not create entities (${name})`, {
           op: name,

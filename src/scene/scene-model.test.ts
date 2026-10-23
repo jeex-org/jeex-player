@@ -787,3 +787,101 @@ describe('a 2.3 document with finish objects survives export', () => {
     });
   });
 });
+
+describe('a 2.4 document with room purposes', () => {
+  /** `emptyShell` declared 2.4: only such a document may take a `set_room_purpose`. */
+  function shell24(): SceneData {
+    const document = draftOf(emptyShell);
+    (document as { schemaVersion: string }).schemaVersion = '2.4';
+    return document;
+  }
+
+  test('a batch that adds a room and marks it commits as ONE revision, and the room has the purpose', () => {
+    // The same split the editor scenario makes: the graph has to stay planar,
+    // so the partition's ends become vertices of the north and south walls
+    // before the partition joins them and the room anchors in the new face.
+    const subject = new SceneModel(shell24(), CATALOGUE_REGISTRIES);
+
+    const result = ok(
+      subject.apply({
+        baseRev: 0,
+        ops: [
+          { op: 'add_node', id: NEW.nodeN, p: { x: 5, z: 0 } },
+          { op: 'add_node', id: NEW.nodeS, p: { x: 5, z: 6 } },
+          { op: 'remove_wall', wallId: EDITOR.wall.wallN },
+          { op: 'remove_wall', wallId: EDITOR.wall.wallS },
+          { op: 'add_wall', id: NEW.wallNW, a: EDITOR.node.cNw, b: NEW.nodeN, thickness: 0.3, role: 'facade' },
+          { op: 'add_wall', id: NEW.wallNE, a: NEW.nodeN, b: EDITOR.node.cNe, thickness: 0.3, role: 'facade' },
+          { op: 'add_wall', id: NEW.wallSE, a: EDITOR.node.cSe, b: NEW.nodeS, thickness: 0.3, role: 'facade' },
+          { op: 'add_wall', id: NEW.wallSW, a: NEW.nodeS, b: EDITOR.node.cSw, thickness: 0.3, role: 'facade' },
+          { op: 'add_wall', id: NEW.wallPart, a: NEW.nodeN, b: NEW.nodeS, thickness: 0.1, role: 'partition' },
+          { op: 'add_room', id: NEW.study, name: 'Study', anchor: { x: 6.5, z: 3 } },
+          { op: 'set_room_purpose', roomId: NEW.study, purpose: 'study' },
+        ],
+      }),
+    );
+
+    expect(result.rev).toBe(1);
+    const added = subject.scene.rooms.find((room) => room.id === NEW.study)!;
+    expect(added.purpose).toBe('study');
+  });
+
+  test('a purpose-only batch commits and the touched list is empty', () => {
+    const document = draftOf(lShapePlan);
+    (document as { schemaVersion: string }).schemaVersion = '2.4';
+    const subject = new SceneModel(document, CATALOGUE_REGISTRIES);
+
+    const result = ok(subject.apply({ baseRev: 0, ops: [{ op: 'set_room_purpose', roomId: ROOM_A, purpose: 'bedroom' }] }));
+
+    expect(result.rev).toBe(1);
+    expect(result.touched).toEqual([]);
+  });
+
+  /** `lShapePlan` declared 2.4, with nothing else changed. */
+  function lShape24(): Draft<SceneData> {
+    const document = draftOf(lShapePlan);
+    (document as { schemaVersion: string }).schemaVersion = '2.4';
+    return document;
+  }
+
+  test('set: the room gains the purpose and every other field of the document, that room included, is unchanged', () => {
+    const subject = new SceneModel(lShape24(), CATALOGUE_REGISTRIES);
+
+    ok(subject.apply({ baseRev: 0, ops: [{ op: 'set_room_purpose', roomId: ROOM_A, purpose: 'kitchen' }] }));
+
+    const expected = lShape24();
+    expected.rooms[0] = { ...expected.rooms[0]!, purpose: 'kitchen' };
+    expect(expected.rooms[0].id).toBe(ROOM_A);
+    expect(subject.scene).toEqual(expected);
+  });
+
+  test('the purpose the room already has commits a revision and changes nothing else', () => {
+    const document = lShape24();
+    document.rooms[0]!.purpose = 'kitchen';
+    const subject = new SceneModel(document, CATALOGUE_REGISTRIES);
+    const before = draftOf(subject.scene);
+
+    const result = ok(subject.apply({ baseRev: 0, ops: [{ op: 'set_room_purpose', roomId: ROOM_A, purpose: 'kitchen' }] }));
+
+    expect(result.rev).toBe(1);
+    expect(subject.rev).toBe(1);
+    expect(subject.scene).toEqual(before);
+  });
+
+  test('on an older document the operation is refused, and the revision and the document stay as they were', () => {
+    for (const version of ['2.2', '2.3'] as const) {
+      const document = draftOf(lShapePlan);
+      (document as { schemaVersion: string }).schemaVersion = version;
+      const subject = new SceneModel(document, CATALOGUE_REGISTRIES);
+      const before = draftOf(subject.scene);
+
+      const result = subject.apply({ baseRev: 0, ops: [{ op: 'set_room_purpose', roomId: ROOM_A, purpose: 'kitchen' }] });
+
+      if (isApplyOk(result)) throw new Error(`expected a ${version} document to refuse set_room_purpose`);
+      expect(result.error).toBe('validation_failed');
+      expect(result.message).toContain(`set_room_purpose needs scene schema 2.4; this document is ${version}`);
+      expect(subject.rev).toBe(0);
+      expect(subject.scene).toEqual(before);
+    }
+  });
+});

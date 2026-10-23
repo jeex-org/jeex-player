@@ -23,13 +23,14 @@ import {
   generateSchema,
   writeSchemas,
 } from './schema-gen.js';
-import { HEX_COLOUR_PATTERN, UUID_V7_PATTERN } from '../src/scene/types.js';
+import { HEX_COLOUR_PATTERN, SCHEMA_VERSIONS, schemaVersionBefore, UUID_V7_PATTERN } from '../src/scene/types.js';
 import {
   OPENING_HINGES,
   OPENING_SHAPES,
   OPENING_SWINGS,
   OPENING_TYPES,
   ROOM_KINDS,
+  ROOM_PURPOSES,
   SITE_SUNS,
   WALL_ROLES,
 } from '../src/scene/schema-sets.js';
@@ -62,6 +63,7 @@ describe('generateSchema', () => {
     const expected: Record<string, readonly string[]> = {
       OpeningType: OPENING_TYPES,
       RoomKind: ROOM_KINDS,
+      RoomPurpose: ROOM_PURPOSES,
       WallRole: WALL_ROLES,
       OpeningShape: OPENING_SHAPES,
       OpeningHinge: OPENING_HINGES,
@@ -81,6 +83,35 @@ describe('generateSchema', () => {
       required: ['schemaVersion', 'site'],
     });
     expect(definitions['SceneSite']?.['additionalProperties']).toBe(false);
+  });
+
+  test('a pre-2.4 document may not carry a room purpose: the allOf conditional beside the other two', () => {
+    const schema = generateSchema(SCENE_TARGET, FIXED_VERSION);
+    const definitions = schema['definitions'] as Record<string, Record<string, unknown>>;
+    // The older versions the rule refuses are generated from SCHEMA_VERSIONS,
+    // never restated here.
+    const older = SCHEMA_VERSIONS.filter((version) => schemaVersionBefore(version, '2.4'));
+    expect(definitions['SceneData']?.['allOf']).toEqual([
+      {
+        not: {
+          required: ['schemaVersion', 'rooms'],
+          properties: {
+            schemaVersion: { enum: [...older] },
+            rooms: { type: 'array', contains: { type: 'object', properties: { purpose: {} }, required: ['purpose'] } },
+          },
+        },
+      },
+    ]);
+    // The site and finishes rules stand beside it, where they were.
+    expect(definitions['SceneData']?.['not']).toBeDefined();
+    expect(definitions['SceneData']?.['anyOf']).toBeDefined();
+  });
+
+  test('the operation names its room and nothing else is its UUID field', () => {
+    const schema = generateSchema(SCENE_TARGET, FIXED_VERSION);
+    const definitions = schema['definitions'] as Record<string, { properties?: Record<string, { pattern?: string }> }>;
+    expect(UUID_FIELDS['SetRoomPurposeOp']).toEqual({ value: ['roomId'] });
+    expect(definitions['SetRoomPurposeOp']?.properties?.['roomId']?.pattern).toBe(UUID_V7_PATTERN.source);
   });
 
   test('set_site needs northDeg or sun in the published schema too', () => {
@@ -159,8 +190,8 @@ describe('the UUID v7 grammar in the scene schema', () => {
     }
   });
 
-  test('a document may declare 2.2 or 2.3 and nothing else', () => {
-    expect((definitions()['SchemaVersion'] as { enum?: unknown }).enum).toEqual(['2.2', '2.3']);
+  test('a document may declare 2.2, 2.3 or 2.4 and nothing else', () => {
+    expect((definitions()['SchemaVersion'] as { enum?: unknown }).enum).toEqual(['2.2', '2.3', '2.4']);
   });
 
   test('a finish colour is #rrggbb, and a finish object needs colour or rotation', () => {
