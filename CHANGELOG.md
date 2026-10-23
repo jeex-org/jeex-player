@@ -9,6 +9,19 @@ as described under [Versioning](#versioning).
 
 ### Added
 
+- **Ambient occlusion and SMAA in walk and tour.** In the two modes where
+  nothing is edited, the player renders through a post-processing chain:
+  three.js GTAO (0.3 m radius, half resolution, denoised) darkens corners,
+  skirtings and the ground under furniture, SMAA smooths edges, and the PBR
+  Neutral display transform is applied once at the end. Glass, transparent
+  surfaces and invisible pick shapes cast no occlusion. Editing modes render
+  exactly as before. The chain loads on the first entry into walk or tour: a
+  separate chunk of about 50 KB gzip in the ES module and demo builds, inline
+  in `jeex-viewer.iife.js` (which grows by about 50 KB gzip). Stills and video
+  frames captured in walk or tour go through the same chain; panoramas do
+  not. Mirrors still reflect once per frame. `__viewerDebug.walkPost()` (debug
+  mounts only) reports the chain's state.
+
 - **Scene schema 2.3: `site`, the plan's orientation and a sun preset.**
   `site: { northDeg?, sun? }` says where true north lies (degrees clockwise
   from `+Z` towards `+X`) and which sun preset lights the scene: `morning`,

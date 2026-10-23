@@ -8,7 +8,8 @@
  * Invariant: nothing here knows about the apartment. The runtime owns WebGL
  * resources and the frame clock; every scene-specific update runs as a frame
  * hook registered by the composition root, in registration order, before the
- * single `render` call of that frame.
+ * single draw of that frame: straight to the screen, or through the post-
+ * processing chain attached with `setPostProcessor` (walk and tour).
  *
  * Visibility invariant: the loop runs only when the canvas could actually be
  * seen. `document.hidden` and `checkVisibility()` gate it, and the frame clock

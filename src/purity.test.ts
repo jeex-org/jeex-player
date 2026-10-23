@@ -390,6 +390,32 @@ describe('the zod boundary', () => {
 });
 
 /**
+ * The walk and tour post-processing chain is not part of any boot graph.
+ *
+ * `render/walk-post.ts` is the only importer of three's post-processing
+ * addons, and the controller reaches it through a dynamic `import()` alone, so
+ * the ES library build and the demo build emit it as a `lazy-` chunk that a
+ * page downloads on its first entry into walk or tour
+ * (`scripts/budget-check.ts`, `LAZY_LIMITS`, measures that chunk). The walker
+ * skips `import()`, so a static edge added anywhere on the way would show
+ * here. The IIFE build cannot split code and carries the chain inline.
+ */
+describe('the walk chain stays out of the boot graph', () => {
+  test('no boot entry statically reaches render/walk-post', () => {
+    for (const entry of ['embed/index', 'embed/element-entry', 'embed/iife-entry', 'main']) {
+      expect({ entry, reaches: reach(entry).modules.has('render/walk-post') }).toEqual({ entry, reaches: false });
+    }
+  });
+
+  // Teeth: the entries do reach the controller, which names the chain only in an `import()`.
+  test('the controller is on the boot graph and loads the chain dynamically', () => {
+    expect(reach('embed/index').modules.has('app/walk-post-controller')).toBe(true);
+    expect(stripComments(sourceOf('app/walk-post-controller'))).toContain("import('../render/walk-post.js')");
+    expect(reach('render/walk-post').packages.has('three/addons/postprocessing/GTAOPass.js')).toBe(true);
+  });
+});
+
+/**
  * The library ships no apartment.
  *
  * `src/embed/index.ts` is what `import … from 'jeex-viewer'` gets, and the

@@ -105,20 +105,27 @@ const LIGHTING_BUNDLE_PREFIX = 'jeex-viewer-lighting';
 
 /**
  * File-name prefix both vite configs give every dynamic-import chunk
- * (`vite.config.ts`, `vite.lib.config.ts`). A lazy chunk is authoring, not
- * viewing: it is loaded by an action, never by opening the page.
+ * (`vite.config.ts`, `vite.lib.config.ts`). A lazy chunk is never loaded by
+ * opening the page: it waits for an action (an export, an editing tool) or for
+ * the first entry into a mode that needs it (the walk and tour chain).
  */
 export const LAZY_CHUNK_PREFIX = 'lazy-';
 /** Hard limit for a lazy chunk that names no override in `LAZY_LIMITS`, gzip bytes. */
 export const LAZY_CHUNK_FAIL_BYTES = 256 * 1024;
 /**
- * Per-lazy-chunk overrides, keyed by file-name prefix (checked after
- * `LAZY_CHUNK_PREFIX` is stripped is NOT required — match against the full
- * file name, same as `limitFor`). Empty today: no lazy chunk exists yet: it
- * is filled in as future lazy modules (the IFC writer, the RoomPlan/Sweet
- * Home importers, the glTF exporter) need a budget of their own.
+ * Per-lazy-chunk overrides, keyed by file-name prefix (matched against the
+ * full file name, same as `limitFor`).
+ *
+ * `lazy-jeex-viewer-walk-post`: the walk and tour post-processing chain
+ * (`src/render/walk-post.ts`: three's composer, GTAO, SMAA with its two
+ * embedded lookup images, the output pass), loaded on the first entry into
+ * walk or tour rather than at boot. The limit is the last measured size of the
+ * ES build's chunk (50,747 gzip bytes, from `measureBundle('dist-lib')` right
+ * after `bun run build:lib`; the demo build's is 49,596) plus 1 KB, so a
+ * second effect added to the chain is noticed here. The IIFE build cannot split
+ * code and carries the chain inline, inside the 700 KB boot budget.
  */
-export const LAZY_LIMITS: Readonly<Record<string, number>> = {};
+export const LAZY_LIMITS: Readonly<Record<string, number>> = { 'lazy-jeex-viewer-walk-post': 50_747 + 1024 };
 
 /** How the sizes are judged: as one download, or as alternatives. */
 export type BudgetMode = 'total' | 'per-file';

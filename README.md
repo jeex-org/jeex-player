@@ -34,6 +34,7 @@ This document is the integration reference.
 - [Scene document](#scene-document)
 - [Project format](#project-format)
 - [Scene operations entry (`jeex-viewer/ops`)](#scene-operations-entry-jeex-viewerops)
+- [Rendering in walk and tour](#rendering-in-walk-and-tour)
 - [Lighting standard (`jeex-viewer/lighting`)](#lighting-standard-jeex-viewerlighting)
 - [Development](#development)
 
@@ -1092,6 +1093,15 @@ Every operation is atomic inside its batch: `applyOp` mutates a draft and answer
 
 A name not on this list is not public, whatever module it lives in — the same façade rule every other library entry follows (`src/embed/ops.test.ts` pins the export surface, sorted, against exactly this list). Nothing above renders anything or touches a document: `src/purity.test.ts` and `.dependency-cruiser.cjs` hold `embed/ops.ts` to the same "no `three`, no DOM" invariant as the rest of the pure layer.
 
+## Rendering in walk and tour
+
+In `walk` and `tour`, the modes where a visitor looks around and nothing is edited, the player renders through a post-processing chain: ambient occlusion (three.js `GTAOPass`, 0.3 m world radius, half resolution, denoised) darkens corners, skirtings and the ground under furniture, and SMAA smooths the edges. The scene is rendered in linear high dynamic range and the lighting standard's display transform (PBR Neutral, exposure, sRGB) is applied once, in the chain's last pass. Window glass, other transparent or transmissive surfaces and invisible pick shapes cast no occlusion. `plan2d`, `plan3d` and `orbit` render straight to the screen exactly as before, and pay nothing for the chain.
+
+- **Loading:** the chain is fetched on the first entry into `walk` or `tour`. The ES module build and the demo emit it as a separate chunk of about 50 KB gzip that a page which never enters those modes never downloads; until it arrives the view renders as in the other modes. The classic-script build (`jeex-viewer.iife.js`) cannot split code and carries it inline. A chunk that fails to load leaves the view rendering directly and emits one `error` event; the next entry into `walk` or `tour` tries again.
+- **Captures:** stills and video frames (`capture.still`, `capture.pair`, `capture.frames`) taken while the viewer is in `walk` or `tour` go through the same chain at the capture's size, so they match the screen; two captures of an unchanged scene are identical. Panoramas are rendered as before, without it.
+- **Mirrors** reflect the room once per frame, with or without the chain.
+- **Resources:** the chain follows the viewer's size and pixel ratio, is kept while you switch to an editing mode and back, is rebuilt after a lost GPU context and releases all its GPU memory when the viewer is disposed.
+
 ## Lighting standard (`jeex-viewer/lighting`)
 
 The player lights every scene with one standard, and publishes it so another application that renders the same content (an asset review page, a store preview, an editor) shows it exactly the same way:
@@ -1122,7 +1132,7 @@ lighting.dispose(); // disposes its rigs and the environment; never your rendere
 - **Version:** `LIGHTING_STANDARD_VERSION` (now 1) rises with every intentional change of the look; put it into the cache key of any preview you store. `LIGHTING_STANDARD` describes the standard as frozen data.
 - **Lost GPU context:** the entry installs no listeners. Stop rendering on `webglcontextlost`; on `webglcontextrestored`, dispose the old context and create a new one and new rigs for your scenes (a regenerated environment cannot be recovered from the old one).
 - **Your content's own lights** (a lamp model with a point light) are left as they are.
-- **Captures:** a still or a panorama applies the display transform to the whole frame, while the live view leaves a background texture, fog and content marked as not tone mapped out of it; lit surfaces agree between the two.
+- **Captures:** a still or a panorama applies the display transform to the whole frame, and so does the live view in `walk` and `tour` (see «Rendering in walk and tour»), while the live view of the editing modes leaves a background texture, fog and content marked as not tone mapped out of it; lit surfaces agree between them.
 
 ## Development
 

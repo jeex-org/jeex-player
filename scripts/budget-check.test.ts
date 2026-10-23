@@ -15,6 +15,7 @@ import {
   HOST_BUDGET_FAIL_BYTES,
   LAZY_CHUNK_FAIL_BYTES,
   LAZY_CHUNK_PREFIX,
+  LAZY_LIMITS,
   OPS_BUDGET_FAIL_BYTES,
   LIGHTING_BUDGET_FAIL_BYTES,
   checkBudget,
@@ -48,6 +49,8 @@ describe('constants', () => {
     expect(HOST_BUDGET_FAIL_BYTES).toBe(4 * 1024);
     expect(LAZY_CHUNK_FAIL_BYTES).toBe(256 * 1024);
     expect(LAZY_CHUNK_PREFIX).toBe('lazy-');
+    // The walk and tour chain: its last measured size plus 1 KB.
+    expect(LAZY_LIMITS).toEqual({ 'lazy-jeex-viewer-walk-post': 50_747 + 1024 });
     expect(formatBytes(700 * 1024)).toBe('700.0 KB');
   });
 
