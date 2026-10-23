@@ -177,13 +177,33 @@ describe('a model upgrade swap', () => {
   test(
     'redraws the shadow when the GLB replaces the stand-in',
     async () => {
-      const handle = mountViewer(openContainer(), { scene: { url: '/tests/fixtures/project/project.json' }, tour: { mode: 'off' } });
-      handles.push(handle);
-      await handle.ready;
-      const atReady = draws();
-      await until(() => debug().assetModels()[0]?.state === 'gltf', 'the GLB to replace the stand-in', PROJECT_TIMEOUT_MS);
-      const settled = await settle();
-      expect(settled).toBeGreaterThan(atReady);
+      // The GLB is held until the stand-in's shadow has drawn: the swap must REdraw it.
+      let release: () => void = () => undefined;
+      const held = new Promise<void>((resolve) => {
+        release = resolve;
+      });
+      const original = globalThis.fetch;
+      const holding = async (input: RequestInfo | URL, init?: RequestInit): Promise<Response> => {
+        if (String(input instanceof Request ? input.url : input).endsWith('.glb')) await held;
+        return original(input, init);
+      };
+      globalThis.fetch = Object.assign(holding, { preconnect: original.preconnect });
+      try {
+        const handle = mountViewer(openContainer(), { scene: { url: '/tests/fixtures/project/project.json' }, tour: { mode: 'off' } });
+        handles.push(handle);
+        await handle.ready;
+        await until(() => draws() >= 1, 'the stand-in to cast its shadow', PROJECT_TIMEOUT_MS);
+        const atStandIn = await settle();
+        expect(atStandIn).toBeGreaterThanOrEqual(1);
+        expect(debug().assetModels()[0]?.state).not.toBe('gltf');
+        release();
+        await until(() => debug().assetModels()[0]?.state === 'gltf', 'the GLB to replace the stand-in', PROJECT_TIMEOUT_MS);
+        const settled = await settle();
+        expect(settled).toBeGreaterThan(atStandIn);
+      } finally {
+        release();
+        globalThis.fetch = original;
+      }
       expect(debug().sunShadow()!.fit).not.toBeNull();
     },
     PROJECT_TIMEOUT_MS,

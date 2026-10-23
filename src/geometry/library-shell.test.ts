@@ -201,6 +201,23 @@ describe('repainting library surfaces', () => {
     expect(fetched.length).toBe(3);
   });
 
+  test('every surface whose maps arrive reports it once, after they are attached (a redraw of walk and tour)', async () => {
+    const network = stubTextures();
+    const attached: Array<THREE.Texture | null> = [];
+    const document = draftOf(lShapePlan) as SceneData & { schemaVersion: string; finishes?: unknown };
+    document.schemaVersion = '2.3';
+    document.finishes = { rooms: { [ROOM.a]: { floor: NATURAL_SCAN.id }, [ROOM.b]: { floor: NATURAL_SCAN.id } } };
+    const model = new SceneModel(document, LIBRARY_REGISTRIES);
+    const floor = (): THREE.MeshStandardMaterial =>
+      (root.getObjectByName(`floor-${ROOM.a}`) as THREE.Mesh).material as THREE.MeshStandardMaterial;
+    const textures = { ...network.textures, attached: () => attached.push(floor().map) };
+    const { root } = new SceneBuilder(model.scene, model.plan, { ...PROJECT, textures }).build();
+    expect(attached).toEqual([]);
+    await flush();
+    expect(attached).toHaveLength(2);
+    expect(attached.at(-1)).not.toBeNull();
+  });
+
   test('repainting one of two rooms keeps the other’s texture and fetches nothing', async () => {
     const { floorOf, fetched, images, paint } = await sharedScan();
     const kept = floorOf(ROOM.b).map;

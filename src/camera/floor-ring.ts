@@ -46,6 +46,7 @@ export function floorRingPoint(
 
 export class FloorRing {
   readonly object: THREE.Mesh<THREE.RingGeometry, THREE.MeshBasicMaterial>;
+  private changed = false;
 
   constructor() {
     const geometry = new THREE.RingGeometry(INNER_M, OUTER_M, SEGMENTS);
@@ -72,12 +73,22 @@ export class FloorRing {
 
   /** Puts the ring at `point` on the floor, or hides it for `null`. */
   show(point: THREE.Vector3 | null): void {
+    const position = this.object.position;
     if (!point) {
+      if (this.object.visible) this.changed = true;
       this.object.visible = false;
       return;
     }
-    this.object.position.set(point.x, point.y + LIFT_M, point.z);
+    if (!this.object.visible || position.x !== point.x || position.y !== point.y + LIFT_M || position.z !== point.z) this.changed = true;
+    position.set(point.x, point.y + LIFT_M, point.z);
     this.object.visible = true;
+  }
+
+  /** Whether the ring moved, appeared or went since the last call (walk redraws on it, `render/render-demand.ts`). */
+  takeChanged(): boolean {
+    const changed = this.changed;
+    this.changed = false;
+    return changed;
   }
 
   get visible(): boolean {

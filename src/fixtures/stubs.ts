@@ -185,6 +185,9 @@ export function stubRuntime(): { renderer: THREE.WebGLRenderer; calls: StubRende
     render() {
       calls.renders += 1;
     },
+    info: { programs: null },
+    getRenderTarget: () => null,
+    setRenderTarget: () => undefined,
     dispose() {
       calls.disposed += 1;
     },
@@ -270,7 +273,7 @@ export function stubEditor(
  * suite, and puts back whatever was there.
  *
  * Several modules probe for a window before deciding what to do
- * (`render-runtime.devicePixelRatioOf`). Under `bun test` there is none, so
+ * (`viewport-box.devicePixelRatioOf`). Under `bun test` there is none, so
  * the probe takes the "no window" branch and the test measures the wrong
  * path. Returns the pair to call from `beforeEach` and `afterEach`.
  */

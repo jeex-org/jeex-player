@@ -148,9 +148,9 @@ export class ViewerSelectionController {
     this.highlight.reapply();
   }
 
-  /** Per frame: the fade (`app/viewer-frame.ts`). */
-  update(now: number): void {
-    this.highlight.update(now);
+  /** Per frame: the fade (`app/viewer-frame.ts`); whether the picture changed. */
+  update(now: number): boolean {
+    return this.highlight.update(now);
   }
 
   dispose(): void {

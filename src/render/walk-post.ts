@@ -33,6 +33,7 @@ import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
 import { GTAOPass } from 'three/addons/postprocessing/GTAOPass.js';
 import { SMAAPass } from 'three/addons/postprocessing/SMAAPass.js';
 import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
+import { warmPrograms } from './scene-compile.js';
 import { withScenePass } from '../shared/scene-pass.js';
 import { withOccludersOnly } from './ao-occluders.js';
 import type { PostProcessor } from './post-processor.js';
@@ -189,6 +190,34 @@ export class WalkPost implements PostProcessor {
     }
   }
 
+  compile(scene: THREE.Scene, camera: THREE.Camera): Promise<unknown> {
+    const renderer = this.renderer;
+    const previous = renderer.getRenderTarget();
+    // The chain's own full-screen materials too (measured on the demo
+    // apartment: about 115 ms of links in the first frame through the chain
+    // without this), each on a throwaway quad with the target it draws into.
+    // Not the output pass's: it replaces its defines at its first render, so
+    // a program compiled before would never be used (`quadMaterials`).
+    // Position and uv only, as three's full-screen quad: a normal attribute is a different program.
+    const quad = new THREE.PlaneGeometry(2, 2).deleteAttribute('normal');
+    const view = new THREE.OrthographicCamera(-1, 1, 1, -1, 0, 1);
+    const quads = (materials: readonly THREE.Material[]): THREE.Scene => {
+      const holder = new THREE.Scene();
+      for (const material of materials) holder.add(new THREE.Mesh(quad, material));
+      return holder;
+    };
+    const intoBuffers = quadMaterials(this.composer.passes, this.output);
+    try {
+      // `compileAsync` creates every program synchronously, before its first
+      // await: the target bound here is the one their keys are made with.
+      renderer.setRenderTarget(this.composer.readBuffer);
+      const pending = [renderer.compileAsync(scene, camera), renderer.compileAsync(quads(intoBuffers), view)];
+      return Promise.all(pending).then(() => warmPrograms(renderer));
+    } finally {
+      renderer.setRenderTarget(previous);
+    }
+  }
+
   setSize(width: number, height: number, pixelRatio: number): void {
     // `WebGLRenderer.setSize` floors the same product for the drawing buffer.
     this.liveWidth = Math.max(1, Math.floor(width * pixelRatio));
@@ -236,4 +265,18 @@ export async function createWalkPost(renderer: THREE.WebGLRenderer, scene: THREE
     throw error;
   }
   return chain;
+}
+
+/**
+ * The full-screen materials of the chain's passes that draw into its own
+ * buffers, compiled ahead on throwaway quads: every pass's but `output`'s,
+ * whose defines are replaced at its first render (three r186 `OutputPass`).
+ */
+export function quadMaterials(passes: readonly object[], output: object): THREE.Material[] {
+  return passes.filter((pass) => pass !== output).flatMap((pass) => materialsOf(pass));
+}
+
+/** The materials a pass keeps as its own fields: what its full-screen quad draws with. */
+function materialsOf(pass: object): THREE.Material[] {
+  return Object.values(pass).filter((value): value is THREE.Material => value instanceof THREE.Material);
 }

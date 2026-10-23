@@ -10,6 +10,9 @@ import type { ViewerMode } from '../scene/types.js';
 import type { ProjectInfo } from './project-wiring.js';
 import type { UpgradeResult } from '../geometry/scene-builder.js';
 import type { SceneModel } from '../scene/scene-model.js';
+import { solvePlan, type SolvedPlan } from '../plan/plan-solver.js';
+import { roomOf } from '../plan/plan-rooms.js';
+import { lShapePlan } from '../fixtures/plan-l-shape.js';
 
 const SCENE_A = '0192f5c4-7a1b-7c3d-8e9f-0a1b2c3d4e5a';
 const SCENE_B = '0192f5c4-7a1b-7c3d-8e9f-0a1b2c3d4e5b';
@@ -116,7 +119,7 @@ afterEach(() => {
   globalThis.fetch = original;
 });
 
-function rig(options: ViewerOptionsInput = {}, gpc = false, site?: TelemetryWiringDeps['site']) {
+function rig(options: ViewerOptionsInput = {}, gpc = false, site?: TelemetryWiringDeps['site'], plan?: SolvedPlan) {
   const page = fakeWindow(gpc);
   const events = new ViewerEvents();
   const tourEvents = new TourEvents();
@@ -129,7 +132,7 @@ function rig(options: ViewerOptionsInput = {}, gpc = false, site?: TelemetryWiri
     events,
     tourEvents,
     project: () => project,
-    plan: () => undefined,
+    plan: () => plan,
     fullscreen: () => false,
   };
   const wiring = telemetryWiring(deps);
@@ -363,6 +366,59 @@ describe('telemetry wiring: the iframe page', () => {
       ['view', 'iframe', 'https://agency.example', '/listing/:id'],
       ['ready', 'iframe', 'https://agency.example', '/listing/:id'],
     ]);
+    subject.wiring.dispose();
+  });
+});
+
+describe('telemetry wiring under drawing on demand (walk and tour skip draws while resting)', () => {
+  test('a resting gap between two draws is not a slow frame', () => {
+    const subject = rig();
+    subject.wiring.attach(subject.stage.stage);
+    subject.stage.setMode('walk');
+    for (let index = 0; index < 5; index += 1) subject.stage.frame(16);
+    // Half a second of ticks that drew nothing, then the camera moves.
+    for (let index = 0; index < 30; index += 1) subject.stage.frame(16, false);
+    for (let index = 0; index < 5; index += 1) subject.stage.frame(16);
+    subject.page.leave();
+    expect(bodies.find((body) => body['group'] === 'device')).toMatchObject({ fps: { '>50': 100, '<20': 0 } });
+    subject.wiring.dispose();
+  });
+
+  test('dwell grows while the visitor stands still in a room, and a pause adds nothing', () => {
+    const plan = solvePlan(lShapePlan);
+    const subject = rig({}, false, undefined, plan);
+    const room = plan.rooms.find((candidate) => {
+      const box = candidate.bbox;
+      return roomOf(plan, { x: (box.minX + box.maxX) / 2, z: (box.minZ + box.maxZ) / 2 }) === candidate.roomId;
+    })!;
+    const position = subject.stage.stage.camera.position;
+    position.x = (room.bbox.minX + room.bbox.maxX) / 2;
+    position.z = (room.bbox.minZ + room.bbox.maxZ) / 2;
+    subject.wiring.attach(subject.stage.stage);
+    subject.stage.setMode('walk');
+    subject.stage.frame(16);
+    // Ten seconds at rest: ticks that drew nothing.
+    for (let index = 0; index < 625; index += 1) subject.stage.frame(16, false);
+    // A hidden tab: the loop stopped, the next tick comes a minute later.
+    subject.stage.frame(60_000, false);
+    subject.page.leave();
+    expect(bodies.find((body) => body['group'] === 'rooms')).toMatchObject({ rooms: [{ room: room.roomId, dwell: '5-30s' }] });
+    subject.wiring.dispose();
+  });
+});
+
+describe('telemetry wiring: ready follows the first picture', () => {
+  test('a resting walk that drew before `ready` reports the load at the next tick, timed by that draw', () => {
+    const subject = rig();
+    subject.wiring.attach(subject.stage.stage);
+    subject.stage.setMode('walk');
+    subject.page.advance(800);
+    // The first picture, then `ready` (it now follows the draw), then ticks that draw nothing.
+    subject.stage.frame(16, true);
+    subject.page.advance(3000);
+    subject.ready(SCENE_A);
+    subject.stage.frame(16, false);
+    expect(bodies.at(-1)).toMatchObject({ event: 'ready', load: '<1s' });
     subject.wiring.dispose();
   });
 });

@@ -29,6 +29,7 @@ import { SceneMount } from './scene-mount.js';
 import { resolveViewerOptions } from './viewer-options.js';
 import type { Dollhouse } from '../geometry/dollhouse.js';
 import type { ViewerUI } from '../ui/viewer-ui.js';
+import type { ApartmentRig } from '../lighting/lighting-context.js';
 
 const SOFA = L_SHAPE.asset.sofa;
 const TABLE = L_SHAPE.asset.table;
@@ -78,14 +79,18 @@ type Rig = {
   /** How many times the whole document was built. */
   builds: () => number;
   load: (document: SceneData, key?: string) => LoadedDocument;
+  /** Redraws the mount asked the runtime for (`RenderDemand.invalidate`). */
+  invalidations: () => number;
 };
 
-function rig(): Rig {
+function rig(sunRig?: ApartmentRig): Rig {
   const scene = new THREE.Scene();
   const downloads: string[] = [];
   const seeded: SceneModel[] = [];
   const settled: Rig['settled'] = [];
   const buildsBefore = builds.mock.calls.length;
+  let invalidations = 0;
+  const demand = { invalidate: () => (invalidations += 1) };
   const ui = {
     showDegradedNotice: () => {},
     closePanel: () => {},
@@ -96,7 +101,7 @@ function rig(): Rig {
   };
   const dollhouse = { prepare: () => {}, isExterior: () => false, update: () => {} };
   const mount = new SceneMount({
-    runtime: () => ({ scene }),
+    runtime: () => ({ scene, demand, ...(sunRig && { sunRig }) }),
     picker: new Picker({ getBoundingClientRect: () => ({ left: 0, top: 0, width: 100, height: 100 }) }),
     dollhouse: dollhouse as unknown as Dollhouse,
     animator: new FurnitureAnimator(),
@@ -131,7 +136,16 @@ function rig(): Rig {
       },
     };
   };
-  return { mount, scene, downloads, seeded, settled, builds: () => builds.mock.calls.length - buildsBefore, load };
+  return {
+    mount,
+    scene,
+    downloads,
+    seeded,
+    settled,
+    builds: () => builds.mock.calls.length - buildsBefore,
+    load,
+    invalidations: () => invalidations,
+  };
 }
 
 /** Lets the frame-paced GLB upgrade pass run to its end. */
@@ -358,5 +372,52 @@ describe('the model pass outcome', () => {
     await settle();
     expect(subject.settled.map((entry) => entry.model)).not.toContain(first.model);
     expect(subject.settled).toHaveLength(1);
+  });
+});
+
+describe('what the mount changes on screen asks for a redraw (walk and tour draw on demand)', () => {
+  test('a mount, every upgraded body, a commit and a plan rebuild each ask', async () => {
+    const subject = rig();
+    subject.mount.mountDocument(subject.load(lShapePlan));
+    const afterMount = subject.invalidations();
+    expect(afterMount).toBeGreaterThanOrEqual(1);
+    await settle();
+    // One per body the model pass swapped in.
+    expect(subject.invalidations() - afterMount).toBe(subject.downloads.length);
+    const beforeEdit = subject.invalidations();
+    subject.mount.present(
+      subject.load(
+        edited((draft) => {
+          draft.assets.find((asset) => asset.id === SOFA)!.position = { x: 2.5, y: 0, z: 5.5 };
+        }),
+      ),
+    );
+    expect(subject.invalidations()).toBeGreaterThan(beforeEdit);
+    const beforePlan = subject.invalidations();
+    expect(subject.mount.rebuild()).not.toBeNull();
+    expect(subject.invalidations()).toBeGreaterThan(beforePlan);
+  });
+});
+
+describe('a sun redraw asks for a redraw too', () => {
+  test('the mounted sun reports its map redraws to the runtime demand', () => {
+    const quiet = () => undefined;
+    const sunRig = {
+      kind: 'apartment',
+      scene: null,
+      shadowMapSize: 2048,
+      shadowDraws: 0,
+      attach: quiet,
+      detach: quiet,
+      dispose: quiet,
+      setSunDirection: quiet,
+      setShadowFrustum: quiet,
+      markShadowDirty: quiet,
+    } satisfies ApartmentRig;
+    const subject = rig(sunRig);
+    subject.mount.mountDocument(subject.load(lShapePlan));
+    const before = subject.invalidations();
+    subject.mount.sunShadow!.markDirty();
+    expect(subject.invalidations()).toBe(before + 1);
   });
 });

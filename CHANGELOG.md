@@ -174,6 +174,28 @@ as described under [Versioning](#versioning).
 
 ### Changed
 
+- **The first picture waits for the scene's shaders, and `ready` waits for
+  the first picture.** The player compiles the scene's shaders asynchronously
+  before its first picture (parallel linking off the main thread where the
+  browser has `KHR_parallel_shader_compile`, at most 1 s), so the first frame
+  no longer blocks the page for the links; the walk and tour chain does the
+  same for its own target before it attaches, and so does a restored GPU
+  context. `ready`, `__appReady` and the reveal of the viewer now come after
+  the first picture is drawn (before, they came just before it), so a host
+  that screenshots on `ready` never sees a blank canvas; a viewer mounted
+  hidden fires them once its shaders are ready, and draws when it is shown.
+
+- **Walk and tour draw on demand.** In `walk` and `tour` the player draws a
+  new picture only when something on screen can have changed (the camera,
+  an edit or rebuild, a door or furniture animation, a model or texture that
+  arrived, the selection, the floor cursor, the sun's shadow, the room
+  lighting, a resize, a canvas shown again or a restored GPU context); a
+  resting view keeps its last picture and draws nothing. Editing modes are
+  unchanged and nothing changes in the public API. The telemetry `fps`
+  shares now count only the time between two consecutive drawn frames, so a
+  view at rest is no longer read as slow frames, and room `dwell` keeps
+  counting while the visitor stands still.
+
 - **The sun respects the apartment.** Its shadow is fitted to the walls,
   ceilings, floors, furniture and door swings of the scene on screen (no more
   fixed square that clipped large plans and wasted the map on small ones),

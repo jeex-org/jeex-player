@@ -17,10 +17,18 @@
  * again on the first eligible frame after a restore. One chain serves the
  * live view and the captures taken in `walk` and `tour` (`forCapture`), so a
  * captured frame has the same occlusion noise as the screen.
+ *
+ * Shaders: a finished chain is attached only once the scene's programs were
+ * compiled for its scene pass (`prepare`, asynchronously; three keys a program
+ * by the target it draws into, so the direct frames' programs do not serve
+ * the chain), or the first-draw bound passed (`render/first-draw.ts`); the
+ * view renders directly meanwhile, so the first frame through the chain does
+ * not wait for links. A `prepare` that throws or rejects attaches at once.
  */
 
 import type * as THREE from 'three';
 import { isPostProcessed, type PostProcessor } from '../render/post-processor.js';
+import { FirstDrawGate } from '../render/first-draw.js';
 import type { ViewerMode } from '../scene/types.js';
 
 /**
@@ -40,6 +48,8 @@ export type WalkPostDeps = {
   attach: (chain: PostProcessor | null) => void;
   /** A build failed; reported once per entry through the viewer's error channel. */
   report: (error: unknown) => void;
+  /** Compiles the scene for a finished chain before it attaches (`PostProcessor.compile`); absent: attach at once. */
+  prepare?: ((chain: PostProcessor) => Promise<unknown>) | undefined;
 };
 
 /** What the chain is doing, for the debug surface. */
@@ -56,6 +66,11 @@ export class WalkPostController {
   private failed = false;
   private eligible = false;
   private disposed = false;
+  /** Closed while the current chain's scene programs compile. */
+  private readonly compiled = new FirstDrawGate({
+    setTimeout: (run, ms) => setTimeout(run, ms) as unknown as number,
+    clearTimeout: (handle) => clearTimeout(handle),
+  });
 
   constructor(deps: WalkPostDeps) {
     this.deps = deps;
@@ -71,8 +86,8 @@ export class WalkPostController {
       this.setAttached(null);
       return;
     }
-    if (this.chain) this.setAttached(this.chain);
-    else void this.load();
+    if (!this.chain) void this.load();
+    else if (this.compiled.open) this.setAttached(this.chain);
   }
 
   /**
@@ -88,7 +103,7 @@ export class WalkPostController {
 
   state(): WalkPostState {
     if (this.attached) return 'on';
-    if (this.pending) return 'loading';
+    if (this.pending || (this.chain && !this.compiled.open)) return 'loading';
     return this.failed ? 'failed' : 'off';
   }
 
@@ -137,7 +152,9 @@ export class WalkPostController {
       return null;
     }
     this.chain = chain;
-    if (this.eligible) this.setAttached(chain);
+    const prepare = this.deps.prepare;
+    this.compiled.arm(prepare ? () => prepare(chain) : null);
+    if (this.eligible && this.compiled.open) this.setAttached(chain);
     return chain;
   }
 

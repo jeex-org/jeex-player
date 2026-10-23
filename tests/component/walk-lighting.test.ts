@@ -24,6 +24,7 @@ import { createLightingContext } from '../../src/lighting/lighting-context.js';
 import { LIGHTING_STANDARD } from '../../src/lighting/lighting-standard.js';
 import type { RoomBox } from '../../src/render/walk-lighting/room-volumes.js';
 import type { SceneOp } from '../../src/scene/types.js';
+import { RenderDemand } from '../../src/render/render-demand.js';
 import { closeContainers, demoScene, nextFrame, openContainer, until } from './support.js';
 
 const MOUNT_TIMEOUT_MS = 300_000;
@@ -465,7 +466,10 @@ describe('room lighting on the demo apartment', { timeout: MOUNT_TIMEOUT_MS }, (
         sum += 0.2126 * linear(pixels[i]!) + 0.7152 * linear(pixels[i + 1]!) + 0.0722 * linear(pixels[i + 2]!);
       screen = sum / 256;
     });
+    // A resting walk draws on demand only (`render-demand.ts`): ask for draws while the screen is read.
+    const drawing = vi.spyOn(RenderDemand.prototype, 'shouldDraw').mockReturnValue(true);
     await until(() => screen !== null, 'a frame on screen', 10_000);
+    drawing.mockRestore();
     spy.mockRestore();
     const size = lighting.renderer.getDrawingBufferSize(new THREE.Vector2());
     const shot = pose!;

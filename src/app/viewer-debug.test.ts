@@ -83,6 +83,7 @@ const READ_ONLY_KEYS = [
   'wallJoints',
   'walkPost',
   'walkLighting',
+  'renderDemand',
 ];
 
 /** The ones that change or export the draft, plus the two lazy layout reads. */
@@ -120,6 +121,7 @@ function host(overrides: Partial<ViewerDebugHost> = {}): ViewerDebugHost {
     sun: () => undefined,
     walkPost: () => undefined,
     walkLighting: () => undefined,
+    renderDemand: () => undefined,
     director: () => stubDirector(),
     editor: () => stubEditor(),
     builder: () => stubBuilder(),
@@ -308,6 +310,11 @@ describe('the getters project the model', () => {
   test('walkLighting is off without a stage and the controller state with one', () => {
     expect(installViewerDebug(host()).walkLighting()).toEqual({ state: 'off', stats: null });
     expect(installViewerDebug(host({ walkLighting: () => ({ state: 'baking', stats: null }) })).walkLighting().state).toBe('baking');
+  });
+
+  test('renderDemand counts nothing without a stage and the runtime counters with one', () => {
+    expect(installViewerDebug(host()).renderDemand()).toEqual({ ticks: 0, draws: 0 });
+    expect(installViewerDebug(host({ renderDemand: () => ({ ticks: 61, draws: 1 }) })).renderDemand()).toEqual({ ticks: 61, draws: 1 });
   });
 
   test('walkPost is off without a stage and the controller state with one', () => {

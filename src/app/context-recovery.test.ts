@@ -31,7 +31,6 @@ function harness(options: { committed?: boolean; released?: boolean } = {}) {
   const recovery = contextRecovery({
     ui: () => ({
       showError: (title, message, retry, keepCanvas) => shown.push({ title, message, retry, keepCanvas }),
-      showViewer: () => calls.push('showViewer'),
     }),
     mount: () => mount,
     messages: () => createMessages('en'),
@@ -71,10 +70,10 @@ describe('a lost context', () => {
 });
 
 describe('a restored context', () => {
-  test('re-mounts the committed document with its project options, shows the viewer and announces ready', () => {
+  test('re-mounts the committed document with its project options and announces ready, which reveals the viewer after the first picture', () => {
     const { recovery, calls } = harness();
     recovery.onRestored();
-    expect(calls).toEqual(['remount', 'showViewer', 'minimap', 'ready']);
+    expect(calls).toEqual(['remount', 'minimap', 'ready']);
   });
 
   test('does nothing once the viewer has been released', () => {

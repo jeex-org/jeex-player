@@ -8,7 +8,7 @@
  */
 
 import { afterEach, beforeEach, describe, expect, test } from 'bun:test';
-import { applyStartView, nextFrame } from './viewer-boot.js';
+import { applyStartView, firstPicture, nextFrame } from './viewer-boot.js';
 import { ViewerDisposedError } from './viewer-context.js';
 import { DEFAULT_VIEWER_OPTIONS, type ViewerOptions } from './viewer-options.js';
 import type { ViewerMode } from '../scene/types.js';
@@ -102,6 +102,38 @@ describe('nextFrame', () => {
     // abort handler per frame it ever waited for.
     controller.abort();
     expect(cancelled).toEqual([]);
+  });
+});
+
+describe('firstPicture', () => {
+  test('waits for the owed first picture, then for the frame after it', async () => {
+    const controller = new AbortController();
+    let draw: () => void = () => undefined;
+    const picture = new Promise<void>((resolve) => {
+      draw = resolve;
+    });
+    let done = false;
+    const waiting = firstPicture(controller.signal, picture).then(() => (done = true));
+    paint();
+    await Promise.resolve();
+    expect(done).toBe(false);
+    draw();
+    for (let turn = 0; turn < 5; turn += 1) await Promise.resolve();
+    expect(done).toBe(false);
+    paint();
+    await waiting;
+    expect(done).toBe(true);
+  });
+
+  test('without a picture owed it is one frame; disposal while waiting rejects', async () => {
+    const plain = firstPicture(new AbortController().signal, undefined);
+    for (let turn = 0; turn < 5; turn += 1) await Promise.resolve();
+    paint();
+    await plain;
+    const controller = new AbortController();
+    const waiting = firstPicture(controller.signal, new Promise<void>(() => {}));
+    controller.abort();
+    await expect(waiting).rejects.toBeInstanceOf(ViewerDisposedError);
   });
 });
 

@@ -49,10 +49,11 @@ export { createKtx2Support } from '../materials/ktx2.js';
 
 type SceneMountDeps = {
   /**
-   * The runtime: the scene graph the root lives in and the rig whose sun lights
-   * it (`render/sun-shadow.ts`); absent before the runtime exists.
+   * The runtime: the scene graph the root lives in, the rig whose sun lights
+   * it (`render/sun-shadow.ts`) and the redraw demand of walk and tour
+   * (`render/render-demand.ts`); absent before the runtime exists.
    */
-  runtime: () => { readonly scene: THREE.Scene; readonly sunRig?: ApartmentRig } | undefined;
+  runtime: () => { readonly scene: THREE.Scene; readonly sunRig?: ApartmentRig; readonly demand?: { invalidate(): void } } | undefined;
   picker: Picker;
   dollhouse: Dollhouse;
   animator: FurnitureAnimator;
@@ -224,6 +225,7 @@ export class SceneMount {
       builder.bindModel(model, (failed) => this.handleDrift(failed)),
       model.onRevision((_rev, touched) => {
         editor.applyRevision(touched);
+        this.invalidate();
         // A plan-level commit ends in `reseed` -> `onDocument`, which re-seeds
         // every consumer. An incremental asset swap does not, so its own
         // consequence — the changed footprint — is published here.
@@ -276,7 +278,12 @@ export class SceneMount {
   private texturesFor(project: LoadedProjectContext): LibraryTextures | null {
     if (this.textures !== null && this.textures.key === project.key) return this.textures.textures;
     const env = this.deps.textureEnv?.() ?? null;
-    return env === null ? null : createProjectTextures(project.info.baseUrl, env);
+    return env === null ? null : { ...createProjectTextures(project.info.baseUrl, env), attached: () => this.invalidate() };
+  }
+
+  /** Something on screen changed: walk and tour draw the next tick (`render/render-demand.ts`). */
+  private invalidate(): void {
+    this.deps.runtime()?.demand?.invalidate();
   }
 
   /** Starts the texture work a frame after the mount: the first frame is flat and has no network in it. */
@@ -348,6 +355,7 @@ export class SceneMount {
             this.currentEditor?.adoptUpgradedBody(group, replaced);
             // Refitted once per frame however many bodies arrive (`flushSunRefit`).
             this.sunRefitPending = true;
+            this.invalidate();
           },
         );
         if (reportFor && !signal.aborted) this.deps.onModelsSettled?.(reportFor, result);
@@ -420,9 +428,10 @@ export class SceneMount {
     this.root = built.root;
     const runtime = this.deps.runtime();
     runtime?.scene.add(built.root);
+    runtime?.demand?.invalidate();
     if (this.currentModel) this.deps.dollhouse.prepare(this.currentModel.plan, built.root);
     if (this.currentModel && runtime?.sunRig) {
-      this.sun = prepareSunShadow(built.root, this.currentModel.scene, this.currentModel.plan, runtime.sunRig);
+      this.sun = prepareSunShadow(built.root, this.currentModel.scene, this.currentModel.plan, runtime.sunRig, () => this.invalidate());
     }
     this.deps.picker.register(built.root, (wallId) => this.deps.dollhouse.isExterior(wallId));
   }
