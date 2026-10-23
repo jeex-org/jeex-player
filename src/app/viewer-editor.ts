@@ -150,6 +150,7 @@ export class ViewerEditor {
     navigation: () => undefined,
     autotour: () => undefined,
     tourCheckpoints: () => undefined,
+    site: () => undefined,
   };
 
   /** What `followPlacement` works with: this editor's registries and its two furniture actions. */

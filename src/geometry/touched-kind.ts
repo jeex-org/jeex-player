@@ -55,6 +55,7 @@ export function touchedText(entity: TouchedEntity): string {
     case 'navigation':
     case 'autotour':
     case 'tourCheckpoints':
+    case 'site':
       return entity.kind;
   }
 }

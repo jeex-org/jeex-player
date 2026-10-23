@@ -27,7 +27,7 @@
  */
 
 import type { FaceKey, FinishSurface, SceneFinishes, WallSide } from './types.finishes.js';
-import type { SceneSite } from './types.site.js';
+import type { SceneSite, SiteSun } from './types.site.js';
 
 export type { SceneSite, SiteSun } from './types.site.js';
 
@@ -728,6 +728,18 @@ export type SplitWallOp = {
   readonly ids: readonly [string, string];
 };
 
+/**
+ * Sets or clears the plan's orientation and sun preset (schema 2.3 only; the
+ * version is never raised by an op). A present value sets the field, `null`
+ * clears it, an omitted key keeps it; at least one key is present. `northDeg`
+ * is stored normalised to [0, 360). Clearing both removes `site`.
+ */
+export type SetSiteOp = {
+  readonly op: 'set_site';
+  readonly northDeg?: number | null;
+  readonly sun?: SiteSun | null;
+};
+
 export type SceneOp =
   | SetMaterialOp
   | ReplaceAssetVariantOp
@@ -755,7 +767,8 @@ export type SceneOp =
   | AddWallOp
   | SetWallOp
   | RemoveWallOp
-  | SplitWallOp;
+  | SplitWallOp
+  | SetSiteOp;
 
 /**
  * A complete interior look offered by the viewer's preset selector: floor and
@@ -962,36 +975,3 @@ export type ViewerMode = 'plan2d' | 'plan3d' | 'orbit' | 'walk' | 'tour';
 export function isPlanMode(mode: ViewerMode): boolean {
   return mode === 'plan2d' || mode === 'plan3d';
 }
-
-// -------------------------------------------------- completeness report --
-//
-// `scene/completeness.ts` needs a report shape, and it is declared down here
-// with the types rather than up in `scene/` for two reasons that outlived the
-// layer rule that first produced it: `checkCompleteness` imports the three
-// names from this module, and `embed/ops.ts` re-exports them, because an
-// importer outside this repository builds its own `ImportReport`/`ReportEntry`
-// to the SAME shape and the two must not drift apart (the shared shape is a
-// package boundary).
-
-/** How serious one completeness finding is. */
-export type SceneReportSeverity = 'info' | 'warning' | 'error';
-
-/** One finding `checkCompleteness` raised, in the shape an import report uses. */
-export type SceneReportEntry = {
-  /** kebab-case, stable across versions, e.g. `'room-no-door'`. */
-  readonly code: string;
-  readonly severity: SceneReportSeverity;
-  /** One sentence, English, numbers included (no separate formatting step). */
-  readonly message: string;
-  readonly entity?: { readonly kind: string; readonly id: string };
-  /** JSON path in the scene document. */
-  readonly path?: string;
-  /** The numeric/boolean/string payload behind `message`. */
-  readonly detail?: Readonly<Record<string, number | string | boolean | null>>;
-};
-
-/** `checkCompleteness`'s whole log, plus a running count by severity. */
-export type SceneReport = {
-  readonly entries: readonly SceneReportEntry[];
-  readonly counts: Readonly<Record<SceneReportSeverity, number>>;
-};

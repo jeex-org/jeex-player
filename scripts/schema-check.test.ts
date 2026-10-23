@@ -115,6 +115,11 @@ describe('a top-level `$schema` key is tolerated', () => {
  * would pass those — so the same deliberately broken documents go through
  * both, and each must be refused twice.
  */
+/** An interior preset carrying one operation, for the operation shapes both schemas judge. */
+function presetWith(op: unknown): unknown {
+  return { id: '01a12ffa-de52-7ebf-9129-0a91479080dd', name: 'Preset', swatch: ['a', 'b'], ops: [op] };
+}
+
 describe('the Zod schema and the published JSON Schema accept the same documents', () => {
   for (const [name, scene] of Object.entries(SCENE_FIXTURES)) {
     test(`${name}: both accept it`, () => {
@@ -138,6 +143,12 @@ describe('the Zod schema and the published JSON Schema accept the same documents
     ],
     ['a 1.x document, whose ids are not UUIDs', () => ({ ...draftOf(lShapePlan), schemaVersion: '1.2' })],
     ['a version this build does not read', () => ({ ...draftOf(lShapePlan), schemaVersion: '2.1' })],
+    ['a set_site with neither key, in a preset', () => ({ ...draftOf(lShapePlan), interiors: [presetWith({ op: 'set_site' })] })],
+    [
+      'a set_site with a misspelt key, in a preset',
+      () => ({ ...draftOf(lShapePlan), interiors: [presetWith({ op: 'set_site', north_deg: 9 })] }),
+    ],
+    ['a set_site sun that is no preset', () => ({ ...draftOf(lShapePlan), interiors: [presetWith({ op: 'set_site', sun: 'night' })] })],
     ['a site in a 2.2 document', () => ({ ...draftOf(lShapePlan), site: { northDeg: 0 } })],
     ['a site with an unknown key', () => ({ ...draftOf(lShapePlan), schemaVersion: '2.3', site: { north_deg: 30 } })],
     ['a site north that is a string', () => ({ ...draftOf(lShapePlan), schemaVersion: '2.3', site: { northDeg: '30' } })],
@@ -235,6 +246,17 @@ describe('the Zod schema and the published JSON Schema accept the same documents
       },
     ],
   ];
+
+  test('a set_site with either key or a null passes both schemas (the validator, not the schema, keeps it out of presets)', () => {
+    for (const op of [
+      { op: 'set_site', sun: 'noon' },
+      { op: 'set_site', northDeg: null },
+      { op: 'set_site', northDeg: -90, sun: null },
+    ]) {
+      const scene = { ...draftOf(lShapePlan), interiors: [presetWith(op)] };
+      expect({ op, ajv: validateSceneSchema(scene), zod: z.safeParse(sceneSchema, scene).success }).toEqual({ op, ajv: true, zod: true });
+    }
+  });
 
   test('schema 2.3 documents with a site, an empty site or none: both accept them', () => {
     for (const site of [{ northDeg: 30, sun: 'evening' }, { sun: 'morning' }, {}, undefined]) {

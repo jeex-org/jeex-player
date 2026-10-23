@@ -192,6 +192,7 @@ export type {
   SetNavigationOp,
   SetAutotourOp,
   SetTourCheckpointsOp,
+  SetSiteOp,
 } from '../scene/types.js';
 
 export { solvePlan } from '../plan/plan-solver.js';
@@ -284,7 +285,7 @@ export { badParams, issueDetail, issuePath } from '../shared/schema-issues.js';
 export type { SchemaIssue } from '../shared/schema-issues.js';
 
 export { WALL_LIMITS, isDoorLike } from '../scene/types.js';
-export type { SceneReport, SceneReportEntry, SceneReportSeverity } from '../scene/types.js';
+export type { SceneReport, SceneReportEntry, SceneReportSeverity } from '../scene/scene-report.js';
 
 /**
  * Identifiers: the viewer CHECKS

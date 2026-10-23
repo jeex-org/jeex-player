@@ -39,7 +39,8 @@
 import { pointInPolygon } from '../plan/plan-geometry.js';
 import type { SolvedPlan } from '../plan/plan-solver.js';
 import type { SceneRegistries } from './registries.js';
-import { isDoorLike, type Opening, type SceneData, type SceneReport, type SceneReportEntry, type SceneReportSeverity } from './types.js';
+import { isDoorLike, type Opening, type SceneData } from './types.js';
+import type { SceneReport, SceneReportEntry, SceneReportSeverity } from './scene-report.js';
 
 /** The rule vocabulary `checkCompleteness` checks, in the order it runs them. */
 export type CompletenessRule =
