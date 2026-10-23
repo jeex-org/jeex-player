@@ -9,6 +9,22 @@ as described under [Versioning](#versioning).
 
 ### Added
 
+- **KTX2 textures.** Furniture GLBs that use `KHR_texture_basisu` and library
+  room maps shipped as `tex/<versionId>/<role>.<px>.ktx2` are decoded by
+  three's Basis Universal transcoder into the GPU's compressed formats. The
+  transcoder ships next to the player's files in every build as
+  `lazy-jeex-viewer-basis-transcoder-<hash>.js` and `.wasm`, is found from the
+  folder of the running player file (ES entry, custom element, iframe page and
+  IIFE alike), and is fetched only when a document first needs KTX2. A KTX2
+  room map is drawn the same way up as its WebP twin, with its own mip levels
+  and the colour space of its role. A KTX2 GLB that cannot be transcoded is
+  refused with `detail.reason: 'ktx2-transcoder'` and keeps its procedural
+  body. New log codes `texture-ktx2` and `texture-colour-space`. Hosts that
+  serve `dist-lib/` must also serve `.wasm` as `application/wasm`; the CSP
+  section lists what KTX2 needs. `jeex-viewer.iife.js` grows by about 26 KB
+  gzip (the loader code it carries inline).
+
+
 - **`set_site`: a scene operation for the plan's orientation and sun preset.**
   `{ op: 'set_site', northDeg?: number | null, sun?: 'morning' | 'noon' | 'evening' | null }`
   on schema 2.3 documents: a value sets the field, `null` clears it, an omitted
@@ -215,6 +231,9 @@ as described under [Versioning](#versioning).
   `assetLibrary`) and are absent for the built-in bank.
 
 ### Fixed
+
+- A disposed model source now frees the textures of the GLBs it parsed, not
+  only their geometries and materials.
 
 - **Tintable library scans draw at their real brightness.** A tint map
   written by the `luma-mid@1` recipe is normalised to a mid-grey mean, and

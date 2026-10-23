@@ -154,3 +154,25 @@ jobs:
             test-results/
             playwright-report/
           retention-days: 7
+
+  # The BUILT library from a second origin (`tests/built/`): every embed shape
+  # must find the Basis transcoder beside its own file. One job, no shards:
+  # four pages, each boots one viewer.
+  built:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - uses: ./.github/actions/setup
+        with:
+          browser: 'true'
+
+      - name: build (library)
+        run: bun run build:lib
+
+      - name: built library embeds (Playwright, tests/built)
+        env:
+          JEEX_E2E_WORKERS: '1'
+          JEEX_E2E_TIME_SCALE: '3'
+        run: bun run test:built

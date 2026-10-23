@@ -44,13 +44,15 @@ export type GlbReason =
 export type GlbResource = { readonly uri?: string | undefined };
 
 /**
- * The two fields of the JSON document that name a network fetch
- * (`model-source.ts`); `glb-container.schema.ts` proves the shape, and
- * `glb-container.schema.test.ts` proves the two agree.
+ * The fields of the JSON document `model-source.ts` reads before the parse:
+ * the two that name a network fetch, and the extensions the document uses
+ * (whether it needs the KTX2 transcoder); `glb-container.schema.ts` proves the
+ * shape, and `glb-container.schema.test.ts` proves the two agree.
  */
 export type GlbDocument = {
   readonly images?: readonly GlbResource[] | undefined;
   readonly buffers?: readonly GlbResource[] | undefined;
+  readonly extensionsUsed?: readonly string[] | undefined;
 };
 
 const HEADER_BYTES = 12;

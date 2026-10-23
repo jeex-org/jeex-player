@@ -894,9 +894,27 @@ describe('library member: texture file paths', () => {
     expect(issuePaths(value)[0]).toBe(`${AT}.maps.albedo.files.512`);
   });
 
-  test('ktx2, png and a path with a folder prefix are refused', () => {
+  test('a material whose every file is KTX2 is accepted', () => {
+    const value = withLibrary(naturalScan, (library) => {
+      for (const map of Object.values(library['maps']) as { files: Record<string, string> }[]) {
+        for (const size of Object.keys(map.files)) map.files[size] = map.files[size]!.replace(/\.webp$/, '.ktx2');
+      }
+    });
+    expect(issuePaths(value)).toEqual([]);
+  });
+
+  test('one KTX2 file among WebP files of the same material is refused, naming the format the material uses', () => {
+    const value = withLibrary(
+      naturalScan,
+      (library) => void (library['maps']['normal']['files']['512'] = tex(LIB.oakVersion, 'normal', '512').replace(/\.webp$/, '.ktx2')),
+    );
+    expect(projectManifestIssues(value).map((issue) => ({ path: issue.path.join('.'), message: issue.message }))).toEqual([
+      { path: `${AT}.maps.normal.files.512`, message: `must be ${tex(LIB.oakVersion, 'normal', '512')}` },
+    ]);
+  });
+
+  test('png and a path with a folder prefix are refused', () => {
     for (const path of [
-      `tex/${LIB.oakVersion}/albedo.512.ktx2`,
       `tex/${LIB.oakVersion}/albedo.512.png`,
       `bake/tex/${LIB.oakVersion}/albedo.512.webp`,
       `https://cdn.example.com/tex/${LIB.oakVersion}/albedo.512.webp`,

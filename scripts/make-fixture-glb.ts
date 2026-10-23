@@ -27,14 +27,28 @@
  * `materialSlots` entry — so one fixture exercises both halves of the binding
  * rule.
  *
- * CLI: `bun scripts/make-fixture-glb.ts` (writes the fixture in place).
+ * A second, textured file (`BASISU_FIXTURE_OUTPUT`) carries the same box with
+ * a `KHR_texture_basisu` base colour, for the KTX2 path.
+ *
+ * CLI: `bun scripts/make-fixture-glb.ts` (writes both fixtures in place).
  */
 
-import { mkdirSync, writeFileSync } from 'node:fs';
+import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 
 /** Where the fixture lives, relative to the repository root. */
 export const FIXTURE_OUTPUT = 'tests/fixtures/project/obj/box-sofa@1.0.0.glb';
+
+/**
+ * The same box sofa with texture coordinates and a KTX2 base colour on its
+ * `frame` behind `KHR_texture_basisu` (required, no fallback), the shape a
+ * KTX2 bake ships. The image is the committed `swatch.16.ktx2` (saturated red,
+ * `scripts/make-fixture-ktx2.ts`), so this file is rebuilt from committed
+ * bytes alone and stays deterministic.
+ */
+export const BASISU_FIXTURE_OUTPUT = 'tests/fixtures/project/obj/box-sofa-basisu@1.0.0.glb';
+/** The KTX2 image the basisu fixture embeds, relative to the repository root. */
+export const BASISU_FIXTURE_IMAGE = 'tests/fixtures/ktx2/swatch.16.ktx2';
 
 /** `[width, height, depth]` in metres — the bbox the loader validates against. */
 export const FIXTURE_DIMS: readonly [number, number, number] = [2.1, 0.85, 0.95];
@@ -118,12 +132,21 @@ const FACES: readonly { normal: readonly [number, number, number]; corners: read
   },
 ];
 
-type Mesh = { positions: number[]; normals: number[]; indices: number[][] };
+type Mesh = { positions: number[]; normals: number[]; uvs: number[]; indices: number[][] };
+
+/** The four corners of every face in texture space, in the order `FACES` lists them. */
+const FACE_UVS: readonly (readonly [number, number])[] = [
+  [0, 1],
+  [1, 1],
+  [1, 0],
+  [0, 0],
+];
 
 /** Welds the blocks into one vertex buffer with one index run per block. */
 function tessellate(boxes: readonly Box[]): Mesh {
   const positions: number[] = [];
   const normals: number[] = [];
+  const uvs: number[] = [];
   const indices: number[][] = [];
   for (const box of boxes) {
     const run: number[] = [];
@@ -133,11 +156,12 @@ function tessellate(boxes: readonly Box[]): Mesh {
         positions.push(corner[0] ? box.max[0] : box.min[0], corner[1] ? box.max[1] : box.min[1], corner[2] ? box.max[2] : box.min[2]);
         normals.push(face.normal[0], face.normal[1], face.normal[2]);
       }
+      for (const uv of FACE_UVS) uvs.push(uv[0], uv[1]);
       run.push(base, base + 1, base + 2, base, base + 2, base + 3);
     }
     indices.push(run);
   }
-  return { positions, normals, indices };
+  return { positions, normals, uvs, indices };
 }
 
 /** Component-wise minimum and maximum of a flat `xyz` triple list, as glTF accessors declare them. */
@@ -173,7 +197,7 @@ export function glbJson(bytes: Uint8Array): Record<string, unknown> {
  * are the model's bounding box — which is what makes the pivot and the
  * dimensions readable from the JSON chunk alone.
  */
-export function buildFixtureGlb(): Uint8Array {
+export function buildFixtureGlb(basisu?: Uint8Array): Uint8Array {
   const mesh = tessellate(blocks());
   const box = bounds(mesh.positions);
 
@@ -187,8 +211,13 @@ export function buildFixtureGlb(): Uint8Array {
     cursor = aligned(cursor + length);
   }
   const indexBytes = cursor - positionBytes - normalBytes;
+  // The textured variant appends its texture coordinates and its image after the indices.
+  const uvOffset = cursor;
+  const uvBytes = basisu === undefined ? 0 : mesh.uvs.length * 4;
+  const imageOffset = uvOffset + uvBytes;
+  const imageBytes = basisu === undefined ? 0 : aligned(basisu.byteLength);
 
-  const binary = new Uint8Array(positionBytes + normalBytes + indexBytes);
+  const binary = new Uint8Array(imageOffset + imageBytes);
   const binaryView = new DataView(binary.buffer);
   mesh.positions.forEach((value, index) => binaryView.setFloat32(index * 4, value, true));
   mesh.normals.forEach((value, index) => binaryView.setFloat32(positionBytes + index * 4, value, true));
@@ -196,6 +225,11 @@ export function buildFixtureGlb(): Uint8Array {
     const base = positionBytes + normalBytes + indexOffsets[runIndex]!;
     run.forEach((value, index) => binaryView.setUint16(base + index * 2, value, true));
   });
+  if (basisu !== undefined) {
+    mesh.uvs.forEach((value, index) => binaryView.setFloat32(uvOffset + index * 4, value, true));
+    binary.set(basisu, imageOffset);
+  }
+  const textured = basisu !== undefined;
 
   const json = {
     asset: { version: '2.0', generator: 'jeex scripts/make-fixture-glb.ts', copyright: 'CC0-1.0' },
@@ -207,7 +241,7 @@ export function buildFixtureGlb(): Uint8Array {
       {
         name: 'box_sofa',
         primitives: mesh.indices.map((_, index) => ({
-          attributes: { POSITION: 0, NORMAL: 1 },
+          attributes: textured ? { POSITION: 0, NORMAL: 1, TEXCOORD_0: 2 + mesh.indices.length } : { POSITION: 0, NORMAL: 1 },
           indices: 2 + index,
           material: index,
         })),
@@ -215,8 +249,17 @@ export function buildFixtureGlb(): Uint8Array {
     ],
     materials: [
       { name: 'seat', pbrMetallicRoughness: { baseColorFactor: [0.78, 0.73, 0.64, 1], metallicFactor: 0, roughnessFactor: 0.9 } },
-      { name: 'frame', pbrMetallicRoughness: { baseColorFactor: [0.45, 0.33, 0.22, 1], metallicFactor: 0, roughnessFactor: 0.6 } },
+      textured
+        ? { name: 'frame', pbrMetallicRoughness: { baseColorTexture: { index: 0 }, metallicFactor: 0, roughnessFactor: 0.6 } }
+        : { name: 'frame', pbrMetallicRoughness: { baseColorFactor: [0.45, 0.33, 0.22, 1], metallicFactor: 0, roughnessFactor: 0.6 } },
     ],
+    ...(textured && {
+      extensionsUsed: ['KHR_texture_basisu'],
+      extensionsRequired: ['KHR_texture_basisu'],
+      samplers: [{ magFilter: 9729, minFilter: 9987, wrapS: 10497, wrapT: 10497 }],
+      textures: [{ sampler: 0, extensions: { KHR_texture_basisu: { source: 0 } } }],
+      images: [{ bufferView: 4, mimeType: 'image/ktx2' }],
+    }),
     accessors: [
       { bufferView: 0, componentType: 5126, count: mesh.positions.length / 3, type: 'VEC3', min: box.min, max: box.max },
       { bufferView: 1, componentType: 5126, count: mesh.normals.length / 3, type: 'VEC3' },
@@ -227,11 +270,18 @@ export function buildFixtureGlb(): Uint8Array {
         count: run.length,
         type: 'SCALAR',
       })),
+      ...(textured ? [{ bufferView: 3, componentType: 5126, count: mesh.uvs.length / 2, type: 'VEC2' }] : []),
     ],
     bufferViews: [
       { buffer: 0, byteOffset: 0, byteLength: positionBytes, target: 34962 },
       { buffer: 0, byteOffset: positionBytes, byteLength: normalBytes, target: 34962 },
       { buffer: 0, byteOffset: positionBytes + normalBytes, byteLength: indexBytes, target: 34963 },
+      ...(textured
+        ? [
+            { buffer: 0, byteOffset: uvOffset, byteLength: uvBytes, target: 34962 },
+            { buffer: 0, byteOffset: imageOffset, byteLength: basisu.byteLength },
+          ]
+        : []),
     ],
     buffers: [{ byteLength: binary.byteLength }],
   };
@@ -257,14 +307,23 @@ export function buildFixtureGlb(): Uint8Array {
   return glb;
 }
 
+/** The basisu fixture, built from the committed KTX2 image. */
+export function buildBasisuFixtureGlb(): Uint8Array {
+  return buildFixtureGlb(new Uint8Array(readFileSync(resolve(import.meta.dirname, '..', BASISU_FIXTURE_IMAGE))));
+}
+
 if (import.meta.main) {
-  const path = resolve(import.meta.dirname, '..', FIXTURE_OUTPUT);
-  const bytes = buildFixtureGlb();
-  if (bytes.byteLength > FIXTURE_SIZE_LIMIT) {
-    console.error(`make-fixture-glb: ${bytes.byteLength} bytes exceeds the ${FIXTURE_SIZE_LIMIT}-byte fixture limit`);
-    process.exit(1);
+  for (const [output, bytes] of [
+    [FIXTURE_OUTPUT, buildFixtureGlb()],
+    [BASISU_FIXTURE_OUTPUT, buildBasisuFixtureGlb()],
+  ] as const) {
+    const path = resolve(import.meta.dirname, '..', output);
+    if (bytes.byteLength > FIXTURE_SIZE_LIMIT) {
+      console.error(`make-fixture-glb: ${bytes.byteLength} bytes exceeds the ${FIXTURE_SIZE_LIMIT}-byte fixture limit`);
+      process.exit(1);
+    }
+    mkdirSync(dirname(path), { recursive: true });
+    writeFileSync(path, bytes);
+    console.log(`make-fixture-glb: wrote ${output} (${bytes.byteLength} bytes)`);
   }
-  mkdirSync(dirname(path), { recursive: true });
-  writeFileSync(path, bytes);
-  console.log(`make-fixture-glb: wrote ${FIXTURE_OUTPUT} (${bytes.byteLength} bytes)`);
 }

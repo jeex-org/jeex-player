@@ -10,9 +10,11 @@
  * frame is own at all: the site's code may share that file, so the check
  * fails closed.
  *
- * The module's own URL is read once, when the bundle evaluates (`selfUrl`).
- * Pure apart from that one guarded read of `document.currentScript`.
+ * The player file's own URL is read once, when the bundle evaluates
+ * (`shared/own-url.ts`).
  */
+
+import { OWN_FILE_URL } from '../shared/own-url.js';
 
 /** The shape of a published player file name. */
 export const PUBLISHED_FILE = /^(?:lazy-)?jeex-viewer[\w.-]*\.js$/;
@@ -36,19 +38,5 @@ export function ownFilePredicate(ownUrl: string): (url: string) => boolean {
   };
 }
 
-/**
- * The URL of the file this module runs in. The ES builds keep `import.meta.url`;
- * the IIFE build has no `import.meta` and leaves the value undefined, but runs
- * synchronously while its own `<script>` is `document.currentScript`, so that
- * is read instead. Neither: an empty string, which owns nothing.
- */
-function selfUrl(): string {
-  const url: unknown = import.meta.url;
-  if (typeof url === 'string' && url !== '') return url;
-  if (typeof document === 'undefined') return '';
-  const script = document.currentScript;
-  return script !== null && 'src' in script && typeof script.src === 'string' ? script.src : '';
-}
-
 /** The predicate for the file this module was loaded from, decided once, when the bundle evaluates. */
-export const isOwnFile: (url: string) => boolean = ownFilePredicate(selfUrl());
+export const isOwnFile: (url: string) => boolean = ownFilePredicate(OWN_FILE_URL);

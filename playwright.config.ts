@@ -83,18 +83,31 @@ export default defineConfig({
       name: 'chromium',
       use: { ...devices['Desktop Chrome'], launchOptions: HEADLESS_WEBGL_LAUNCH },
     },
+    // The BUILT library, served by routing from `dist-lib/` (`tests/built/`): run after
+    // `bun run build:lib` with `bun run test:built`; `test:e2e` runs only `chromium`.
+    {
+      name: 'built',
+      testDir: 'tests/built',
+      use: { ...devices['Desktop Chrome'], launchOptions: HEADLESS_WEBGL_LAUNCH },
+    },
   ],
-  webServer: {
-    // `--strictPort` on purpose: a server that quietly moved to another port
-    // would leave every spec pointing at whatever else is on 3701.
-    command: `vite --port ${E2E_PORT} --strictPort --host 127.0.0.1`,
-    // No file watcher on this server, so nothing reloads a page behind a spec's
-    // back (`vite.config.ts`, `E2E_SERVER`).
-    env: { JEEX_E2E_SERVER: '1' },
-    url: E2E_BASE_URL,
-    reuseExistingServer: !process.env['CI'],
-    timeout: 120_000,
-    stdout: 'ignore',
-    stderr: 'pipe',
-  },
+  // `bun run test:built` sets `JEEX_E2E_BUILT=1`: the built project routes every request
+  // itself (`tests/built/`), so it starts no dev server.
+  ...(process.env['JEEX_E2E_BUILT'] === '1'
+    ? {}
+    : {
+        webServer: {
+          // `--strictPort` on purpose: a server that quietly moved to another port
+          // would leave every spec pointing at whatever else is on 3701.
+          command: `vite --port ${E2E_PORT} --strictPort --host 127.0.0.1`,
+          // No file watcher on this server, so nothing reloads a page behind a spec's
+          // back (`vite.config.ts`, `E2E_SERVER`).
+          env: { JEEX_E2E_SERVER: '1' },
+          url: E2E_BASE_URL,
+          reuseExistingServer: !process.env['CI'],
+          timeout: 120_000,
+          stdout: 'ignore',
+          stderr: 'pipe',
+        },
+      }),
 });

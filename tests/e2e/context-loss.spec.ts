@@ -14,7 +14,7 @@
  */
 
 import { expect, test } from '@playwright/test';
-import { expectCanvasStillRendering, waitForBoot } from './support.js';
+import { expectCanvasStillRendering, serveKtx2LibraryProject, waitForBoot } from './support.js';
 import { scaled } from './time-scale.js';
 import { LIBRARY_PROJECT_FIXTURE } from '../fixtures/project/fixture-ids.js';
 
@@ -110,6 +110,34 @@ test('a restored context draws a library project’s maps again from the bytes i
     'metalnessMap',
   ]);
   expect(requested).toHaveLength(before);
+});
+
+test('a restored context draws KTX2 maps again from the bytes it kept: no new map or transcoder request', async ({ page, request }) => {
+  const served = await serveKtx2LibraryProject(page, request);
+  await page.goto('/dev/project.html?project=/tests/fixtures/project-library/project.json');
+  await waitForBoot(page, 'window.__appReady === true');
+  const floor = `floor-${LIBRARY_PROJECT_FIXTURE.room.living}`;
+  const hasMaps = (name: string) => (window.__viewerDebug!.surfaceMaterial(name)?.maps.length ?? 0) > 0;
+  await page.waitForFunction(hasMaps, floor, { timeout: RESTORE_TIMEOUT_MS });
+  expect([served.maps().length, served.transcoder()]).toEqual([3, { js: 1, wasm: 1 }]);
+  await page.evaluate(() => {
+    const canvas = document.querySelector<HTMLCanvasElement>('[data-jeex="scene-canvas"]');
+    const gl = canvas?.getContext('webgl2') ?? canvas?.getContext('webgl');
+    window.__jeexLose = gl?.getExtension('WEBGL_lose_context') ?? null;
+  });
+  await page.evaluate(() => window.__jeexLose?.loseContext());
+  await expect(page.locator('[data-jeex="error-state"]')).toBeVisible();
+  await page.evaluate(() => window.__jeexLose?.restoreContext());
+  await expect(page.locator('[data-jeex="error-state"]')).toBeHidden({ timeout: RESTORE_TIMEOUT_MS });
+  await page.waitForFunction(hasMaps, floor, { timeout: RESTORE_TIMEOUT_MS });
+  expect(await page.evaluate((name) => window.__viewerDebug!.surfaceMaterial(name)?.maps, floor)).toEqual([
+    'map',
+    'normalMap',
+    'aoMap',
+    'roughnessMap',
+    'metalnessMap',
+  ]);
+  expect([served.maps().length, served.transcoder()]).toEqual([3, { js: 1, wasm: 1 }]);
 });
 
 declare global {

@@ -1,7 +1,15 @@
 import { describe, expect, test } from 'bun:test';
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
-import { buildFixtureGlb, FIXTURE_DIMS, FIXTURE_OUTPUT, FIXTURE_SIZE_LIMIT, glbJson } from './make-fixture-glb.ts';
+import {
+  BASISU_FIXTURE_OUTPUT,
+  buildBasisuFixtureGlb,
+  buildFixtureGlb,
+  FIXTURE_DIMS,
+  FIXTURE_OUTPUT,
+  FIXTURE_SIZE_LIMIT,
+  glbJson,
+} from './make-fixture-glb.ts';
 
 const HERE = import.meta.dirname;
 
@@ -43,5 +51,35 @@ describe('make-fixture-glb', () => {
   test('the committed fixture is what the script produces', () => {
     const committed = readFileSync(resolve(HERE, '..', FIXTURE_OUTPUT));
     expect(Buffer.from(committed)).toEqual(Buffer.from(bytes));
+  });
+});
+
+describe('make-fixture-glb, the KHR_texture_basisu variant', () => {
+  const bytes = buildBasisuFixtureGlb();
+  const json = glbJson(bytes);
+
+  test('requires KHR_texture_basisu and names its KTX2 image only through the extension', () => {
+    expect(json['extensionsUsed']).toEqual(['KHR_texture_basisu']);
+    expect(json['extensionsRequired']).toEqual(['KHR_texture_basisu']);
+    const texture = (json['textures'] as Record<string, unknown>[])[0]!;
+    expect(texture['source']).toBeUndefined();
+    expect(texture['extensions']).toEqual({ KHR_texture_basisu: { source: 0 } });
+    expect(json['images']).toEqual([{ bufferView: 4, mimeType: 'image/ktx2' }]);
+  });
+
+  test('embeds the KTX2 bytes as they are, and the frame samples them', () => {
+    const views = json['bufferViews'] as { byteOffset: number; byteLength: number }[];
+    const image = views[4]!;
+    const binStart = 20 + new DataView(bytes.buffer, bytes.byteOffset).getUint32(12, true) + 8;
+    const embedded = bytes.subarray(binStart + image.byteOffset, binStart + image.byteOffset + image.byteLength);
+    expect(Buffer.from(embedded)).toEqual(readFileSync(resolve(HERE, '..', 'tests/fixtures/ktx2/swatch.16.ktx2')));
+    const frame = (json['materials'] as { name: string; pbrMetallicRoughness: Record<string, unknown> }[])[1]!;
+    expect(frame.pbrMetallicRoughness['baseColorTexture']).toEqual({ index: 0 });
+  });
+
+  test('is deterministic, small, and the committed file', () => {
+    expect(Buffer.from(buildBasisuFixtureGlb())).toEqual(Buffer.from(bytes));
+    expect(bytes.byteLength).toBeLessThanOrEqual(FIXTURE_SIZE_LIMIT);
+    expect(readFileSync(resolve(HERE, '..', BASISU_FIXTURE_OUTPUT))).toEqual(Buffer.from(bytes));
   });
 });
