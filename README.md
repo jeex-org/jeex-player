@@ -515,7 +515,7 @@ Handle (`viewer.on(...)`) and custom element (`addEventListener(...)`, `detail` 
 
 | Handle event | Element event | Payload |
 |---|---|---|
-| `ready` | `jeex-ready` | `{ options, sceneId }` after the first FRAME of that scene has been drawn — on the first mount, on every `loadScene` and after a restored GPU context, so a host may screenshot on it. The first picture waits for the scene's shaders ([First picture](#first-picture)), so `ready` and the reveal of the viewer come after it, never on a blank canvas |
+| `ready` | `jeex-ready` | `{ options, sceneId }` after the first FRAME of that scene has been drawn — on the first mount, on every `loadScene` and after a restored GPU context, so a host may screenshot on it. The first picture waits for the scene's shaders ([First picture](#first-picture)), so `ready` and the reveal of the viewer come after it, never on a blank canvas; a viewer mounted hidden fires `ready` once its shaders are ready and draws its first picture when it is shown |
 | `error` | `jeex-error` | A `ViewerLibError` (`{ code, message, path?, detail?, cause? }`); codes in [Errors](#errors). The iframe bridge sends `{ code, message }` only |
 | `scene` | `jeex-scene` | `{ sceneId, rev }` after every committed change |
 | `mode` | `jeex-mode` | `ViewerMode` |

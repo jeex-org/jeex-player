@@ -500,6 +500,45 @@ describe('the first picture waits for asynchronous shader compilation', () => {
     runtime.dispose();
   });
 
+  test('a viewer started hidden announces its first picture once the shaders are ready, and draws it when shown', async () => {
+    let visible = false;
+    const canvas = { checkVisibility: () => visible } as unknown as HTMLCanvasElement;
+    const rig = harness({ canvas });
+    const pending: Array<() => void> = [];
+    (rig.runtime.renderer as unknown as { compileAsync: () => Promise<unknown> }).compileAsync = () =>
+      new Promise<void>((resolve) => {
+        pending.push(resolve);
+      });
+    rig.runtime.setCamera(new THREE.PerspectiveCamera());
+    let announced = false;
+    rig.runtime.start();
+    void rig.runtime.firstDraw.next.then(() => (announced = true));
+    expect(rig.pending()).toBeNull();
+    await settle();
+    expect(announced).toBe(false);
+    pending.splice(0).forEach((resolve) => resolve());
+    await settle();
+    expect(announced).toBe(true);
+    expect(rig.stub.renders).toBe(0);
+    visible = true;
+    rig.runtime.start();
+    rig.tick(16);
+    expect(rig.stub.renders).toBe(1);
+    rig.runtime.dispose();
+  });
+
+  test('a compilation that throws at once does not escape start(): the first tick draws', () => {
+    const rig = harness();
+    (rig.runtime.renderer as unknown as { compileAsync: () => Promise<unknown> }).compileAsync = () => {
+      throw new Error('no programs');
+    };
+    rig.runtime.setCamera(new THREE.PerspectiveCamera());
+    expect(() => rig.runtime.start()).not.toThrow();
+    rig.tick(16);
+    expect(rig.stub.renders).toBe(1);
+    rig.runtime.dispose();
+  });
+
   test('a lost context owes a new first picture; the restore compiles again before drawing it', async () => {
     const { canvas, fire } = fakeCanvas();
     const rig = harness({ canvas });

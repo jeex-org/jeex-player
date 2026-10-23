@@ -160,6 +160,8 @@ export class RenderRuntime {
   readonly firstDraw = new FirstDrawSignal();
   /** Whether the next `start()` owes a first picture: the first one, and the one after a context restore. */
   private firstOwed = true;
+  /** Frees what the first-picture compilation built, once a picture drew. */
+  private releaseCompile: (() => void) | null = null;
   private readonly canvas: HTMLCanvasElement;
   private readonly pixelRatioCap: number;
   /** Watches the viewport box; `null` where there is no `ResizeObserver`. */
@@ -510,25 +512,35 @@ export class RenderRuntime {
     if (!this.running && this.firstOwed) this.armFirstDraw();
     this.running = true;
     this.resume();
+    this.announceIfParked();
   }
 
   /**
-   * A first picture is owed, drawn once the scene compiled asynchronously
-   * (`first-draw.ts`) for the path that draws it: through the attached chain
-   * (its own target, `PostProcessor.compile`) or straight to the screen
-   * (`scene-compile.ts`).
+   * A first picture is owed, drawn once the scene compiled (`first-draw.ts`) for its path:
+   * the attached chain's target (`PostProcessor.compile`) or the screen (`scene-compile.ts`).
    */
   private armFirstDraw(): void {
     this.firstOwed = false;
     this.firstDraw.arm();
     const camera = this.camera;
     const post = this.post;
-    if (!camera) {
-      this.gate.arm(null);
-      return;
+    const direct = typeof (this.renderer as Partial<THREE.WebGLRenderer>).compileAsync === 'function';
+    // Thunks: a compilation that throws opens the gate instead of escaping `start()`.
+    let compile: (() => Promise<unknown>) | null = null;
+    if (camera && post) compile = () => post.compile(this.scene, camera);
+    else if (camera && direct) {
+      compile = () => {
+        const compiling = compileScene(this.renderer, this.scene, camera)!;
+        this.releaseCompile = () => compiling.release();
+        return compiling.done;
+      };
     }
-    const pending = post ? post.compile(this.scene, camera) : compileScene(this.renderer, this.scene, camera);
-    this.gate.arm(pending === null ? null : () => pending);
+    this.gate.arm(compile, () => this.announceIfParked());
+  }
+
+  /** A loop parked while hidden draws nothing: the owed first picture is announced once it could be drawn (the first visible tick draws it). */
+  private announceIfParked(): void {
+    if (this.gate.open && this.running && this.handle === null && !this.contextLost) this.firstDraw.drawn();
   }
 
   stop(): void {
@@ -626,6 +638,8 @@ export class RenderRuntime {
       this.lastDrawn = now;
       this.demand.commit(camera);
       this.firstDraw.drawn();
+      this.releaseCompile?.(); // the real background drew with the stand-in's program
+      this.releaseCompile = null;
     }
     // The post-render hooks run on skipped ticks too (plan2d, a resting walk):
     // the camera-preview card's visibility sync lives there. A drawing hook

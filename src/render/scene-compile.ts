@@ -26,8 +26,15 @@
 
 import * as THREE from 'three';
 
+/**
+ * The compilations under way: `done` settles once all are compiled and warm;
+ * `release` frees the background stand-in, to be called once the real
+ * background has drawn (it shares the program, so the program survives).
+ */
+export type SceneCompile = { readonly done: Promise<unknown>; release(): void };
+
 /** Starts both compilations; `null` for a renderer without `compileAsync`. */
-export function compileScene(renderer: THREE.WebGLRenderer, scene: THREE.Scene, camera: THREE.Camera): Promise<unknown> | null {
+export function compileScene(renderer: THREE.WebGLRenderer, scene: THREE.Scene, camera: THREE.Camera): SceneCompile | null {
   const compile = (renderer as Partial<THREE.WebGLRenderer>).compileAsync?.bind(renderer);
   if (!compile) return null;
   const previous = renderer.getRenderTarget();
@@ -41,10 +48,22 @@ export function compileScene(renderer: THREE.WebGLRenderer, scene: THREE.Scene, 
     for (const target of [null, linear]) {
       renderer.setRenderTarget(target);
       if (sky) scene.add(sky);
-      pending.push(compile(scene, camera));
-      sky?.removeFromParent();
+      try {
+        pending.push(compile(scene, camera));
+      } finally {
+        sky?.removeFromParent();
+      }
     }
-    return Promise.all(pending).then(() => warmPrograms(renderer));
+    let released = false;
+    return {
+      done: Promise.all(pending).then(() => warmPrograms(renderer)),
+      release: () => {
+        if (released || !sky) return;
+        released = true;
+        sky.geometry.dispose();
+        (sky.material as THREE.Material).dispose();
+      },
+    };
   } finally {
     renderer.setRenderTarget(previous);
     linear.dispose();
@@ -53,8 +72,9 @@ export function compileScene(renderer: THREE.WebGLRenderer, scene: THREE.Scene, 
 
 /**
  * A plane drawn like three's background plane for `scene`'s texture
- * background; `null` otherwise. Its material is never disposed: that would
- * release the program it exists to link.
+ * background; `null` otherwise. Released (`SceneCompile.release`) only after
+ * the real background drew: disposing it earlier would free the program it
+ * exists to link.
  */
 function backgroundStandIn(scene: THREE.Scene): THREE.Mesh | null {
   const background = scene.background;

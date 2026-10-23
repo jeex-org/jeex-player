@@ -29,7 +29,7 @@ describe('compileScene', () => {
     renderer.setRenderTarget(previous);
     const pending = compileScene(renderer, new THREE.Scene(), new THREE.PerspectiveCamera());
     expect(pending).not.toBeNull();
-    await pending;
+    await pending!.done;
     expect(compiled).toHaveLength(2);
     expect(compiled[0]).toBeNull();
     expect(compiled[1]).toBeInstanceOf(THREE.WebGLRenderTarget);
@@ -53,9 +53,32 @@ describe('compileScene and a texture background', () => {
       seen.push(compiled.children.length);
       return Promise.resolve();
     };
-    await compileScene(renderer, scene, new THREE.PerspectiveCamera());
+    await compileScene(renderer, scene, new THREE.PerspectiveCamera())!.done;
     expect(seen).toEqual([1, 1]);
     expect(scene.children).toHaveLength(0);
+  });
+});
+
+describe('the background stand-in is released after the first picture', () => {
+  test('release disposes its material and geometry, once', async () => {
+    const { renderer } = recordingRenderer();
+    const disposed: string[] = [];
+    const scene = new THREE.Scene();
+    scene.background = new THREE.Texture();
+    let plane: THREE.Mesh | null = null;
+    (renderer as unknown as { compileAsync: (compiled: THREE.Scene) => Promise<unknown> }).compileAsync = (compiled) => {
+      plane ??= compiled.children[0] as THREE.Mesh;
+      return Promise.resolve();
+    };
+    const compiled = compileScene(renderer, scene, new THREE.PerspectiveCamera())!;
+    await compiled.done;
+    const stand = plane as unknown as THREE.Mesh<THREE.BufferGeometry, THREE.Material>;
+    stand.material.addEventListener('dispose', () => disposed.push('material'));
+    stand.geometry.addEventListener('dispose', () => disposed.push('geometry'));
+    expect(disposed).toEqual([]);
+    compiled.release();
+    compiled.release();
+    expect(disposed.sort()).toEqual(['geometry', 'material']);
   });
 });
 

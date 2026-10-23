@@ -196,8 +196,8 @@ export class WalkPost implements PostProcessor {
     // The chain's own full-screen materials too (measured on the demo
     // apartment: about 115 ms of links in the first frame through the chain
     // without this), each on a throwaway quad with the target it draws into.
-    // The output pass sets its defines at its first render, so its program
-    // still links then.
+    // Not the output pass's: it replaces its defines at its first render, so
+    // a program compiled before would never be used (`quadMaterials`).
     // Position and uv only, as three's full-screen quad: a normal attribute is a different program.
     const quad = new THREE.PlaneGeometry(2, 2).deleteAttribute('normal');
     const view = new THREE.OrthographicCamera(-1, 1, 1, -1, 0, 1);
@@ -206,14 +206,12 @@ export class WalkPost implements PostProcessor {
       for (const material of materials) holder.add(new THREE.Mesh(quad, material));
       return holder;
     };
-    const intoBuffers = this.composer.passes.filter((pass) => pass !== this.output).flatMap((pass) => materialsOf(pass));
+    const intoBuffers = quadMaterials(this.composer.passes, this.output);
     try {
       // `compileAsync` creates every program synchronously, before its first
       // await: the target bound here is the one their keys are made with.
       renderer.setRenderTarget(this.composer.readBuffer);
       const pending = [renderer.compileAsync(scene, camera), renderer.compileAsync(quads(intoBuffers), view)];
-      renderer.setRenderTarget(null);
-      pending.push(renderer.compileAsync(quads(materialsOf(this.output)), view));
       return Promise.all(pending).then(() => warmPrograms(renderer));
     } finally {
       renderer.setRenderTarget(previous);
@@ -267,6 +265,15 @@ export async function createWalkPost(renderer: THREE.WebGLRenderer, scene: THREE
     throw error;
   }
   return chain;
+}
+
+/**
+ * The full-screen materials of the chain's passes that draw into its own
+ * buffers, compiled ahead on throwaway quads: every pass's but `output`'s,
+ * whose defines are replaced at its first render (three r186 `OutputPass`).
+ */
+export function quadMaterials(passes: readonly object[], output: object): THREE.Material[] {
+  return passes.filter((pass) => pass !== output).flatMap((pass) => materialsOf(pass));
 }
 
 /** The materials a pass keeps as its own fields: what its full-screen quad draws with. */

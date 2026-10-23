@@ -182,7 +182,8 @@ as described under [Versioning](#versioning).
   same for its own target before it attaches, and so does a restored GPU
   context. `ready`, `__appReady` and the reveal of the viewer now come after
   the first picture is drawn (before, they came just before it), so a host
-  that screenshots on `ready` never sees a blank canvas.
+  that screenshots on `ready` never sees a blank canvas; a viewer mounted
+  hidden fires them once its shaders are ready, and draws when it is shown.
 
 - **Walk and tour draw on demand.** In `walk` and `tour` the player draws a
   new picture only when something on screen can have changed (the camera,

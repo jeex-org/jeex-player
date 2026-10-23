@@ -48,27 +48,29 @@ export class FirstDrawGate {
   /**
    * Closes the gate until `compile` settles or the bound passes. `null` (no
    * asynchronous compilation) and a `compile` that throws leave it open.
+   * `opened` hears the gate open, once, whichever way it does.
    */
-  arm(compile: (() => Promise<unknown>) | null): void {
+  arm(compile: (() => Promise<unknown>) | null, opened: () => void = () => undefined): void {
     this.generation += 1;
     const generation = this.generation;
     this.clearTimer();
-    if (compile === null) {
-      this.opened = true;
-      return;
-    }
-    let pending: Promise<unknown>;
+    let pending: Promise<unknown> | null = null;
     try {
-      pending = compile();
+      pending = compile === null ? null : compile();
     } catch {
+      pending = null;
+    }
+    if (pending === null) {
       this.opened = true;
+      opened();
       return;
     }
     this.opened = false;
     const release = (): void => {
-      if (generation !== this.generation) return;
+      if (generation !== this.generation || this.opened) return;
       this.opened = true;
       this.clearTimer();
+      opened();
     };
     this.timer = this.timers.setTimeout(release, FIRST_DRAW_BOUND_MS);
     pending.then(release, release);

@@ -141,4 +141,20 @@ describe('the first picture waits for the shaders', { timeout: MOUNT_TIMEOUT_MS 
     const before = await settledShot();
     expect(await differingShare(before, compiled)).toBeLessThan(0.01);
   });
+
+  test('a viewer mounted hidden fires `ready` once its shaders are ready, and draws when shown', async () => {
+    const container = openContainer(480, 320);
+    container.style.display = 'none';
+    const handle = mountViewer(container, {
+      scene: { repository: new InlineSceneRepository(demoScene()) },
+      tour: { mode: 'off' },
+      debug: true,
+    });
+    handles.push(handle);
+    await handle.ready;
+    expect(window.__appReady).toBe(true);
+    expect(debug().renderDemand().draws).toBe(0);
+    container.style.display = '';
+    await until(() => debug().renderDemand().draws > 0, 'the first picture once shown', 60_000);
+  });
 });

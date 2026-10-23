@@ -110,6 +110,35 @@ describe('FirstDrawGate', () => {
   });
 });
 
+describe('FirstDrawGate tells its owner when it opens', () => {
+  test('once, on the compilation, on the bound, at once without compilation or on a throw', async () => {
+    const time = clock();
+    const gate = new FirstDrawGate(time.timers);
+    const heard: string[] = [];
+    const compile = deferred();
+    gate.arm(
+      () => compile.promise,
+      () => heard.push('compiled'),
+    );
+    compile.resolve();
+    await settle();
+    time.advance(FIRST_DRAW_BOUND_MS);
+    gate.arm(
+      () => new Promise<void>(() => {}),
+      () => heard.push('bound'),
+    );
+    time.advance(FIRST_DRAW_BOUND_MS);
+    gate.arm(null, () => heard.push('none'));
+    gate.arm(
+      () => {
+        throw new Error('no programs');
+      },
+      () => heard.push('thrown'),
+    );
+    expect(heard).toEqual(['compiled', 'bound', 'none', 'thrown']);
+  });
+});
+
 describe('FirstDrawSignal', () => {
   test('resolves on the first draw after an arming, and is re-armed by the next one', async () => {
     const signal = new FirstDrawSignal();
