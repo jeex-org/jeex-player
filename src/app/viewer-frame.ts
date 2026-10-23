@@ -7,6 +7,11 @@
  * of the frame that is about to be drawn, and the selection glows go last
  * because they are decoration over everything else.
  *
+ * Drawing on demand (`render/render-demand.ts`): whatever these hooks see
+ * change on a tick — a shell switch or cutaway, the walk floor ring, a door
+ * or furniture frame up to the final one, the selection tint while it fades,
+ * an aura while it exists — asks walk and tour to draw that tick.
+ *
  * `ViewerStage` puts the CAMERA hook in front of all of these
  * (`viewer-stage.orderFrameHooks`); nothing here may assume anything about the
  * camera except that it has already moved.
@@ -57,6 +62,8 @@ export function frameHooksFor(deps: FrameHookDeps): readonly FrameHook[] {
       const furnitureMoving = furnitureMoved.length > 0 || deps.animator.busy;
       if (furnitureWasMoving && !furnitureMoving) sun?.settle();
       furnitureWasMoving = furnitureMoving;
+      const ringMoved = stage?.director?.controller.floorRing.takeChanged() === true;
+      if (deps.dollhouse.takeChanged() || ringMoved || doorsMoved || furnitureMoved.length > 0) stage?.runtime.demand.invalidate();
       // The map follows whatever the mode ended up being — a button, a room
       // focus or a manual grab mid-tour all land here on the next frame.
       stage?.syncMinimap();
@@ -68,10 +75,12 @@ export function frameHooksFor(deps: FrameHookDeps): readonly FrameHook[] {
       if (deps.anchor.hasTarget()) deps.anchor.update(stage ? stage.anchorScene(deps.mount.sceneRoot) : null);
     },
     (_delta, now) => {
-      deps.mount.editor?.updateGlows(now);
+      const glowing = deps.mount.editor?.updateGlows(now) === true;
       // Decoration over everything else, like the glows above it: the
       // selection tint fades in and out rather than popping.
-      deps.stage()?.selection.update(now);
+      const stage = deps.stage();
+      const tinting = stage?.selection.update(now) === true;
+      if (glowing || tinting) stage?.runtime.demand.invalidate();
     },
   ];
 }

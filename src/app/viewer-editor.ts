@@ -609,8 +609,12 @@ export class ViewerEditor {
     this.selectedOpeningId = null;
   }
 
-  /** Per-frame aura tick: advances the live aura and reaps the finished ones. */
-  updateGlows(nowMs: number): void {
+  /**
+   * Per-frame aura tick: advances the live aura and reaps the finished ones.
+   * Answers whether an aura was on screen (walk and tour redraw while one is).
+   */
+  updateGlows(nowMs: number): boolean {
+    const animated = this.selectionGlow !== null || this.fadingGlows.length > 0;
     const seconds = nowMs / 1000;
     updateSelectionGlow(this.selectionGlow, seconds);
     for (let index = this.fadingGlows.length - 1; index >= 0; index -= 1) {
@@ -620,6 +624,7 @@ export class ViewerEditor {
       disposeSelectionGlow(glow);
       this.fadingGlows.splice(index, 1);
     }
+    return animated;
   }
 
   /**

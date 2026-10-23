@@ -2,17 +2,17 @@
 
 ## 1. Gate (TDD)
 
-- [ ] 1.1 `render-demand.ts` test-first: dirty flag, camera snapshot compare (identity, world matrix with tolerance, exact projection, layers), accumulated slow drift against the LAST DISPLAYED snapshot, commit only after a successful draw (a throw keeps demand), inactive outside walk/tour; verify its unit test.
-- [ ] 1.2 Runtime wiring: gate after hooks with the camera matrix updated, keep-warm only for render-disabled modes, captures never commit; verify `render-runtime.test.ts` with the injected scheduler (coalescing, heartbeat precedence, failed draw) and that `render-runtime.ts` stays under 700 lines.
+- [x] 1.1 `render-demand.ts` test-first: dirty flag, camera snapshot compare (identity, world matrix with tolerance, exact projection, layers), accumulated slow drift against the LAST DISPLAYED snapshot, commit only after a successful draw (a throw keeps demand), inactive outside walk/tour; verify its unit test.
+- [x] 1.2 Runtime wiring: gate after hooks with the camera matrix updated, keep-warm only for render-disabled modes, captures never commit; verify `render-runtime.test.ts` with the injected scheduler (coalescing, heartbeat precedence, failed draw) and that `render-runtime.ts` stays under 700 lines.
 
 ## 2. Dirty sources, each wired with its regression test
 
-- [ ] 2.1 Scene revisions and rebuilds; shell visibility/layers (dollhouse, `setMode`, `engageTour`); verify unit/stub tests.
-- [ ] 2.2 Door and furniture moved readings (single drain) incl. final frames; model upgrade `onSwapped` per body; library surface after map attachment; verify unit/stub tests.
-- [ ] 2.3 Selection set/clear/recolour/fade/glow; floor ring; sun shadow; walk chain attach/detach; room lighting look/complete/fail/refresh; verify unit/stub tests.
-- [ ] 2.4 Resize, pixel ratio, visibility resume, canvas reattach, context restore, capture-frames restart; verify unit/stub tests.
-- [ ] 2.5 Telemetry: rewire the post-render sampling (today it returns unless the frame drew), so dwell accumulates on hook time excluding hidden time while frame-interval samples reset across skipped draws; first-draw readiness unchanged; verify telemetry tests.
-- [ ] 2.6 Debug counters for ticks and display draws (two-file change); verify the debug surface test.
+- [x] 2.1 Scene revisions and rebuilds; shell visibility/layers (dollhouse, `setMode`, `engageTour`); verify unit/stub tests.
+- [x] 2.2 Door and furniture moved readings (single drain) incl. final frames; model upgrade `onSwapped` per body; library surface after map attachment; verify unit/stub tests.
+- [x] 2.3 Selection set/clear/recolour/fade/glow; floor ring; sun shadow; walk chain attach/detach; room lighting look/complete/fail/refresh; verify unit/stub tests.
+- [x] 2.4 Resize, pixel ratio, visibility resume, canvas reattach, context restore, capture-frames restart; verify unit/stub tests.
+- [x] 2.5 Telemetry: rewire the post-render sampling (today it returns unless the frame drew), so dwell accumulates on hook time excluding hidden time while frame-interval samples reset across skipped draws; first-draw readiness unchanged; verify telemetry tests.
+- [x] 2.6 Debug counters for ticks and display draws (two-file change); verify the debug surface test.
 
 ## 3. Browser acceptance (heavy queue; new file in `COMPONENT_FILE_COST_S`)
 

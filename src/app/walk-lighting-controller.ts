@@ -69,21 +69,29 @@ export class WalkLightingController<Doc = WalkDocument> {
   private failed = false;
   private scope: LightingScope | null = null;
   private lastEdit = 0;
+  /** Whether the last frame showed the room lighting (rather than the direct look). */
+  private shown = false;
 
   constructor(deps: WalkLightingDeps<Doc>) {
     this.deps = deps;
   }
 
-  /** Called once per frame with the mode about to be drawn. */
-  update(mode: ViewerMode | undefined): void {
-    if (this.disposed || this.contextGone) return;
+  /**
+   * Called once per frame with the mode about to be drawn. Answers whether
+   * the look changed this frame: the room lighting shown or taken away (live,
+   * a mode switch, a failure, a restarted bake) or refreshed. Walk and tour
+   * redraw on it (`render/render-demand.ts`).
+   */
+  update(mode: ViewerMode | undefined): boolean {
+    if (this.disposed || this.contextGone) return false;
     const eligible = isPostProcessed(mode) && this.deps.chainReady();
     const lighting = this.lighting;
     if (!lighting) {
       if (eligible) this.load();
-      return;
+      return false;
     }
     if (this.stale) this.adopt(lighting);
+    let refreshed = false;
     try {
       // Only on a frame drawn with the room lighting: an edit made in an editing
       // mode waits, pending, for the next entry into walk or tour.
@@ -91,6 +99,7 @@ export class WalkLightingController<Doc = WalkDocument> {
         const scope = this.scope;
         this.scope = null;
         lighting.refresh(scope);
+        refreshed = true;
       }
       lighting.frame(eligible && !this.failed);
     } catch (error) {
@@ -99,6 +108,10 @@ export class WalkLightingController<Doc = WalkDocument> {
       this.deps.report(error);
       lighting.frame(false);
     }
+    const shown = eligible && !this.failed && lighting.phase === 'live';
+    const changed = refreshed || shown !== this.shown;
+    this.shown = shown;
+    return changed;
   }
 
   /** A new or rebuilt document is on screen. */
@@ -179,5 +192,6 @@ export class WalkLightingController<Doc = WalkDocument> {
     this.lighting?.dispose();
     this.lighting = null;
     this.stale = true;
+    this.shown = false;
   }
 }

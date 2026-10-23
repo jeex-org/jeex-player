@@ -402,3 +402,20 @@ describe('a landed model re-registers the body the editor still owns', () => {
     expect(subject.editor.selectedFurniture()).toBe(ID.sofa);
   });
 });
+
+describe('the selection aura asks walk and tour to redraw while it exists', () => {
+  test('updateGlows answers true while an aura lives or dissolves, false once none is left', () => {
+    const subject = harness();
+    subject.editor.attachRoot(stubRoot(ID.sofa).root);
+    expect(subject.editor.updateGlows(0)).toBe(false);
+    subject.editor.handleFurniturePick(ID.sofa);
+    expect(subject.editor.updateGlows(16)).toBe(true);
+    expect(subject.editor.updateGlows(32)).toBe(true);
+    subject.editor.clearSelection();
+    // Dissolving: still an aura on screen.
+    expect(subject.editor.updateGlows(performance.now())).toBe(true);
+    // Long after the fade-out: the tick that reaps it still drew it, the next one rests.
+    expect(subject.editor.updateGlows(performance.now() + 60_000)).toBe(true);
+    expect(subject.editor.updateGlows(performance.now() + 60_016)).toBe(false);
+  });
+});

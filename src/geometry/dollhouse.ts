@@ -45,6 +45,8 @@ export class Dollhouse {
   private root: THREE.Object3D | null = null;
   private shellState: ShellState = 'dollhouse';
   private keepExteriors = false;
+  /** Whether a shell switch or the cutaway changed what is drawn since `takeChanged`. */
+  private changed = false;
 
   constructor(exteriors: ExteriorObjects) {
     this.exteriors = exteriors;
@@ -88,9 +90,21 @@ export class Dollhouse {
     this.update(camera);
   }
 
+  /**
+   * Whether what the shell draws changed since the last call: a shell switch
+   * or a wall cut away or put back. Walk and tour redraw on it
+   * (`render/render-demand.ts`).
+   */
+  takeChanged(): boolean {
+    const changed = this.changed;
+    this.changed = false;
+    return changed;
+  }
+
   /** Switches the shell state and applies it to the whole scene root. */
   setState(state: ShellState, camera?: THREE.Camera): void {
     this.shellState = state;
+    this.changed = true;
     this.root?.traverse((object) => {
       if (object.userData['isCeiling']) object.visible = state === 'full';
       if (object.userData['isLightFixture']) {
@@ -123,7 +137,7 @@ export class Dollhouse {
     const camZ = camera?.position.z ?? 0;
     for (const object of this.exteriors()) {
       if (full) {
-        setDrawn(object, true);
+        this.draw(object, true);
         continue;
       }
       const wallIds = object.userData['wallIds'];
@@ -131,14 +145,19 @@ export class Dollhouse {
         // A junction core belongs to every wall meeting there, so it goes only
         // when they ALL go. Hiding it with the first one would take the end cap
         // off the wall that stays and re-open the corner the core just closed.
-        setDrawn(
+        this.draw(
           object,
           wallIds.some((wallId) => !this.hidden(wallId, camX, camZ)),
         );
         continue;
       }
-      setDrawn(object, !this.hidden(object.userData['wallId'] as string, camX, camZ));
+      this.draw(object, !this.hidden(object.userData['wallId'] as string, camX, camZ));
     }
+  }
+
+  /** `setDrawn`, remembering a change for `takeChanged`. */
+  private draw(object: THREE.Object3D, drawn: boolean): void {
+    if (setDrawn(object, drawn)) this.changed = true;
   }
 
   /** Whether the camera stands outside `wallId`; `false` for a wall with no facade face. */
@@ -153,12 +172,12 @@ export class Dollhouse {
  * Puts `object` and every descendant on layer 0 (drawn) or off it (cut away).
  * A cut-away node joins the shadow-only layer and keeps it once drawn again:
  * no camera draws that layer, so it costs nothing, and the shadow pass then
- * sees the node in every state.
+ * sees the node in every state. Answers whether anything changed.
  */
-function setDrawn(object: THREE.Object3D, drawn: boolean): void {
+function setDrawn(object: THREE.Object3D, drawn: boolean): boolean {
   // The whole subtree moves together, so the root tells its state: a frame
   // that changes nothing walks nothing.
-  if (object.layers.isEnabled(0) === drawn) return;
+  if (object.layers.isEnabled(0) === drawn) return false;
   object.traverse((node) => {
     if (drawn) {
       node.layers.enable(0);
@@ -167,4 +186,5 @@ function setDrawn(object: THREE.Object3D, drawn: boolean): void {
     node.layers.enable(SHADOW_ONLY_LAYER);
     node.layers.disable(0);
   });
+  return true;
 }

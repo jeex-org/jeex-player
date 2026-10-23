@@ -227,6 +227,31 @@ function union(boxes: readonly ShadowBox[]): ShadowBox {
   return { min, max };
 }
 
+/** What the sun uses of its rig. */
+type SunRigUse = Pick<ApartmentRig, 'shadowMapSize' | 'shadowDraws' | 'setSunDirection' | 'setShadowFrustum' | 'markShadowDirty'>;
+
+/** `rig` with its three redraw requests also reported to `redrawn`. */
+function heardRig(rig: ApartmentRig, redrawn: () => void): SunRigUse {
+  return {
+    shadowMapSize: rig.shadowMapSize,
+    get shadowDraws() {
+      return rig.shadowDraws;
+    },
+    setSunDirection: (direction) => {
+      rig.setSunDirection(direction);
+      redrawn();
+    },
+    setShadowFrustum: (fit) => {
+      rig.setShadowFrustum(fit);
+      redrawn();
+    },
+    markShadowDirty: () => {
+      rig.markShadowDirty();
+      redrawn();
+    },
+  };
+}
+
 function sameSite(a: SceneSite | undefined, b: SceneSite | undefined): boolean {
   return a?.northDeg === b?.northDeg && a?.sun === b?.sun && (a === undefined) === (b === undefined);
 }
@@ -234,13 +259,17 @@ function sameSite(a: SceneSite | undefined, b: SceneSite | undefined): boolean {
 /**
  * Prepares `root` (built from `scene` and `plan`) for `rig`'s sun: slabs,
  * direction and fit. The rig is the caller's; `dispose` leaves it lit.
+ * `redrawn` hears every redraw of the map asked of the rig: the next display
+ * draw shows a new shadow (walk and tour draw on demand, `render-demand.ts`).
  */
 export function prepareSunShadow(
   root: THREE.Object3D,
   scene: Pick<SceneData, 'rooms' | 'ceilingHeight' | 'site'>,
   plan: Pick<SolvedPlan, 'rooms'>,
-  rig: ApartmentRig,
+  liveRig: ApartmentRig,
+  redrawn?: () => void,
 ): SunShadow {
+  const rig = redrawn === undefined ? liveRig : heardRig(liveRig, redrawn);
   const casters: CeilingCasters = buildCeilingCasters(scene, plan);
   root.add(casters.group);
   let site: SceneSite | undefined = scene.site;

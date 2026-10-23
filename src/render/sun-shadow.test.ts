@@ -149,6 +149,28 @@ describe('prepareSunShadow', () => {
     expect(recorder.dirty()).toBe(before + 1);
   });
 
+  test('every redraw it asks of the rig is heard by `redrawn` too (walk and tour draw on demand)', () => {
+    const recorder = recordingRig();
+    const root = apartment();
+    let heard = 0;
+    const sun = prepareSunShadow(root, scene(), plan, recorder.rig, () => (heard += 1));
+    expect(heard).toBe(recorder.dirty());
+    const sofa = root.getObjectByName('sofa')!;
+    sun.refit();
+    sun.markDirty();
+    sun.include(sofa);
+    sofa.position.set(40, 0.4, 40);
+    sun.include(sofa);
+    sofa.position.set(2, 0.4, 1.5);
+    sofa.updateMatrixWorld(true);
+    sun.settle();
+    sun.orient({ northDeg: 0, sun: 'evening' });
+    sofa.position.x += 0.5;
+    sun.refit();
+    expect(heard).toBe(recorder.dirty());
+    expect(heard).toBeGreaterThan(5);
+  });
+
   test('hiding the furniture is a change, showing it again another', () => {
     const recorder = recordingRig();
     const root = apartment();

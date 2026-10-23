@@ -52,6 +52,7 @@ import type { AssetMoveDebug } from '../edit/asset-move-session.js';
 import type { WalkPostState } from './walk-post-controller.js';
 import type { WalkLightingState } from './walk-lighting-controller.js';
 import type { WalkLightingStats } from '../render/walk-lighting/walk-lighting.js';
+import type { DemandCounters } from '../render/render-demand.js';
 
 import { freeSpaceModule, layoutLintModule, loadLayoutModules } from './debug-layout-modules.js';
 
@@ -113,6 +114,11 @@ type ViewerDebugApi = {
   walkPost: () => WalkPostState;
   /** The walk and tour room lighting: its phase and the last full bake's measurement (`walk-lighting-controller.ts`). */
   walkLighting: () => WalkLightingDebug;
+  /**
+   * Cumulative frame-loop ticks and display draws (`render/render-demand.ts`):
+   * a resting walk or tour keeps ticking while its draws stay flat.
+   */
+  renderDemand: () => DemandCounters;
   /**
    * What every furniture body on screen actually IS, right now: the placement
    * id, whether its body is procedural, a `dims` stand-in waiting for a GLB or
@@ -362,6 +368,7 @@ type SceneDebug = {
   sun: () => SunShadow | undefined;
   walkPost: () => WalkPostState | undefined;
   walkLighting: () => WalkLightingDebug | undefined;
+  renderDemand: () => DemandCounters | undefined;
   furnitureVisible: () => boolean;
   /** This instance's catalogue; `setLocale` replaces it. */
   messages: () => Messages;
@@ -489,6 +496,7 @@ export function installViewerDebug(host: ViewerDebugHost): ViewerDebugApi {
     sunShadow: () => host.sun()?.state() ?? null,
     walkPost: () => host.walkPost() ?? 'off',
     walkLighting: () => host.walkLighting() ?? { state: 'off', stats: null },
+    renderDemand: () => host.renderDemand() ?? { ticks: 0, draws: 0 },
     assetModels: () => {
       const furniture = host.sceneRoot()?.getObjectByName(FURNITURE_GROUP_NAME);
       if (!furniture) return [];

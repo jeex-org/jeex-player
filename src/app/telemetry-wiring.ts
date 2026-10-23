@@ -10,8 +10,9 @@
  *
  * Measurement invariants: `ready` is the first frame the renderer actually
  * DREW after a document was announced (`RenderRuntime.lastDrawnAt`), once per
- * load; frame time counts only drawn 3D frames; room time counts only while
- * the camera is inside the apartment (walk and tour); a mode change counts only
+ * load; frame time counts only intervals between consecutive drawn 3D frames;
+ * room time counts the frame loop's ticks, drawn or not, while the camera is
+ * inside the apartment (walk and tour); a mode change counts only
  * after the first `ready` and only when the mode really changed.
  */
 
@@ -175,15 +176,31 @@ function live(telemetry: Telemetry, deps: TelemetryWiringDeps, win: Window): Tel
   ];
 
   let previousDrawn: number | null = null;
+  let previousTick: number | null = null;
   let roomTime = 0;
+  /**
+   * Every tick of the frame loop, drawn or not: walk and tour draw only on
+   * demand (`render/render-demand.ts`), so a visitor standing still makes
+   * ticks that draw nothing. Frame intervals are measured between two
+   * CONSECUTIVE display draws, and a skipped draw starts the measurement
+   * over; room time runs on the ticks, so it grows while the view rests.
+   */
   const onFrame: FrameHook = (_delta, now) => {
     const current = stage;
-    if (!current || current.runtime.lastDrawnAt !== now) return;
+    if (!current) return;
+    const tick = previousTick === null ? 0 : now - previousTick;
+    previousTick = now;
+    const mode = current.mode;
+    // A pause (a hidden tab, an off-screen canvas) is no time in a room.
+    if (mode !== undefined && ROOM_MODES.has(mode) && tick > 0 && tick <= MAX_FRAME_INTERVAL_MS) dwellFor(current, tick);
+    if (current.runtime.lastDrawnAt !== now) {
+      previousDrawn = null;
+      return;
+    }
     if (awaitingDraw) {
       awaitingDraw = false;
       telemetry.ready((now - loadOrigin) / 1000);
     }
-    const mode = current.mode;
     // The plan view draws the scene only as a heartbeat: neither its frames nor
     // the gap to the first 3D frame after it are frame times.
     if (mode === undefined || mode === 'plan2d') {
@@ -192,11 +209,14 @@ function live(telemetry: Telemetry, deps: TelemetryWiringDeps, win: Window): Tel
     }
     const interval = previousDrawn === null ? 0 : now - previousDrawn;
     previousDrawn = now;
-    // A pause (a hidden tab, an off-screen canvas) is neither a frame nor time in a room.
+    // A pause (a hidden tab, an off-screen canvas) is not a frame.
     if (interval <= 0 || interval > MAX_FRAME_INTERVAL_MS) return;
     telemetry.frame(interval, deps.fullscreen());
-    if (!ROOM_MODES.has(mode)) return;
-    roomTime += interval;
+  };
+
+  /** `ms` more in the room the camera stands in, sampled once a second. */
+  const dwellFor = (current: ViewerStage, ms: number): void => {
+    roomTime += ms;
     if (roomTime < ROOM_SAMPLE_MS) return;
     const plan = deps.plan();
     const position = current.camera.position;
@@ -222,6 +242,7 @@ function live(telemetry: Telemetry, deps: TelemetryWiringDeps, win: Window): Tel
       detach?.();
       stage = next;
       previousDrawn = null;
+      previousTick = null;
       deviceFacts(next);
       next.runtime.addPostRenderHook(onFrame);
       detach = () => next.runtime.removePostRenderHook(onFrame);

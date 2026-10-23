@@ -202,3 +202,31 @@ describe('WalkLightingController', () => {
     expect(built[0]!.disposed).toBe(true);
   });
 });
+
+describe('WalkLightingController.update answers whether the look changed (walk and tour draw on demand)', () => {
+  test('the bake rests, going live, a refresh and a failure each answer true once', async () => {
+    const { controller, built, finishBuild, tick } = setup({ bakeFrames: 3 });
+    expect(controller.update('walk')).toBe(false);
+    await finishBuild();
+    // Loading the document and baking keep the direct look: nothing to redraw.
+    const baking = [controller.update('walk'), controller.update('walk')];
+    expect(baking).toEqual([false, false]);
+    // The third bake frame goes live: the swap frame changes the look.
+    expect(controller.update('walk')).toBe(true);
+    expect(controller.update('walk')).toBe(false);
+    controller.edited({ all: false, grids: ['bath'], probes: [] });
+    tick(5000);
+    expect(controller.update('walk')).toBe(true);
+    expect(built[0]!.refreshes).toHaveLength(1);
+    expect(controller.update('walk')).toBe(false);
+    // Leaving walk shows the editing look, coming back the room lighting.
+    expect(controller.update('orbit')).toBe(true);
+    expect(controller.update('walk')).toBe(true);
+    const lighting = built[0]!;
+    lighting.frame = (eligible: boolean) => {
+      if (eligible) throw new Error('lost probe');
+    };
+    expect(controller.update('walk')).toBe(true);
+    expect(controller.update('walk')).toBe(false);
+  });
+});

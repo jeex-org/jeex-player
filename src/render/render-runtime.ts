@@ -9,7 +9,8 @@
  * resources and the frame clock; every scene-specific update runs as a frame
  * hook registered by the composition root, in registration order, before the
  * single draw of that frame: straight to the screen, or through the post-
- * processing chain attached with `setPostProcessor` (walk and tour).
+ * processing chain attached with `setPostProcessor` (walk and tour). In walk
+ * and tour the draw happens only on demand (`render-demand.ts`, `demand`).
  *
  * Visibility invariant: the loop runs only when the canvas could actually be
  * seen. `document.hidden` and `checkVisibility()` gate it, and the frame clock
@@ -47,6 +48,7 @@ import type { ApartmentRig, LightingContext } from '../lighting/lighting-context
 import { installShadowLayerPass } from './shadow-layer-pass.js';
 import { withScenePass } from '../shared/scene-pass.js';
 import type { PostProcessor } from './post-processor.js';
+import { RenderDemand } from './render-demand.js';
 
 /** Device pixel ratio cap: above this the fill cost outgrows the visible gain. */
 const PIXEL_RATIO_CAP = 1.7;
@@ -62,8 +64,8 @@ export const MAX_FRAME_DELTA = 0.05;
  * often, beneath the opaque overlay. A WebGL context that draws nothing for
  * about a second lets the browser and the driver page out what the scene
  * draws with; the first frames after leaving the mode then waited 1.2–5 s on
- * the GPU (measured: plan2d → walk froze 0.55–2.6 s before the glide). A heartbeat of two frames a second keeps it resident; one per
- * second was measured to suffice too, so this keeps a margin.
+ * the GPU (plan2d → walk froze 0.55–2.6 s before the glide). Two frames a
+ * second keep it resident; one was measured to suffice, so this has a margin.
  */
 export const KEEP_WARM_MS = 500;
 const SKY_TOP = '#dcd3c2';
@@ -116,6 +118,8 @@ type RenderRuntimeOptions = {
   signal?: AbortSignal | undefined;
   /** A frame hook threw. The frame goes on; the composition root reports it. */
   onError?: ((error: unknown) => void) | undefined;
+  /** The camera mode now: walk and tour draw on demand (`render-demand.ts`). */
+  mode?: (() => string | undefined) | undefined;
 };
 
 /**
@@ -174,6 +178,9 @@ export class RenderRuntime {
   private readonly cancel: (handle: number) => void;
   private readonly now: () => number;
   private readonly report: (error: unknown) => void;
+  private readonly mode: () => string | undefined;
+  /** Whether a tick draws; `invalidate()` it for anything visible that changed. */
+  readonly demand = new RenderDemand();
   private readonly canvas: HTMLCanvasElement;
   private readonly pixelRatioCap: number;
   /** Watches the viewport box; `null` where there is no `ResizeObserver`. */
@@ -203,6 +210,7 @@ export class RenderRuntime {
     this.cancel = options.cancelFrame ?? ((handle) => cancelAnimationFrame(handle));
     this.now = options.now ?? (() => performance.now());
     this.report = options.onError ?? (() => undefined);
+    this.mode = options.mode ?? (() => undefined);
     this.hooks = new Fanout<[number, number]>((error) => this.report(error));
     this.postRenderHooks = new Fanout<[number, number]>((error) => this.report(error));
     this.canvas = options.canvas;
@@ -215,12 +223,10 @@ export class RenderRuntime {
     this.renderer = (options.createRenderer ?? defaultRenderer)(options.canvas);
     this.renderer.setPixelRatio(this.pixelRatio());
     this.renderer.setSize(Math.max(1, this.viewport.clientWidth), Math.max(1, this.viewport.clientHeight), false);
-    // The procedural textures outlive any one runtime and are shared between
-    // viewers on a page, so this runtime takes a HOLD on them and frees it in
-    // `dispose` — the last holder is what actually disposes (`texture-cache.ts`).
+    // The procedural textures are shared between viewers on a page: a HOLD,
+    // freed in `dispose`; the last holder disposes (`texture-cache.ts`).
     sharedTextureCache.retain();
-    // Grazing-angle floors and long walls need the hardware maximum here; with
-    // two renderers the cache keeps the lower of the two caps.
+    // The hardware maximum for grazing floors; two renderers keep the lower cap.
     setTextureAnisotropy(this.renderer.capabilities.getMaxAnisotropy());
 
     // The lighting standard sets the display transform (PBR Neutral, exposure
@@ -329,6 +335,7 @@ export class RenderRuntime {
     if (!this.running || this.handle !== null || this.disposed || this.contextLost) return;
     if (!this.isVisible()) return;
     this.lastFrame = this.now();
+    this.demand.invalidate();
     this.handle = this.schedule(this.frame);
   }
 
@@ -478,6 +485,7 @@ export class RenderRuntime {
    */
   setPostProcessor(post: PostProcessor | null): void {
     this.post = post;
+    this.demand.invalidate();
     post?.setSize(this.appliedWidth, this.appliedHeight, this.appliedRatio);
   }
 
@@ -491,9 +499,9 @@ export class RenderRuntime {
   }
 
   /**
-   * The frame clock reading (`now`, ms) of the last frame that actually RENDERED
-   * the scene; `-Infinity` before the first. A post-render hook compares it with
-   * its own `now` to tell a drawn frame from one the plan heartbeat skipped.
+   * The frame clock reading (`now`, ms) of the last display draw; `-Infinity`
+   * before the first. A post-render hook compares it with its own `now` to
+   * tell a drawn tick from a skipped one (the plan heartbeat, a resting walk).
    */
   get lastDrawnAt(): number {
     return this.lastDrawn;
@@ -538,6 +546,7 @@ export class RenderRuntime {
     // the same device pixels as often as for one that really changed.
     const ratio = this.pixelRatio();
     if (width === this.appliedWidth && height === this.appliedHeight && ratio === this.appliedRatio) return;
+    this.demand.invalidate();
     this.appliedWidth = width;
     this.appliedHeight = height;
     this.appliedRatio = ratio;
@@ -597,20 +606,20 @@ export class RenderRuntime {
     const now = this.now();
     const delta = Math.min(MAX_FRAME_DELTA, (now - this.lastFrame) / 1000);
     this.lastFrame = now;
-    // The copy-before-iterate and the per-hook try/catch are `Fanout`'s
-    // (`shared/fanout.ts`): walking a live array would make a hook that removed
-    // itself skip the NEXT hook, and one throwing hook would abort the whole
-    // frame — the remaining hooks and the render with it, freezing the picture
-    // with nothing reported.
+    // Copy-before-iterate and per-hook try/catch are `Fanout`'s: a hook that
+    // removed itself must not skip the NEXT one, and a throwing hook must not
+    // abort the frame (the render with it) with nothing reported.
     this.hooks.emit(delta, now);
-    if (this.camera && (this.renderEnabled || now - this.lastDrawn >= KEEP_WARM_MS)) {
-      this.draw(this.camera, delta);
+    // Committed only after the draw returned: a throwing draw keeps the demand.
+    const camera = this.camera;
+    if (camera && this.demand.shouldDraw(camera, this.mode()) && (this.renderEnabled || now - this.lastDrawn >= KEEP_WARM_MS)) {
+      this.draw(camera, delta);
       this.lastDrawn = now;
+      this.demand.commit(camera);
     }
-    // The post-render hooks run even when the render itself is OFF (plan2d):
-    // the camera-preview card's visibility sync lives there, and a card left
-    // standing over a scene that stopped being drawn is exactly the bug a
-    // skipped hook produces. A drawing hook guards itself.
+    // The post-render hooks run on skipped ticks too (plan2d, a resting walk):
+    // the camera-preview card's visibility sync lives there. A drawing hook
+    // guards itself, and none may draw on a skipped tick in walk or tour.
     this.postRenderHooks.emit(delta, now);
   };
 
