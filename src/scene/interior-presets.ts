@@ -15,15 +15,16 @@
  * structural `PresetModel` and a type-only import, so nothing here depends on
  * the model at runtime — and the finish catalogue it needs to tell a floor
  * finish from a wall one arrives through `SceneRegistries`, for the same reason
- * the appliers take one.
+ * the appliers take one. That inference is the LEGACY form's only: an explicit
+ * `set_material` names its surface, and coverage and the reset read it.
  */
 
-import { roomWallFinishOf, type InteriorPreset, type SceneOp } from './scene-ops.js';
+import { roomWallFinishRefOf, type InteriorPreset, type SceneOp } from './scene-ops.js';
 import type { ApplyResult } from './scene-model.js';
 import type { SceneRegistries } from './registries.js';
 import type { Committed } from '../shared/committed.js';
 import { sameFace } from './types.js';
-import type { FaceKey, SceneData } from './types.js';
+import type { FaceKey, SceneData, SetMaterialOp, SetMaterialSurfaceOp } from './types.js';
 
 /**
  * What applying a preset needs of a `SceneModel`. Structural on purpose: the
@@ -65,6 +66,11 @@ function pushFace(list: FaceKey[], face: FaceKey): void {
   if (!list.some((listed) => sameFace(listed, face))) list.push(face);
 }
 
+/** The explicit `set_material` form, told apart by its `surface` key; the legacy form has none. */
+function isExplicit(op: SetMaterialOp): op is SetMaterialSurfaceOp {
+  return op.surface !== undefined;
+}
+
 /**
  * Which rooms, placements and openings a preset touches — the panel's footer
  * copy, and what the tests measure coverage against.
@@ -77,7 +83,15 @@ export function presetCoverage(scene: SceneData, preset: InteriorPreset): Preset
   for (const op of preset.ops) {
     if (op.op === 'replace_asset_variant') push(coverage.assets, op.assetId);
     else if (op.op === 'replace_opening_variant') push(coverage.openings, op.openingId);
-    else if (op.op === 'set_material') {
+    else if (op.op === 'set_material' && isExplicit(op)) {
+      // The explicit form says where it paints: a face, a room, the facade, or every room.
+      if (op.face !== undefined) {
+        push(coverage.rooms, op.face.room);
+        pushFace(coverage.faces, op.face);
+      } else if (op.surface === 'facade') continue;
+      else if (op.room === undefined) everyRoom();
+      else push(coverage.rooms, op.room);
+    } else if (op.op === 'set_material') {
       if (op.target === 'floors' || op.target === 'walls') everyRoom();
       else if (op.target === 'facade') continue;
       else if (typeof op.target === 'object') {
@@ -97,7 +111,16 @@ export function presetCoverage(scene: SceneData, preset: InteriorPreset): Preset
 function roomsRepaintedOnWalls(scene: SceneData, preset: InteriorPreset, registries: SceneRegistries): Set<string> {
   const rooms = new Set<string>();
   for (const op of preset.ops) {
-    if (op.op !== 'set_material' || registries.finishKind(op.material) !== 'wall') continue;
+    if (op.op !== 'set_material') continue;
+    if (isExplicit(op)) {
+      // Read from `surface`, never inferred: a face operation repaints one
+      // face and clears nothing; a room or every-room wall paint clears.
+      if (op.surface !== 'wall' || op.face !== undefined) continue;
+      if (op.room === undefined) for (const room of scene.rooms) rooms.add(room.id);
+      else rooms.add(op.room);
+      continue;
+    }
+    if (registries.finishKind(op.material) !== 'wall') continue;
     if (op.target === 'walls') {
       for (const room of scene.rooms) rooms.add(room.id);
     } else if (op.target === 'facade' || op.target === 'floors') {
@@ -127,10 +150,36 @@ export function presetBatchOps(scene: SceneData, preset: InteriorPreset, registr
     if (owner === undefined || cleared.has(owner) || !touched.includes(owner)) continue;
     // Repainting the room with the finish it already has is what drops the
     // override: the paint is a no-op, the reset is the point.
-    ops.push({ op: 'set_material', target: owner, material: roomWallFinishOf(scene, owner) });
+    ops.push(resetOp(scene, owner, registries));
     cleared.add(owner);
   }
   return ops;
+}
+
+/**
+ * The operation that repaints a room's walls with the finish they already
+ * wear, in its exact spelling.
+ *
+ * A bare finish the legacy form routes to the walls stays in that form, as it
+ * always was written. Anything else goes through the explicit form, which
+ * names the surface: a finish object (whose colour and rotation only that
+ * form can write) and a bare finish the legacy form would infer as a FLOOR (a
+ * material that dresses both).
+ */
+function resetOp(scene: SceneData, room: string, registries: SceneRegistries): SceneOp {
+  const walls = roomWallFinishRefOf(scene, room);
+  if (typeof walls === 'string') {
+    if (registries.finishKind(walls) === 'wall') return { op: 'set_material', target: room, material: walls };
+    return { op: 'set_material', surface: 'wall', room, material: walls };
+  }
+  return {
+    op: 'set_material',
+    surface: 'wall',
+    room,
+    material: walls.material,
+    ...(walls.colour !== undefined && { colour: walls.colour }),
+    ...(walls.rotation !== undefined && { rotation: walls.rotation }),
+  };
 }
 
 /**

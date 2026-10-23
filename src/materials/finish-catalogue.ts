@@ -231,6 +231,7 @@ for (const finish of WALL_FINISHES) catalogue.set(finish.id, { finish, family: '
  * painted with it looks like today.
  */
 export function finishFromProjectMaterial(material: ProjectMaterial): Finish {
+  if ('library' in material) return flatLibraryFinish(material);
   const generated = 'generator' in material;
   const tile = generated ? material.tile : material.pbr.tile[0];
   return {
@@ -248,9 +249,31 @@ export function finishFromProjectMaterial(material: ProjectMaterial): Finish {
   };
 }
 
+/**
+ * A library material as a flat surface `Finish`: its `averageColour`, or the
+ * first suggested colour of a tintable parameters material (a paint has no map
+ * to average), at its roughness. What the legacy finish path can say about a
+ * library material; its maps, tint and tile are drawn by the library path.
+ */
+function flatLibraryFinish(material: Extract<ProjectMaterial, { library: unknown }>): Finish {
+  const { facts, kind } = material.library;
+  const paint = kind === 'parameters' ? facts.tint?.suggestedColours[0]?.hex : undefined;
+  return {
+    id: material.id,
+    name: material.name,
+    kind: 'plaster',
+    base: paint ?? facts.averageColour,
+    roughness: facts.pbr.roughness ?? 1,
+    ...(facts.tileM !== null && { tile: facts.tileM[0] }),
+  };
+}
+
+/** The surface words of `apply`: a project material naming one of them may dress a room surface. */
+const SURFACE_APPLY: ReadonlySet<string> = new Set(['floor', 'wall', 'ceiling', 'facade', 'trim']);
+
 /** Whether a project material may dress a room surface at all. */
 function isSurfaceMaterial(material: ProjectMaterial): boolean {
-  return material.apply.includes('floor') || material.apply.includes('wall');
+  return material.apply.some((word) => SURFACE_APPLY.has(word));
 }
 
 /**
@@ -259,8 +282,8 @@ function isSurfaceMaterial(material: ProjectMaterial): boolean {
  * `source` is a BAKED PROJECT's `materials[]`: the surfaces of a
  * project are painted with the project's own finishes, and the module
  * catalogues below are what a bare scene still has. Only materials that may
- * dress a room surface — `apply` naming `floor` or `wall` — answer from a
- * project source, which is the same question `finishKind` asks of the bank.
+ * dress a room surface answer from a project source (`floor`, `wall`, `ceiling`, `facade` or `trim`), which is
+ * the same question `finishKind` asks of the bank.
  *
  * Defaulted rather than overloaded so that every existing caller
  * (`shell-paint.ts`, `material-catalogue.ts`, the UI panels) keeps its one

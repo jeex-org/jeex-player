@@ -10,11 +10,12 @@
  * all throws `OpError`.
  *
  * Touched entities are a small discriminated union the geometry layer
- * subscribes to (`TouchedEntity`, below): a room's floor or walls, one wall
- * face, the facade, a placement, an opening (variant only), a camera, the
- * navigation, the autotour, the tour checkpoints, and `shell` (the plan itself
- * changed and the geometry must be rebuilt). A structure, not a joined string,
- * because a face is a structure: nothing a host receives has to be parsed.
+ * subscribes to (`TouchedEntity`, below): a room's floor, walls, ceiling or
+ * trim, one wall face, the facade, a placement, an opening (variant only), a
+ * camera, the navigation, the autotour, the tour checkpoints, and `shell`
+ * (the plan itself changed and the geometry must be rebuilt). A structure,
+ * not a joined string, because a face is a structure: nothing a host receives
+ * has to be parsed.
  *
  * Nothing here imports an applier, so the op modules may all read it without a
  * cycle; `scene-ops.ts` re-exports every name below, which is why the split of
@@ -74,6 +75,8 @@ export type TouchedEntity =
   | { readonly kind: 'facade' }
   | { readonly kind: 'floor'; readonly room: string }
   | { readonly kind: 'walls'; readonly room: string }
+  | { readonly kind: 'ceiling'; readonly room: string }
+  | { readonly kind: 'trim'; readonly room: string }
   | { readonly kind: 'face'; readonly face: FaceKey }
   | { readonly kind: 'asset'; readonly id: string }
   | { readonly kind: 'opening'; readonly id: string }
@@ -92,6 +95,8 @@ export const TOUCHED_TOUR_CHECKPOINTS: TouchedEntity = Object.freeze({ kind: 'to
 
 export const touchedFloor = (room: string): TouchedEntity => ({ kind: 'floor', room });
 export const touchedRoomWalls = (room: string): TouchedEntity => ({ kind: 'walls', room });
+export const touchedCeiling = (room: string): TouchedEntity => ({ kind: 'ceiling', room });
+export const touchedTrim = (room: string): TouchedEntity => ({ kind: 'trim', room });
 export const touchedFace = (face: FaceKey): TouchedEntity => ({ kind: 'face', face });
 export const touchedAsset = (id: string): TouchedEntity => ({ kind: 'asset', id });
 export const touchedOpening = (id: string): TouchedEntity => ({ kind: 'opening', id });
@@ -116,6 +121,8 @@ export function sameTouched(a: TouchedEntity, b: TouchedEntity): boolean {
   switch (a.kind) {
     case 'floor':
     case 'walls':
+    case 'ceiling':
+    case 'trim':
       return b.kind === a.kind && b.room === a.room;
     case 'face':
       return b.kind === 'face' && sameFace(a.face, b.face);

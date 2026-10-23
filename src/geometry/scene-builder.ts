@@ -16,7 +16,7 @@
  */
 
 import * as THREE from 'three';
-import { sameFace, type DemoAsset, type FaceKey, type SceneData } from '../scene/types.js';
+import { sameFace, type DemoAsset, type FaceKey, type FinishRef, type SceneData } from '../scene/types.js';
 import { AssetLoader, type AssetLoaderOptions, type ModelState, type ModelUrlResolver } from './asset-loader.js';
 import type { AsyncModelSource } from './model-source.js';
 import { MAX_MODEL_PARALLEL, MAX_PROJECT_BYTES } from '../shared/limits.js';
@@ -26,10 +26,11 @@ import type { ProjectMaterial } from '../materials/finish-types.js';
 import type { Finish } from '../materials/finishes.js';
 import type { SolvedPlan } from '../plan/plan-solver.js';
 import { createBuilderContext, type BuilderContext } from './builder-context.js';
+import type { LibraryTextures } from './library-surface.js';
 import { ShellBuilder } from './shell-builder.js';
 import { OpeningBuilder } from './opening-builder.js';
 import type { SceneModel } from '../scene/scene-model.js';
-import { facadeFinishOf, floorFinishOf, roomWallFinishOf, type TouchedEntity } from '../scene/scene-ops.js';
+import { facadeFinishRefOf, floorFinishRefOf, roomWallFinishRefOf, type TouchedEntity } from '../scene/scene-ops.js';
 import { dispatchTouched, type TouchedHandlers } from './touched-kind.js';
 import { GLOW_GROUP_NAME } from './selection-glow.js';
 import { bodyMirrorOf, mirrorBody } from './asset-mirror.js';
@@ -83,6 +84,8 @@ export type SceneBuilderOptions = {
   projectMaterials?: readonly ProjectMaterial[] | undefined;
   /** Room-surface finish lookup; the bundled catalogue when absent (`builder-context.ts`). */
   findFinish?: ((id: string) => Finish | null) | undefined;
+  /** Where library materials on room surfaces take their maps from; flat colours only when absent. */
+  textures?: LibraryTextures | undefined;
   /** `'omit'` for the files of a baked project. */
   credentials?: RequestCredentials | undefined;
   /** Where `asset-defect` and `project-budget` are reported; the console when absent. */
@@ -153,7 +156,7 @@ export class SceneBuilder {
     this.plan = plan;
     this.options = options;
     this.log = options.log ?? defaultLogger;
-    this.ctx = createBuilderContext(scene, plan, options.findFinish);
+    this.ctx = createBuilderContext(scene, plan, options.findFinish, options.projectMaterials, options.textures ?? null);
     this.shell = new ShellBuilder(this.ctx);
     this.openings = new OpeningBuilder(this.ctx);
     // One loader for the whole scene: geometry and finishes are shared between
@@ -424,12 +427,12 @@ export class SceneBuilder {
   // -------------------------------------------------------------- finishes ---
 
   /** Swaps one room's floor finish (`set_material` with a `<room id>` target). */
-  setRoomFloor(roomId: string, finishId: string): boolean {
-    return this.shell.paint.setRoomFloor(roomId, finishId);
+  setRoomFloor(roomId: string, finish: FinishRef): boolean {
+    return this.shell.paint.setRoomFloor(roomId, finish);
   }
 
-  setAllFloors(finishId: string): void {
-    this.shell.paint.setAllFloors(finishId);
+  setAllFloors(finish: FinishRef): void {
+    this.shell.paint.setAllFloors(finish);
   }
 
   getFloorFinish(roomId: string): string | null {
@@ -437,8 +440,8 @@ export class SceneBuilder {
   }
 
   /** Paints every face of a room's loop and drops that room's per-face overrides. */
-  setRoomWall(roomId: string, finishId: string): boolean {
-    return this.shell.paint.setRoomWall(roomId, finishId);
+  setRoomWall(roomId: string, finish: FinishRef): boolean {
+    return this.shell.paint.setRoomWall(roomId, finish);
   }
 
   getRoomWall(roomId: string): string | null {
@@ -446,8 +449,8 @@ export class SceneBuilder {
   }
 
   /** Paints a single face (corner to corner, or up to a T-junction). */
-  setFaceWall(face: FaceKey, finishId: string): boolean {
-    return this.shell.paint.setFaceWall(face, finishId);
+  setFaceWall(face: FaceKey, finish: FinishRef): boolean {
+    return this.shell.paint.setFaceWall(face, finish);
   }
 
   /** Effective finish of a face: its own override, else the room's or the facade's. */
@@ -456,8 +459,8 @@ export class SceneBuilder {
   }
 
   /** Paints every outer face of the building as one area. */
-  setFacadeWall(finishId: string): boolean {
-    return this.shell.paint.setFacadeWall(finishId);
+  setFacadeWall(finish: FinishRef): boolean {
+    return this.shell.paint.setFacadeWall(finish);
   }
 
   getFacadeWall(): string {
@@ -465,8 +468,18 @@ export class SceneBuilder {
   }
 
   /** Paints every room; the facade keeps its own finish. */
-  setAllWalls(finishId: string): void {
-    this.shell.paint.setAllWalls(finishId);
+  setAllWalls(finish: FinishRef): void {
+    this.shell.paint.setAllWalls(finish);
+  }
+
+  /** Repaints a room's ceiling from the committed document. */
+  setRoomCeiling(roomId: string): boolean {
+    return this.shell.paint.setRoomCeiling(roomId);
+  }
+
+  /** Repaints a room's baseboards from the committed document. */
+  setRoomTrim(roomId: string): boolean {
+    return this.shell.paint.setRoomTrim(roomId);
   }
 
   /**
@@ -544,7 +557,13 @@ export class SceneBuilder {
       this.plan = model.plan;
     }
     this.dispose();
-    this.ctx = createBuilderContext(this.scene, this.plan, this.options.findFinish);
+    this.ctx = createBuilderContext(
+      this.scene,
+      this.plan,
+      this.options.findFinish,
+      this.options.projectMaterials,
+      this.options.textures ?? null,
+    );
     this.shell = new ShellBuilder(this.ctx);
     if (model) this.shell.paint.bindScene(() => model.scene);
     this.openings = new OpeningBuilder(this.ctx);
@@ -570,14 +589,14 @@ const routeAsUnhandled = (ctx: SceneBuilderApplyCtx, entity: TouchedEntity): voi
  */
 const SCENE_BUILDER_TOUCHED_HANDLERS: TouchedHandlers<SceneBuilderApplyCtx> = {
   facade: (ctx, entity) => {
-    if (!ctx.builder.setFacadeWall(facadeFinishOf(ctx.scene))) ctx.failed.push(entity);
+    if (!ctx.builder.setFacadeWall(facadeFinishRefOf(ctx.scene))) ctx.failed.push(entity);
   },
   floor: (ctx, entity) => {
-    const finishId = floorFinishOf(ctx.scene, entity.room);
-    if (!finishId || !ctx.builder.setRoomFloor(entity.room, finishId)) ctx.failed.push(entity);
+    const finish = floorFinishRefOf(ctx.scene, entity.room);
+    if (!finish || !ctx.builder.setRoomFloor(entity.room, finish)) ctx.failed.push(entity);
   },
   walls: (ctx, entity) => {
-    if (!ctx.builder.setRoomWall(entity.room, roomWallFinishOf(ctx.scene, entity.room))) ctx.failed.push(entity);
+    if (!ctx.builder.setRoomWall(entity.room, roomWallFinishRefOf(ctx.scene, entity.room))) ctx.failed.push(entity);
   },
   face: (ctx, entity) => {
     const override = ctx.scene.finishes?.faces?.find((entry) => sameFace(entry, entity.face))?.finish;
@@ -586,6 +605,12 @@ const SCENE_BUILDER_TOUCHED_HANDLERS: TouchedHandlers<SceneBuilderApplyCtx> = {
     } else if (!ctx.builder.resetFaceWall(entity.face)) {
       ctx.failed.push(entity);
     }
+  },
+  ceiling: (ctx, entity) => {
+    if (!ctx.builder.setRoomCeiling(entity.room)) ctx.failed.push(entity);
+  },
+  trim: (ctx, entity) => {
+    if (!ctx.builder.setRoomTrim(entity.room)) ctx.failed.push(entity);
   },
   // `shell`, `asset` and `opening` belong to another consumer (the composition
   // root); cameras, navigation and the tour are not geometry at all — all of

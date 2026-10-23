@@ -20,7 +20,7 @@ import { variantsForPlacement } from './asset-variants.js';
 import { findOpeningVariant, variantFamily, variantsForOpening } from './opening-variants.js';
 import { DEFAULT_FLOOR_FINISH, findFinish, finishKind } from '../materials/finish-catalogue.js';
 import { isKnownFinish, resolveSurfaceFinish } from '../materials/material-catalogue.js';
-import { placementIn, type CatalogueArchetype, type LibraryCatalogue, type SceneRegistries } from '../scene/registries.js';
+import { bundledSurfaces, placementIn, type CatalogueArchetype, type LibraryCatalogue, type SceneRegistries } from '../scene/registries.js';
 
 /**
  * The shipped library as one entry of `SceneRegistries.libraries`.
@@ -41,6 +41,9 @@ export const CATALOGUE_REGISTRIES: SceneRegistries = {
   isSurfaceFinish: (id) => resolveSurfaceFinish(id) !== null,
   isFinish: (id) => findFinish(id) !== null,
   finishKind,
+  finishSurfaces: (id) => bundledSurfaces(finishKind(id)),
+  // The shipped bank has no library materials: they come only with a project.
+  isLibraryMaterial: () => false,
   isKnownFinish,
   variantsForPlacement,
   libraries: new Map([[DEFAULT_LIBRARY, STARTER_LIBRARY]]),

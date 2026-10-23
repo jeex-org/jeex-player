@@ -129,7 +129,7 @@ describe('finish ops: one builder for the panel and the host card', () => {
       op: { op: 'set_material', target: 'facade', material: FINISH.sage },
       hint: 'hint.facadeApplied',
     });
-    expect(finishApplyAllAction(target, FINISH.sage, false).hint).toBe('hint.allWallsAppliedFacadeKept');
+    expect(finishApplyAllAction(target, FINISH.sage, false)?.hint).toBe('hint.allWallsAppliedFacadeKept');
     expect(finishOwnerName(SCENE, target, EN)).toBe('Facade');
   });
 

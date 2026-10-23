@@ -58,15 +58,21 @@ export const HOST_BUDGET_FAIL_BYTES = 4 * 1024;
  * scene schemas — a good deal of the scene model, but still no `three` and no
  * DOM.
  *
- * The gate is the last measured size of `jeex-viewer-ops.js` (75,170 gzip
- * bytes, 73.4 KB, from `measureBundle('dist-lib')` right after
- * `bun run build:lib`) plus 1 KB. Most of the entry is the scene model and its
+ * The gate is set from a measured size of `jeex-viewer-ops.js` (79,666 gzip
+ * bytes, 77.8 KB, from `measureBundle('dist-lib')` right after
+ * `bun run build:lib`) plus 1 KB; with the sun orientation's `site` field
+ * merged in the entry measures 80,286 bytes, still under the gate. Most of the entry is the scene model and its
  * `zod/mini` schemas; the bundled bank's fixed UUID v7 literals (random hex
- * that gzip cannot fold) are a large share. A future export that crosses it is
- * meant to be noticed here, not discovered at `npm pack` time; the fix is to
- * re-measure and update this comment, never to raise the number from memory.
+ * that gzip cannot fold) are a large share. The last raise, from 75,170
+ * bytes, is the library materials: the manifest's `library` member with its
+ * cross-field rules (about 1.9 KB), and the scene's finish values, the
+ * surface table and the explicit `set_material` with its version gate (about
+ * 2.2 KB), all of which a host judges and applies server-side. A future
+ * export that crosses it is meant to be noticed here, not discovered at
+ * `npm pack` time; the fix is to re-measure and update this comment, never to
+ * raise the number from memory.
  */
-export const OPS_BUDGET_FAIL_BYTES = 74 * 1024 + 418;
+export const OPS_BUDGET_FAIL_BYTES = 78 * 1024 + 818;
 
 /**
  * Hard limit for the `jeex-viewer/lighting` entry, gzip bytes. It carries the

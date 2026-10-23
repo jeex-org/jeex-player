@@ -18,9 +18,10 @@
 import type { SolvedPlan } from '../../plan/plan-solver.js';
 import { SceneValidationError, type ErrorDetail } from '../../shared/errors.js';
 import type { Logger } from '../../shared/logger.js';
-import type { SceneRegistries } from '../registries.js';
+import { isLibraryMaterialIn, surfacesIn, type SceneRegistries } from '../registries.js';
 import { isUuidV7 } from '../types.js';
-import type { MaterialDefinition, SceneData, Vec2, Vec3 } from '../types.js';
+import { finishRefProblem } from '../finish-value.js';
+import type { FinishRef, FinishSurface, MaterialDefinition, SceneData, Vec2, Vec3 } from '../types.js';
 
 /**
  * Refuses the document: `rule` names the check, `path` names the field.
@@ -137,6 +138,51 @@ export function requireFinishFamily(ctx: ValidationContext, id: string, family: 
       family,
     });
   }
+}
+
+/**
+ * A finish VALUE standing on `surface`: its shape, its version, the material
+ * it names and whether that material dresses the surface.
+ *
+ * The two spellings are judged by two rules on purpose. A finish object names
+ * a LIBRARY material (the only one with modifiers to read) whose `apply`
+ * contains the surface, strictly. A bare UUID keeps the rule of 2.2 extended
+ * to the new places: the surface table, plus the compatibility that a finish
+ * dressing walls also dresses the facade.
+ */
+export function requireFinishOn(ctx: ValidationContext, value: FinishRef, surface: FinishSurface, label: string, path: string): void {
+  const problem = finishRefProblem(value);
+  if (problem !== null) fail('finish-invalid', path, `${label} ${problem}`);
+  const { registries } = ctx;
+  if (typeof value === 'object') {
+    if (ctx.scene.schemaVersion === '2.2') {
+      fail('finish-needs-schema-2-3', path, `${label} is a finish object, which needs scene schema 2.3; this document is 2.2`);
+    }
+    const id = value.material;
+    if (!registries.isSurfaceFinish(id) && !isLibraryMaterialIn(registries, id)) {
+      fail('finish-unknown', path, `${label} references unknown finish ${id}`, { finish: id });
+    }
+    if (!isLibraryMaterialIn(registries, id)) {
+      fail('finish-modifiers-need-library', path, `${label} gives ${id} a colour or rotation; modifiers need a library material`, {
+        finish: id,
+      });
+    }
+    if (!surfacesIn(registries, id).has(surface)) wrongSurface(ctx, id, surface, label, path);
+    return;
+  }
+  if (!registries.isSurfaceFinish(value)) fail('finish-unknown', path, `${label} references unknown finish ${value}`, { finish: value });
+  const surfaces = surfacesIn(registries, value);
+  if (!surfaces.has(surface) && !(surface === 'facade' && surfaces.has('wall'))) wrongSurface(ctx, value, surface, label, path);
+}
+
+/** Refuses a finish on a surface it does not dress, naming both. */
+function wrongSurface(ctx: ValidationContext, id: string, surface: FinishSurface, label: string, path: string): never {
+  const kind = ctx.registries.finishKind(id);
+  return fail('finish-wrong-family', path, `${label} references ${id}, which is a ${kind ?? 'unknown'} finish, not a ${surface} finish`, {
+    finish: id,
+    kind: kind ?? null,
+    family: surface,
+  });
 }
 
 /** A `{ position, target }` pose with finite coordinates. */

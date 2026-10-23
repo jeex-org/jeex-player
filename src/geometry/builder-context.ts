@@ -17,8 +17,11 @@
  */
 
 import type { SolvedPlan, WallFace } from '../plan/plan-solver.js';
-import type { PlanNode, Room, SceneData, Wall } from '../scene/types.js';
+import type { FinishRef, PlanNode, Room, SceneData, Wall } from '../scene/types.js';
 import { findFinish as catalogueFinish, type Finish } from '../materials/finishes.js';
+import type { ProjectMaterial } from '../materials/finish-types.js';
+import { resolveRoomFinish, type RoomFinishDraw } from '../materials/room-finish.js';
+import type { LibraryTextures } from './library-surface.js';
 
 /** How a room-surface finish id is turned into a finish: the seam a project fills. */
 export type FinishLookup = (id: string) => Finish | null;
@@ -43,9 +46,23 @@ export type BuilderContext = {
    * not of the module.
    */
   findFinish: FinishLookup;
+  /**
+   * What a room surface's finish VALUE is drawn as: a library draw for a
+   * project library material, else the legacy finish `findFinish` gives.
+   */
+  resolve: (ref: FinishRef) => RoomFinishDraw | null;
+  /** Where library materials take their maps from; `null` without a project or a WebGL context. */
+  textures: LibraryTextures | null;
 };
 
-export function createBuilderContext(scene: SceneData, plan: SolvedPlan, findFinish?: FinishLookup): BuilderContext {
+export function createBuilderContext(
+  scene: SceneData,
+  plan: SolvedPlan,
+  findFinish?: FinishLookup,
+  projectMaterials?: readonly ProjectMaterial[],
+  textures: LibraryTextures | null = null,
+): BuilderContext {
+  const lookup = findFinish ?? catalogueFinish;
   const facesByWall = new Map<string, WallFace[]>();
   for (const face of plan.faces.values()) {
     const list = facesByWall.get(face.wallId);
@@ -62,6 +79,8 @@ export function createBuilderContext(scene: SceneData, plan: SolvedPlan, findFin
     roomsById: new Map(scene.rooms.map((room) => [room.id, room])),
     facesByWall,
     exteriorWallIds,
-    findFinish: findFinish ?? catalogueFinish,
+    findFinish: lookup,
+    resolve: (ref) => resolveRoomFinish(ref, projectMaterials, lookup),
+    textures,
   };
 }

@@ -1029,3 +1029,19 @@ describe('analytics', () => {
     }
   });
 });
+
+describe('resolveTexture: a host object', () => {
+  test('is copied through verbatim, never re-created or validated', () => {
+    const resolveTexture = (path: string): string => `https://signed.example.test/${path}`;
+    expect(resolveViewerOptions({ resolveTexture }).resolveTexture).toBe(resolveTexture);
+  });
+
+  test('is absent unless the host passes one', () => {
+    expect('resolveTexture' in resolveViewerOptions({})).toBe(false);
+  });
+
+  test('has no query or attribute spelling', () => {
+    expect(optionsFromQuery('?resolveTexture=x&resolve-texture=y')).not.toHaveProperty('resolveTexture');
+    expect(optionsFromDataset({ resolveTexture: 'x' })).not.toHaveProperty('resolveTexture');
+  });
+});

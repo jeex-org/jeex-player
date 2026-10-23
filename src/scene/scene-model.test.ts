@@ -34,6 +34,8 @@ import { L_SHAPE } from '../fixtures/plan-l-shape-ids.js';
 import { EDITOR } from '../fixtures/editor-scenario-ids.js';
 import { OPENING_VARIANT, VARIANT } from '../assets/catalogue-ids.js';
 import { FINISH } from '../materials/finish-ids.js';
+import { LIBRARY_FINISH as LIB, LIBRARY_REGISTRIES } from '../fixtures/library-finishes.js';
+import type { Draft } from '../shared/committed.js';
 
 const ROOM_A = L_SHAPE.room.a;
 const ROOM_B = L_SHAPE.room.b;
@@ -742,5 +744,46 @@ describe('the editor scenario', () => {
     expect(subject.rev).toBe(0);
     expect(subject.scene.rooms).toHaveLength(1);
     expect(subject.scene.assets).toEqual([]);
+  });
+});
+
+describe('a 2.3 document with finish objects survives export', () => {
+  test('exported, serialised and loaded again, every finish value is deep-equal to the original', () => {
+    const document = draftOf(lShapePlan) as Draft<SceneData> & { schemaVersion: string };
+    document.schemaVersion = '2.3';
+    const finishes = {
+      rooms: {
+        [L_SHAPE.room.a]: {
+          floor: { material: LIB.floorScan, rotation: 90 },
+          walls: { material: LIB.paint, colour: '#c9d6df' },
+          ceiling: LIB.paint,
+          trim: { material: LIB.paint, colour: '#ffffff', rotation: 0 },
+        },
+      },
+      faces: [
+        {
+          room: L_SHAPE.room.b,
+          wallId: L_SHAPE.wall.wPart,
+          side: 'R' as const,
+          finish: { material: LIB.wallOnly, colour: '#d8cbb5', rotation: 45 },
+        },
+      ],
+      facade: { material: LIB.facadeOnly, rotation: 180 },
+    };
+    (document as { finishes?: unknown }).finishes = finishes;
+    const loaded = SceneModel.load(document, LIBRARY_REGISTRIES);
+    const applied = loaded.apply({
+      baseRev: loaded.rev,
+      ops: [{ op: 'set_material', surface: 'ceiling', room: L_SHAPE.room.b, material: LIB.paint, colour: '#203040' }],
+    });
+    expect(isApplyOk(applied)).toBe(true);
+
+    const exported = JSON.parse(JSON.stringify(loaded.toJSON())) as unknown;
+    const reloaded = SceneModel.load(exported, LIBRARY_REGISTRIES);
+    expect(reloaded.scene.schemaVersion).toBe('2.3');
+    expect(reloaded.scene.finishes).toEqual({
+      ...finishes,
+      rooms: { ...finishes.rooms, [L_SHAPE.room.b]: { ceiling: { material: LIB.paint, colour: '#203040' } } },
+    });
   });
 });

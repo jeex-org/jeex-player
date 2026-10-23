@@ -1,0 +1,206 @@
+import { describe, expect, test } from 'bun:test';
+import * as THREE from 'three';
+import { attachLibraryMaps, createLibraryMaterial } from './library-material.js';
+import type { LibraryDraw } from './room-finish.js';
+import type { LibraryMaterial, LibraryPbr, ProjectMaterial } from './finish-types.js';
+import { NATURAL_SCAN, PAINT, TINTABLE_SCAN } from '../fixtures/library-materials.js';
+
+/** The library member of a fixture material. */
+const libraryOf = (material: ProjectMaterial): LibraryMaterial => (material as Extract<ProjectMaterial, { library: unknown }>).library;
+
+/** A draw of `material` with an optional tint. */
+function draw(material: ProjectMaterial, colour?: string): LibraryDraw {
+  return { id: material.id, material: libraryOf(material), ...(colour !== undefined && { colour }), rotation: 0 };
+}
+
+/** `material` with its PBR facts replaced. */
+function withPbr(material: ProjectMaterial, pbr: LibraryPbr): LibraryDraw {
+  const library = libraryOf(material);
+  return { id: material.id, material: { ...library, facts: { ...library.facts, pbr } }, rotation: 0 };
+}
+
+/** The material's colour as `#rrggbb` (sRGB). */
+const hexOf = (material: THREE.MeshStandardMaterial): string => `#${material.color.getHexString()}`;
+
+describe('createLibraryMaterial: the first frame', () => {
+  test('a natural material draws its averageColour, and ignores a colour', () => {
+    expect(hexOf(createLibraryMaterial(draw(NATURAL_SCAN)))).toBe('#9a7b56');
+    expect(hexOf(createLibraryMaterial(draw(NATURAL_SCAN, '#ff0000')))).toBe('#9a7b56');
+  });
+
+  test('a tintable scan draws averageColour times the tint in linear light', () => {
+    const expected = new THREE.Color('#808080').multiply(new THREE.Color('#ff0000'));
+    expect(createLibraryMaterial(draw(TINTABLE_SCAN, '#ff0000')).color.equals(expected)).toBe(true);
+    const suggested = new THREE.Color('#808080').multiply(new THREE.Color('#c9d6df'));
+    expect(createLibraryMaterial(draw(TINTABLE_SCAN)).color.equals(suggested)).toBe(true);
+  });
+
+  test('a tintable paint draws exactly its tint, never its base colour or a product of the two', () => {
+    expect(hexOf(createLibraryMaterial(draw(PAINT, '#2050a0')))).toBe('#2050a0');
+    expect(hexOf(createLibraryMaterial(draw(PAINT)))).toBe('#f1eee8');
+  });
+
+  test('defaults are applied when drawing: metalness 0, roughness 1, opaque', () => {
+    const material = createLibraryMaterial(withPbr(NATURAL_SCAN, {}));
+    expect({
+      metalness: material.metalness,
+      roughness: material.roughness,
+      transparent: material.transparent,
+      alphaTest: material.alphaTest,
+    }).toEqual({
+      metalness: 0,
+      roughness: 1,
+      transparent: false,
+      alphaTest: 0,
+    });
+  });
+
+  test('the scalar facts are applied: roughness, metalness, emissive, blend and mask', () => {
+    const material = createLibraryMaterial(
+      withPbr(NATURAL_SCAN, { roughness: 0.3, metalness: 1, emissive: '#102030', emissiveIntensity: 2, alphaMode: 'blend', opacity: 0.5 }),
+    );
+    expect({
+      roughness: material.roughness,
+      metalness: material.metalness,
+      emissive: `#${material.emissive.getHexString()}`,
+      emissiveIntensity: material.emissiveIntensity,
+      transparent: material.transparent,
+      opacity: material.opacity,
+    }).toEqual({ roughness: 0.3, metalness: 1, emissive: '#102030', emissiveIntensity: 2, transparent: true, opacity: 0.5 });
+    expect(createLibraryMaterial(withPbr(NATURAL_SCAN, { alphaMode: 'mask' })).alphaTest).toBe(0.5);
+  });
+
+  test('each physical field, and only a physical field, promotes the material to the physical model', () => {
+    const fields: LibraryPbr[] = [
+      { sheen: 0.5 },
+      { sheenColour: '#ffffff' },
+      { clearcoat: 0.5 },
+      { clearcoatRoughness: 0.5 },
+      { transmission: 0.5 },
+      { ior: 1.5 },
+      { thicknessM: 0.01 },
+      { attenuationDistanceM: 1 },
+      { attenuationColour: '#ffffff' },
+    ];
+    for (const pbr of fields) {
+      expect({ pbr, physical: createLibraryMaterial(withPbr(NATURAL_SCAN, pbr)) instanceof THREE.MeshPhysicalMaterial }).toEqual({
+        pbr,
+        physical: true,
+      });
+    }
+    expect(createLibraryMaterial(withPbr(NATURAL_SCAN, { roughness: 0.5, metalness: 0.5 })) instanceof THREE.MeshPhysicalMaterial).toBe(
+      false,
+    );
+  });
+
+  test('ior alone gives a physical material whose index of refraction is that ior', () => {
+    const material = createLibraryMaterial(withPbr(NATURAL_SCAN, { ior: 1.5 }));
+    expect(material).toBeInstanceOf(THREE.MeshPhysicalMaterial);
+    expect((material as THREE.MeshPhysicalMaterial).ior).toBe(1.5);
+  });
+
+  test('the physical fields reach their three.js names', () => {
+    const material = createLibraryMaterial(
+      withPbr(NATURAL_SCAN, {
+        sheen: 0.4,
+        sheenColour: '#ff0000',
+        clearcoat: 0.6,
+        clearcoatRoughness: 0.2,
+        transmission: 0.7,
+        thicknessM: 0.02,
+        attenuationDistanceM: 3,
+        attenuationColour: '#00ff00',
+      }),
+    ) as THREE.MeshPhysicalMaterial;
+    expect({
+      sheen: material.sheen,
+      sheenColor: `#${material.sheenColor.getHexString()}`,
+      clearcoat: material.clearcoat,
+      clearcoatRoughness: material.clearcoatRoughness,
+      transmission: material.transmission,
+      thickness: material.thickness,
+      attenuationDistance: material.attenuationDistance,
+      attenuationColor: `#${material.attenuationColor.getHexString()}`,
+    }).toEqual({
+      sheen: 0.4,
+      sheenColor: '#ff0000',
+      clearcoat: 0.6,
+      clearcoatRoughness: 0.2,
+      transmission: 0.7,
+      thickness: 0.02,
+      attenuationDistance: 3,
+      attenuationColor: '#00ff00',
+    });
+  });
+});
+
+describe('attachLibraryMaps', () => {
+  const view = (): THREE.Texture => new THREE.Texture();
+
+  test('a natural colour map turns the colour white, so the map is drawn as is, and marks the material for recompilation', () => {
+    const material = createLibraryMaterial(draw(NATURAL_SCAN));
+    const version = material.version;
+    const albedo = view();
+    attachLibraryMaps(material, draw(NATURAL_SCAN), { albedo });
+    expect(material.map).toBe(albedo);
+    expect(hexOf(material)).toBe('#ffffff');
+    expect(material.version).toBeGreaterThan(version);
+  });
+
+  test('a tintable scan’s tint map is drawn times the tint', () => {
+    const material = createLibraryMaterial(draw(TINTABLE_SCAN, '#ff0000'));
+    attachLibraryMaps(material, draw(TINTABLE_SCAN, '#ff0000'), { albedoTint: view() });
+    expect(hexOf(material)).toBe('#ff0000');
+  });
+
+  test('a scan’s baseColour multiplies its colour map by glTF rules', () => {
+    const tinted = withPbr(NATURAL_SCAN, { baseColour: '#808080' });
+    const material = createLibraryMaterial(tinted);
+    attachLibraryMaps(material, tinted, { albedo: view() });
+    expect(hexOf(material)).toBe('#808080');
+  });
+
+  test('one ARM view feeds ambient occlusion, roughness and metalness, AO on the primary UV set', () => {
+    const material = createLibraryMaterial(draw(NATURAL_SCAN));
+    const arm = view();
+    attachLibraryMaps(material, draw(NATURAL_SCAN), { arm });
+    expect([material.aoMap, material.roughnessMap, material.metalnessMap]).toEqual([arm, arm, arm]);
+    expect(arm.channel).toBe(0);
+    // Absent metalness stays 0, so the ARM blue channel cannot make it metallic.
+    expect([material.metalness, material.roughness]).toEqual([0, 1]);
+  });
+
+  test('metalness 1 lets the ARM blue channel decide', () => {
+    const metal = withPbr(NATURAL_SCAN, { metalness: 1 });
+    const material = createLibraryMaterial(metal);
+    attachLibraryMaps(material, metal, { arm: view() });
+    expect(material.metalness).toBe(1);
+  });
+
+  test('separate roughness and AO maps take their own slots', () => {
+    const material = createLibraryMaterial(draw(TINTABLE_SCAN));
+    const roughness = view();
+    const ao = view();
+    attachLibraryMaps(material, draw(TINTABLE_SCAN), { roughness, ao });
+    expect([material.roughnessMap, material.aoMap, material.metalnessMap]).toEqual([roughness, ao, null]);
+    expect(ao.channel).toBe(0);
+    expect(material.roughness).toBe(0.9);
+  });
+
+  test('the normal map is read with a scale of normalStrength, 1 when absent', () => {
+    const scan = createLibraryMaterial(draw(NATURAL_SCAN));
+    attachLibraryMaps(scan, draw(NATURAL_SCAN), { normal: view() });
+    expect([scan.normalScale.x, scan.normalScale.y]).toEqual([1, 1]);
+    const weave = createLibraryMaterial(draw(TINTABLE_SCAN));
+    attachLibraryMaps(weave, draw(TINTABLE_SCAN), { normal: view() });
+    expect([weave.normalScale.x, weave.normalScale.y]).toEqual([0.8, 0.8]);
+  });
+
+  test('attaching nothing new changes nothing', () => {
+    const material = createLibraryMaterial(draw(PAINT));
+    const version = material.version;
+    attachLibraryMaps(material, draw(PAINT), {});
+    expect(material.version).toBe(version);
+    expect(hexOf(material)).toBe('#f1eee8');
+  });
+});

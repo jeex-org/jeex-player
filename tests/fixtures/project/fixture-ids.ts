@@ -47,3 +47,18 @@ export const INVALID_PROJECT_FIXTURE = {
   projectId: '01a12fec-9d41-7c54-a85d-0467f53e8f9b',
   bakeId: '01a12fec-9d42-7ccc-8a3d-71dcc4d09896',
 } as const;
+
+/**
+ * `tests/fixtures/project-library/`: the same plan dressed in library
+ * materials — a natural plank scan with its albedo, normal and ARM maps at 256
+ * and 512, and a tintable paint — and no objects. The living room wears the scan
+ * on its floor and the paint on its walls (tinted) and ceiling; the bedroom
+ * keeps the generator finishes of the plain bake.
+ */
+export const LIBRARY_PROJECT_FIXTURE = {
+  projectId: '01a1683e-d6fd-7f30-9e42-f52c285a391f',
+  bakeId: '01a1683e-d6fd-789a-a1af-948e57e30bc3',
+  material: { scan: '01a1683e-d6fd-7bc4-8915-f35f1150eb5b', paint: '01a1683e-d6fe-74c9-ade2-59702d05dec2' },
+  version: { scan: '01a1683e-d6fd-7e48-b046-25153a9ef95a', paint: '01a1683e-d6fe-7391-887a-d5c0bf074458' },
+  room: { living: PROJECT_FIXTURE.room.living, bedroom: PROJECT_FIXTURE.room.bedroom },
+} as const;

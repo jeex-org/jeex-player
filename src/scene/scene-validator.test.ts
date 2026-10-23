@@ -6,7 +6,7 @@ import type { MaterialDefinition, PlanNode, Room, SceneData, Wall } from './type
 import type { Draft } from '../shared/committed.js';
 import type { InteriorPreset } from './scene-ops.js';
 import { WALL_LIMITS, validateScene } from './scene-validator.js';
-import { SceneValidationError, ViewerLibError } from '../shared/errors.js';
+import { SceneValidationError, ViewerLibError, boundDocumentText } from '../shared/errors.js';
 import type { Logger } from '../shared/logger.js';
 import { collectLogger } from '../fixtures/stubs.js';
 import { solvePlan } from '../plan/plan-solver.js';
@@ -14,6 +14,8 @@ import { floorOutline } from '../plan/floor-outline.js';
 import { BAY, L_SHAPE } from '../fixtures/plan-l-shape-ids.js';
 import { ARCHETYPE, OPENING_VARIANT, VARIANT } from '../assets/catalogue-ids.js';
 import { FINISH } from '../materials/finish-ids.js';
+import { LIBRARY_FINISH as LIB, LIBRARY_REGISTRIES } from '../fixtures/library-finishes.js';
+import { SceneModel } from './scene-model.js';
 
 const NODE = L_SHAPE.node;
 const WALL = L_SHAPE.wall;
@@ -967,5 +969,221 @@ describe('every entity id is a UUID v7', () => {
     const invalid = draftOf(lShapePlan);
     roomById(invalid, ROOM.a).id = ROOM.a.toUpperCase();
     expect(errorOf(() => validateScene(invalid, CATALOGUE_REGISTRIES)).rule).toBe('id-invalid');
+  });
+});
+
+/* ------------------------------------------------------ finish values --- */
+
+/** The six places a finish value stands, with the surface each one is. */
+const FINISH_PLACES = ['floor', 'walls', 'ceiling', 'trim', 'facade', 'roomFace', 'facadeFace'] as const;
+type FinishPlace = (typeof FINISH_PLACES)[number];
+
+/** A room-owned face and a facade face of the L-shape plan. */
+const ROOM_FACE = { room: L_SHAPE.room.a, wallId: L_SHAPE.wall.wPart, side: 'L' } as const;
+const FACADE_FACE = { wallId: L_SHAPE.wall.wSA, side: 'R' } as const;
+
+/** `lShapePlan` at `version` with `value` at `place` and nothing else painted. */
+function paintedAt(place: FinishPlace, value: unknown, version: '2.2' | '2.3' = '2.3'): Draft<SceneData> {
+  const scene = draftOf(lShapePlan);
+  (scene as { schemaVersion: string }).schemaVersion = version;
+  const finishes: Record<string, unknown> =
+    place === 'facade'
+      ? { facade: value }
+      : place === 'roomFace'
+        ? { faces: [{ ...ROOM_FACE, finish: value }] }
+        : place === 'facadeFace'
+          ? { faces: [{ ...FACADE_FACE, finish: value }] }
+          : { rooms: { [L_SHAPE.room.a]: { [place]: value } } };
+  (scene as { finishes?: unknown }).finishes = finishes;
+  return scene;
+}
+
+/** The path a refusal at `place` names, as the error carries it (a document path is bounded like any echo of a document). */
+function finishPath(place: FinishPlace): string {
+  if (place === 'facade') return 'finishes.facade';
+  if (place === 'roomFace' || place === 'facadeFace') return 'finishes.faces[0].finish';
+  return boundDocumentText(`finishes.rooms.${L_SHAPE.room.a}.${place}`);
+}
+
+/** The rule and path `document` is refused with against the library registries, or `accepted`. */
+function refusalOf(document: unknown): { rule: string; path: string | undefined } | 'accepted' {
+  try {
+    validateScene(document, LIBRARY_REGISTRIES);
+  } catch (error) {
+    if (error instanceof SceneValidationError) return { rule: error.rule, path: error.path };
+    throw error;
+  }
+  return 'accepted';
+}
+
+describe('finish values: the shape is checked at runtime, on the load path', () => {
+  const MALFORMED = [
+    { material: LIB.paint, colour: '#c9d6df', scale: 2 },
+    { material: LIB.paint, colour: 'beige' },
+    { material: LIB.paint, rotation: Number.POSITIVE_INFINITY },
+    { material: LIB.paint },
+  ];
+
+  test('SceneModel.load refuses an unknown key, a bad colour, a non-finite rotation and a modifier-free object at every place', () => {
+    for (const place of FINISH_PLACES) {
+      for (const value of MALFORMED) {
+        let refusal: { rule: string; path: string | undefined } | 'accepted' = 'accepted';
+        try {
+          SceneModel.load(paintedAt(place, value), LIBRARY_REGISTRIES);
+        } catch (error) {
+          if (!(error instanceof SceneValidationError)) throw error;
+          refusal = { rule: error.rule, path: error.path };
+        }
+        expect({ place, value, refusal }).toEqual({ place, value, refusal: { rule: 'finish-invalid', path: finishPath(place) } });
+      }
+    }
+  });
+
+  test('a modifier-free object is told to use the bare UUID', () => {
+    const error = errorOf(() => validateScene(paintedAt('walls', { material: LIB.paint }), LIBRARY_REGISTRIES));
+    expect(error.message).toContain('use the bare UUID');
+  });
+
+  test('the bare UUID, a colour and a rotation are the three accepted spellings', () => {
+    for (const value of [LIB.paint, { material: LIB.paint, colour: '#c9d6df' }, { material: LIB.paint, rotation: 90 }]) {
+      expect({ value, refusal: refusalOf(paintedAt('walls', value)) }).toEqual({ value, refusal: 'accepted' });
+    }
+  });
+});
+
+describe('finish values: what is new in 2.3 needs 2.3', () => {
+  test('a 2.2 document with a finish object, a ceiling or a trim is refused, naming 2.3', () => {
+    for (const [place, value] of [
+      ['walls', { material: LIB.paint, colour: '#c9d6df' }],
+      ['ceiling', FINISH.sand],
+      ['trim', FINISH.sand],
+      ['roomFace', { material: LIB.paint, rotation: 90 }],
+    ] as const) {
+      const document = paintedAt(place, value, '2.2');
+      expect({ place, refusal: refusalOf(document) }).toEqual({
+        place,
+        refusal: { rule: 'finish-needs-schema-2-3', path: finishPath(place) },
+      });
+      expect(errorOf(() => validateScene(document, LIBRARY_REGISTRIES)).message).toContain('2.3');
+    }
+  });
+
+  test('the same document as 2.3 is accepted', () => {
+    expect(refusalOf(paintedAt('ceiling', FINISH.sand))).toBe('accepted');
+    expect(refusalOf(paintedAt('trim', { material: LIB.paint, colour: '#ffffff' }))).toBe('accepted');
+  });
+
+  test('every 2.2 fixture of this build still validates', () => {
+    for (const scene of [lShapePlan, bayPlan]) expect(refusalOf(scene)).toBe('accepted');
+  });
+});
+
+describe('finish values: which material may dress which place', () => {
+  /** The surface word a place is judged by. */
+  const SURFACE: Record<FinishPlace, string> = {
+    floor: 'floor',
+    walls: 'wall',
+    ceiling: 'ceiling',
+    trim: 'trim',
+    facade: 'facade',
+    roomFace: 'wall',
+    facadeFace: 'facade',
+  };
+  /** Library materials and the surface words of their `apply`. */
+  const APPLIES: Record<string, readonly string[]> = {
+    [LIB.floorScan]: ['floor'],
+    [LIB.paint]: ['wall', 'ceiling', 'facade', 'trim'],
+    [LIB.floorAndWall]: ['floor', 'wall'],
+    [LIB.facadeOnly]: ['facade'],
+    [LIB.facadeAndWall]: ['facade', 'wall'],
+    [LIB.wallOnly]: ['wall'],
+  };
+
+  test('a finish object dresses exactly the surfaces of its apply, at every place', () => {
+    for (const [material, apply] of Object.entries(APPLIES)) {
+      for (const place of FINISH_PLACES) {
+        const expected = apply.includes(SURFACE[place]) ? 'accepted' : { rule: 'finish-wrong-family', path: finishPath(place) };
+        expect({ material, place, refusal: refusalOf(paintedAt(place, { material, colour: '#c9d6df' })) }).toEqual({
+          material,
+          place,
+          refusal: expected,
+        });
+      }
+    }
+  });
+
+  test('a bare UUID dresses the surfaces of its apply, and a wall material the facade as well', () => {
+    for (const [material, apply] of Object.entries(APPLIES)) {
+      for (const place of FINISH_PLACES) {
+        const surface = SURFACE[place];
+        const dresses = apply.includes(surface) || (surface === 'facade' && apply.includes('wall'));
+        const expected = dresses ? 'accepted' : { rule: 'finish-wrong-family', path: finishPath(place) };
+        expect({ material, place, refusal: refusalOf(paintedAt(place, material)) }).toEqual({ material, place, refusal: expected });
+      }
+    }
+  });
+
+  test('a bundled floor finish dresses floors, a bundled wall finish walls, faces, the facade, ceilings and trim', () => {
+    for (const place of FINISH_PLACES) {
+      const floor = place === 'floor' ? 'accepted' : { rule: 'finish-wrong-family', path: finishPath(place) };
+      const wall = place === 'floor' ? { rule: 'finish-wrong-family', path: finishPath(place) } : 'accepted';
+      expect({ place, oak: refusalOf(paintedAt(place, FINISH.oak)), sand: refusalOf(paintedAt(place, FINISH.sand)) }).toEqual({
+        place,
+        oak: floor,
+        sand: wall,
+      });
+    }
+  });
+
+  test('a wrong surface names the material and the surface', () => {
+    const error = errorOf(() => validateScene(paintedAt('ceiling', { material: LIB.wallOnly, colour: '#c9d6df' }), LIBRARY_REGISTRIES));
+    expect(error.message).toContain(LIB.wallOnly);
+    expect(error.message).toContain('ceiling');
+  });
+
+  test('an unknown material is refused in either spelling', () => {
+    const ghost = '01a167f6-040a-72e4-9504-fef48f8fd18d';
+    for (const place of FINISH_PLACES) {
+      expect({
+        place,
+        bare: refusalOf(paintedAt(place, ghost)),
+        object: refusalOf(paintedAt(place, { material: ghost, rotation: 90 })),
+      }).toEqual({
+        place,
+        bare: { rule: 'finish-unknown', path: finishPath(place) },
+        object: { rule: 'finish-unknown', path: finishPath(place) },
+      });
+    }
+  });
+
+  test('a bundled finish, a pbr and a generator material in object form are refused: modifiers need a library material', () => {
+    for (const [place, material] of [
+      ['walls', FINISH.sand],
+      ['floor', FINISH.oak],
+      ['walls', LIB.pbrWall],
+      ['floor', LIB.generatorFloor],
+    ] as const) {
+      const document = paintedAt(place, { material, colour: '#c9d6df' });
+      expect({ material, refusal: refusalOf(document) }).toEqual({
+        material,
+        refusal: { rule: 'finish-modifiers-need-library', path: finishPath(place) },
+      });
+      const message = errorOf(() => validateScene(document, LIBRARY_REGISTRIES)).message;
+      expect(message).toContain(material);
+      expect(message).toContain('library material');
+    }
+  });
+
+  test('pbr and generator project materials by bare UUID are still accepted, in a 2.3 document as in a 2.2 one', () => {
+    for (const version of ['2.2', '2.3'] as const) {
+      const scene = paintedAt('walls', LIB.pbrWall, version);
+      (scene.finishes as { rooms: Record<string, Record<string, unknown>> }).rooms[L_SHAPE.room.a]!['floor'] = LIB.generatorFloor;
+      expect({ version, refusal: refusalOf(scene) }).toEqual({ version, refusal: 'accepted' });
+    }
+  });
+
+  test('the 2.2 facade painted with a project wall material is accepted as before', () => {
+    expect(refusalOf(paintedAt('facade', LIB.wallOnly, '2.2'))).toBe('accepted');
+    expect(refusalOf(paintedAt('facade', LIB.pbrWall, '2.2'))).toBe('accepted');
   });
 });

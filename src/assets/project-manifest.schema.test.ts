@@ -495,3 +495,480 @@ describe('the demo project, when JEEX_DEMO_PROJECT points at one', () => {
     expect(projectManifestIssues(JSON.parse(readFileSync(demoManifest!, 'utf8')))).toEqual([]);
   });
 });
+
+/* ------------------------------------------------ the library member --- */
+
+/** Ids the library-member tests add: three materials and the catalogue versions their maps sit under. */
+const LIB = {
+  oakScan: '01a167ee-5039-79c9-8479-8069a429c30c',
+  oakVersion: '01a167ee-5039-735c-bbdf-3f2acd1d2e5a',
+  linenScan: '01a167ee-503a-7261-a2a5-15d7d20dc7d8',
+  linenVersion: '01a167ee-503a-7da4-acfa-418617c6bc41',
+  paint: '01a167ee-503a-79cd-917f-d0ab27855aa6',
+  paintVersion: '01a167ee-503a-7db9-a6f4-238603050ab2',
+} as const;
+
+/** The file a map of `role` at `size` must be, under `version`. */
+const tex = (version: string, role: string, size: string): string => `tex/${version}/${role}.${size}.webp`;
+
+/** One map entry listing `sizes`, every file at its exact path. */
+function mapOf(version: string, role: string, colourSpace: 'srgb' | 'linear', sizes: readonly string[], extra: object = {}) {
+  return { colourSpace, ...extra, files: Object.fromEntries(sizes.map((size) => [size, tex(version, role, size)])) };
+}
+
+/** A natural scan: albedo, normal and arm at 256 and 512. */
+function naturalScan(): Record<string, unknown> {
+  return {
+    id: LIB.oakScan,
+    name: 'Oak planks',
+    apply: ['floor'],
+    library: {
+      versionId: LIB.oakVersion,
+      kind: 'scan',
+      facts: {
+        tileM: [2, 1],
+        grain: 'along_u',
+        suitability: 'plank_floor',
+        colourMode: 'natural',
+        averageColour: '#9a7b56',
+        pbr: {},
+      },
+      maps: {
+        albedo: mapOf(LIB.oakVersion, 'albedo', 'srgb', ['256', '512']),
+        normal: mapOf(LIB.oakVersion, 'normal', 'linear', ['256', '512'], { convention: 'opengl' }),
+        arm: mapOf(LIB.oakVersion, 'arm', 'linear', ['256', '512']),
+      },
+    },
+  };
+}
+
+/** A tintable scan: albedoTint plus separate roughness and ao. */
+function tintableScan(): Record<string, unknown> {
+  return {
+    id: LIB.linenScan,
+    name: 'Linen weave',
+    apply: ['wall', 'ceiling'],
+    library: {
+      versionId: LIB.linenVersion,
+      kind: 'scan',
+      facts: {
+        tileM: [0.5, 0.5],
+        grain: 'none',
+        suitability: 'continuous',
+        normalStrength: 0.8,
+        colourMode: 'tintable',
+        tint: { recipe: 'luma-mid@1', suggestedColours: [{ name: 'Mist', hex: '#c9d6df' }] },
+        averageColour: '#808080',
+        pbr: { roughness: 0.9 },
+      },
+      maps: {
+        albedoTint: mapOf(LIB.linenVersion, 'albedoTint', 'srgb', ['384']),
+        roughness: mapOf(LIB.linenVersion, 'roughness', 'linear', ['384']),
+        ao: mapOf(LIB.linenVersion, 'ao', 'linear', ['384']),
+      },
+    },
+  };
+}
+
+/** A tintable parameters material: a paint, no maps. */
+function paint(): Record<string, unknown> {
+  return {
+    id: LIB.paint,
+    name: 'Matt paint',
+    apply: ['wall', 'ceiling', 'facade', 'trim'],
+    library: {
+      versionId: LIB.paintVersion,
+      kind: 'parameters',
+      facts: {
+        tileM: null,
+        grain: 'none',
+        suitability: 'continuous',
+        colourMode: 'tintable',
+        tint: { recipe: 'luma-mid@1', suggestedColours: [{ name: 'Chalk', hex: '#f1eee8' }] },
+        averageColour: '#806040',
+        pbr: { baseColour: '#806040', roughness: 0.85 },
+      },
+      maps: {},
+    },
+  };
+}
+
+/** The fixture manifest with `materials` as its library's whole material list. */
+function withMaterials(...materials: Record<string, unknown>[]): Record<string, unknown> {
+  return broken((manifest) => void ((manifest['library'] as { materials: unknown[] }).materials = materials)) as Record<string, unknown>;
+}
+
+/** The fixture manifest with ONE library material, edited by `edit` before it is judged. */
+function withLibrary(make: () => Record<string, unknown>, edit: (library: Record<string, any>) => void): unknown {
+  const material = JSON.parse(JSON.stringify(make())) as Record<string, any>;
+  edit(material['library']);
+  return withMaterials(material);
+}
+
+/** The joined paths of every issue `value` raises. */
+const issuePaths = (value: unknown): string[] => projectManifestIssues(value).map((issue) => issue.path.join('.'));
+
+/** The path prefix of the only material's library member. */
+const AT = 'library.materials.0.library';
+
+describe('library member: apply words', () => {
+  test('ceiling, facade and trim are surface words a project material may name', () => {
+    const manifest = broken((value) => void (firstMaterial(value)['apply'] = ['ceiling', 'facade', 'trim']));
+    expect(projectManifestIssues(manifest)).toEqual([]);
+  });
+
+  test('a word outside the vocabulary is still refused', () => {
+    expect(issuePaths(broken((value) => void (firstMaterial(value)['apply'] = ['floor', 'roof'])))).toEqual([
+      'library.materials.0.apply.1',
+    ]);
+  });
+});
+
+describe('library member: the strict shape', () => {
+  test('a natural scan, a tintable scan and a paint parse and come back as the very object', () => {
+    const manifest = withMaterials(naturalScan(), tintableScan(), paint());
+    expect(projectManifestIssues(manifest)).toEqual([]);
+    expect(parseProjectManifest(manifest)).toBe(manifest as unknown as BakedProjectManifest);
+  });
+
+  test('absent defaults stay absent: no metalness, no normalStrength is written in', () => {
+    const manifest = withMaterials(naturalScan()) as unknown as BakedProjectManifest;
+    const material = parseProjectManifest(manifest).library.materials[0]!;
+    expect('library' in material && material.library.facts).not.toHaveProperty('normalStrength');
+    expect('library' in material && material.library.facts.pbr).toEqual({});
+  });
+
+  test('an unknown key is refused at every depth, at the object that carries it, and the issue names it', () => {
+    const cases: [(library: Record<string, any>) => void, string][] = [
+      [(library) => void (library['scale'] = 2), AT],
+      [(library) => void (library['facts']['origin'] = 'source'), `${AT}.facts`],
+      [(library) => void (library['facts']['pbr']['specular'] = 1), `${AT}.facts.pbr`],
+      [(library) => void (library['maps']['albedo']['mime'] = 'image/webp'), `${AT}.maps.albedo`],
+      [(library) => void (library['maps']['height'] = mapOf(LIB.oakVersion, 'height', 'linear', ['256'])), `${AT}.maps`],
+      [(library) => void (library['maps']['albedo']['files']['1024'] = tex(LIB.oakVersion, 'albedo', '1024')), `${AT}.maps.albedo.files`],
+    ];
+    for (const [edit, path] of cases) {
+      const issues = projectManifestIssues(withLibrary(naturalScan, edit));
+      expect(issues.map((issue) => issue.path.join('.'))).toEqual([path]);
+      expect(issues[0]!.message).toMatch(/^unknown key "[^"]+"$/);
+    }
+    const tinted = projectManifestIssues(withLibrary(tintableScan, (library) => void (library['facts']['tint']['mode'] = 'multiply')));
+    expect(tinted.map((issue) => issue.path.join('.'))).toEqual([`${AT}.facts.tint`]);
+  });
+
+  test('versionId is a lowercase UUID v7', () => {
+    expect(issuePaths(withLibrary(naturalScan, (library) => void (library['versionId'] = UUID_V4)))).toContain(`${AT}.versionId`);
+    expect(issuePaths(withLibrary(naturalScan, (library) => void (library['versionId'] = LIB.oakVersion.toUpperCase())))).toContain(
+      `${AT}.versionId`,
+    );
+  });
+
+  test('averageColour is #rrggbb', () => {
+    for (const colour of ['rgb(10, 10, 10)', '#abc', '9a7b56', '#9a7b5g']) {
+      expect(issuePaths(withLibrary(naturalScan, (library) => void (library['facts']['averageColour'] = colour)))).toEqual([
+        `${AT}.facts.averageColour`,
+      ]);
+    }
+  });
+
+  test('normalStrength is above 0', () => {
+    expect(issuePaths(withLibrary(naturalScan, (library) => void (library['facts']['normalStrength'] = 0)))).toEqual([
+      `${AT}.facts.normalStrength`,
+    ]);
+  });
+
+  test('kind, grain, suitability and colourMode are closed words', () => {
+    expect(issuePaths(withLibrary(naturalScan, (library) => void (library['kind'] = 'procedural')))).toEqual([`${AT}.kind`]);
+    expect(issuePaths(withLibrary(naturalScan, (library) => void (library['facts']['grain'] = 'diagonal')))).toEqual([`${AT}.facts.grain`]);
+    expect(issuePaths(withLibrary(naturalScan, (library) => void (library['facts']['suitability'] = 'tile')))).toEqual([
+      `${AT}.facts.suitability`,
+    ]);
+  });
+});
+
+describe('library member: PBR ranges', () => {
+  const pbrIssues = (field: string, value: unknown): string[] =>
+    issuePaths(withLibrary(naturalScan, (library) => void (library['facts']['pbr'][field] = value)));
+
+  test('every unit-interval field refuses -0.01 and 1.01 and accepts both ends', () => {
+    for (const field of ['roughness', 'metalness', 'opacity', 'sheen', 'clearcoat', 'clearcoatRoughness', 'transmission']) {
+      expect({ field, low: pbrIssues(field, -0.01), high: pbrIssues(field, 1.01) }).toEqual({
+        field,
+        low: [`${AT}.facts.pbr.${field}`],
+        high: [`${AT}.facts.pbr.${field}`],
+      });
+      expect({ field, ends: [...pbrIssues(field, 0), ...pbrIssues(field, 1)] }).toEqual({ field, ends: [] });
+    }
+  });
+
+  test('ior lies in [1, 2.333]', () => {
+    expect(pbrIssues('ior', 0.99)).toEqual([`${AT}.facts.pbr.ior`]);
+    expect(pbrIssues('ior', 2.34)).toEqual([`${AT}.facts.pbr.ior`]);
+    expect([...pbrIssues('ior', 1), ...pbrIssues('ior', 2.333)]).toEqual([]);
+  });
+
+  test('distances and the emissive intensity are not negative', () => {
+    for (const field of ['thicknessM', 'attenuationDistanceM', 'emissiveIntensity']) {
+      expect({ field, issues: pbrIssues(field, -0.01) }).toEqual({ field, issues: [`${AT}.facts.pbr.${field}`] });
+      expect({ field, issues: pbrIssues(field, 0) }).toEqual({ field, issues: [] });
+    }
+  });
+
+  test('NaN and the infinities are refused in every numeric field', () => {
+    for (const value of [Number.NaN, Number.POSITIVE_INFINITY, Number.NEGATIVE_INFINITY]) {
+      expect(pbrIssues('roughness', value)).toEqual([`${AT}.facts.pbr.roughness`]);
+      expect(pbrIssues('emissiveIntensity', value)).toEqual([`${AT}.facts.pbr.emissiveIntensity`]);
+      expect(issuePaths(withLibrary(naturalScan, (library) => void (library['facts']['tileM'] = [value, 1])))).toEqual([
+        `${AT}.facts.tileM.0`,
+      ]);
+    }
+  });
+
+  test('every colour field is #rrggbb', () => {
+    for (const field of ['baseColour', 'sheenColour', 'attenuationColour', 'emissive']) {
+      expect({ field, issues: pbrIssues(field, 'white') }).toEqual({ field, issues: [`${AT}.facts.pbr.${field}`] });
+      expect({ field, issues: pbrIssues(field, '#FFFFFF') }).toEqual({ field, issues: [] });
+    }
+  });
+
+  test('alphaMode is opaque, blend or mask', () => {
+    expect([...pbrIssues('alphaMode', 'mask'), ...pbrIssues('alphaMode', 'blend')]).toEqual([]);
+    expect(pbrIssues('alphaMode', 'cutout')).toEqual([`${AT}.facts.pbr.alphaMode`]);
+  });
+});
+
+describe('library member: colour mode', () => {
+  test('a tintable material without a tint is refused', () => {
+    expect(issuePaths(withLibrary(tintableScan, (library) => void delete library['facts']['tint']))).toEqual([`${AT}.facts.tint`]);
+  });
+
+  test('a natural material with a tint is refused', () => {
+    const tint = { recipe: 'luma-mid@1', suggestedColours: [{ name: 'Mist', hex: '#c9d6df' }] };
+    expect(issuePaths(withLibrary(naturalScan, (library) => void (library['facts']['tint'] = tint)))).toEqual([`${AT}.facts.tint`]);
+  });
+
+  test('a tint suggests at least one colour, each #rrggbb, under the one recipe', () => {
+    expect(issuePaths(withLibrary(tintableScan, (library) => void (library['facts']['tint']['suggestedColours'] = [])))).toEqual([
+      `${AT}.facts.tint.suggestedColours`,
+    ]);
+    expect(
+      issuePaths(withLibrary(tintableScan, (library) => void (library['facts']['tint']['suggestedColours'][0]['hex'] = 'mist'))),
+    ).toEqual([`${AT}.facts.tint.suggestedColours.0.hex`]);
+    expect(issuePaths(withLibrary(tintableScan, (library) => void (library['facts']['tint']['recipe'] = 'luma-mid@2')))).toEqual([
+      `${AT}.facts.tint.recipe`,
+    ]);
+  });
+
+  test('a natural scan ships albedo and no albedoTint', () => {
+    const map = mapOf(LIB.oakVersion, 'albedoTint', 'srgb', ['256', '512']);
+    expect(issuePaths(withLibrary(naturalScan, (library) => void (library['maps']['albedoTint'] = map)))).toEqual([
+      `${AT}.maps.albedoTint`,
+    ]);
+    expect(issuePaths(withLibrary(naturalScan, (library) => void delete library['maps']['albedo']))).toEqual([`${AT}.maps.albedo`]);
+  });
+
+  test('a tintable scan ships albedoTint and no albedo', () => {
+    const map = mapOf(LIB.linenVersion, 'albedo', 'srgb', ['384']);
+    expect(issuePaths(withLibrary(tintableScan, (library) => void (library['maps']['albedo'] = map)))).toEqual([`${AT}.maps.albedo`]);
+    expect(issuePaths(withLibrary(tintableScan, (library) => void delete library['maps']['albedoTint']))).toEqual([
+      `${AT}.maps.albedoTint`,
+    ]);
+  });
+
+  test('a scan has a tile size', () => {
+    expect(issuePaths(withLibrary(naturalScan, (library) => void (library['facts']['tileM'] = null)))).toEqual([`${AT}.facts.tileM`]);
+    expect(issuePaths(withLibrary(naturalScan, (library) => void (library['facts']['tileM'] = [0, 1])))).toEqual([`${AT}.facts.tileM.0`]);
+  });
+});
+
+describe('library member: maps', () => {
+  test('colour roles are srgb and every other role is linear', () => {
+    expect(issuePaths(withLibrary(naturalScan, (library) => void (library['maps']['normal']['colourSpace'] = 'srgb')))).toEqual([
+      `${AT}.maps.normal.colourSpace`,
+    ]);
+    expect(issuePaths(withLibrary(naturalScan, (library) => void (library['maps']['albedo']['colourSpace'] = 'linear')))).toEqual([
+      `${AT}.maps.albedo.colourSpace`,
+    ]);
+  });
+
+  test('convention appears only on normal, and only as opengl', () => {
+    expect(issuePaths(withLibrary(naturalScan, (library) => void (library['maps']['arm']['convention'] = 'opengl')))).toEqual([
+      `${AT}.maps.arm.convention`,
+    ]);
+    expect(issuePaths(withLibrary(naturalScan, (library) => void (library['maps']['normal']['convention'] = 'directx')))).toEqual([
+      `${AT}.maps.normal.convention`,
+    ]);
+    expect(issuePaths(withLibrary(naturalScan, (library) => void delete library['maps']['normal']['convention']))).toEqual([]);
+  });
+
+  test('arm or roughness: never arm beside roughness or ao', () => {
+    const roughness = mapOf(LIB.oakVersion, 'roughness', 'linear', ['256', '512']);
+    const ao = mapOf(LIB.oakVersion, 'ao', 'linear', ['256', '512']);
+    expect(issuePaths(withLibrary(naturalScan, (library) => void (library['maps']['roughness'] = roughness)))).toEqual([
+      `${AT}.maps.roughness`,
+    ]);
+    expect(issuePaths(withLibrary(naturalScan, (library) => void (library['maps']['ao'] = ao)))).toEqual([`${AT}.maps.ao`]);
+  });
+
+  test('ao alone is refused, roughness with ao is accepted, and neither form is accepted too', () => {
+    expect(issuePaths(withLibrary(tintableScan, (library) => void delete library['maps']['roughness']))).toEqual([`${AT}.maps.ao`]);
+    expect(issuePaths(withMaterials(tintableScan()))).toEqual([]);
+    expect(issuePaths(withLibrary(naturalScan, (library) => void delete library['maps']['arm']))).toEqual([]);
+  });
+
+  test('every map of a material lists the same sizes', () => {
+    const armOnly512 = mapOf(LIB.oakVersion, 'arm', 'linear', ['512']);
+    expect(issuePaths(withLibrary(naturalScan, (library) => void (library['maps']['arm'] = armOnly512)))).toEqual([`${AT}.maps.arm.files`]);
+  });
+
+  test('a map lists at least one size, and only 128, 256, 384, 512 or 768', () => {
+    expect(issuePaths(withLibrary(naturalScan, (library) => void (library['maps']['albedo']['files'] = {})))).toContain(
+      `${AT}.maps.albedo.files`,
+    );
+    for (const size of ['128', '384', '768']) {
+      const sizes = (role: string, space: 'srgb' | 'linear') => mapOf(LIB.oakVersion, role, space, [size]);
+      const value = withLibrary(naturalScan, (library) => {
+        library['maps'] = { albedo: sizes('albedo', 'srgb'), arm: sizes('arm', 'linear') };
+      });
+      expect({ size, issues: issuePaths(value) }).toEqual({ size, issues: [] });
+    }
+    expect(
+      issuePaths(
+        withLibrary(naturalScan, (library) => void (library['maps']['albedo']['files']['64'] = tex(LIB.oakVersion, 'albedo', '64'))),
+      ),
+    ).toEqual([`${AT}.maps.albedo.files`]);
+  });
+});
+
+describe('library member: parameters materials', () => {
+  test('a paint ships maps: {} and tileM: null', () => {
+    const map = mapOf(LIB.paintVersion, 'roughness', 'linear', ['256']);
+    expect(issuePaths(withLibrary(paint, (library) => void (library['maps'] = { roughness: map })))).toEqual([`${AT}.maps`]);
+    expect(issuePaths(withLibrary(paint, (library) => void (library['facts']['tileM'] = [1, 1])))).toEqual([`${AT}.facts.tileM`]);
+  });
+
+  test('a paint carries pbr.baseColour', () => {
+    expect(issuePaths(withLibrary(paint, (library) => void delete library['facts']['pbr']['baseColour']))).toEqual([
+      `${AT}.facts.pbr.baseColour`,
+    ]);
+  });
+
+  test('its averageColour equals pbr.baseColour, compared without case', () => {
+    expect(
+      issuePaths(
+        withLibrary(paint, (library) => {
+          library['facts']['pbr']['baseColour'] = '#808080';
+          library['facts']['averageColour'] = '#7f7f7f';
+        }),
+      ),
+    ).toEqual([`${AT}.facts.averageColour`]);
+    expect(issuePaths(withLibrary(paint, (library) => void (library['facts']['averageColour'] = '#806040'.toUpperCase())))).toEqual([]);
+  });
+});
+
+describe('library member: texture file paths', () => {
+  test('a file under another material’s version is refused', () => {
+    const value = withLibrary(
+      naturalScan,
+      (library) => void (library['maps']['albedo']['files']['512'] = tex(LIB.linenVersion, 'albedo', '512')),
+    );
+    expect(issuePaths(value)).toEqual([`${AT}.maps.albedo.files.512`]);
+  });
+
+  test('a file under another role is refused', () => {
+    const value = withLibrary(
+      naturalScan,
+      (library) => void (library['maps']['albedo']['files']['512'] = tex(LIB.oakVersion, 'roughness', '512')),
+    );
+    expect(projectManifestIssues(value).map((issue) => ({ path: issue.path.join('.'), message: issue.message }))).toEqual([
+      { path: `${AT}.maps.albedo.files.512`, message: `must be ${tex(LIB.oakVersion, 'albedo', '512')}` },
+    ]);
+  });
+
+  test('the size key and the file name agree', () => {
+    const value = withLibrary(
+      naturalScan,
+      (library) => void (library['maps']['albedo']['files']['512'] = tex(LIB.oakVersion, 'albedo', '256')),
+    );
+    // The 256 file is also listed under its own key, so the same path is a duplicate as well.
+    expect(issuePaths(value)[0]).toBe(`${AT}.maps.albedo.files.512`);
+  });
+
+  test('ktx2, png and a path with a folder prefix are refused', () => {
+    for (const path of [
+      `tex/${LIB.oakVersion}/albedo.512.ktx2`,
+      `tex/${LIB.oakVersion}/albedo.512.png`,
+      `bake/tex/${LIB.oakVersion}/albedo.512.webp`,
+      `https://cdn.example.com/tex/${LIB.oakVersion}/albedo.512.webp`,
+    ]) {
+      const value = withLibrary(naturalScan, (library) => void (library['maps']['albedo']['files']['512'] = path));
+      expect({ path, issues: issuePaths(value) }).toEqual({ path, issues: [`${AT}.maps.albedo.files.512`] });
+    }
+  });
+});
+
+describe('library member: manifest-wide texture rules', () => {
+  test('a path listed by two materials is refused at its second occurrence', () => {
+    const second = naturalScan();
+    second['id'] = LIB.linenScan;
+    const issues = projectManifestIssues(withMaterials(naturalScan(), second));
+    expect(issues.map((issue) => issue.path.join('.'))).toEqual(
+      ['albedo', 'normal', 'arm'].flatMap((role) => ['256', '512'].map((size) => `library.materials.1.library.maps.${role}.files.${size}`)),
+    );
+    expect(issues[0]!.message).toBe('is listed twice in the manifest');
+  });
+
+  /** `count` scans of one map at one size each, every version its own: `count` listed files. */
+  function scans(count: number): Record<string, unknown>[] {
+    return Array.from({ length: count }, (_, index) => {
+      const suffix = index.toString(16).padStart(12, '0');
+      const version = `01a167ee-503a-7000-8000-${suffix}`;
+      return {
+        id: `01a167ee-503b-7000-8000-${suffix}`,
+        name: `Scan ${index}`,
+        apply: ['floor'],
+        library: {
+          versionId: version,
+          kind: 'scan',
+          facts: { tileM: [1, 1], grain: 'none', suitability: 'continuous', colourMode: 'natural', averageColour: '#808080', pbr: {} },
+          maps: { albedo: mapOf(version, 'albedo', 'srgb', ['256']) },
+        },
+      };
+    });
+  }
+
+  test('512 listed files are accepted', () => {
+    expect(projectManifestIssues(withMaterials(...scans(512)))).toEqual([]);
+  });
+
+  test('513 are refused with an issue that names the limit', () => {
+    const issues = projectManifestIssues(withMaterials(...scans(513)));
+    expect(issues.map((issue) => issue.path.join('.'))).toEqual(['library.materials']);
+    expect(issues[0]!.message).toContain('MAX_PROJECT_TEXTURE_FILES (512)');
+  });
+});
+
+describe('library member: the legacy members are untouched', () => {
+  test('pbr and generator materials still parse beside library ones', () => {
+    const generator = firstMaterial(JSON.parse(JSON.stringify(fixtureManifest())) as Record<string, unknown>);
+    const pbr = { id: FIXTURE_STONE, name: 'Stone', apply: ['floor'], pbr: { albedo: 'tex/stone.ktx2', roughness: 0.6, tile: [1.2, 1.2] } };
+    expect(projectManifestIssues(withMaterials(generator, pbr, naturalScan(), paint()))).toEqual([]);
+  });
+
+  test('a material with two members at once is refused', () => {
+    const both = { ...naturalScan(), generator: { kind: 'painted_plaster', tone: '#f1eee8', seed: 2 } };
+    expect(projectManifestIssues(withMaterials(both))).not.toEqual([]);
+  });
+});
+
+describe('projectLibraryOf marks the library materials', () => {
+  test('a library material carries library: true to the scene layer, a generator one does not', () => {
+    const generator = firstMaterial(JSON.parse(JSON.stringify(fixtureManifest())) as Record<string, unknown>);
+    const manifest = parseProjectManifest(withMaterials(generator, naturalScan(), paint()));
+    expect(projectLibraryOf(manifest).materials).toEqual([
+      { id: FIXTURE.material.oak, apply: ['floor'] },
+      { id: LIB.oakScan, apply: ['floor'], library: true },
+      { id: LIB.paint, apply: ['wall', 'ceiling', 'facade', 'trim'], library: true },
+    ]);
+  });
+});

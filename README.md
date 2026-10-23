@@ -225,7 +225,7 @@ Methods: `play`, `pause`, `toggle`, `stop`, `seek {fraction}`, `seekDistance {me
 
 ## Options
 
-Every option has one name in each of the three spellings. Unknown keys are ignored. An invalid value falls back to the default and is reported once through the [log sink](#logging) with code `option-invalid` and the key. Boolean values accept `0`, `1`, `false`, `true`. Two options exist only in the object spelling: `scene` (a source object, see [scene sources](#scene-sources)) and `onLog` (a function, see [Logging](#logging)). Three ROWS below have no object spelling at all — `chrome`, `overlay` and `unbranded` are query/attribute-only sugar that expands into the other rows (see "Compound attributes" underneath the table); an object caller sets the expanded fields directly, or spreads the exported `OVERLAY_PRESETS['kiosk' | 'embed' | 'unbranded' | 'none']`.
+Every option has one name in each of the three spellings. Unknown keys are ignored. An invalid value falls back to the default and is reported once through the [log sink](#logging) with code `option-invalid` and the key. Boolean values accept `0`, `1`, `false`, `true`. Three options exist only in the object spelling: `scene` (a source object, see [scene sources](#scene-sources)), `onLog` (a function, see [Logging](#logging)) and `resolveTexture` (a function, see [Library materials](#library-materials)); `resolveTexture` is not part of the published viewer options JSON Schema. Three ROWS below have no object spelling at all — `chrome`, `overlay` and `unbranded` are query/attribute-only sugar that expands into the other rows (see "Compound attributes" underneath the table); an object caller sets the expanded fields directly, or spreads the exported `OVERLAY_PRESETS['kiosk' | 'embed' | 'unbranded' | 'none']`.
 
 | Option (object) | Query (`embed.html?…`) | Attribute (`<jeex-viewer>`) | Default | Values / meaning |
 |---|---|---|---|---|
@@ -371,7 +371,7 @@ type SelectionDescription = {
   }>;
   scope?: {                            // finishes only; a variant panel has no narrow/broad pair
     label: string;                     // "Apply to all floors" / "Apply to all walls"
-    ops: { one: SceneOp; all: SceneOp };  // the finish in force, applied narrowly or broadly
+    ops: { one: SceneOp; all?: SceneOp };  // the finish in force, applied narrowly or broadly; `all` is absent when the material cannot dress it
   };
   mirror?: {                           // furniture only: the mirror buttons a host card may draw
     allowed: ('x' | 'y' | 'z')[];      // axes the asset's catalogue facts allow; [] when it allows none
@@ -387,6 +387,8 @@ Mirroring is a handle command next to the move tool: `handle.mirrorAsset(assetId
 A swatch click is `handle`-free: apply `option.op` yourself, through your own document (`edits: 'emit'`/`'off'`) or through `jeex-viewer/ops`. `preview` has three sources and takes the first that answers: the address the CONTENT declares — a variant's `preview` in the loaded project's manifest, which may be an absolute `http(s)` URL such as a catalogue service's public preview, resolved against the manifest folder when it is a relative path; then the viewer's own render, made on demand at the moment of the call (furniture variants with the viewer's renderer, finishes and openings as canvas swatches); then the variant's palette as an SVG data URL when nothing can be drawn (no WebGL, a lost context). So it is never empty and never carries text. A picture served from another origin can fail — the viewer's own panel replaces a failed one with the flat palette chip, and a host card should do the same (`onerror`).
 
 `access` and `allowed` are the content's words, carried and never judged: the viewer puts no badge on a swatch, refuses no click and asks no question — a `pro` option is listed like any other, with its own `op`. What such an option does on click is the host's decision, and a host that ignores both fields gets the same behaviour as for any other option. They are present only where the loaded project's manifest names them; the viewer's own bundled catalogue is silent about both. `title` and `label` follow [`setLocale`](#languages). It is a HANDLE capability: with the [custom element](#2-custom-element) reach it through `document.querySelector('jeex-viewer').viewer?.describeSelection(...)`. The [iframe protocol](#3-iframe-with-postmessage) does not carry it — `METHOD_LIST` and `PROTOCOL_VERSION` are unchanged — because a description holds rendered images, and a host across a frame boundary draws its own chrome around the frame rather than inside it.
+
+In a loaded project, a finish selection lists the project's [library materials](#library-materials) first, in manifest order, then the bundled finishes of that surface: those whose `apply` names `floor` for a floor, `wall` for a room's wall, `facade` for a face no room owns. A library option carries the explicit `set_material` (`{ surface, room? | face?, material }`) for the picked room or face, and so do its scope actions; an action whose surface the material's `apply` does not name is left out — a facade-only paint offers its facade face but no "apply to all walls". `current` is the material UUID in force, whether the surface wears it bare or as a finish object. A library option's picture is the manifest's `preview` when it names one, else a flat chip in its `averageColour` (the first suggested colour for a tintable material); no texture is drawn for it. The built-in panel offers exactly the same list.
 
 `project()` answers with the baked manifest the viewer validated and the absolute URL of the folder it came from, or `null` when the scene was a bare document. It is per instance — two viewers on one page keep their catalogues, their finishes and their manifests to themselves. See [Project format](#project-format).
 
@@ -722,11 +724,11 @@ The repository ships no server, so the header is a deployment fact, not a runtim
 
 ## Scene document
 
-Schema `2.3` or `2.2`: a `2.0` or `2.1` document is refused, never converted (2.1 added a placement's `mirror` and made `scale` positive; 2.2 split a placement's catalogue reference into the fields `asset` and `library`, so the earlier `library:asset` string means nothing to this build and its producer rewrites it). 2.3 adds the optional `site`; a 2.2 document reads exactly as before and may not carry `site`. The full shape is the published JSON Schema (`dist-lib/schema/scene.schema.json`, written by `bun run build:lib`, imported as `jeex-viewer/schema/scene.json`, see below); the rules it cannot express are listed under it. Minimal shape:
+Schemas `2.2` and `2.3`: a `2.0` or `2.1` document is refused, never converted (2.1 added a placement's `mirror` and made `scale` positive; 2.2 split a placement's catalogue reference into the fields `asset` and `library`, so the earlier `library:asset` string means nothing to this build and its producer rewrites it). 2.3 adds the optional `site` and the library finishes (a finish object, a room's `ceiling` and `trim`, see [Scene finishes](#scene-finishes)); a 2.2 document may carry none of them (`site-invalid`, `finish-needs-schema-2-3`), and every other 2.2 document reads and draws as before. The full shape is the published JSON Schema (`dist-lib/schema/scene.schema.json`, written by `bun run build:lib`, imported as `jeex-viewer/schema/scene.json`, see below); the rules it cannot express are listed under it. Minimal shape:
 
 ```ts
 type SceneData = {
-  schemaVersion: '2.3' | '2.2';
+  schemaVersion: '2.2' | '2.3';
   id: string;                          // every id in the document is a UUID v7
   name: string;                        // shown as the brand context line
   ceilingHeight: number;               // metres
@@ -745,9 +747,9 @@ type SceneData = {
   site?: { northDeg?: number; sun?: 'morning' | 'noon' | 'evening' };   // schema 2.3: orientation and sun preset
   autotour: { speed?: number; path: Vec3[]; gaze: TourGazeKey[]; zones?: TourSpeedZone[] };
   finishes?: {                         // painted state; what the viewer exports
-    rooms?: Record<string, { floor?: string; walls?: string }>;   // keyed by room UUID
-    faces?: { room?: string; wallId: string; side: 'L' | 'R'; finish: string }[];   // `room` omitted on the facade
-    facade?: string;
+    rooms?: Record<string, { floor?: FinishRef; walls?: FinishRef; ceiling?: FinishRef; trim?: FinishRef }>;   // keyed by room UUID
+    faces?: { room?: string; wallId: string; side: 'L' | 'R'; finish: FinishRef }[];   // `room` omitted on the facade
+    facade?: FinishRef;
   };
   tourCheckpoints?: { id: string; position: Vec3; yaw: number; pitch: number; name?: string }[];
   interiors?: InteriorPreset[];        // preset selector appears only when present
@@ -770,6 +772,22 @@ Rules the validator enforces:
 - `site` (schema 2.3 only) ties the sun to the plan. `northDeg` is the world azimuth of true north, in degrees clockwise seen from above, from `+Z` towards `+X`, read modulo 360 (absent: 0); `sun` is a preset (absent: `noon`). The presets are artistic, northern hemisphere, not astronomical: `morning` shines from 90° (east of north) at 20° elevation, `noon` from 180° at 55°, `evening` from 270° at 20°. The sun's world azimuth is `northDeg + preset azimuth`. A document without `site` keeps the sun of earlier versions. `site` is a strict object: any other key (`north_deg`), a `northDeg` that is not a finite number or another `sun` is refused as `site-invalid` naming the field, and so is `site` in a 2.2 document.
 - An interior preset dresses what exists: it may not carry an operation that creates an entity (`add_node`, `add_wall`, `split_wall`, `add_room`, `add_opening`, `place_object`).
 
+### Scene finishes
+
+Every place a finish stands — `rooms[].floor`, `.walls`, `.ceiling`, `.trim`, `facade` and `faces[].finish` — takes a finish value:
+
+```ts
+type FinishRef =
+  | string                                                    // a bare finish UUID: bundled, or any project material
+  | { material: string; colour?: string; rotation?: number }; // schema 2.3: a project LIBRARY material with modifiers
+```
+
+- The object is strict: `material` is a UUID v7, `colour` is `#rrggbb` (sRGB, read by a tintable material only), `rotation` a finite number of degrees, counter-clockwise from the automatic grain orientation. It carries at least one of the two modifiers; `{ material }` alone is refused («use the bare UUID»), so every finish has one spelling.
+- An object names only a project material of the `library` member whose `apply` contains the surface of its place (`floor`, `wall` for room walls and room faces, `ceiling`, `trim`, `facade` for the facade and its faces). A bundled finish and a `pbr` or `generator` project material are referenced by bare UUID only (`finish-modifiers-need-library`).
+- A bare UUID keeps the 2.2 rule, extended to the new places: a bundled floor finish dresses floors; a bundled wall finish walls, faces, the facade, ceilings and trim; a project material every surface word of its `apply`, and one with `wall` also the facade.
+- A wall face resolves from its `faces` entry, then its owner (`rooms[].walls` or `facade`), then the default wall finish; a floor from `rooms[].floor`, then `Room.floorMaterial`; a ceiling and trim from their room entry, then the bundled white plaster and the default trim colour.
+- The value is carried whole through validation, a wall split, interior presets, export and repaint; the viewer never rewrites one spelling into the other.
+
 The demo document `src/demo/scene-data.ts` (an invented two-bedroom flat with a study: nine rooms, a curved bay and a loggia, furnished throughout) exercises every feature and is the reference for authoring.
 
 A JSON Schema (draft 2020-12) is generated from this same `SceneData` type — no second, hand-written source of truth — and published alongside the package, next to one for the viewer options (`bun run build:lib` writes both to `dist-lib/schema/`):
@@ -790,6 +808,7 @@ project.json                       the manifest: scene, library, materials, righ
 scene.json                         the scene document (schema 2.2)
 obj/<versionId>.glb                one file per placed variant version
 tex/<material>_<map>.ktx2          pbr materials only
+tex/<versionId>/<role>.<px>.webp   library materials: one file per map role and size
 prev/<id>.webp                     variant and finish previews
 poster.webp                        a still for cards and OpenGraph
 video/<preset>.mp4                 optional
@@ -859,7 +878,34 @@ type ProjectMaterial = {
 } & (
   | { pbr: { albedo: string; normal?: string; roughness: number; metalness?: number; tile: [number, number] } }
   | { generator: FinishGenerator; tile?: number }   // one of eleven named parametric textures
+  | { library: LibraryMaterial }                    // a scanned texture set or a parameter-only material
 );
+// FinishApply: 'floor' | 'wall' | 'ceiling' | 'facade' | 'trim' | 'furniture' | 'fabric' | 'metal' | 'glass' | 'decor'
+
+type LibraryMaterial = {
+  versionId: string;                 // UUID v7 of the catalogue version; the folder of its maps
+  kind: 'scan' | 'parameters';
+  facts: {
+    tileM: [number, number] | null;  // metres per repeat, both above 0; null exactly for `parameters`
+    grain: 'along_u' | 'along_v' | 'none' | 'unknown';
+    suitability: 'plank_floor' | 'board' | 'continuous';
+    normalStrength?: number;         // above 0
+    colourMode: 'natural' | 'tintable';
+    tint?: { recipe: 'luma-mid@1'; suggestedColours: { name: string; hex: string }[] };  // exactly when tintable, at least one colour
+    averageColour: string;           // #rrggbb
+    pbr: {                           // every field optional; colours #rrggbb
+      baseColour?: string; roughness?: number; metalness?: number; alphaMode?: 'opaque' | 'blend' | 'mask'; opacity?: number;
+      sheen?: number; sheenColour?: string; clearcoat?: number; clearcoatRoughness?: number; transmission?: number;
+      ior?: number; thicknessM?: number; attenuationDistanceM?: number; attenuationColour?: string;
+      emissive?: string; emissiveIntensity?: number;
+    };
+  };
+  maps: Partial<Record<'albedo' | 'albedoTint' | 'normal' | 'roughness' | 'ao' | 'arm', {
+    colourSpace: 'srgb' | 'linear';
+    convention?: 'opengl';           // on `normal` only
+    files: Partial<Record<'128' | '256' | '384' | '512' | '768', string>>;   // `tex/<versionId>/<role>.<px>.webp`
+  }>>;
+};
 
 type ProjectRights = {
   workspaceId: string;               // UUID v7
@@ -875,6 +921,16 @@ type ProjectRights = {
 Pricing and access are metadata supplied by whoever produced the bake. The player checks their shape (an unknown key or value is a `project-invalid` refusal like any other), copies a variant's `pricing.model` onto its placed object's `userData.pricing`, carries `access` and `allowed` into [`describeSelection`](#viewer-handle-api) and hands the whole manifest, `rights` included, to the host through `project()`. It shows no price, badge or lock and refuses no variant because of them.
 
 A material is either `pbr` (KTX2 maps inside the folder) or `generator` — a named parametric texture the viewer draws itself: `planks`, `chevron`, `terrazzo`, `tiles`, `plaster`, `stripes`, `wood_grain`, `fabric_weave`, `painted_plaster`, `plank_floor`, `tile_grid`. A generator this build does not know gives a flat material in the entry's own `tone` and a warning, never a refusal.
+
+A `library` material is the shape a catalogue bake writes for a scanned texture set (`scan`) or a parameter-only material such as a paint (`parameters`). Every object in it is strict, nothing is defaulted while reading (metalness 0, roughness 1, alpha `opaque` and normal strength 1 apply when drawing), and these rules are checked with the rest of the manifest:
+
+- Ranges: roughness, metalness, opacity, sheen, clearcoat, clearcoat roughness and transmission in [0, 1]; `ior` in [1, 2.333]; `thicknessM`, `attenuationDistanceM` and `emissiveIntensity` at least 0; every number finite.
+- A `natural` scan ships `albedo` and no `albedoTint`, a `tintable` one `albedoTint` and no `albedo`; `normal` is optional; a scan has a `tileM`.
+- Surface maps are either `arm` or `roughness` (with `ao` optional), never `arm` beside `roughness` or `ao`; `ao` alone is refused.
+- `albedo` and `albedoTint` are `srgb`, every other role `linear`; `convention` appears only on `normal`.
+- Every map of one material lists the same sizes, at least one, from 128, 256, 384, 512 and 768; each file is exactly `tex/<versionId>/<role>.<px>.webp` with the material's own version, the map's role and the size it is listed under.
+- A `parameters` material has `maps: {}`, `tileM: null` and a `pbr.baseColour`, and its `averageColour` equals that base colour (compared without case).
+- No texture path appears twice in a manifest, and a manifest lists at most 512 texture files (`MAX_PROJECT_TEXTURE_FILES`), every role and size counted.
 
 ### Loading a project
 
@@ -909,6 +965,26 @@ type ProjectInfo = { manifest: BakedProjectManifest; baseUrl: string };
 handle.project(): ProjectInfo | null;   // null for a bare scene
 ```
 
+### Library materials
+
+A `library` material ([its shape](#project-format)) dresses room floors, walls, ceilings, facades and baseboards with a scanned texture set or a parameter-only material, drawn from the bake's own folder: `tex/<versionId>/<role>.<px>.webp`, one file per map role and listed size.
+
+- **First frame.** Every library surface is drawn flat at once, with no network in the first frame: `averageColour` for a natural material, `averageColour` times the tint in linear light for a tintable scan, the tint itself for a tintable paint. The maps are fetched afterwards, and a surface takes them as they arrive. A tintable material is tinted with its finish value's `colour`, else its first suggested colour; a natural one ignores `colour`.
+- **Size by device.** One size per map per document, by the WebGL context's capability class (whether or not telemetry is on): 256 px on a low device, 512 on a mid one, 768 on a high one, or the nearest size the material lists (the smaller on a tie). Without a WebGL context nothing is fetched.
+- **Drawing.** Repeating, mipmapped, trilinear, anisotropy up to 8; colour maps in sRGB, the others as data; one ARM image for ambient occlusion, roughness and metalness; OpenGL normals scaled by `normalStrength`; metres divided by `tileM`, turned by the floor grain (a plank scan follows the room's longest edge) plus the finish value's `rotation`. glTF's defaults apply when drawing: metalness 0, roughness 1, opaque, mask cutoff 0.5; a physical field (sheen, clearcoat, transmission, `ior`, thickness, attenuation) selects three's physical material.
+- **Live resolver.** A host that serves its maps itself (an editor signing short-lived URLs, or previewing local files) passes `resolveTexture(path) => url | Promise<url>`: it is called with the logical path, lazily, once per size actually loaded, and must answer an absolute `http(s)` or a `blob:` URL; anything else, a throw or a rejection leaves that surface flat with a `texture-location` warning. Without it every path resolves against the manifest folder. The resolver is a function, so only a host that calls `mountViewer(options)` can pass it: the `<jeex-viewer>` element and the iframe embed have no spelling for it.
+- **Shared and released.** Every surface that draws one map shares one decoded image; repainting a surface releases its maps through the document's texture source and never an image another surface still draws. The encoded bytes are kept for the document, so a lost and restored rendering context draws the maps again without fetching them; unmounting releases everything.
+
+The three texture limits, exported by name from `src/shared/limits.ts`:
+
+| Constant | Value | Enforced |
+|---|---|---|
+| `MAX_PROJECT_TEXTURE_FILES` | 512 | at validation: a manifest listing more texture files is refused (`project-invalid`) |
+| `MAX_TEXTURE_FILE_BYTES` | 2 MiB | at fetch: a file is cancelled once the bytes read pass it, whatever `Content-Length` says (`texture-too-large`) |
+| `MAX_PROJECT_TEXTURE_BYTES` | 48 MiB | at fetch: the bytes a document has read; the fetch that reaches it is cancelled with the active and queued ones, and the remaining surfaces stay flat (`texture-budget`) |
+
+Each texture job also has `TEXTURE_FETCH_DEADLINE_MS` (30 s) from the moment its URL is asked for to its last byte (`texture-deadline`), and four run at once.
+
 ### Limits
 
 Part of the contract, enforced while reading (`src/shared/limits.ts`):
@@ -920,6 +996,7 @@ Part of the contract, enforced while reading (`src/shared/limits.ts`):
 | one GLB | 16 MB |
 | one project in total | 96 MB, after which the loader stops and reports `project-budget` |
 | models in flight | 4 |
+| texture files listed in one manifest | 512 (`MAX_PROJECT_TEXTURE_FILES`), refused as `project-invalid` |
 
 The manifest and the scene are fetched with `redirect: 'error'` and a `Content-Type` that must include `application/json`; the project's own files (the scene and the GLBs) go out with `credentials: 'omit'`, so a cross-origin bake needs CORS and never carries the viewer's cookies. The very first request, which cannot yet know it is reading a manifest, omits them too.
 
@@ -929,18 +1006,20 @@ Before any of that, the container's own structure is checked against glTF 2.0: t
 
 ### Log codes
 
-None of these is a failure; all four arrive through `onLog` (see [Logging](#logging)):
+None of these is a failure; all of them arrive through `onLog` (see [Logging](#logging)):
 
 | Code | Meaning |
 |---|---|
 | `asset-defect` | A GLB out of the bake breaks a convention — bounding box off `dims` by more than 2 %, an unbound material slot, a pivot off the floor, a camera or a light inside the model. It is drawn anyway |
 | `project-budget` | The 96 MB total was reached; the remaining models are not downloaded |
 | `pbr-textures-deferred` | A `pbr` material was accepted and drawn flat (its `roughness` and `metalness`, the neutral fallback colour): KTX2 texture loading is not in this version |
+| `texture-location`, `texture-fetch`, `texture-decode`, `texture-size-mismatch` | A library map could not be located, fetched or decoded, or its pixel size is not its listed size; that surface keeps its flat colour |
+| `texture-too-large`, `texture-budget`, `texture-deadline` | A library map hit one of the [texture limits](#library-materials); the surfaces still waiting keep their flat colours |
 | `unknown-generator:<kind>` | A material named a parametric texture this build does not have; it is drawn flat in the entry's own `tone` |
 
 ## Scene operations entry (`jeex-viewer/ops`)
 
-`jeex-viewer/ops` (`dist-lib/jeex-viewer-ops.js`, ≤ 72.6 KB gzip — its own budget, kept out of the 700 KB viewer boot sum: editing a document is an authoring action, not part of opening a tour) is the entry for a caller that edits a scene document WITHOUT mounting a viewer — for example a server-side editor process applying a batch of operations to a document it stores. It carries no `three` and no DOM:
+`jeex-viewer/ops` (`dist-lib/jeex-viewer-ops.js`, ≤ 78.8 KB gzip — its own budget, kept out of the 700 KB viewer boot sum: editing a document is an authoring action, not part of opening a tour) is the entry for a caller that edits a scene document WITHOUT mounting a viewer — for example a server-side editor process applying a batch of operations to a document it stores. It carries no `three` and no DOM:
 
 ```ts
 import { CATALOGUE_REGISTRIES, SceneModel, isApplyOk, lintLayout, parseSceneDocument, parseSceneOps } from 'jeex-viewer/ops';
@@ -971,7 +1050,7 @@ The full export list:
 | `add_room` | Adds room `id` at an anchor inside a free face of the graph; starts on `registries.defaultFloorFinish` when given no `floorMaterial`. |
 | `set_room` | Changes a room's `name`, `kind`, `anchor` or `accent`; a name is non-empty and at most `ROOM_NAME_MAX` characters. |
 | `remove_room` | Removes a room, unbinds its furniture, drops its camera and its finishes, all in `touched`. |
-| `set_material` | Paints a finish onto one room (its UUID), one face (`{ room?, wallId, side }`), every floor, every wall or the facade (the words `floors`, `walls`, `facade`). |
+| `set_material` | Paints a finish. Explicit form `{ surface, room?, face?, material, colour?, rotation? }` (see below), or the legacy form `{ target, material, scope? }`: one room (its UUID, the surface inferred from the finish), one face (`{ room?, wallId, side }`), every floor, every wall or the facade (the words `floors`, `walls`, `facade`). |
 | `place_object` | Puts catalogue object `id` down — `asset` is a bare archetype or variant UUID, the optional `library` the UUID of its library (absent: the document's `assetLibrary`, then the built-in bank), written into the placement as given — with an optional variant, room, yaw and finishes; a floor-standing object's `y` is pinned to 0. |
 | `move_object` | Moves a placement (`position` or `dposition`) and binds or unbinds it from a room (`room: null`). |
 | `rotate_object` | Turns a placement (`rotationY` or `drotation`), normalised into (−π, π]. |
@@ -983,6 +1062,18 @@ The full export list:
 | `set_navigation` | Replaces the walk-mode waypoints wholesale. |
 | `set_autotour` | Updates the tour's `path`, `gaze`, `zones` and `speed` (clamped into `TOUR_SPEED`); every `at` has to index the effective path. |
 | `set_tour_checkpoints` | Replaces the tour cameras wholesale, in tour order (each `{ id, position, yaw, pitch, name? }`, ids from the caller); an empty list falls back to the authored `autotour`. |
+
+`set_material` has two forms, told apart by their key; an operation carrying both `surface` and `target` is refused.
+
+- **Explicit** `{ op: 'set_material', surface, room?, face?, material, colour?, rotation? }` names the surface (`floor`, `wall`, `ceiling`, `trim` or `facade`), so nothing is inferred. The material must dress that surface by the strict surface table (a project material's `apply` must contain the word; there is no facade allowance for a wall material here). `colour` and `rotation` are allowed only with a project `library` material; without them the bare UUID is written, with them the finish object. Writing a finish object, a ceiling or a trim into a `2.2` document is refused (an operation never changes a document's version). It touches `{ kind: 'floor' | 'walls' | 'ceiling' | 'trim', room }`, `{ kind: 'face', face }` or `{ kind: 'facade' }`.
+
+  | `surface` | with `room` | with `face` | with neither |
+  |---|---|---|---|
+  | `floor`, `ceiling`, `trim` | that room's | refused | every room's |
+  | `wall` | that room's walls; its face overrides are dropped | that room-owned face | every room's walls; every room face override is dropped |
+  | `facade` | refused | that face no room owns | the facade; its face overrides are dropped |
+
+- **Legacy** `{ op: 'set_material', target, material, scope? }` keeps its behaviour and is the only form that infers the surface: for a room target, a finish that dresses floors paints the floor, else the room's walls; the facade alias and a facade face also take a finish that dresses walls.
 
 The creating operations (`add_node`, `add_wall`, `add_room`, `add_opening`, `place_object`, and `split_wall` with its `nodeId` and two `ids`) take the new entity's UUID v7 from the caller — the viewer mints none, so a replayed journal is byte-identical. A missing or malformed id refuses with `OpError` `detail.reason: 'invalid_id'`, an id the document already carries with `'duplicate_id'`.
 
@@ -997,7 +1088,7 @@ Every operation is atomic inside its batch: `applyOp` mutates a draft and answer
 - **Interior presets** — `applyPresetBatch`, `findPreset`, `standardPreset`, `presetCoverage`, `presetBatchOps` (types `PresetModel`, `PresetCoverage`).
 - **The `zod/mini` shape check** — `sceneSchema`, `sceneOpSchema`, `isSceneShape`, `sceneShapeIssues`, so a caller can shape-check a document before handing it to `validateScene`.
 - **The closed sets** — `OPENING_TYPES`, `ROOM_KINDS`, `WALL_ROLES`.
-- **Identifiers** — `UUID_V7_PATTERN` and `isUuidV7` (the validator's own check; the entry exports no generator), `faceKey`, `sameFace`, `isFaceKey` (types `FaceKey`, `FaceFinish`, `SetMaterialAlias`, `TopologyRemap`, `TopologyRemapEntry`, and `NewIdRefusal`: the `OpError.detail.reason` a creating op refuses an id with, `invalid_id` or `duplicate_id`), and `CATALOGUE_ID_BY_SLUG` (types `CatalogueIdBySlug`, `CatalogueSlugTable`), the shipped catalogue's readable slug → UUID table.
+- **Identifiers** — `UUID_V7_PATTERN` and `isUuidV7` (the validator's own check; the entry exports no generator), `faceKey`, `sameFace`, `isFaceKey` (types `FaceKey`, `FaceFinish`, `FinishRef`, `SetMaterialAlias`, `SetMaterialSurfaceOp`, `TopologyRemap`, `TopologyRemapEntry`, and `NewIdRefusal`: the `OpError.detail.reason` a creating op refuses an id with, `invalid_id` or `duplicate_id`), and `CATALOGUE_ID_BY_SLUG` (types `CatalogueIdBySlug`, `CatalogueSlugTable`), the shipped catalogue's readable slug → UUID table.
 
 A name not on this list is not public, whatever module it lives in — the same façade rule every other library entry follows (`src/embed/ops.test.ts` pins the export surface, sorted, against exactly this list). Nothing above renders anything or touches a document: `src/purity.test.ts` and `.dependency-cruiser.cjs` hold `embed/ops.ts` to the same "no `three`, no DOM" invariant as the rest of the pure layer.
 

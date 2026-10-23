@@ -52,6 +52,8 @@ export const COMPONENT_FILE_COST_S: Readonly<Record<string, number>> = {
   'gltf-body.test.ts': 1,
   'gltf-furniture.test.ts': 1,
   'host-slots.test.ts': 33,
+  'library-material.test.ts': 2,
+  'library-panel.test.ts': 4,
   'lighting-calibration.test.ts': 1,
   'minimap.test.ts': 1,
   'panorama.test.ts': 1,

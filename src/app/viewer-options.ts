@@ -216,6 +216,15 @@ export type ViewerOptions = {
    */
   onLog?: LogSink | undefined;
   /**
+   * Turns a library material's logical texture path (`tex/<versionId>/<role>.<px>.webp`)
+   * into the URL to fetch, for a host that serves its maps itself (signed or
+   * `blob:` URLs); called lazily, once per size loaded, and answering an
+   * absolute `http(s)` or `blob:` URL, else that surface stays flat. Absent:
+   * paths resolve against the manifest folder. A HOST OBJECT like `onLog`, and
+   * not part of the published viewer options JSON Schema.
+   */
+  resolveTexture?: ((path: string) => string | Promise<string>) | undefined;
+  /**
    * Anonymous player telemetry (`TELEMETRY.md`). It FAILS CLOSED: only an
    * absent `mode` or exactly `'on'` sends; `'off'` and every other value
    * (`false`, `null`, `'OFF'`, `'none'`, an empty attribute) send nothing at
@@ -295,7 +304,7 @@ export const DEFAULT_VIEWER_OPTIONS: ViewerOptions = {
  * copied through verbatim; `resolveSceneSource` and the mount are what decide
  * whether what arrived is usable.
  */
-const OPAQUE_PATHS: readonly string[] = ['scene.document', 'scene.repository', 'scene.library', 'onLog'];
+const OPAQUE_PATHS: readonly string[] = ['scene.document', 'scene.repository', 'scene.library', 'onLog', 'resolveTexture'];
 
 // Each closed set is proved complete against its union (`closedSet`, `option-sets.ts`).
 const TOUR_MODES = closedSet<TourStartMode>()(['play', 'paused', 'off']);

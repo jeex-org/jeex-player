@@ -11,8 +11,9 @@
  * needs the shell, the options and the committed document to still be there, so
  * a lost context raises a card over a live viewer and nothing is released. Every
  * GPU resource went with the context, though, so the restore re-mounts the
- * committed `SceneModel` from scratch — which is also what re-seeds the stage,
- * the doors and the debug API (`SceneMount.mount` → `onDocument`).
+ * committed `SceneModel` from scratch, with everything it was mounted with
+ * (`SceneMount.remount`) — which is also what re-seeds the stage, the doors
+ * and the debug API (`SceneMount.mount` → `onDocument`).
  */
 
 import type { Messages } from '../ui/messages.js';
@@ -57,7 +58,10 @@ export function contextRecovery(deps: ContextRecoveryDeps): { onLost: () => void
       const mount = deps.mount();
       const model = mount.model;
       if (deps.released() || !model) return;
-      mount.mount(model);
+      // With the document's own options, variants and library key: a bare
+      // `mount(model)` here once dropped a project's resolver, materials and
+      // catalogue and drew it from the shipped bank.
+      mount.remount();
       deps.ui().showViewer();
       deps.syncMinimap();
       deps.announceReady(model);

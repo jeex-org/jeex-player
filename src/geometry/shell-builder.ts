@@ -38,12 +38,12 @@ import { jointCores } from '../plan/plan-joints.js';
 import type { FaceOpening, FaceQuad } from '../plan/plan-openings.js';
 import { EPS, add, dist, leftN, norm, sub } from '../plan/plan-geometry.js';
 import { clamp } from '../shared/math.js';
-import { DEFAULT_WALL_FINISH, floorFinishOf } from '../scene/scene-ops.js';
+import { DEFAULT_WALL_FINISH } from '../scene/scene-ops.js';
 import { ShellPaint } from './shell-paint.js';
 import { resolveFinish } from '../materials/material-catalogue.js';
 import { FINISH } from '../materials/finish-ids.js';
 import { effectiveRoom, isDoorLike, type Vec2 } from '../scene/types.js';
-import { placeFaceLocal, quadPrism } from './builder-uv.js';
+import { boardUV, placeFaceLocal, quadPrism, type BoardFrame } from './builder-uv.js';
 
 /** Face slab depth as a fraction of the wall thickness (1 % overlap on the centreline). */
 const FACE_DEPTH_RATIO = 0.51;
@@ -169,11 +169,15 @@ export class ShellBuilder {
   dispose(): void {
     const materials = new Set<THREE.Material>(this.ownedMaterials);
     this.paint.collectMaterials(materials);
+    // Library surfaces give their maps back to the texture source and free
+    // their own materials; the pass below must not dispose a shared map.
+    const released = this.paint.releaseLibrary();
+    for (const material of released) materials.delete(material);
     this.builtRoot?.traverse((object) => {
       if (!(object instanceof THREE.Mesh)) return;
       object.geometry.dispose();
       for (const material of Array.isArray(object.material) ? object.material : [object.material]) {
-        materials.add(material);
+        if (!released.has(material)) materials.add(material);
       }
     });
     for (const material of materials) disposeMaterial(material);
@@ -210,31 +214,35 @@ export class ShellBuilder {
     for (const roomFace of this.ctx.plan.rooms) {
       const room = this.ctx.roomsById.get(roomFace.roomId);
       if (!room) continue;
-      const finish = this.ctx.findFinish(floorFinishOf(this.ctx.scene, room.id) ?? room.floorMaterial) ?? this.ctx.findFinish('oak');
       // Notched through the doorways (`floor-outline.ts`), so no strip of site
       // slab shows under a door and the two floors meet on the centreline.
       const outline = floorOutline(this.ctx.plan, this.ctx.scene, room.id);
-      const geometry = finish ? this.slabGeometry(outline, 0, FLOOR_SLAB) : null;
-      if (!finish || !geometry) continue;
-      const floor = new THREE.Mesh(geometry, this.paint.floorMaterialFor(finish));
+      const geometry = this.slabGeometry(outline, 0, FLOOR_SLAB);
+      const material = geometry ? this.paint.floorMaterialForRoom(room.id, outline) : null;
+      if (!geometry || !material) {
+        geometry?.dispose();
+        continue;
+      }
+      const floor = new THREE.Mesh(geometry, material);
       floor.name = `floor-${room.id}`;
       floor.userData['roomId'] = room.id;
       floor.userData['surface'] = 'floor';
       floor.userData['navigable'] = true;
       floor.receiveShadow = true;
       root.add(floor);
-      this.paint.registerFloor(room.id, floor);
+      this.paint.registerFloor(room.id, floor, outline);
     }
   }
 
   private buildCeilings(root: THREE.Group): void {
-    const material = this.ceilingMaterial;
     for (const roomFace of this.ctx.plan.rooms) {
       const room = this.ctx.roomsById.get(roomFace.roomId);
       if (!room || effectiveRoom(room).kind === 'loggia') continue;
       const geometry = this.polygonCap(roomFace.polygon, this.ctx.scene.ceilingHeight, false);
       if (!geometry) continue;
-      const ceiling = new THREE.Mesh(geometry, material);
+      // A room that names a ceiling finish gets its own material; every other one shares the plaster.
+      const ceiling = new THREE.Mesh(geometry, this.paint.ceilingMaterialFor(room.id) ?? this.ceilingMaterial);
+      this.paint.registerCeiling(room.id, ceiling, this.ceilingMaterial);
       ceiling.name = `ceiling-${room.id}`;
       ceiling.visible = false;
       ceiling.userData['isCeiling'] = true;
@@ -523,7 +531,8 @@ export class ShellBuilder {
   private buildSkirting(root: THREE.Group, face: WallFace): void {
     if (face.roomId === null) return;
     const segments = faceSegments(face);
-    const trim = this.trimMaterial;
+    // A room that names a trim finish gets its own baseboard material; every other one shares the default.
+    const trim = this.paint.trimMaterialFor(face.roomId) ?? this.trimMaterial;
     const parts: THREE.BufferGeometry[] = [];
     for (const [from, to] of this.skirtingSpans(face)) {
       for (const segment of segments) {
@@ -537,6 +546,7 @@ export class ShellBuilder {
           segment.normal,
         );
         const box = new THREE.BoxGeometry(b - a, SKIRTING_HEIGHT, SKIRTING_DEPTH);
+        metreBoardUVs(box, { centreU: face.t0 + (a + b) / 2, height: SKIRTING_HEIGHT, depth: SKIRTING_DEPTH });
         // rotation.y = t maps local +X to (cos t, 0, -sin t) and local +Z to the
         // face normal, so the board stands in front of the wall.
         const matrix = new THREE.Matrix4().makeRotationY(Math.atan2(-segment.tangent.z, segment.tangent.x));
@@ -557,6 +567,7 @@ export class ShellBuilder {
     board.castShadow = false;
     board.receiveShadow = true;
     root.add(board);
+    this.paint.registerTrim(face.roomId, board, this.trimMaterial);
   }
 
   /** `[from, to]` runs of the face that carry a baseboard (doorways removed). */
@@ -571,6 +582,26 @@ export class ShellBuilder {
     if (face.length - cursor > EPS) spans.push([cursor, face.length]);
     return spans;
   }
+}
+
+/**
+ * Replaces a baseboard box's normalised UVs with metre ones (`boardUV`), in
+ * the box's own frame before it is placed, so a trim material tiles at its
+ * `tileM` like every other room surface.
+ */
+function metreBoardUVs(box: THREE.BoxGeometry, frame: BoardFrame): void {
+  const position = box.getAttribute('position');
+  const normal = box.getAttribute('normal');
+  const uv = box.getAttribute('uv');
+  for (let index = 0; index < uv.count; index += 1) {
+    const [u, v] = boardUV(
+      { x: position.getX(index), y: position.getY(index), z: position.getZ(index) },
+      { x: normal.getX(index), y: normal.getY(index), z: normal.getZ(index) },
+      frame,
+    );
+    uv.setXY(index, u, v);
+  }
+  uv.needsUpdate = true;
 }
 
 /** Frees a material and the colour map cloned for it; shared bump clones stay. */

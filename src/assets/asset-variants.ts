@@ -15,6 +15,7 @@ import { findCatalogueEntry } from './asset-catalogue.js';
 import type { CatalogueLookup, CatalogueMatch, ResolvableObject, ResolvableVariant } from './asset-resolver.js';
 import type { VariantAccess } from './asset-types.js';
 import { finishColour } from '../materials/asset-finish-catalogue.js';
+import type { ProjectMaterial } from '../materials/finish-types.js';
 
 export type AssetVariant = {
   id: string;
@@ -63,6 +64,8 @@ export type AssetVariant = {
 export type VariantBank = {
   readonly catalogue: CatalogueLookup;
   readonly previewUrl?: ((asset: { readonly preview?: string | undefined }) => string | undefined) | undefined;
+  /** The project's own materials, in manifest order: its library materials are offered first on a room surface. */
+  readonly materials?: readonly ProjectMaterial[] | undefined;
 };
 
 function project(object: ResolvableObject, variant: ResolvableVariant, bank?: VariantBank): AssetVariant {
