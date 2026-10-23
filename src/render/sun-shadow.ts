@@ -13,8 +13,12 @@
  * Bounds are the world boxes of every mesh under the root that casts or
  * receives and is seen, plus the swept space of every door leaf (a box around
  * the leaf grown by its own width), minus the site ground disk, which would
- * otherwise spend the map on a field. They are read when asked (`refit`), not
- * per frame.
+ * otherwise spend the map on a field. The building's shadow on that disk is
+ * kept: the casters' footprint on the ground plane, every caster corner
+ * carried along the light down to the ground's height and clamped to the
+ * disk (`groundFootprint`), is one more box of the fit, so a low sun's long
+ * shadow stays in the map while the disk itself never widens it. They are
+ * read when asked (`refit`), not per frame.
  *
  * Dirtiness invariant: the map is redrawn exactly when something it shows may
  * have changed. `refit` changes the frustum when the fit changed and otherwise
@@ -94,10 +98,57 @@ class Signature {
   }
 }
 
-/** Boxes of everything that casts or receives under `root`, and the casters' signature. */
-function survey(root: THREE.Object3D): { boxes: ShadowBox[]; signature: number } {
+/** The ground plane a building's shadow falls on: its height and, where it is a disk, its centre and radius. */
+export type ShadowGround = { readonly y: number; readonly centre: readonly [number, number]; readonly radius: number };
+
+/**
+ * Where the casters' shadow lands on `ground`: every corner of every caster
+ * box carried along the light (opposite `direction`, which points to the sun)
+ * down to the ground's height, clamped to the ground disk, as one flat box.
+ * `null` when there are no casters. Pure.
+ */
+export function groundFootprint(casters: readonly ShadowBox[], direction: Triple, ground: ShadowGround): ShadowBox | null {
+  if (casters.length === 0 || !(direction[1] > 0)) return null;
+  let minX = Infinity;
+  let maxX = -Infinity;
+  let minZ = Infinity;
+  let maxZ = -Infinity;
+  for (const box of casters) {
+    for (const cx of [box.min[0], box.max[0]])
+      for (const cy of [box.min[1], box.max[1]])
+        for (const cz of [box.min[2], box.max[2]]) {
+          const drop = Math.max(0, cy - ground.y) / direction[1];
+          let x = cx - direction[0] * drop - ground.centre[0];
+          let z = cz - direction[2] * drop - ground.centre[1];
+          const reach = Math.hypot(x, z);
+          if (reach > ground.radius) {
+            x *= ground.radius / reach;
+            z *= ground.radius / reach;
+          }
+          minX = Math.min(minX, x + ground.centre[0]);
+          maxX = Math.max(maxX, x + ground.centre[0]);
+          minZ = Math.min(minZ, z + ground.centre[1]);
+          maxZ = Math.max(maxZ, z + ground.centre[1]);
+        }
+  }
+  return { min: [minX, ground.y, minZ], max: [maxX, ground.y, maxZ] };
+}
+
+/** The site ground disk under `root`, as a plane the shadow lands on; `null` without one. */
+function groundOf(root: THREE.Object3D): ShadowGround | null {
+  const disk = root.getObjectByName('site-ground');
+  if (!(disk instanceof THREE.Mesh) || !seen(disk)) return null;
+  const parameters = (disk.geometry as THREE.CircleGeometry).parameters as { radius?: number } | undefined;
+  const scale = disk.getWorldScale(new THREE.Vector3());
+  const centre = disk.getWorldPosition(new THREE.Vector3());
+  return { y: centre.y, centre: [centre.x, centre.z], radius: (parameters?.radius ?? 0) * Math.max(scale.x, scale.z) };
+}
+
+/** Boxes of everything that casts or receives under `root`, the casters among them, the ground and the casters' signature. */
+function survey(root: THREE.Object3D): { boxes: ShadowBox[]; casters: ShadowBox[]; ground: ShadowGround | null; signature: number } {
   root.updateMatrixWorld(true);
   const boxes: ShadowBox[] = [];
+  const casters: ShadowBox[] = [];
   const signature = new Signature();
   root.traverse((object) => {
     if (!(object instanceof THREE.Mesh)) return;
@@ -108,6 +159,7 @@ function survey(root: THREE.Object3D): { boxes: ShadowBox[]; signature: number }
     if (geometry.boundingBox === null || geometry.boundingBox.isEmpty()) return;
     BOX.copy(geometry.boundingBox).applyMatrix4(mesh.matrixWorld);
     boxes.push(shadowBox(BOX));
+    if (mesh.castShadow) casters.push(shadowBox(BOX));
     signature.add(geometry.id);
     for (const element of mesh.matrixWorld.elements) signature.add(element);
   });
@@ -122,8 +174,9 @@ function survey(root: THREE.Object3D): { boxes: ShadowBox[]; signature: number }
     BOX.max.x += reach;
     BOX.max.z += reach;
     boxes.push(shadowBox(BOX));
+    casters.push(shadowBox(BOX));
   });
-  return { boxes, signature: signature.value };
+  return { boxes, casters, ground: groundOf(root), signature: signature.value };
 }
 
 /** Whether every corner of `box` lies inside the frustum of `fit`. */
@@ -178,13 +231,21 @@ export function prepareSunShadow(
   let fit: ShadowFit | null = null;
   let signature: number | null = null;
   let base: ShadowBox[] = [];
+  let casterBoxes: ShadowBox[] = [];
+  let ground: ShadowGround | null = null;
   const extra: ShadowBox[] = [];
   let released = false;
 
   /** Fits `boxes`; sets the frustum when it changed and reports whether it did. */
+  /** `boxes` and the casters' shadow on the ground, which the fit must hold too. */
+  const withFootprint = (boxes: readonly ShadowBox[]): ShadowBox[] => {
+    const footprint = ground === null ? null : groundFootprint([...casterBoxes, ...extra], sun.direction, ground);
+    return footprint === null ? [...boxes] : [...boxes, footprint];
+  };
+
   const apply = (boxes: readonly ShadowBox[]): boolean => {
     if (boxes.length === 0) return false;
-    const next = fitShadowFrustum(boxes, sun.direction, rig.shadowMapSize);
+    const next = fitShadowFrustum(withFootprint(boxes), sun.direction, rig.shadowMapSize);
     if (fit !== null && JSON.stringify(next) === JSON.stringify(fit)) return false;
     fit = next;
     rig.setShadowFrustum(next);
@@ -195,6 +256,8 @@ export function prepareSunShadow(
     if (released) return;
     const surveyed = survey(root);
     base = surveyed.boxes;
+    casterBoxes = surveyed.casters;
+    ground = surveyed.ground;
     const changed = apply([...base, ...extra]);
     if (!changed && signature !== surveyed.signature) rig.markShadowDirty();
     signature = surveyed.signature;
@@ -234,7 +297,7 @@ export function prepareSunShadow(
       fit = null;
       refit();
     },
-    bounds: () => union([...base, ...extra]),
+    bounds: () => union(withFootprint([...base, ...extra])),
     state: () => ({ direction: sun.direction, azimuth: sun.azimuth, elevation: sun.elevation, fit, draws: rig.shadowDraws }),
     dispose() {
       if (released) return;

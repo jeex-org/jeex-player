@@ -18,7 +18,7 @@ On every scene load, rebuild and GPU context restore, the player SHALL aim the a
 
 ### Requirement: Fitted shadow
 
-The sun's shadow SHALL cover exactly the apartment: walls with their thickness, ceiling casters, furniture, floors and the swept space of doors, padded by the standard; the site ground, sky and helpers SHALL NOT widen it. The fit SHALL be recomputed after a structural change; while an object is dragged or animated the frustum SHALL only grow to contain it, and SHALL be refitted when the move is committed, cancelled or reverted. The map size SHALL stay 2048² unless the rig options say otherwise.
+The sun's shadow SHALL cover exactly the apartment and its shadow on the ground: walls with their thickness, ceiling casters, furniture, floors and the swept space of doors, plus the footprint of those casters carried along the light onto the site ground's height and clamped to the ground disk, padded by the standard; the extent of the site ground disk itself, the sky and helpers SHALL NOT widen it. The fit SHALL be recomputed after a structural change; while an object is dragged or animated the frustum SHALL only grow to contain it, and SHALL be refitted when the move is committed, cancelled or reverted. The map size SHALL stay 2048² unless the rig options say otherwise.
 
 #### Scenario: Large plan not clipped
 - **WHEN** a plan 30 m across is shown
@@ -29,8 +29,12 @@ The sun's shadow SHALL cover exactly the apartment: walls with their thickness, 
 - **THEN** its shadow is drawn during the drag and the frustum returns to the apartment's fit after the cancel
 
 #### Scenario: Ground does not widen the fit
-- **WHEN** the same plan is fitted with and without the site ground present
+- **WHEN** the same plan is fitted over a site ground disk of 36 m and of 360 m radius
 - **THEN** the two frustums are equal
+
+#### Scenario: Long shadow on the ground
+- **WHEN** the plan is lit by a sun at 20° elevation
+- **THEN** the frustum reaches past the building on the downwind side by about the tallest caster's height above the ground divided by tan 20°, and the building's shadow on the site ground is drawn
 
 ### Requirement: Shadow cache
 

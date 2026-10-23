@@ -14,7 +14,7 @@ import type { ApartmentRig } from '../lighting/lighting-context.js';
 import type { ShadowFit } from '../lighting/shadow-fit.js';
 import type { Triple } from '../lighting/lighting-standard.js';
 import type { SceneData } from '../scene/types.js';
-import { prepareSunShadow } from './sun-shadow.js';
+import { groundFootprint, prepareSunShadow } from './sun-shadow.js';
 
 const plan = solvePlan(lShapePlan);
 
@@ -57,8 +57,8 @@ function box(name: string, min: Triple, max: Triple, options: { cast?: boolean; 
   return mesh;
 }
 
-/** A small apartment root: a floor, a wall, a sofa, the site slab and the site ground. */
-function apartment(withGround = true): THREE.Group {
+/** A small apartment root: a floor, a wall, a sofa and the site ground disk (`groundRadius` 0: none). */
+function apartment(groundRadius = 36): THREE.Group {
   const root = new THREE.Group();
   root.add(box('floor', [0, -0.1, 0], [6, 0, 6], { cast: false }));
   root.add(box('wall', [0, 0, -0.1], [6, 2.7, 0.1]));
@@ -66,8 +66,12 @@ function apartment(withGround = true): THREE.Group {
   furniture.name = 'furniture';
   furniture.add(box('sofa', [1, 0, 1], [3, 0.8, 2]));
   root.add(furniture);
-  if (withGround) {
-    const ground = box('site-ground', [-36, -0.5, -36], [36, -0.46, 36], { cast: false });
+  if (groundRadius > 0) {
+    const ground = new THREE.Mesh(new THREE.CircleGeometry(groundRadius, 48));
+    ground.name = 'site-ground';
+    ground.rotation.x = -Math.PI / 2;
+    ground.position.set(3, -0.462, 3);
+    ground.receiveShadow = true;
     root.add(ground);
   }
   return root;
@@ -97,12 +101,22 @@ describe('prepareSunShadow', () => {
     expect(evening.directions.at(-1)).toEqual(sunDirection({ northDeg: 0, sun: 'evening' }).direction);
   });
 
-  test('the site ground does not widen the fit', () => {
-    const withGround = recordingRig();
-    const without = recordingRig();
-    prepareSunShadow(apartment(true), scene(), plan, withGround.rig);
-    prepareSunShadow(apartment(false), scene(), plan, without.rig);
-    expect(withGround.fits.at(-1)).toEqual(without.fits.at(-1));
+  test('the site ground disk does not widen the fit: a 36 m and a 360 m disk fit the same', () => {
+    for (const site of [undefined, { sun: 'evening' as const }, { sun: 'noon' as const }]) {
+      const small = recordingRig();
+      const large = recordingRig();
+      prepareSunShadow(apartment(36), scene(site), plan, small.rig);
+      prepareSunShadow(apartment(360), scene(site), plan, large.rig);
+      expect(small.fits.at(-1)).toEqual(large.fits.at(-1));
+    }
+  });
+
+  test('a low sun keeps the long shadow of the building on the ground inside the fit', () => {
+    const recorder = recordingRig();
+    const sun = prepareSunShadow(apartment(36), scene({ northDeg: 0, sun: 'evening' }), plan, recorder.rig);
+    // Evening: the sun is towards -X at 20 degrees, the shadow falls towards +X.
+    const tallest = lShapePlan.ceilingHeight + 0.1;
+    expect(sun.bounds().max[0]).toBeGreaterThan(6 + (tallest + 0.462) / Math.tan((20 * Math.PI) / 180) - 0.3);
   });
 
   test('the fit covers the slabs above the ceiling', () => {
@@ -190,5 +204,37 @@ describe('prepareSunShadow', () => {
     expect(state.elevation).toBeCloseTo(20, 9);
     expect(state.fit).toEqual(recorder.fits.at(-1)!);
     expect(state.draws).toBe(0);
+  });
+});
+
+describe('groundFootprint', () => {
+  const ground = { y: -0.462, centre: [0, 0] as const, radius: 36 };
+  const wall = { min: [0, 0, 0], max: [6, 2.7, 0.2] } as const;
+  const DEG = Math.PI / 180;
+
+  test('a low sun stretches the footprint by about h / tan(E) on the downwind side', () => {
+    const e = 20 * DEG;
+    const footprint = groundFootprint([wall], [-Math.cos(e), Math.sin(e), 0], ground)!;
+    expect(footprint.max[0]).toBeCloseTo(6 + (2.7 + 0.462) / Math.tan(e), 6);
+    expect(footprint.min[0]).toBeCloseTo(0 + 0.462 / Math.tan(e), 6);
+    expect(footprint.min[1]).toBe(-0.462);
+    expect(footprint.max[1]).toBe(-0.462);
+  });
+
+  test('a high sun keeps it short', () => {
+    const footprint = groundFootprint([wall], [0, 1, 0], ground)!;
+    expect(footprint.min).toEqual([0, -0.462, 0]);
+    expect(footprint.max).toEqual([6, -0.462, 0.2]);
+  });
+
+  test('the footprint never leaves the ground disk', () => {
+    const e = 3 * DEG;
+    const footprint = groundFootprint([wall], [-Math.cos(e), Math.sin(e), 0], { ...ground, radius: 10 })!;
+    expect(footprint.max[0]).toBeLessThanOrEqual(10 + 1e-9);
+  });
+
+  test('no casters, or a sun not above the horizon, has no footprint', () => {
+    expect(groundFootprint([], [0, 1, 0], ground)).toBeNull();
+    expect(groundFootprint([wall], [1, 0, 0], ground)).toBeNull();
   });
 });
