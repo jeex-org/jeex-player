@@ -13,7 +13,7 @@
 
 import { ViewerLibError } from '../shared/errors.js';
 import { isLightTemperature } from '../lighting/colour-temperature.js';
-import { LIGHTING_STANDARD } from '../lighting/lighting-standard.js';
+import { TEMPERATURE_RANGE } from '../lighting/temperature-range.js';
 
 /** A refused value, as the refusal names it. */
 function describe(value: unknown): string {
@@ -23,7 +23,7 @@ function describe(value: unknown): string {
 /** Answers `value` as a temperature, or throws `bad-params` (path `lightTemperature`). */
 export function requireLightTemperature(value: unknown): number | null {
   if (value === null || isLightTemperature(value)) return value;
-  const { min, max, step } = LIGHTING_STANDARD.temperature;
+  const { min, max, step } = TEMPERATURE_RANGE;
   throw new ViewerLibError(
     'bad-params',
     `setLightTemperature: lightTemperature must be null or a whole multiple of ${step} K from ${min} to ${max}, got ${describe(value)}`,

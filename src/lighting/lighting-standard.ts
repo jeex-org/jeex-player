@@ -16,6 +16,8 @@
  * Pure module: no `three`, no DOM.
  */
 
+import { TEMPERATURE_RANGE } from './temperature-range.js';
+
 /** Appearance version of the standard; raised with every intentional change of the look. */
 export const LIGHTING_STANDARD_VERSION = 1;
 
@@ -184,12 +186,7 @@ export const LIGHTING_STANDARD = deepFreeze({
    * `colour-temperature.ts`; choosing one changes no rig value above, so the
    * appearance version does not depend on it.
    */
-  temperature: {
-    min: 2700,
-    max: 6500,
-    step: 100,
-    default: null,
-  },
+  temperature: TEMPERATURE_RANGE,
 });
 
 export type LightingStandard = typeof LIGHTING_STANDARD;

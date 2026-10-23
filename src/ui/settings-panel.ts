@@ -25,7 +25,7 @@
  */
 
 import { linkedAbortController, listenerOptions } from '../shared/abort.js';
-import { LIGHTING_STANDARD } from '../lighting/lighting-standard.js';
+import { TEMPERATURE_RANGE } from '../lighting/temperature-range.js';
 import { isLightTemperature } from '../lighting/colour-temperature.js';
 import type { Messages } from './messages.js';
 import type { ViewerRoots } from './viewer-shell.js';
@@ -226,7 +226,7 @@ export class SettingsPanel {
     const label = element(doc, 'span', 'settings-label');
     const output = element(doc, 'output', 'settings-value');
     fieldHead.append(label, output);
-    const { min, max, step } = LIGHTING_STANDARD.temperature;
+    const { min, max, step } = TEMPERATURE_RANGE;
     const slider = element(doc, 'input', 'settings-slider', { type: 'range', min: String(min), max: String(max), step: String(step) });
     const reset = element(doc, 'button', 'settings-reset', { type: 'button' });
     field.append(fieldHead, slider, reset);

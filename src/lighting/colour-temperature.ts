@@ -13,7 +13,8 @@
  * Pure module: no `three`, no DOM.
  */
 
-import { LIGHTING_STANDARD, type Triple } from './lighting-standard.js';
+import type { Triple } from './lighting-standard.js';
+import { TEMPERATURE_RANGE } from './temperature-range.js';
 
 /** Linear value of one sRGB-encoded channel in 0–1. */
 function srgbToLinear(value: number): number {
@@ -31,7 +32,7 @@ function channel(value: number): number {
  */
 export function colourTemperatureRgb(kelvin: number): Triple {
   if (!Number.isFinite(kelvin)) throw new RangeError(`colour temperature must be a finite number of kelvin, got ${String(kelvin)}`);
-  const { min, max } = LIGHTING_STANDARD.temperature;
+  const { min, max } = TEMPERATURE_RANGE;
   const t = Math.min(max, Math.max(min, kelvin)) / 100;
   const r = channel(255);
   const g = channel(99.470_802_586_1 * Math.log(t) - 161.119_568_166_1);
@@ -42,6 +43,6 @@ export function colourTemperatureRgb(kelvin: number): Triple {
 
 /** Whether `value` is a temperature the standard allows: a whole step of kelvin inside the range. */
 export function isLightTemperature(value: unknown): value is number {
-  const { min, max, step } = LIGHTING_STANDARD.temperature;
+  const { min, max, step } = TEMPERATURE_RANGE;
   return typeof value === 'number' && Number.isInteger(value) && value >= min && value <= max && (value - min) % step === 0;
 }
