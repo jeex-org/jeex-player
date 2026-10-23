@@ -14,9 +14,20 @@
  *
  * Invariant: walls are always full height. The dollhouse never scales a wall,
  * it only hides the ones standing between the camera and the interior.
+ *
+ * Shadow invariant: a wall is cut away by LAYERS, never by `visible`. Its whole
+ * subtree (layers do not inherit) leaves layer 0, so no camera draws it and no
+ * raycaster picks it, and joins `SHADOW_ONLY_LAYER`, so it keeps casting the
+ * sun's shadow exactly as when it stands (`render/shadow-layer-pass.ts`).
+ * Every `castShadow` is left as the builder set it (window panes and glass
+ * inserts do not cast). The set of casters is therefore the same in every
+ * shell state, and a change of the cutaway never needs the shadow redrawn.
+ * The ceiling cap is the one thing still hidden by `visible`: it casts
+ * nothing, the closed ceiling slabs do that (`geometry/ceiling-casters.ts`).
  */
 
 import * as THREE from 'three';
+import { SHADOW_ONLY_LAYER } from '../shared/render-layers.js';
 import { polylineMidpoint } from '../plan/plan-geometry.js';
 import type { SolvedPlan } from '../plan/plan-solver.js';
 
@@ -112,7 +123,7 @@ export class Dollhouse {
     const camZ = camera?.position.z ?? 0;
     for (const object of this.exteriors()) {
       if (full) {
-        object.visible = true;
+        setDrawn(object, true);
         continue;
       }
       const wallIds = object.userData['wallIds'];
@@ -120,10 +131,13 @@ export class Dollhouse {
         // A junction core belongs to every wall meeting there, so it goes only
         // when they ALL go. Hiding it with the first one would take the end cap
         // off the wall that stays and re-open the corner the core just closed.
-        object.visible = wallIds.some((wallId) => !this.hidden(wallId, camX, camZ));
+        setDrawn(
+          object,
+          wallIds.some((wallId) => !this.hidden(wallId, camX, camZ)),
+        );
         continue;
       }
-      object.visible = !this.hidden(object.userData['wallId'] as string, camX, camZ);
+      setDrawn(object, !this.hidden(object.userData['wallId'] as string, camX, camZ));
     }
   }
 
@@ -133,4 +147,21 @@ export class Dollhouse {
     if (!plane) return false;
     return (camX - plane.cx) * plane.ox + (camZ - plane.cz) * plane.oz > 0.001;
   }
+}
+
+/**
+ * Puts `object` and every descendant on layer 0 (drawn) or off it (cut away).
+ * A cut-away node joins the shadow-only layer and keeps it once drawn again:
+ * no camera draws that layer, so it costs nothing, and the shadow pass then
+ * sees the node in every state.
+ */
+function setDrawn(object: THREE.Object3D, drawn: boolean): void {
+  object.traverse((node) => {
+    if (drawn) {
+      node.layers.enable(0);
+      return;
+    }
+    node.layers.enable(SHADOW_ONLY_LAYER);
+    node.layers.disable(0);
+  });
 }

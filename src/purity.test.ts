@@ -129,6 +129,7 @@ const PURE_MODULES = [
   'embed/protocol',
   'embed/ops',
   'shared/sha1',
+  'shared/render-layers',
   'shared/uuid',
   'scene/guid',
   'scene/finish-remap',

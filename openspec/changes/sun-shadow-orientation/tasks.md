@@ -20,10 +20,10 @@
 
 ## 4. Shadow-only casters
 
-- [ ] 4.1 Create `src/shared/render-layers.ts`; move the floor ring's number there; verify the floor ring tests.
+- [x] 4.1 Create `src/shared/render-layers.ts`; move the floor ring's number there; verify the floor ring tests.
 - [ ] 4.2 Write `src/render/shadow-layer-pass.ts` and a browser component test proving a shadow-only caster darkens a receiver with the adapter and not without it; verify that test file through the heavy queue.
-- [ ] 4.2a Make the adapter restore the camera mask when the shadow pass throws and be reinstalled exactly once after a context restore; verify unit tests with a stub renderer.
-- [ ] 4.3 Write `src/geometry/ceiling-casters.ts` (closed slabs per non-loggia room, owned material, dispose) test-first; verify its unit test (closed volume, outline overlap, layers, flags).
+- [x] 4.2a Make the adapter restore the camera mask when the shadow pass throws and be reinstalled exactly once after a context restore; verify unit tests with a stub renderer.
+- [x] 4.3 Write `src/geometry/ceiling-casters.ts` (closed slabs per non-loggia room, owned material, dispose) test-first; verify its unit test (closed volume, outline overlap, layers, flags).
 - [ ] 4.4 Change the dollhouse to move cut-away walls and hidden ceilings by layers, keep visible caps from casting; verify dollhouse tests and a picking test through a cut-away wall.
 
 ## 5. Fitted, cached sun shadow in the player
