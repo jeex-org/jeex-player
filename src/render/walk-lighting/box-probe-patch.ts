@@ -19,9 +19,11 @@
  *   reflections come from the room probes in one shared atlas, box-projected
  *   onto the room box chosen per fragment (lookup point pushed along the
  *   normal), blended across `blendM` at a shared box face; a fragment of the
- *   band that lies beyond a box is projected through that box's other faces,
- *   never the one it stands outside (at an open boundary that face is no
- *   surface, and projecting onto it put a bright ridge along the boundary); a fragment outside
+ *   band that lies beyond a box never ends a ray on the face it stands
+ *   outside when the ray leaves through it (at an open boundary that face is
+ *   no surface, and projecting onto it put a bright ridge along the
+ *   boundary), while a ray heading back into the box still ends on the far
+ *   wall; a fragment outside
  *   every room reflects the studio environment. The anisotropy and
  *   retroreflection branches keep the studio environment.
  *
@@ -254,9 +256,10 @@ vec3 jeexRadiance( const in vec3 viewDir, const in vec3 normal, const in float r
 		if ( weight <= 0.0 ) continue;
 		vec3 from = clamp( jeexWorldPos, jeexBoxMin[ i ], jeexBoxMax[ i ] );
 		vec3 exits = max( ( jeexBoxMax[ i ] - from ) * reciprocal, ( jeexBoxMin[ i ] - from ) * reciprocal );
-		// A fragment in the blend band beyond this box (an open boundary) is clamped onto the box's face; the
-		// ray leaves through that face at once, so that face is no surface: it exits through the others.
-		exits += step( 1e-4, abs( jeexWorldPos - from ) ) * 1e4;
+		// A fragment in the blend band beyond this box (an open boundary) is clamped onto the box's face. A ray
+		// that leaves through that face at once (exit ~0) sees no surface there and exits through the others;
+		// a ray heading back into the box keeps its real exit, the far wall.
+		exits += step( 1e-4, abs( jeexWorldPos - from ) ) * step( exits, vec3( 1e-4 ) ) * 1e4;
 		float travel = max( min( min( exits.x, exits.y ), exits.z ), 0.0 );
 		vec3 direction = from + reflectVec * travel - jeexProbe[ i ];
 		sum += weight * jeexProbeSample( direction, roughness, jeexTile[ i ] );
@@ -267,10 +270,19 @@ vec3 jeexRadiance( const in vec3 viewDir, const in vec3 normal, const in float r
 #endif
 `;
 
-/** Locates the fragment's room before the directional lights, for the sun factor. */
+/**
+ * Locates the fragment's room once, ahead of the begin chunk, for the sun
+ * factor and the maps chunk alike. The begin chunk's `geometryPosition` and
+ * `geometryNormal` are these same two values, declared inside it.
+ */
+const LOCATE = /* glsl */ `#if defined( USE_ENVMAP ) && defined( ENVMAP_TYPE_CUBE_UV )
+	jeexLocate( - vViewPosition, normal );
+#endif
+`;
+
+/** Scales the directional lights' direct light inside the rooms by the sun factor. */
 const SUN_SCALE = /* glsl */ `DirectionalLight directionalLight;
 	#if defined( USE_ENVMAP ) && defined( ENVMAP_TYPE_CUBE_UV )
-	jeexLocate( geometryPosition, geometryNormal );
 	float jeexSunScale = mix( 1.0, jeexSun, jeexInRoom );
 	#else
 	float jeexSunScale = 1.0;
@@ -284,6 +296,7 @@ const SUN_SCALE = /* glsl */ `DirectionalLight directionalLight;
 function beginChunk(): string {
   const [grid, declare, directional] = ENGINE_CHUNK_ANCHORS.lights_fragment_begin;
   return (
+    LOCATE +
     'vec3 jeexGridIrradiance = vec3( 0.0 );\n' +
     THREE.ShaderChunk.lights_fragment_begin
       .replace(
@@ -295,7 +308,7 @@ function beginChunk(): string {
   );
 }
 
-/** The maps chunk with the switches, preceded by the room lookup and followed by the grid hand-over. */
+/** The maps chunk with the switches, followed by the grid hand-over; the room is located in the begin chunk. */
 function mapsChunk(): string {
   const [diffuse, specular, clearcoat] = ENGINE_CHUNK_ANCHORS.lights_fragment_maps;
   const maps = THREE.ShaderChunk.lights_fragment_maps
@@ -304,7 +317,6 @@ function mapsChunk(): string {
     .replace(clearcoat, 'clearcoatRadiance += jeexRadiance( geometryViewDir, geometryClearcoatNormal, material.clearcoatRoughness );');
   return /* glsl */ `
 #if defined( USE_ENVMAP ) && defined( ENVMAP_TYPE_CUBE_UV )
-	jeexLocate( geometryPosition, geometryNormal );
 	float jeexDiffuseScale = mix( 1.0, jeexDiffuse, jeexInRoom );
 ${maps}
 	#if defined( RE_IndirectDiffuse ) && defined( USE_LIGHT_PROBES_GRID ) && defined( STANDARD )

@@ -25,7 +25,7 @@ import type { ViewerSelectionTarget } from '../app/selection.js';
 import { resolveLocaleTag } from '../ui/messages.js';
 import { parseRatio } from './ratio.js';
 import { isLightTemperature } from '../lighting/colour-temperature.js';
-import { ORIGINAL_TEMPERATURE } from '../app/option-raw.js';
+import { convertRaw } from '../app/option-raw.js';
 import { PendingViewer } from './pending-viewer.js';
 import type { ElementRuntime } from './element-runtime.js';
 import {
@@ -406,12 +406,8 @@ export class ViewerElementController {
    */
   private applyTemperature(handle: ViewerHandle): void {
     const raw = this.host.attribute(TEMPERATURE_ATTRIBUTE);
-    if (raw === null || raw === ORIGINAL_TEMPERATURE) {
-      handle.setLightTemperature(null);
-      return;
-    }
-    const value = Number(raw);
-    if (raw.trim() !== '' && isLightTemperature(value)) {
+    const value = raw === null ? null : convertRaw('temperature', raw);
+    if (value === null || isLightTemperature(value)) {
       handle.setLightTemperature(value);
       return;
     }

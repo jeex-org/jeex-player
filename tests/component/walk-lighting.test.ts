@@ -737,4 +737,28 @@ describe('reflections from the room probes', { timeout: MOUNT_TIMEOUT_MS }, () =
     expect(max(near)).toBeLessThanOrEqual(Math.max(max(far) * 1.5, 1e-3));
     world.dispose();
   });
+
+  test('just beyond an open boundary, a reflection heading back into the room still ends on its far wall', () => {
+    const world = lit([{ id: 'a', box: A }], (scene) => {
+      (scene.getObjectByName('jeex-lighting-sun') as THREE.Light).intensity = 0;
+      room(scene, A, { side: 'x1' });
+      floor(scene, { x0: 0, x1: 8.1, z0: 0, z1: 4 }, 0.05);
+      // A bar on the far wall where the floor near the opening reflects it (about 1.2-1.4 m up);
+      // a projection that misses the far wall ends on the ceiling and reads the wall above it.
+      light(scene, [0.04, 0.45, 3], [0.06, 1.325, 2]);
+    });
+    // Low, beyond the room, looking back in: every reflected ray heads into the room along x.
+    const { pixels, camera } = world.shoot({ x: 5.5, y: 0.5, z: 2 }, { x: 4, y: 0, z: 2 });
+    const at = (x: number): number => {
+      const p = new THREE.Vector3(x, 0, 2).project(camera);
+      return world.lum(pixels, Math.round(((p.x + 1) / 2) * world.size.w), Math.round(((p.y + 1) / 2) * world.size.h));
+    };
+    // 3.9 is inside the box; 4.03 is outside it but inside the room's selection (the half wall), so only this box reflects there.
+    const inside = at(3.9);
+    const beyond = at(4.03);
+    record('openBoundaryBackward', { inside, beyond });
+    expect(inside).toBeGreaterThan(0.5);
+    expect(beyond).toBeGreaterThan(inside * 0.5);
+    world.dispose();
+  });
 });

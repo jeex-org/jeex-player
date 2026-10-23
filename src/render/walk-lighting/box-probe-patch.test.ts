@@ -45,20 +45,23 @@ describe('patchFragmentShader', () => {
       'getIBLAnisotropyRadiance( geometryViewDir, geometryNormal, material.roughness, material.anisotropyB, material.anisotropy )',
     );
     expect(physical).toContain('getIBLRetroRadiance( geometryViewDir, geometryNormal, material.roughness )');
-    // A fragment beyond a box (an open boundary's blend band) does not reflect that box's open face.
-    expect(physical).toContain('exits += step( 1e-4, abs( jeexWorldPos - from ) ) * 1e4;');
+    // A fragment beyond a box (an open boundary's blend band) does not reflect that box's open face,
+    // but a ray heading back into the box keeps its far wall.
+    expect(physical).toContain('exits += step( 1e-4, abs( jeexWorldPos - from ) ) * step( exits, vec3( 1e-4 ) ) * 1e4;');
   });
 
   test('scales direct sunlight inside the rooms by the walk sun factor, after the room is located, and nothing else', () => {
     const begin = physical.indexOf('getDirectionalLightInfo( directionalLight, directLight );');
-    const locate = physical.indexOf('jeexLocate( geometryPosition, geometryNormal );');
+    const locate = physical.indexOf('jeexLocate( - vViewPosition, normal );');
     const scale = physical.indexOf('directLight.color *= jeexSunScale;');
     expect(locate).toBeGreaterThan(-1);
     expect(locate).toBeLessThan(begin);
     expect(scale).toBeGreaterThan(begin);
+    // Located once per fragment, ahead of the lights and the maps chunk that both read it.
+    expect(physical.split('jeexLocate(')).toHaveLength(3); // the definition and the one call
+    expect(locate).toBeLessThan(physical.indexOf('vec3 geometryPosition = - vViewPosition;'));
     // Once, in the directional loop: point lights (the lamps) and the rest keep their light.
     expect(physical.split('directLight.color *= jeexSunScale;')).toHaveLength(2);
-    expect(physical.indexOf('getPointLightInfo( pointLight, geometryPosition, directLight );')).toBeLessThan(locate);
     expect(physical).toContain('float jeexSunScale = mix( 1.0, jeexSun, jeexInRoom );');
     // A material without the studio environment has no room lookup: its sun is unscaled.
     expect(physical).toContain('float jeexSunScale = 1.0;');

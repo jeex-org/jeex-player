@@ -61,10 +61,11 @@ describe('the settings button', { timeout: MOUNT_TIMEOUT_MS }, () => {
 
   for (const width of [900, 560, 400]) {
     test(`at ${width} px it is attached to the bar's end and no control moves`, async () => {
-      const plain = await mount(width);
+      // The bar pinned open in both: a boot slower than the chrome's idle would otherwise compare a collapsed bar with an open one.
+      const plain = await mount(width, { chrome: { autoHide: false } });
       const before = barLayout(plain);
       plain.dispose();
-      const viewer = await mount(width, { settings: { show: true } });
+      const viewer = await mount(width, { settings: { show: true }, chrome: { autoHide: false } });
       expect(barLayout(viewer)).toEqual(before);
       const button = node(viewer, 'settings-button')!.getBoundingClientRect();
       const bar = node(viewer, 'control-bar')!.getBoundingClientRect();
@@ -112,10 +113,26 @@ describe('the settings button', { timeout: MOUNT_TIMEOUT_MS }, () => {
   });
 });
 
+/**
+ * A press, dispatched as the other component files do: a live viewer on the
+ * software rasteriser keeps the page busy every frame, and Playwright's
+ * pointer actions never complete over it.
+ */
+function press(target: HTMLElement): void {
+  target.dispatchEvent(new PointerEvent('pointerdown', { bubbles: true, composed: true, isPrimary: true }));
+  target.dispatchEvent(new PointerEvent('pointerup', { bubbles: true, composed: true, isPrimary: true }));
+  target.click();
+}
+
 describe('the settings panel', { timeout: MOUNT_TIMEOUT_MS }, () => {
   async function open(viewer: ViewerHandle): Promise<{ button: HTMLButtonElement; panel: HTMLElement; slider: HTMLInputElement }> {
     const button = node<HTMLButtonElement>(viewer, 'settings-button')!;
-    await userEvent.click(button);
+    // Shown and inside the viewer's box: the press below is dispatched, so this is what proves it can be reached.
+    expect(button.checkVisibility()).toBe(true);
+    const at = button.getBoundingClientRect();
+    const box = viewer.element.getBoundingClientRect();
+    expect(at.left >= box.left && at.right <= box.right && at.top >= box.top && at.bottom <= box.bottom).toBe(true);
+    press(button);
     const panel = node(viewer, 'settings-panel')!;
     return { button, panel, slider: panel.querySelector<HTMLInputElement>('input[type="range"]')! };
   }
@@ -144,9 +161,9 @@ describe('the settings panel', { timeout: MOUNT_TIMEOUT_MS }, () => {
     expect(button.getAttribute('aria-expanded')).toBe('false');
     expect(document.activeElement).toBe(button);
     // Reopened, it shows the current value; «Original» gives the default back.
-    await userEvent.click(button);
+    press(button);
     expect(slider.value).toBe('3900');
-    await userEvent.click(panel.querySelector<HTMLButtonElement>('.settings-reset')!);
+    press(panel.querySelector<HTMLButtonElement>('.settings-reset')!);
     expect(viewer.getState().lightTemperature).toBeNull();
     expect(events.at(-1)).toEqual({ temperature: null, source: 'panel' });
   });
@@ -163,19 +180,40 @@ describe('the settings panel', { timeout: MOUNT_TIMEOUT_MS }, () => {
     expect(() => viewer.setLightTemperature(2750)).toThrow(expect.objectContaining({ code: 'bad-params', path: 'lightTemperature' }));
   });
 
+  test('follows its button when the viewer resizes while it is open, and stays inside the viewer', async () => {
+    const container = openContainer(900, 420);
+    const viewer = mountViewer(container, {
+      scene: { repository: new InlineSceneRepository(demoScene()) },
+      tour: { mode: 'off' },
+      settings: { show: true },
+    });
+    viewers.push(viewer);
+    await viewer.ready;
+    const { button, panel } = await open(viewer);
+    const aligned = (): boolean => Math.abs(panel.getBoundingClientRect().right - button.getBoundingClientRect().right) < 1.5;
+    expect(aligned()).toBe(true);
+    // Still above the narrow breakpoint, so the panel stays anchored rather than becoming a sheet.
+    container.style.width = '700px';
+    await until(aligned, 'the panel’s end edge on the button’s after the resize');
+    expect(panel.hidden).toBe(false);
+    expect(panel.getBoundingClientRect().right).toBeLessThanOrEqual(viewer.element.getBoundingClientRect().right);
+  });
+
   test('a press outside closes it: inside the viewer focus goes back to the button, outside it does not', async () => {
     const viewer = await mount(900, { settings: { show: true } });
     const { button, panel } = await open(viewer);
     // The hint card: inside the viewer, and not a pick (a press on the scene opens the finish panel, which takes focus itself).
-    await userEvent.click(node(viewer, 'hint-card')!);
+    press(node(viewer, 'hint-card')!);
     expect(panel.hidden).toBe(true);
     await until(() => document.activeElement === button, 'focus back on the settings button');
-    await userEvent.click(button);
+    press(button);
     expect(panel.hidden).toBe(false);
     const outside = document.createElement('button');
     outside.textContent = 'page';
     document.body.append(outside);
-    await userEvent.click(outside);
+    press(outside);
+    // What the browser does after a real press on a focusable button outside.
+    outside.focus();
     expect(panel.hidden).toBe(true);
     await delay(50);
     expect(document.activeElement).toBe(outside);
@@ -186,11 +224,11 @@ describe('the settings panel', { timeout: MOUNT_TIMEOUT_MS }, () => {
     const viewer = await mount(900, { settings: { show: true } });
     const { panel } = await open(viewer);
     const interiors = node<HTMLButtonElement>(viewer, 'interiors-button')!;
-    await userEvent.click(interiors);
+    press(interiors);
     const finish = node(viewer, 'finish-panel')!;
     expect(finish.classList.contains('is-hidden')).toBe(false);
     expect(panel.hidden).toBe(true);
-    await userEvent.click(node<HTMLButtonElement>(viewer, 'settings-button')!);
+    press(node<HTMLButtonElement>(viewer, 'settings-button')!);
     expect(panel.hidden).toBe(false);
     expect(finish.classList.contains('is-hidden')).toBe(true);
   });

@@ -25,7 +25,7 @@ export function asFlag(raw: string): boolean {
 }
 
 /** The spelling of «Original» (no colour temperature) in a query string or an attribute. */
-export const ORIGINAL_TEMPERATURE = 'original';
+const ORIGINAL_TEMPERATURE = 'original';
 
 /** Converts one raw string to the shape its `OptionKind` expects; validation happens in `resolveViewerOptions`. */
 export function convertRaw(kind: OptionKind, raw: string): unknown {

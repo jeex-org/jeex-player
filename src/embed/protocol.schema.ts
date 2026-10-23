@@ -33,8 +33,8 @@
  */
 
 import { z } from 'zod/mini';
-import { isLightTemperature } from '../lighting/colour-temperature.js';
 import { OPTION_SCHEMA } from '../app/viewer-options.js';
+import { lightTemperatureSchema } from '../app/viewer-options.schema.js';
 import { isLocale, locales } from '../ui/messages.js';
 import { cameraPoseSchema } from '../scene/types.schema.js';
 import { isUuidV7 } from '../scene/types.js';
@@ -171,10 +171,6 @@ const setModeParamsSchema = z.object({ mode: viewerModeSchema }, { error: 'must 
 const focusRoomParamsSchema = z.object({ roomId: wireUuid }, { error: 'must be an object naming a `roomId`' });
 const setFurnitureVisibleParamsSchema = z.object({ visible: wireBoolean }, { error: 'must be an object naming `visible`' });
 const setLocaleParamsSchema = z.object({ locale: localeSchema }, { error: 'must be an object naming a `locale`' });
-/** A whole step of kelvin inside the lighting standard's range, or `null` for «Original». */
-const lightTemperatureSchema = z.union([z.number().check(z.refine((value) => isLightTemperature(value))), z.null()], {
-  error: 'must be null or a whole multiple of 100 from 2700 to 6500',
-});
 const setLightTemperatureParamsSchema = z.object(
   { temperature: lightTemperatureSchema },
   { error: 'must be an object naming a `temperature`' },

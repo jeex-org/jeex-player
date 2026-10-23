@@ -215,6 +215,11 @@ describe('readCommand', () => {
     for (const temperature of [2600, 6600, 3050, '3000', undefined])
       expect(readCommand('setLightTemperature', { temperature }).ok).toBe(false);
     expect(readCommand('setLightTemperature', {}).ok).toBe(false);
+    // One message for every refusal, a number off the steps included.
+    for (const temperature of [2750, '3000'])
+      expect(refusal('setLightTemperature', { temperature })).toEqual([
+        { path: 'params.temperature', message: 'must be null or a whole multiple of 100 from 2700 to 6500' },
+      ]);
   });
 
   test('setSelection takes a target or null and nothing else', () => {
