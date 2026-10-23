@@ -57,12 +57,18 @@ export type SunShadow = {
   refit(): void;
   /** A pose or visibility changed inside the fit. */
   markDirty(): void;
-  /** `object` moves in a preview or an animation: redraw, and grow the frustum only if it left it. */
-  include(object: THREE.Object3D): void;
+  /**
+   * `object` moves: redraw, and grow the frustum only if it left it. `preview`
+   * (an asset-move drag) keeps the growth until `endPreview`; an animation's
+   * growth is dropped by `settle` or the next `refit`.
+   */
+  include(object: THREE.Object3D, kind?: 'animation' | 'preview'): void;
   /** The preview ended (commit, cancel, revert): fit the apartment again. */
   endPreview(): void;
-  /** Aims the sun by `site` (absent: the legacy direction) and refits when it changed. */
-  orient(site: SceneSite | undefined): void;
+  /** An animation came to rest: drop what it grew, unless a preview still runs. */
+  settle(): void;
+  /** Aims the sun by `site` (absent: the legacy direction); `true` when it changed and the fit was redone. */
+  orient(site: SceneSite | undefined): boolean;
   /** The world box around everything the fit is made of, for tests and the debug surface. */
   bounds(): ShadowBox;
   state(): SunShadowState;
@@ -179,13 +185,24 @@ function survey(root: THREE.Object3D): { boxes: ShadowBox[]; casters: ShadowBox[
   return { boxes, casters, ground: groundOf(root), signature: signature.value };
 }
 
+/** Scratch vectors of `fitContains`: it runs per animated object per frame. */
+const FIT_D = new THREE.Vector3();
+const FIT_X = new THREE.Vector3();
+const FIT_Y = new THREE.Vector3();
+const FIT_EYE = new THREE.Vector3();
+const FIT_CORNER = new THREE.Vector3();
+
 /** Whether every corner of `box` lies inside the frustum of `fit`. */
 function fitContains(fit: ShadowFit, box: ShadowBox): boolean {
-  const d = new THREE.Vector3(...fit.position).sub(new THREE.Vector3(...fit.target)).normalize();
-  const x = new THREE.Vector3(...fit.up).cross(d).normalize();
-  const y = d.clone().cross(x);
-  const eye = new THREE.Vector3(...fit.position);
-  const corner = new THREE.Vector3();
+  const eye = FIT_EYE.set(...fit.position);
+  const d = FIT_D.set(...fit.target)
+    .subVectors(eye, FIT_D)
+    .normalize();
+  const x = FIT_X.set(...fit.up)
+    .cross(d)
+    .normalize();
+  const y = FIT_Y.copy(d).cross(x);
+  const corner = FIT_CORNER;
   for (const cx of [box.min[0], box.max[0]])
     for (const cy of [box.min[1], box.max[1]])
       for (const cz of [box.min[2], box.max[2]]) {
@@ -234,15 +251,17 @@ export function prepareSunShadow(
   let casterBoxes: ShadowBox[] = [];
   let ground: ShadowGround | null = null;
   const extra: ShadowBox[] = [];
+  /** Whether an asset-move drag is running: its growth stays until `endPreview`. */
+  let previewing = false;
   let released = false;
 
-  /** Fits `boxes`; sets the frustum when it changed and reports whether it did. */
   /** `boxes` and the casters' shadow on the ground, which the fit must hold too. */
   const withFootprint = (boxes: readonly ShadowBox[]): ShadowBox[] => {
     const footprint = ground === null ? null : groundFootprint([...casterBoxes, ...extra], sun.direction, ground);
     return footprint === null ? [...boxes] : [...boxes, footprint];
   };
 
+  /** Fits `boxes`; sets the frustum when it changed and reports whether it did. */
   const apply = (boxes: readonly ShadowBox[]): boolean => {
     if (boxes.length === 0) return false;
     const next = fitShadowFrustum(withFootprint(boxes), sun.direction, rig.shadowMapSize);
@@ -255,6 +274,8 @@ export function prepareSunShadow(
   const refit = (): void => {
     if (released) return;
     const surveyed = survey(root);
+    // An animation's growth does not outlive the structure it was measured on.
+    if (!previewing) extra.length = 0;
     base = surveyed.boxes;
     casterBoxes = surveyed.casters;
     ground = surveyed.ground;
@@ -271,8 +292,9 @@ export function prepareSunShadow(
     markDirty() {
       if (!released) rig.markShadowDirty();
     },
-    include(object) {
+    include(object, kind = 'animation') {
       if (released) return;
+      if (kind === 'preview') previewing = true;
       object.updateWorldMatrix(true, true);
       BOX.setFromObject(object);
       if (!BOX.isEmpty()) {
@@ -286,16 +308,22 @@ export function prepareSunShadow(
     },
     endPreview() {
       if (released) return;
-      extra.length = 0;
+      previewing = false;
       refit();
     },
+    settle() {
+      if (released || previewing || extra.length === 0) return;
+      extra.length = 0;
+      apply(base);
+    },
     orient(next) {
-      if (released || sameSite(site, next)) return;
+      if (released || sameSite(site, next)) return false;
       site = next;
       sun = sunDirection(site);
       rig.setSunDirection(sun.direction);
       fit = null;
       refit();
+      return true;
     },
     bounds: () => union(withFootprint([...base, ...extra])),
     state: () => ({ direction: sun.direction, azimuth: sun.azimuth, elevation: sun.elevation, fit, draws: rig.shadowDraws }),

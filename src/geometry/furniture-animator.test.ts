@@ -57,3 +57,33 @@ describe('FurnitureAnimator.takeMoved', () => {
     expect(animator.takeMoved()).toEqual([]);
   });
 });
+
+describe('FurnitureAnimator.takeMoved and the edges of an animation', () => {
+  test('attach forgets the groups a settled swap touched: they belong to the replaced root', () => {
+    const container = new THREE.Group();
+    const old = new THREE.Group();
+    const fresh = new THREE.Group();
+    container.add(old, fresh);
+    const animator = new FurnitureAnimator();
+    animator.attach(container);
+    animator.swap(old, fresh, 1, () => undefined, 0);
+    animator.attach(new THREE.Group());
+    expect(animator.takeMoved()).toEqual([]);
+  });
+
+  test('a ripple item waiting out its delay is not reported until its pose changes', () => {
+    const container = new THREE.Group();
+    const group = new THREE.Group();
+    container.add(group);
+    const animator = new FurnitureAnimator();
+    animator.attach(container);
+    animator.setVisible(true);
+    // Showing furniture already shown: every frame writes the same resting pose.
+    const start = performance.now();
+    animator.update(start + 10_000);
+    animator.takeMoved();
+    animator.setVisible(true);
+    animator.update(start + 20_000);
+    expect(animator.takeMoved()).toEqual([]);
+  });
+});

@@ -2,7 +2,7 @@
 
 ## 1. Standard: sun direction and shadow fit (pure, TDD)
 
-- [x] 1.1 Add presets, fit tuning and the legacy direction to `LIGHTING_STANDARD.apartment.sun`, raise `LIGHTING_STANDARD_VERSION` to 2; verify `lighting-standard.test.ts` pins the values and the version.
+- [x] 1.1 Add presets, fit tuning and the legacy direction to `LIGHTING_STANDARD.apartment.sun`, keep `LIGHTING_STANDARD_VERSION` at 1 (the additions change no existing rig value); verify `lighting-standard.test.ts` pins the values and the version.
 - [x] 1.2 Write `src/lighting/sun-direction.ts` test-first: preset scenarios of the spec, north rotation, modulo 360, legacy default, world azimuth/elevation; verify `bun test src/lighting/sun-direction.test.ts`.
 - [x] 1.3 Write `src/lighting/shadow-fit.ts` test-first: every corner inside with padding for random upward directions and the zenith, smaller plan and bigger map give finer texels, light upstream, near ≥ minimum, up vector rule, bias rule, every `bad-options` case of the spec, and a fit applied to a real three `DirectionalLight` whose clip-space projection contains every corner; verify its test file.
 - [x] 1.4 Export both from the `jeex-viewer/lighting` entry and its type declarations; verify the lighting entry check and the export-surface test.

@@ -81,6 +81,8 @@ export class FurnitureAnimator {
     // A rebuild replaces the whole furniture group: any swap still running
     // would animate objects that are no longer in the scene.
     this.settleSwaps();
+    // The settled groups belong to the root being replaced: nobody downstream may measure them.
+    this.touched.clear();
     this.items.clear();
     this.toggle = null;
     this.group = container;
@@ -189,15 +191,23 @@ export class FurnitureAnimator {
       const progress = item.from + (item.to - item.from) * (anim.hide ? clamped * clamped * clamped : eased);
       const base = this.items.get(item.group);
       if (base) base.progress = progress;
-      this.touched.add(item.group);
       const shown = Math.max(0.001, progress);
-      item.group.scale.setScalar(item.baseScale * shown);
+      const scale = item.baseScale * shown;
       // Pop-in: the item hops slightly above its spot and settles back down.
       const hop = anim.hide ? 0 : Math.sin(clamped * Math.PI) * HOP_M * clamped;
-      item.group.position.y = item.baseY - TOGGLE_DIP_M * (1 - Math.min(1, Math.max(0, eased))) + hop;
+      const y = item.baseY - TOGGLE_DIP_M * (1 - Math.min(1, Math.max(0, eased))) + hop;
+      // Only a pose that changed is news: an item waiting out its delay is not.
+      if (item.group.scale.x === scale && item.group.position.y === y) continue;
+      item.group.scale.setScalar(scale);
+      item.group.position.y = y;
+      this.touched.add(item.group);
     }
     if (finished) {
-      if (anim.hide) container.visible = false;
+      if (anim.hide) {
+        container.visible = false;
+        // Hiding the container changes what casts even where no pose did.
+        for (const item of anim.items) this.touched.add(item.group);
+      }
       this.toggle = null;
     }
   }

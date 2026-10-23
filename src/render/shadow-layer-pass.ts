@@ -12,7 +12,7 @@
  * camera for the duration of the call and restores the exact mask in
  * `finally`. Nothing else calls the shadow pass: three does, inside
  * `renderer.render`, through the property, which is why replacing the method
- * on the object is enough. `tests/component/shadow-layer-pass.test.ts` pins the
+ * on the object is enough. `tests/component/sun-shadow.test.ts` pins the
  * behaviour, so an engine upgrade that changes it fails loudly.
  *
  * A context restore makes three build a NEW `WebGLShadowMap`; the runtime

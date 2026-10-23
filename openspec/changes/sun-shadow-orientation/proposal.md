@@ -6,7 +6,7 @@ Sunlight in the player does not respect the apartment: the shadow frustum is a f
 
 ## What Changes
 
-- The apartment rig's sun gets a typed control: set its direction and its shadow frustum. The standard publishes the fitting and direction math, the three sun presets and the shadow tuning values; its appearance version rises from 1 to 2.
+- The apartment rig's sun gets a typed control: set its direction and its shadow frustum. The standard publishes the fitting and direction math, the three sun presets and the shadow tuning values; its appearance version stays 1, since no existing rig value changes.
 - The player fits the sun's shadow to the apartment's casters and receivers, and caches the shadow map until something that casts or receives changes.
 - Ceilings block the sun in every shell state through closed shadow-only casters; walls cut away by the dollhouse keep casting. Hidden casters are never drawn, never picked.
 - Window glass never casts (already true; now pinned by a test).
@@ -22,7 +22,7 @@ Sunlight in the player does not respect the apartment: the shadow frustum is a f
 
 ### Modified Capabilities
 
-- `lighting-standard`: the apartment rig exposes sun direction and shadow frustum control; the standard publishes the sun presets, the direction and fitting functions and the shadow tuning values; appearance version 2.
+- `lighting-standard`: the apartment rig exposes sun direction and shadow frustum control; the standard publishes the sun presets, the direction and fitting functions and the shadow tuning values; appearance version unchanged (1).
 
 ## Impact
 

@@ -106,15 +106,20 @@ describe('Dollhouse cutaway', () => {
     expect(cap.visible).toBe(true);
   });
 
-  test('an object added to a cut-away wall later is cut away with it on the next update', () => {
+  test('an update that changes nothing walks no subtree', () => {
     const { group } = exteriorWall(face.wallId);
     const dollhouse = new Dollhouse(() => [group]);
     dollhouse.prepare(plan, group);
     const camera = outside();
     dollhouse.setState('dollhouse', camera);
-    const late = new THREE.Mesh(new THREE.BoxGeometry());
-    group.add(late);
+    let walks = 0;
+    const traverse = group.traverse.bind(group);
+    group.traverse = (callback) => {
+      walks += 1;
+      traverse(callback);
+    };
     dollhouse.update(camera);
-    expect(drawn(late)).toBe(false);
+    dollhouse.update(camera);
+    expect(walks).toBe(0);
   });
 });

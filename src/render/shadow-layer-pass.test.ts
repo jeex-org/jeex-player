@@ -3,7 +3,7 @@
  * camera's layer mask around the shadow pass, that it restores it whatever
  * happens, and that installing is idempotent and survives a replaced shadow
  * map. The engine behaviour it exists for is pinned in the browser
- * (`tests/component/shadow-layer-pass.test.ts`).
+ * (`tests/component/sun-shadow.test.ts`).
  */
 
 import { describe, expect, test } from 'bun:test';
@@ -64,24 +64,23 @@ describe('installShadowLayerPass', () => {
   });
 
   test('a replaced shadow map (a context restore) is wrapped exactly once again', () => {
-    let calls = 0;
     const renderer: { shadowMap: { render: Pass } } = stubRenderer(() => undefined);
     installShadowLayerPass(renderer);
-    renderer.shadowMap = {
-      render: () => {
-        calls += 1;
-      },
+    const seen: boolean[] = [];
+    const raw: Pass = (_lights, _scene, camera) => {
+      seen.push(camera.layers.isEnabled(SHADOW_ONLY_LAYER));
     };
+    renderer.shadowMap = { render: raw };
     installShadowLayerPass(renderer);
+    const installed = renderer.shadowMap.render;
     installShadowLayerPass(renderer);
+    expect(installed).not.toBe(raw);
+    expect(renderer.shadowMap.render).toBe(installed);
     const camera = new THREE.PerspectiveCamera();
-    let during = false;
-    const inner = renderer.shadowMap.render;
     renderer.shadowMap.render([], new THREE.Scene(), camera);
-    expect(calls).toBe(1);
-    expect(inner).toBe(renderer.shadowMap.render);
-    during = camera.layers.isEnabled(SHADOW_ONLY_LAYER);
-    expect(during).toBe(false);
+    // Inside the pass the layer is on, exactly once; outside it is off again.
+    expect(seen).toEqual([true]);
+    expect(camera.layers.isEnabled(SHADOW_ONLY_LAYER)).toBe(false);
   });
 
   test('uninstalling puts the original pass back', () => {

@@ -22,7 +22,8 @@ as described under [Versioning](#versioning).
   and takes a new option `shadowCache` (default `false`). The entry also
   exports `sunDirection`, `LEGACY_SUN_DIRECTION` and `fitShadowFrustum`; the
   standard publishes the sun presets and the shadow fit tuning.
-  `LIGHTING_STANDARD_VERSION` is 2. Existing rigs keep working unchanged.
+  `LIGHTING_STANDARD_VERSION` stays 1: no existing rig value changed.
+  Existing rigs keep working unchanged.
 
 - **`jeex-viewer/lighting`: the lighting standard as a public entry.**
   `createLightingContext(three, renderer)` binds it to your own three.js

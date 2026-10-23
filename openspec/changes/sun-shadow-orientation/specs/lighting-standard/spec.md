@@ -58,7 +58,7 @@ The entry SHALL publish a read-only description of the standard (engine revision
 
 #### Scenario: Version
 - **WHEN** a consumer reads the appearance version
-- **THEN** it is 2, raised from 1 by the fitted sun shadow and its tuning values
+- **THEN** it stays 1: the additions are data and functions that change no existing rig value
 
 ## ADDED Requirements
 

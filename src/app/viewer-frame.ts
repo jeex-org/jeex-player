@@ -33,6 +33,8 @@ type FrameHookDeps = {
 
 /** The hooks a mounted viewer runs, in the order they must run in. */
 export function frameHooksFor(deps: FrameHookDeps): readonly FrameHook[] {
+  /** Whether the furniture moved on the previous frame: the first still frame after motion settles the sun. */
+  let furnitureWasMoving = false;
   return [
     (_delta, now) => {
       const stage = deps.stage();
@@ -45,9 +47,13 @@ export function frameHooksFor(deps: FrameHookDeps): readonly FrameHook[] {
       // sun shadow must redraw (`render/sun-shadow.ts`); drained every frame.
       const doorsMoved = deps.doors.takeMoved();
       const furnitureMoved = deps.animator.takeMoved();
+      // A model upgrade swapped bodies since the last frame: one refit for all of them.
+      deps.mount.flushSunRefit();
       const sun = deps.mount.sunShadow;
       if (sun && doorsMoved) sun.markDirty();
       for (const group of furnitureMoved) sun?.include(group);
+      if (furnitureWasMoving && furnitureMoved.length === 0) sun?.settle();
+      furnitureWasMoving = furnitureMoved.length > 0;
       // The map follows whatever the mode ended up being — a button, a room
       // focus or a manual grab mid-tour all land here on the next frame.
       stage?.syncMinimap();

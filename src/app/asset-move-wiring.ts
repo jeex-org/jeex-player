@@ -108,7 +108,7 @@ export function assetMoveWiring(deps: AssetMoveWiringDeps): AssetMoveControl {
     if (mirror) setBodyMirror(body.group, mirror);
     body.group.updateMatrixWorld(true);
     // The dragged body casts: redraw, growing the sun's frustum past the fit if it must.
-    deps.mount().sunShadow?.include(body.group);
+    deps.mount().sunShadow?.include(body.group, 'preview');
   };
 
   const viewYaw = (): number => {

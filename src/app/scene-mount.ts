@@ -95,6 +95,8 @@ export class SceneMount {
   private root?: THREE.Group | undefined;
   /** The sun over `root`: slabs, direction, fit and the cached map's dirtiness. */
   private sun?: SunShadow | undefined;
+  /** A model upgrade swapped a body since the last `flushSunRefit`. */
+  private sunRefitPending = false;
   /**
    * What the mounted document was drawn WITH (`LoadedProjectContext.key`):
    * a later document is a revision of this one only when it comes with the
@@ -130,6 +132,13 @@ export class SceneMount {
 
   get sceneRoot(): THREE.Group | undefined {
     return this.root;
+  }
+
+  /** Refits the sun once if model upgrades swapped bodies since the last call; the frame hook calls it. */
+  flushSunRefit(): void {
+    if (!this.sunRefitPending) return;
+    this.sunRefitPending = false;
+    this.sun?.refit();
   }
 
   /** The sun of the mounted root; `undefined` before a mount or without a runtime. */
@@ -189,8 +198,7 @@ export class SceneMount {
         if (SceneBuilder.needsRebuild(touched)) return;
         // A rebuild prepared a new sun in `adopt`; anything else is refitted,
         // which redraws only when a caster or the site really changed.
-        this.sun?.orient(model.scene.site);
-        this.sun?.refit();
+        if (this.sun?.orient(model.scene.site) !== true) this.sun?.refit();
         if (touched.some((entry) => isTouchedAsset(entry))) {
           this.deps.onAssetsChanged(model);
           // A variant swap hands out a freshly BUILT (procedural) body, so the
@@ -274,7 +282,8 @@ export class SceneMount {
             // The editor owns furniture pick registration and the auras, so a
             // swapped body is its news, not the mount's (`viewer-editor.ts`).
             this.currentEditor?.adoptUpgradedBody(group, replaced);
-            this.sun?.refit();
+            // Refitted once per frame however many bodies arrive (`flushSunRefit`).
+            this.sunRefitPending = true;
           },
         );
         if (reportFor && !signal.aborted) this.deps.onModelsSettled?.(reportFor, result);

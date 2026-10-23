@@ -26,8 +26,9 @@ function neutral(value: number): number {
 }
 
 describe('LIGHTING_STANDARD', () => {
-  test('is version 2 and frozen at every depth', () => {
-    expect(LIGHTING_STANDARD_VERSION).toBe(2);
+  test('is version 1 and frozen at every depth', () => {
+    // The sun presets, the fit tuning and the sun API change no existing rig value.
+    expect(LIGHTING_STANDARD_VERSION).toBe(1);
     const walk = (value: unknown, path: string): void => {
       if (typeof value !== 'object' || value === null) return;
       expect({ path, frozen: Object.isFrozen(value) }).toEqual({ path, frozen: true });

@@ -184,13 +184,49 @@ describe('prepareSunShadow', () => {
     expect(recorder.fits.at(-1)).toEqual(fitted);
   });
 
+  test('an animation that left the fit grows it, and settling returns it to the apartment fit', () => {
+    const recorder = recordingRig();
+    const root = apartment();
+    const sun = prepareSunShadow(root, scene(), plan, recorder.rig);
+    const fitted = recorder.fits.at(-1)!;
+    const sofa = root.getObjectByName('sofa')!;
+    sofa.position.set(40, 0.4, 40);
+    sun.include(sofa);
+    expect(recorder.fits.at(-1)).not.toEqual(fitted);
+    sofa.position.set(2, 0.4, 1.5);
+    sofa.updateMatrixWorld(true);
+    sun.settle();
+    expect(recorder.fits.at(-1)).toEqual(fitted);
+  });
+
+  test('a refit drops an animation growth, but keeps a drag preview until endPreview', () => {
+    const recorder = recordingRig();
+    const root = apartment();
+    const sun = prepareSunShadow(root, scene(), plan, recorder.rig);
+    const fitted = recorder.fits.at(-1)!;
+    const sofa = root.getObjectByName('sofa')!;
+    sofa.position.set(40, 0.4, 40);
+    sun.include(sofa, 'preview');
+    sofa.position.set(2, 0.4, 1.5);
+    sun.refit();
+    sun.settle();
+    expect(recorder.fits.at(-1)).not.toEqual(fitted);
+    sun.endPreview();
+    expect(recorder.fits.at(-1)).toEqual(fitted);
+    sofa.position.set(40, 0.4, 40);
+    sun.include(sofa);
+    sofa.position.set(2, 0.4, 1.5);
+    sun.refit();
+    expect(recorder.fits.at(-1)).toEqual(fitted);
+  });
+
   test('orient changes the sun only when the site changes', () => {
     const recorder = recordingRig();
     const sun = prepareSunShadow(apartment(), scene({ sun: 'noon' }), plan, recorder.rig);
     const directions = recorder.directions.length;
-    sun.orient({ sun: 'noon' });
+    expect(sun.orient({ sun: 'noon' })).toBe(false);
     expect(recorder.directions.length).toBe(directions);
-    sun.orient({ sun: 'morning' });
+    expect(sun.orient({ sun: 'morning' })).toBe(true);
     expect(recorder.directions.length).toBe(directions + 1);
     sun.orient(undefined);
     expect(recorder.directions.at(-1)).toEqual(LEGACY_SUN_DIRECTION);

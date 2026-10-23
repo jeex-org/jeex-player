@@ -156,6 +156,9 @@ export class Dollhouse {
  * sees the node in every state.
  */
 function setDrawn(object: THREE.Object3D, drawn: boolean): void {
+  // The whole subtree moves together, so the root tells its state: a frame
+  // that changes nothing walks nothing.
+  if (object.layers.isEnabled(0) === drawn) return;
   object.traverse((node) => {
     if (drawn) {
       node.layers.enable(0);
