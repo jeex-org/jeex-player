@@ -8,7 +8,7 @@
 
 - [x] 2.1 Tag the bank's point lights (`buildLamp`, `buildPendant`, `buildCeilingLight`: `userData.artificialLight = { colour }`); `light-temperature.ts` test-first using the real bank builders: luminance kept, «Original» restores exactly, applied on new roots and model swaps, on the offscreen scene of default-state captures, and to the walk ambient floor; invalidates the on-demand gate; verify unit tests.
 - [x] 2.2 Walk: probe re-capture one room per frame after a 250 ms settle, written in place, each invalidating the gate; grids never re-baked; repeated input coalesces; verify unit/stub tests.
-- [ ] 2.3 Sun factor in the walk patch (`walkSunScale` in the walk tuning; 1 in editing and capture); a test pins the new loop anchor in the r186 chunk and identity in editing/capture; measure the sunlit floor (64 × 64 px, evening preset) before and after; verify the walk-lighting ratios and the new floor, façade and lamp checks (heavy queue).
+- [ ] 2.3 Sun factor in the walk patch (`walkSunScale` in the walk tuning; 1 in editing and capture); a test pins the new loop anchor in the r186 chunk and identity in editing/capture; measure the sunlit floor (64 × 64 px, the preset whose sun reaches a seen floor: noon; all three recorded) before and after; verify the walk-lighting ratios and the new floor, façade and lamp checks (heavy queue).
 
 ## 3. Host contract (test-first for schema and resolvers)
 

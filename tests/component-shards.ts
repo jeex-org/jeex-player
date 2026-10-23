@@ -56,6 +56,7 @@ export const COMPONENT_FILE_COST_S: Readonly<Record<string, number>> = {
   'ktx2.test.ts': 1,
   'library-material.test.ts': 2,
   'library-panel.test.ts': 4,
+  'light-temperature.test.ts': 120,
   'lighting-calibration.test.ts': 1,
   'minimap.test.ts': 1,
   'no-webgl.test.ts': 1,
