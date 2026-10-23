@@ -16,6 +16,7 @@
 import { expect, test } from '@playwright/test';
 import { expectCanvasStillRendering, waitForBoot } from './support.js';
 import { scaled } from './time-scale.js';
+import { LIBRARY_PROJECT_FIXTURE } from '../fixtures/project/fixture-ids.js';
 
 /** How long a restored context may take to reach a drawn frame, ms — the whole document rebuilds on a GPU that just came back. */
 const RESTORE_TIMEOUT_MS = scaled(20_000);
@@ -72,6 +73,43 @@ test('a real WEBGL_lose_context loss raises the card and the context-lost event,
   // DOM: a real compositor screenshot of the apartment, same tolerance as
   // every other canvas baseline (`expectCanvasScreenshot`).
   await expectCanvasStillRendering(page.locator('[data-jeex="scene-canvas"]'), 'context-loss-restored-canvas.png');
+});
+
+test('a restored context draws a library project’s maps again from the bytes it kept, with no new texture request', async ({ page }) => {
+  const requested: string[] = [];
+  page.on('request', (sent) => {
+    if (sent.url().includes('/tests/fixtures/project-library/tex/')) requested.push(sent.url());
+  });
+  await page.goto('/dev/project.html?project=/tests/fixtures/project-library/project.json');
+  await waitForBoot(page, 'window.__appReady === true');
+  const floor = `floor-${LIBRARY_PROJECT_FIXTURE.room.living}`;
+  const hasMaps = (name: string) => (window.__viewerDebug!.surfaceMaterial(name)?.maps.length ?? 0) > 0;
+  await page.waitForFunction(hasMaps, floor, { timeout: RESTORE_TIMEOUT_MS });
+  const before = requested.length;
+  expect(before).toBe(3);
+
+  const hasExtension = await page.evaluate(() => {
+    const canvas = document.querySelector<HTMLCanvasElement>('[data-jeex="scene-canvas"]');
+    const gl = canvas?.getContext('webgl2') ?? canvas?.getContext('webgl');
+    window.__jeexLose = gl?.getExtension('WEBGL_lose_context') ?? null;
+    return Boolean(window.__jeexLose);
+  });
+  expect(hasExtension, 'the browser must expose WEBGL_lose_context for this test to mean anything').toBe(true);
+  await page.evaluate(() => window.__jeexLose?.loseContext());
+  await expect(page.locator('[data-jeex="error-state"]')).toBeVisible();
+  await page.evaluate(() => window.__jeexLose?.restoreContext());
+  await expect(page.locator('[data-jeex="error-state"]')).toBeHidden({ timeout: RESTORE_TIMEOUT_MS });
+
+  // The project came back as a PROJECT: its own library material on the floor, maps and all.
+  await page.waitForFunction(hasMaps, floor, { timeout: RESTORE_TIMEOUT_MS });
+  expect(await page.evaluate((name) => window.__viewerDebug!.surfaceMaterial(name)?.maps, floor)).toEqual([
+    'map',
+    'normalMap',
+    'aoMap',
+    'roughnessMap',
+    'metalnessMap',
+  ]);
+  expect(requested).toHaveLength(before);
 });
 
 declare global {

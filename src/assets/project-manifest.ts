@@ -12,6 +12,7 @@
  * scene.json
  * obj/<versionId>.glb
  * tex/<material>_<map>.ktx2
+ * tex/<versionId>/<role>.<px>.webp
  * prev/<id>.webp
  * poster.webp
  * video/<preset>.mp4
@@ -183,7 +184,7 @@ export type BakedProjectManifest = {
   /** ISO-8601. */
   readonly bakedAt: string;
   readonly title?: string;
-  /** Relative path of the scene document (schema 2.2). */
+  /** Relative path of the scene document (schema 2.2 or 2.3). */
   readonly scene: string;
   /** The project's asset library: library-manifest shape, `baseUrl` omitted (it IS the manifest folder). */
   readonly library: ProjectLibraryManifest;
@@ -240,6 +241,11 @@ export function projectLibraryOf(manifest: BakedProjectManifest): ProjectLibrary
       // The one other archetype fact an EDIT judges: which axes `mirror_object` may set.
       ...(object.mirror === undefined ? {} : { mirror: object.mirror }),
     })),
-    materials: manifest.library.materials.map((material) => ({ id: material.id, apply: material.apply })),
+    materials: manifest.library.materials.map((material) => ({
+      id: material.id,
+      apply: material.apply,
+      // Which member draws it: only a `library` material takes a finish object.
+      ...('library' in material && { library: true }),
+    })),
   };
 }

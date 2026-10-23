@@ -28,6 +28,16 @@
  *    format version means something by from being silently ignored by this
  *    one.
  *
+ * A material is `pbr`, `generator` or `library`. The `library` member is a
+ * catalogue's scanned texture set or parameter-only material: strict at every
+ * depth, with its cross-field rules (colour map by colour mode, `arm` or
+ * `roughness`, colour space by role, one size set per material, the exact
+ * `tex/<versionId>/<role>.<px>.webp` path of every file) checked on the
+ * member and two manifest-wide ones (no texture path twice, at most
+ * `MAX_PROJECT_TEXTURE_FILES` listed) on the root. Like the rest, they judge:
+ * the defaults the format names (metalness 0, roughness 1, alpha `opaque`,
+ * normal strength 1) are the renderer's to apply, never written in here.
+ *
  * Every id and every reference to one is a UUID v7, judged by the SAME
  * `isUuidV7` that judges every id of the scene (`scene/types.ts`): there is no
  * looser "any UUID" rule anywhere, so a v4 id minted elsewhere is refused here
@@ -40,7 +50,9 @@
 import { z } from 'zod/mini';
 import { schemaRefusal } from '../shared/schema-issues.js';
 import type { SchemaIssue } from '../shared/schema-issues.js';
-import { isUuidV7 } from '../scene/types.js';
+import { HEX_COLOUR_PATTERN, isUuidV7 } from '../scene/types.js';
+import { MAX_PROJECT_TEXTURE_FILES } from '../shared/limits.js';
+import type { LibraryMapRole } from '../materials/finish-types.js';
 import { ASSET_ANCHORS, KNEE_SIDES, VARIANT_ACCESS, isHttpUrl } from './asset-types.js';
 import { PROJECT_FORMAT } from './project-manifest.js';
 import type { BakedProjectManifest } from './project-manifest.js';
@@ -128,7 +140,7 @@ const slotNameSchema = z.string().check(z.regex(SLOT_NAME, 'must be a slot name:
 const slotFinishesSchema = z.record(slotNameSchema, uuidSchema);
 
 /** `FinishApply`: the surface families a material may dress. */
-const finishApplySchema = z.enum(['floor', 'wall', 'furniture', 'fabric', 'metal', 'glass', 'decor']);
+const finishApplySchema = z.enum(['floor', 'wall', 'ceiling', 'facade', 'trim', 'furniture', 'fabric', 'metal', 'glass', 'decor']);
 
 /** `FinishGenerator`: the five parametric textures a material may be drawn by. */
 const finishGeneratorSchema = z.union([
@@ -223,6 +235,159 @@ const objectSchema = z.strictObject({
   ...surfaceFactsShape,
 });
 
+/* ---------------------------------------------------- library materials --- */
+
+/** A `#rrggbb` colour, the scene schema's own grammar (`HEX_COLOUR_PATTERN`). */
+const hexSchema = z.string().check(z.regex(HEX_COLOUR_PATTERN, 'must be a #rrggbb colour'));
+
+/** A fraction: roughness, metalness, opacity and the physical weights. */
+const unitSchema = z.number().check(z.gte(0), z.lte(1));
+
+/** A distance or an intensity: zero or more. */
+const nonNegativeSchema = z.number().check(z.gte(0));
+
+/** A strictly positive number: a tile edge, a normal strength. */
+const positiveSchema = z.number().check(z.gt(0));
+
+/** `LibraryPbr`: glTF's PBR facts, every one optional, with the ranges glTF gives them. */
+const libraryPbrSchema = z.strictObject({
+  baseColour: z.optional(hexSchema),
+  roughness: z.optional(unitSchema),
+  metalness: z.optional(unitSchema),
+  alphaMode: z.optional(z.enum(['opaque', 'blend', 'mask'])),
+  opacity: z.optional(unitSchema),
+  sheen: z.optional(unitSchema),
+  sheenColour: z.optional(hexSchema),
+  clearcoat: z.optional(unitSchema),
+  clearcoatRoughness: z.optional(unitSchema),
+  transmission: z.optional(unitSchema),
+  // 2.333 is diamond's index, the top of what glTF's `KHR_materials_ior` means.
+  ior: z.optional(z.number().check(z.gte(1), z.lte(2.333))),
+  thicknessM: z.optional(nonNegativeSchema),
+  attenuationDistanceM: z.optional(nonNegativeSchema),
+  attenuationColour: z.optional(hexSchema),
+  emissive: z.optional(hexSchema),
+  emissiveIntensity: z.optional(nonNegativeSchema),
+});
+
+/** `LibraryFacts`. The cross-field rules (tint by colour mode, `tileM` by kind) are `checkLibraryMaterial`'s. */
+const libraryFactsSchema = z.strictObject({
+  tileM: z.nullable(z.tuple([positiveSchema, positiveSchema])),
+  grain: z.enum(['along_u', 'along_v', 'none', 'unknown']),
+  suitability: z.enum(['plank_floor', 'board', 'continuous']),
+  normalStrength: z.optional(positiveSchema),
+  colourMode: z.enum(['natural', 'tintable']),
+  tint: z.optional(
+    z.strictObject({
+      recipe: z.literal('luma-mid@1'),
+      suggestedColours: z.array(z.strictObject({ name: z.string(), hex: hexSchema })).check(z.minLength(1)),
+    }),
+  ),
+  averageColour: hexSchema,
+  pbr: libraryPbrSchema,
+});
+
+/** The sizes a map may be listed at, smallest first: the keys of `LibraryMap.files`. */
+const LIBRARY_MAP_SIZES = ['128', '256', '384', '512', '768'] as const;
+
+/** `LibraryMap`. `files` is strict over the five sizes, so a `1024` file is an unknown key. */
+const libraryMapSchema = z.strictObject({
+  colourSpace: z.enum(['srgb', 'linear']),
+  convention: z.optional(z.literal('opengl')),
+  files: z.strictObject(
+    Object.fromEntries(LIBRARY_MAP_SIZES.map((size) => [size, z.optional(z.string())])) as Record<
+      (typeof LIBRARY_MAP_SIZES)[number],
+      z.ZodMiniOptional<z.ZodMiniString>
+    >,
+  ),
+});
+
+/** The map roles, in the order the rules below report them. */
+const LIBRARY_MAP_ROLES = ['albedo', 'albedoTint', 'normal', 'roughness', 'ao', 'arm'] as const satisfies readonly LibraryMapRole[];
+
+/** The two roles whose maps hold colour (sRGB); every other role holds data (linear). */
+const COLOUR_ROLES: ReadonlySet<LibraryMapRole> = new Set(['albedo', 'albedoTint']);
+
+/** `LibraryMaterial` without its cross-field rules. */
+const libraryMaterialSchema = z.strictObject({
+  versionId: uuidSchema,
+  kind: z.enum(['scan', 'parameters']),
+  facts: libraryFactsSchema,
+  maps: z.strictObject(
+    Object.fromEntries(LIBRARY_MAP_ROLES.map((role) => [role, z.optional(libraryMapSchema)])) as Record<
+      LibraryMapRole,
+      z.ZodMiniOptional<typeof libraryMapSchema>
+    >,
+  ),
+});
+
+/** A library material as the schema infers it: what the rules below read. */
+type LibraryShape = z.infer<typeof libraryMaterialSchema>;
+
+/** One listed map of a library material. */
+type LibraryMapShape = z.infer<typeof libraryMapSchema>;
+
+/** The one file name a map of `role` at `size` may have: `tex/<versionId>/<role>.<px>.webp`. */
+function libraryMapPath(versionId: string, role: LibraryMapRole, size: string): string {
+  return `tex/${versionId}/${role}.${size}.webp`;
+}
+
+/** The listed maps of a library material, role and map, in `LIBRARY_MAP_ROLES` order. */
+function listedMaps(library: LibraryShape): [LibraryMapRole, LibraryMapShape][] {
+  return LIBRARY_MAP_ROLES.flatMap((role): [LibraryMapRole, LibraryMapShape][] => {
+    const map = library.maps[role];
+    return map === undefined ? [] : [[role, map]];
+  });
+}
+
+/**
+ * The cross-field rules of a library material: each one an issue of its own,
+ * at the field it is about, under the member's `library` key.
+ *
+ * Judged here rather than in the shape because every one of them reads two
+ * fields at once; nothing is filled in or corrected, so a manifest that passes
+ * is the manifest that was given.
+ */
+function checkLibraryMaterial(library: LibraryShape, issue: (message: string, path: readonly (string | number)[]) => void): void {
+  const { facts, maps } = library;
+  if ((facts.tint !== undefined) !== (facts.colourMode === 'tintable')) {
+    issue('must be present exactly when colourMode is tintable', ['facts', 'tint']);
+  }
+  const listed = listedMaps(library);
+  if (library.kind === 'parameters') {
+    if (listed.length > 0) issue('must be {} for a parameters material', ['maps']);
+    if (facts.tileM !== null) issue('must be null for a parameters material', ['facts', 'tileM']);
+    if (facts.pbr.baseColour === undefined) issue('is required for a parameters material', ['facts', 'pbr', 'baseColour']);
+    else if (facts.averageColour.toLowerCase() !== facts.pbr.baseColour.toLowerCase()) {
+      issue('must equal pbr.baseColour for a parameters material', ['facts', 'averageColour']);
+    }
+    return;
+  }
+  if (facts.tileM === null) issue('must be [u, v] metres for a scan', ['facts', 'tileM']);
+  const colourRole = facts.colourMode === 'tintable' ? 'albedoTint' : 'albedo';
+  const otherRole = colourRole === 'albedo' ? 'albedoTint' : 'albedo';
+  if (maps[colourRole] === undefined) issue(`a ${facts.colourMode} scan must ship ${colourRole}`, ['maps', colourRole]);
+  if (maps[otherRole] !== undefined) issue(`a ${facts.colourMode} scan must not ship ${otherRole}`, ['maps', otherRole]);
+  if (maps.arm !== undefined && maps.roughness !== undefined) issue('must not ship beside arm', ['maps', 'roughness']);
+  if (maps.arm !== undefined && maps.ao !== undefined) issue('must not ship beside arm', ['maps', 'ao']);
+  if (maps.ao !== undefined && maps.roughness === undefined && maps.arm === undefined) issue('ships only beside roughness', ['maps', 'ao']);
+  let sizeSet: string | undefined;
+  for (const [role, map] of listed) {
+    const space = COLOUR_ROLES.has(role) ? 'srgb' : 'linear';
+    if (map.colourSpace !== space) issue(`must be ${space} for ${role}`, ['maps', role, 'colourSpace']);
+    if (map.convention !== undefined && role !== 'normal') issue('is allowed only on normal', ['maps', role, 'convention']);
+    const sizes = LIBRARY_MAP_SIZES.filter((size) => map.files[size] !== undefined);
+    if (sizes.length === 0) issue('must list at least one size', ['maps', role, 'files']);
+    for (const size of sizes) {
+      const expected = libraryMapPath(library.versionId, role, size);
+      if (map.files[size] !== expected) issue(`must be ${expected}`, ['maps', role, 'files', size]);
+    }
+    const set = sizes.join(',');
+    if (sizeSet === undefined) sizeSet = set;
+    else if (set !== sizeSet) issue('must list the same sizes as every other map of the material', ['maps', role, 'files']);
+  }
+}
+
 /** What every material carries, whichever way it is drawn. */
 const materialBase = {
   id: uuidSchema,
@@ -252,6 +417,13 @@ const materialSchema = z.union([
     }),
   }),
   z.strictObject({ ...materialBase, generator: finishGeneratorSchema, tile: z.optional(z.number()) }),
+  z
+    .strictObject({ ...materialBase, library: libraryMaterialSchema })
+    .check(
+      z.superRefine((material, ctx) =>
+        checkLibraryMaterial(material.library, (message, path) => ctx.addIssue({ code: 'custom', message, path: ['library', ...path] })),
+      ),
+    ),
 ]);
 
 /** `ProjectLibraryManifest`: the library-manifest shape with no `baseUrl` — the manifest folder is the base. */
@@ -326,22 +498,88 @@ export const projectManifestSchema = z
       error: 'must equal projectId: the library of a bake is its project',
       path: ['library', 'id'],
     }),
+    z.superRefine((manifest, ctx) =>
+      checkTextureFiles(manifest.library.materials, (message, path) => ctx.addIssue({ code: 'custom', message, path: [...path] })),
+    ),
   );
+
+/**
+ * The manifest-wide texture rules: no file path listed twice (refused at its
+ * second occurrence), and at most `MAX_PROJECT_TEXTURE_FILES` files listed in
+ * all, every role and size counted, the ones a viewer never draws included.
+ */
+function checkTextureFiles(
+  materials: readonly z.infer<typeof materialSchema>[],
+  issue: (message: string, path: readonly (string | number)[]) => void,
+): void {
+  const seen = new Set<string>();
+  let count = 0;
+  for (const [index, material] of materials.entries()) {
+    if (!('library' in material)) continue;
+    for (const [role, map] of listedMaps(material.library)) {
+      for (const size of LIBRARY_MAP_SIZES) {
+        const path = map.files[size];
+        if (path === undefined) continue;
+        count += 1;
+        if (seen.has(path))
+          issue('is listed twice in the manifest', ['library', 'materials', index, 'library', 'maps', role, 'files', size]);
+        seen.add(path);
+      }
+    }
+  }
+  if (count > MAX_PROJECT_TEXTURE_FILES) {
+    issue(`lists ${count} texture files; at most MAX_PROJECT_TEXTURE_FILES (${MAX_PROJECT_TEXTURE_FILES}) are allowed`, [
+      'library',
+      'materials',
+    ]);
+  }
+}
 
 /** A schema's own path step in this project's vocabulary (`scene/types.schema.ts`'s own `pathStep` twin). */
 function pathStep(step: PropertyKey): string | number {
   return typeof step === 'symbol' ? step.toString() : step;
 }
 
+/** One issue as `zod` raises it. */
+type ZodIssue = z.core.$ZodIssue;
+
+/**
+ * The member of a refused union the value was meant to be: the one option
+ * whose shallowest issue lies deepest. A material that names `library` fails
+ * the `pbr` and `generator` members at their own top level (an unknown key, a
+ * missing member key) and the `library` member only inside it, so that member
+ * is the one worth reporting. A tie means the value matches no member better
+ * than another, and the union issue itself stands.
+ */
+function closestOption(options: readonly (readonly ZodIssue[])[]): readonly ZodIssue[] | undefined {
+  const depths = options.map((issues) => Math.min(...issues.map((issue) => issue.path.length)));
+  const deepest = Math.max(...depths);
+  return depths.filter((depth) => depth === deepest).length === 1 ? options[depths.indexOf(deepest)] : undefined;
+}
+
+/**
+ * `issue` in this project's vocabulary, under `prefix`: a refused union is
+ * opened to the member the value was meant to be, and an unknown key is named
+ * in the message (its path is the object that carries it).
+ */
+function readableIssues(issue: ZodIssue, prefix: readonly PropertyKey[]): SchemaIssue[] {
+  const path = [...prefix, ...issue.path];
+  if (issue.code === 'invalid_union' && issue.errors.length > 0) {
+    const chosen = closestOption(issue.errors);
+    if (chosen !== undefined) return chosen.flatMap((inner) => readableIssues(inner, path));
+  }
+  const message =
+    issue.code === 'unrecognized_keys'
+      ? `unknown key${issue.keys.length === 1 ? '' : 's'} ${issue.keys.map((key) => JSON.stringify(key)).join(', ')}`
+      : issue.message;
+  return [{ path: path.map((step) => pathStep(step)), message, code: issue.code }];
+}
+
 /** Every issue that keeps `value` from being a baked project manifest; empty means it is one. */
 export function projectManifestIssues(value: unknown): readonly SchemaIssue[] {
   const result = z.safeParse(projectManifestSchema, value);
   if (result.success) return [];
-  return result.error.issues.map((issue) => ({
-    path: issue.path.map(pathStep),
-    message: issue.message,
-    code: issue.code,
-  }));
+  return result.error.issues.flatMap((issue) => readableIssues(issue, []));
 }
 
 /**

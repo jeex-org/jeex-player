@@ -1,0 +1,123 @@
+{
+  "format": "jeex-project",
+  "formatVersion": 2,
+  "projectId": "01a1683e-d6fd-7f30-9e42-f52c285a391f",
+  "bakeId": "01a1683e-d6fd-789a-a1af-948e57e30bc3",
+  "bakedAt": "2026-09-11T09:00:00.000Z",
+  "title": "Fixture library project",
+  "scene": "scene.json",
+  "library": {
+    "manifestVersion": "1.0",
+    "id": "01a1683e-d6fd-7f30-9e42-f52c285a391f",
+    "name": "Fixture library materials",
+    "publisher": "01a12fec-9d2a-7190-95af-61ba91a556ed",
+    "license": "CC0-1.0",
+    "objects": [],
+    "materials": [
+      {
+        "id": "01a12fec-9d2d-7a44-8991-7dada752fe18",
+        "name": "Fixture oak",
+        "tags": ["floor", "wood"],
+        "apply": ["floor", "furniture"],
+        "generator": {
+          "kind": "plank_floor",
+          "tone": "#b5855a",
+          "seed": 1
+        },
+        "tile": 3.2
+      },
+      {
+        "id": "01a12fec-9d2e-79bd-a184-d53d62036c87",
+        "name": "Fixture white",
+        "tags": ["wall", "paint"],
+        "apply": ["wall", "furniture"],
+        "generator": {
+          "kind": "painted_plaster",
+          "tone": "#f1eee8",
+          "seed": 2
+        },
+        "tile": 2.4
+      },
+      {
+        "id": "01a1683e-d6fd-7bc4-8915-f35f1150eb5b",
+        "name": "Fixture planks",
+        "apply": ["floor"],
+        "library": {
+          "versionId": "01a1683e-d6fd-7e48-b046-25153a9ef95a",
+          "kind": "scan",
+          "facts": {
+            "tileM": [1, 1],
+            "grain": "along_u",
+            "suitability": "plank_floor",
+            "colourMode": "natural",
+            "averageColour": "#806040",
+            "pbr": {}
+          },
+          "maps": {
+            "albedo": {
+              "colourSpace": "srgb",
+              "files": {
+                "256": "tex/01a1683e-d6fd-7e48-b046-25153a9ef95a/albedo.256.webp",
+                "512": "tex/01a1683e-d6fd-7e48-b046-25153a9ef95a/albedo.512.webp"
+              }
+            },
+            "normal": {
+              "colourSpace": "linear",
+              "convention": "opengl",
+              "files": {
+                "256": "tex/01a1683e-d6fd-7e48-b046-25153a9ef95a/normal.256.webp",
+                "512": "tex/01a1683e-d6fd-7e48-b046-25153a9ef95a/normal.512.webp"
+              }
+            },
+            "arm": {
+              "colourSpace": "linear",
+              "files": {
+                "256": "tex/01a1683e-d6fd-7e48-b046-25153a9ef95a/arm.256.webp",
+                "512": "tex/01a1683e-d6fd-7e48-b046-25153a9ef95a/arm.512.webp"
+              }
+            }
+          }
+        }
+      },
+      {
+        "id": "01a1683e-d6fe-74c9-ade2-59702d05dec2",
+        "name": "Fixture paint",
+        "apply": ["wall", "ceiling", "trim", "facade"],
+        "library": {
+          "versionId": "01a1683e-d6fe-7391-887a-d5c0bf074458",
+          "kind": "parameters",
+          "facts": {
+            "tileM": null,
+            "grain": "none",
+            "suitability": "continuous",
+            "colourMode": "tintable",
+            "tint": {
+              "recipe": "luma-mid@1",
+              "suggestedColours": [
+                {
+                  "name": "Chalk",
+                  "hex": "#f1eee8"
+                }
+              ]
+            },
+            "averageColour": "#808080",
+            "pbr": {
+              "baseColour": "#808080",
+              "roughness": 0.9
+            }
+          },
+          "maps": {}
+        }
+      }
+    ]
+  },
+  "rights": {
+    "workspaceId": "01a12fec-9d2a-7190-95af-61ba91a556ed",
+    "perpetual": true,
+    "assets": []
+  },
+  "generator": {
+    "name": "tests/fixtures/project-library",
+    "version": "1"
+  }
+}

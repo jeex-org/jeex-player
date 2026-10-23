@@ -291,6 +291,19 @@ describe('floors, ceilings and skirting', () => {
     expect(material.roughness).toBe(plaster!.roughness);
   });
 
+  test('skirting boards carry metre UVs: their u runs as far as the board does', () => {
+    const { root } = build(lShapePlan);
+    const boards = meshes(root).filter((mesh) => mesh.name.endsWith('-skirting'));
+    for (const board of boards) {
+      const uv = board.geometry.getAttribute('uv');
+      const us = Array.from({ length: uv.count }, (_, index) => uv.getX(index));
+      board.geometry.computeBoundingBox();
+      const box = board.geometry.boundingBox!;
+      const run = Math.max(box.max.x - box.min.x, box.max.z - box.min.z);
+      expect({ name: board.name, short: Math.max(...us) - Math.min(...us) < run - 0.05 }).toEqual({ name: board.name, short: false });
+    }
+  });
+
   test('skirting boards are not paintable pick targets', () => {
     const { root } = build(lShapePlan);
     const boards = meshes(root).filter((mesh) => mesh.name.endsWith('-skirting'));

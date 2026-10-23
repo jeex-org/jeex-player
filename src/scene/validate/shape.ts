@@ -91,7 +91,7 @@ function checkSite(scene: Partial<SceneData>): void {
 }
 
 /**
- * Refuses anything that is not a schema-2.2 or 2.3 document with every required field
+ * Refuses anything that is not a schema 2.2 or 2.3 document with every required field
  * present and of the right container kind, and narrows it to `SceneData`.
  */
 export function assertSceneShape(input: unknown): asserts input is SceneData {

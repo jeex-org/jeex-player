@@ -20,7 +20,7 @@
  * Pure module: no `three`, no DOM.
  */
 
-import { isDoorLike, type DemoAsset, type MaterialDefinition, type MirrorFacts, type OpeningType } from './types.js';
+import { isDoorLike, type DemoAsset, type FinishSurface, type MaterialDefinition, type MirrorFacts, type OpeningType } from './types.js';
 
 /** Which family of opening a variant was built for. */
 export type OpeningVariantFamily = 'window' | 'door';
@@ -102,8 +102,32 @@ export type SceneRegistries = {
   readonly isFinish: (id: string) => boolean;
   /** Variants a placement may be replaced with, in offering order. */
   readonly variantsForPlacement: (asset: DemoAsset) => readonly { readonly id: string }[];
-  /** Which surface family a finish id belongs to, or `null` when it is unknown. */
+  /**
+   * Which surface family a finish id belongs to, or `null` when it is unknown:
+   * `floor` when it dresses floors, else `wall` when it dresses walls. Derived
+   * from `finishSurfaces` and read only where a surface is INFERRED (the
+   * legacy `set_material` form, a room's `floorMaterial`, a preset swatch).
+   */
   readonly finishKind: (id: string) => 'floor' | 'wall' | null;
+  /**
+   * The room surfaces a finish may dress, as its own table says: a bundled
+   * floor finish `{floor}`, a bundled wall finish `{wall, facade, ceiling,
+   * trim}`, a project material the surface words of its `apply`. Empty for an
+   * id that dresses no room surface. Strict: the compatibility of a bare UUID
+   * (a project `wall` material also dresses the facade) is the caller's rule,
+   * applied only where a bare UUID is judged.
+   *
+   * Optional, so registries a host wrote before the table existed still
+   * typecheck: absent, the table is derived from `finishKind` (`surfacesIn`).
+   */
+  readonly finishSurfaces?: (id: string) => ReadonlySet<FinishSurface>;
+  /**
+   * True when the id names a project material of the `library` member: the
+   * only finish a finish object may name and the only one that takes
+   * `colour` and `rotation`. Optional: absent, no finish is one
+   * (`isLibraryMaterialIn`).
+   */
+  readonly isLibraryMaterial?: (id: string) => boolean;
   /** True when the id resolves in any catalogue, the scene's own overrides included. */
   readonly isKnownFinish: (id: string | undefined, sceneMaterials: readonly MaterialDefinition[]) => boolean;
   /**
@@ -241,7 +265,9 @@ export function placementIn(registries: SceneRegistries, asset: DemoAsset): Cata
  */
 export type LibraryFinish = {
   readonly id: string;
-  readonly apply?: readonly ('floor' | 'wall' | 'furniture' | 'fabric' | 'metal' | 'glass' | 'decor')[];
+  readonly apply?: readonly ('floor' | 'wall' | 'ceiling' | 'facade' | 'trim' | 'furniture' | 'fabric' | 'metal' | 'glass' | 'decor')[];
+  /** True for a material of the manifest's `library` member (`isLibraryMaterial`); absent for `pbr` and `generator`. */
+  readonly library?: boolean;
 };
 
 /**
@@ -262,11 +288,57 @@ export type ProjectLibrary = {
   readonly materials?: readonly LibraryFinish[];
 };
 
+/** The surface words of `apply`, in the order `FinishSurface` lists them. */
+const SURFACE_WORDS: readonly FinishSurface[] = ['floor', 'wall', 'ceiling', 'trim', 'facade'];
+
+/** The surfaces of a bundled floor finish and of a bundled wall finish. */
+const BUNDLED_FLOOR_SURFACES: ReadonlySet<FinishSurface> = new Set(['floor']);
+const BUNDLED_WALL_SURFACES: ReadonlySet<FinishSurface> = new Set(['wall', 'facade', 'ceiling', 'trim']);
+const NO_SURFACES: ReadonlySet<FinishSurface> = new Set();
+
+/** Which surfaces a library finish dresses: the surface words of its `apply`. */
+function surfacesOf(finish: LibraryFinish): ReadonlySet<FinishSurface> {
+  return new Set(SURFACE_WORDS.filter((word) => finish.apply?.includes(word)));
+}
+
+/**
+ * `finishKind` read off a surface table: `floor` first, as it always was, then
+ * `wall`; `null` for a finish that dresses neither.
+ */
+export function kindOfSurfaces(surfaces: ReadonlySet<FinishSurface>): 'floor' | 'wall' | null {
+  if (surfaces.has('floor')) return 'floor';
+  if (surfaces.has('wall')) return 'wall';
+  return null;
+}
+
+/**
+ * The surface table of a BUNDLED finish, from the family the bank files it
+ * under: a floor finish dresses floors, a wall finish every vertical and
+ * overhead surface. What `CATALOGUE_REGISTRIES` answers with.
+ */
+export function bundledSurfaces(kind: 'floor' | 'wall' | null): ReadonlySet<FinishSurface> {
+  if (kind === 'floor') return BUNDLED_FLOOR_SURFACES;
+  if (kind === 'wall') return BUNDLED_WALL_SURFACES;
+  return NO_SURFACES;
+}
+
+/**
+ * `registries.finishSurfaces(id)`, or the table derived from the finish family
+ * when the registries do not carry one: what every reader of the surface
+ * table asks through.
+ */
+export function surfacesIn(registries: SceneRegistries, id: string): ReadonlySet<FinishSurface> {
+  return registries.finishSurfaces?.(id) ?? bundledSurfaces(registries.finishKind(id));
+}
+
+/** `registries.isLibraryMaterial(id)`, or `false` when the registries do not say. */
+export function isLibraryMaterialIn(registries: SceneRegistries, id: string): boolean {
+  return registries.isLibraryMaterial?.(id) ?? false;
+}
+
 /** Which surface family a library finish dresses; `null` means an object finish. */
 function finishFamilyOf(finish: LibraryFinish): 'floor' | 'wall' | null {
-  if (finish.apply?.includes('floor')) return 'floor';
-  if (finish.apply?.includes('wall')) return 'wall';
-  return null;
+  return kindOfSurfaces(surfacesOf(finish));
 }
 
 /**
@@ -310,21 +382,28 @@ export function registriesFromLibrary(library: ProjectLibrary, base?: SceneRegis
   const own: readonly [string, LibraryCatalogue] = [library.id, { id: library.id, objects }];
   const libraries = new Map<string, LibraryCatalogue>([...(base?.libraries ?? []), own]);
 
-  const families = new Map<string, 'floor' | 'wall' | null>();
-  for (const finish of library.materials ?? []) families.set(finish.id, finishFamilyOf(finish));
-
-  const finishKind = (id: string): 'floor' | 'wall' | null => (families.has(id) ? families.get(id)! : (base?.finishKind(id) ?? null));
+  const surfaces = new Map<string, ReadonlySet<FinishSurface>>();
+  const libraryMaterials = new Set<string>();
+  for (const finish of library.materials ?? []) {
+    surfaces.set(finish.id, surfacesOf(finish));
+    if (finish.library === true) libraryMaterials.add(finish.id);
+  }
+  const finishSurfaces = (id: string): ReadonlySet<FinishSurface> => surfaces.get(id) ?? (base ? surfacesIn(base, id) : NO_SURFACES);
+  const finishKind = (id: string): 'floor' | 'wall' | null =>
+    surfaces.has(id) ? kindOfSurfaces(surfaces.get(id)!) : (base?.finishKind(id) ?? null);
   const isKnownFinish = (id: string | undefined, sceneMaterials: readonly MaterialDefinition[]): boolean => {
     if (id === undefined) return false;
-    if (families.has(id)) return true;
+    if (surfaces.has(id)) return true;
     if (base) return base.isKnownFinish(id, sceneMaterials);
     return sceneMaterials.some((material) => material.id === id);
   };
 
   const registries: SceneRegistries = {
-    isSurfaceFinish: (id) => id !== undefined && finishKind(id) !== null,
-    isFinish: (id) => families.has(id) || (base?.isFinish(id) ?? false),
+    isSurfaceFinish: (id) => id !== undefined && (surfaces.has(id) ? surfaces.get(id)!.size > 0 : (base?.isSurfaceFinish(id) ?? false)),
+    isFinish: (id) => surfaces.has(id) || (base?.isFinish(id) ?? false),
     finishKind,
+    finishSurfaces,
+    isLibraryMaterial: (id) => libraryMaterials.has(id) || (!surfaces.has(id) && base !== undefined && isLibraryMaterialIn(base, id)),
     isKnownFinish,
     variantsForPlacement: (asset) => placementIn(registries, asset)?.object.variants ?? [],
     libraries,

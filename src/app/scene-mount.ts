@@ -37,9 +37,14 @@ import type { FurnitureAnimator } from '../geometry/furniture-animator.js';
 import type { ViewerUI } from '../ui/viewer-ui.js';
 import type { Messages } from '../ui/messages.js';
 import { toViewerError, type ViewerError } from './viewer-events.js';
-import type { LoadedDocument } from './project-wiring.js';
+import type { LoadedDocument, LoadedProjectContext } from './project-wiring.js';
 import { prepareSunShadow, type SunShadow } from '../render/sun-shadow.js';
 import type { ApartmentRig } from '../lighting/lighting-context.js';
+import type { LibraryTextures } from '../geometry/library-surface.js';
+import { createProjectTextures, type TextureEnv } from './project-textures.js';
+
+// What the composition root reads the texture environment of its renderer with, through the one door it already uses.
+export { textureEnvOf } from './project-textures.js';
 
 type SceneMountDeps = {
   /**
@@ -85,6 +90,20 @@ type SceneMountDeps = {
   onModelsSettled?: ((model: SceneModel, result: UpgradeResult) => void) | undefined;
   /** Hears accepted actions in the built-in panels (`shared/usage.ts`). */
   usage?: UsageSink | undefined;
+  /**
+   * What the renderer says about drawing library textures, read when a
+   * project mounts; `null` (or absent) without a WebGL context, and then no
+   * texture is fetched at all.
+   */
+  textureEnv?: (() => TextureEnv | null) | undefined;
+};
+
+/** What the last `mount` was called with: everything a context restore must replay. */
+type MountArgs = {
+  readonly model: SceneModel;
+  readonly options: SceneBuilderOptions;
+  readonly variants: VariantBank | undefined;
+  readonly sourceKey: string;
 };
 
 export class SceneMount {
@@ -113,6 +132,10 @@ export class SceneMount {
   private upgrades = new AbortController();
   /** The passes queued so far, chained: two of them must never swap the same body at once. */
   private upgradePass: Promise<void> = Promise.resolve();
+  /** The mounted project's texture source, with the library key it belongs to. */
+  private textures: { readonly key: string; readonly textures: LibraryTextures } | null = null;
+  /** The arguments of the last `mount`, for `remount`. */
+  private last: MountArgs | null = null;
 
   constructor(deps: SceneMountDeps) {
     this.deps = deps;
@@ -160,7 +183,12 @@ export class SceneMount {
    * `SceneMountDeps`: `loadScene` may swap a bare scene for a project and back.
    */
   mount(model: SceneModel, options: SceneBuilderOptions = {}, variants?: VariantBank, sourceKey = ''): BuildResult {
-    this.release();
+    // A remount of the same document keeps its texture source, and with it
+    // the bytes a restored context rebuilds its maps from.
+    const keepTextures = options.textures !== undefined && this.textures?.textures === options.textures;
+    this.release(keepTextures);
+    if (options.textures !== undefined) this.textures = { key: sourceKey, textures: options.textures };
+    this.last = { model, options, variants, sourceKey };
     this.sourceKey = sourceKey;
     this.currentModel = model;
     const builder = new SceneBuilder(model.scene, model.plan, options);
@@ -213,15 +241,47 @@ export class SceneMount {
       }),
     );
     this.deps.onDocument(model);
+    this.scheduleTextures(options.textures);
     this.scheduleUpgrade(builder, model);
     return built;
   }
 
-  /** `mount` for a loaded document: the project's builder options, variant bank and library key. */
+  /**
+   * Mounts the last mounted document again, with everything it was mounted
+   * with — its model resolver, materials, catalogue, variants, library key
+   * and texture source — after a lost rendering context came back. Nothing
+   * on the GPU survived, so the shell is built anew; the texture source
+   * rebuilds its maps from the bytes it kept, without fetching them.
+   */
+  remount(): BuildResult | null {
+    const last = this.last;
+    if (last === null) return null;
+    return this.mount(last.model, last.options, last.variants, last.sourceKey);
+  }
+
+  /** `mount` for a loaded document: the project's builder options, variant bank, library key and texture source. */
   mountDocument(loaded: LoadedDocument): BuildResult {
     const project = loaded.project;
     this.deps.ui.setProjectMark(project?.info.manifest.mark);
-    return this.mount(loaded.model, project?.builderOptions, project?.variants, project?.key ?? '');
+    const textures = project === null ? null : this.texturesFor(project);
+    const options = project === null ? undefined : textures === null ? project.builderOptions : { ...project.builderOptions, textures };
+    return this.mount(loaded.model, options, project?.variants, project?.key ?? '');
+  }
+
+  /** The project's texture source: the mounted one when the library is the same, else a new one; `null` without a context. */
+  private texturesFor(project: LoadedProjectContext): LibraryTextures | null {
+    if (this.textures !== null && this.textures.key === project.key) return this.textures.textures;
+    const env = this.deps.textureEnv?.() ?? null;
+    return env === null ? null : createProjectTextures(project.info.baseUrl, env);
+  }
+
+  /** Starts the texture work a frame after the mount: the first frame is flat and has no network in it. */
+  private scheduleTextures(textures: LibraryTextures | undefined): void {
+    if (textures === undefined) return;
+    const signal = this.upgrades.signal;
+    void nextFrame(signal)
+      .then(() => textures.source.start())
+      .catch(() => undefined);
   }
 
   /**
@@ -324,8 +384,11 @@ export class SceneMount {
     return built;
   }
 
-  /** Frees the mounted document; the mount can be reused with `mount`. */
-  release(): void {
+  /**
+   * Frees the mounted document; the mount can be reused with `mount`.
+   * `keepTextures` keeps the texture source for a remount of the same document.
+   */
+  release(keepTextures = false): void {
     for (const off of this.teardown.splice(0)) off();
     // Before the builder is disposed: a pass in flight must stop writing into
     // a graph whose caches are about to be freed.
@@ -337,6 +400,11 @@ export class SceneMount {
     this.currentEditor?.dispose();
     this.currentBuilder?.dispose();
     this.currentBuilder = undefined;
+    if (!keepTextures) {
+      this.textures?.textures.source.dispose();
+      this.textures = null;
+      this.last = null;
+    }
     this.currentEditor = undefined;
     this.currentModel = undefined;
     this.root = undefined;

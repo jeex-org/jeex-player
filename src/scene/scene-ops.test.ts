@@ -19,7 +19,7 @@ import { DEMO } from '../demo/demo-ids.js';
 import { L_SHAPE } from '../fixtures/plan-l-shape-ids.js';
 import { opDraft as draft, rejectsOp as rejects } from '../fixtures/op-drafts.js';
 import { FINISH } from '../materials/finish-ids.js';
-import { faceKey, type SetMaterialOp } from './types.js';
+import { faceKey, type SetMaterialTargetOp } from './types.js';
 import {
   DEFAULT_WALL_FINISH,
   TOUCHED_FACADE,
@@ -37,7 +37,10 @@ import {
   type SceneOp,
   type TouchedEntity,
 } from './scene-ops.js';
-import { TOUCHED_AUTOTOUR, TOUCHED_NAVIGATION, touchedCamera } from './ops/context.js';
+import { TOUCHED_AUTOTOUR, TOUCHED_NAVIGATION, OpError, touchedCamera, touchedCeiling, touchedTrim } from './ops/context.js';
+import { LIBRARY_FINISH as LIB, LIBRARY_REGISTRIES } from '../fixtures/library-finishes.js';
+import type { Draft } from '../shared/committed.js';
+import type { SceneData } from './types.js';
 
 const { a: ROOM_A, b: ROOM_B } = L_SHAPE.room;
 const W = L_SHAPE.wall;
@@ -165,7 +168,7 @@ describe('set_material', () => {
 
   test('rejects a face target that is not a face key, or names a wall or room the scene lacks', () => {
     const scene = draft();
-    const malformed = { wallId: W.wW } as unknown as SetMaterialOp['target'];
+    const malformed = { wallId: W.wW } as unknown as SetMaterialTargetOp['target'];
     expect(rejects(scene, { op: 'set_material', target: malformed, material: FINISH.sand })).toContain('not a wall face');
     expect(rejects(scene, { op: 'set_material', target: faceKey(ROOM_A, NEW.ghost, 'L'), material: FINISH.sand })).toContain(
       `unknown wall ${NEW.ghost}`,
@@ -481,6 +484,231 @@ const VOCABULARY_SNAPSHOT: readonly VocabularyCase[] = [
     touched: [TOUCHED_SHELL],
   },
 ];
+
+/* ------------------------------------------- set_material, explicit form --- */
+
+/** A fresh L-shape draft declared as 2.3 (or 2.2), so finish objects, ceilings and trims may be written. */
+function draft23(version: '2.2' | '2.3' = '2.3'): Draft<SceneData> {
+  const scene = draft();
+  (scene as { schemaVersion: string }).schemaVersion = version;
+  return scene;
+}
+
+/** Applies `op` against the library registries and answers with the outcome. */
+function paint(scene: Draft<SceneData>, op: SceneOp) {
+  return applyOp(scene, op, LIBRARY_REGISTRIES);
+}
+
+/** Applies `op` against the library registries expecting a refusal; answers with the message, and proves the draft unchanged. */
+function refuses(scene: Draft<SceneData>, op: SceneOp): string {
+  const before = JSON.stringify(scene);
+  try {
+    applyOp(scene, op, LIBRARY_REGISTRIES);
+  } catch (error) {
+    if (!(error instanceof OpError)) throw error;
+    expect(JSON.stringify(scene)).toBe(before);
+    return error.message;
+  }
+  throw new Error(`set_material ${JSON.stringify(op)} was expected to be refused`);
+}
+
+const ROOM_FACE = faceKey(ROOM_A, W.wPart, 'L');
+const FACADE_FACE = faceKey(null, W.wSA, 'R');
+
+describe('set_material, explicit form: addressing', () => {
+  test('floor of one room, and of every room', () => {
+    const scene = draft23();
+    expect(paint(scene, { op: 'set_material', surface: 'floor', room: ROOM_A, material: LIB.floorScan }).touched).toEqual([
+      touchedFloor(ROOM_A),
+    ]);
+    expect(scene.finishes?.rooms?.[ROOM_A]?.floor).toBe(LIB.floorScan);
+    expect(scene.finishes?.rooms?.[ROOM_B]?.floor).toBeUndefined();
+    expect(paint(scene, { op: 'set_material', surface: 'floor', material: LIB.floorAndWall }).touched).toEqual([
+      touchedFloor(ROOM_A),
+      touchedFloor(ROOM_B),
+    ]);
+    expect(scene.finishes?.rooms?.[ROOM_B]?.floor).toBe(LIB.floorAndWall);
+  });
+
+  test('ceiling and trim of one room, and of every room, each touched as itself', () => {
+    const scene = draft23();
+    expect(paint(scene, { op: 'set_material', surface: 'ceiling', room: ROOM_A, material: LIB.paint }).touched).toEqual([
+      touchedCeiling(ROOM_A),
+    ]);
+    expect(paint(scene, { op: 'set_material', surface: 'trim', room: ROOM_B, material: FINISH.sand }).touched).toEqual([
+      touchedTrim(ROOM_B),
+    ]);
+    expect(scene.finishes?.rooms?.[ROOM_A]).toEqual({ ceiling: LIB.paint });
+    expect(scene.finishes?.rooms?.[ROOM_B]).toEqual({ trim: FINISH.sand });
+    expect(paint(scene, { op: 'set_material', surface: 'ceiling', material: LIB.paint, colour: '#c9d6df' }).touched).toEqual([
+      touchedCeiling(ROOM_A),
+      touchedCeiling(ROOM_B),
+    ]);
+    expect(paint(scene, { op: 'set_material', surface: 'trim', material: LIB.paint }).touched).toEqual([
+      touchedTrim(ROOM_A),
+      touchedTrim(ROOM_B),
+    ]);
+  });
+
+  test('walls of one room clear its face overrides, as the legacy room target does', () => {
+    const scene = draft23();
+    paint(scene, { op: 'set_material', surface: 'wall', face: ROOM_FACE, material: FINISH.terra });
+    paint(scene, { op: 'set_material', surface: 'facade', face: FACADE_FACE, material: FINISH.terra });
+    expect(paint(scene, { op: 'set_material', surface: 'wall', room: ROOM_A, material: LIB.paint }).touched).toEqual([
+      touchedRoomWalls(ROOM_A),
+    ]);
+    expect(scene.finishes?.rooms?.[ROOM_A]?.walls).toBe(LIB.paint);
+    expect(scene.finishes?.faces).toEqual([{ ...FACADE_FACE, finish: FINISH.terra }]);
+  });
+
+  test('walls of every room clear every room face override and keep the facade’s', () => {
+    const scene = draft23();
+    paint(scene, { op: 'set_material', surface: 'wall', face: ROOM_FACE, material: FINISH.terra });
+    paint(scene, { op: 'set_material', surface: 'facade', face: FACADE_FACE, material: FINISH.terra });
+    expect(paint(scene, { op: 'set_material', surface: 'wall', material: LIB.paint }).touched).toEqual([
+      touchedRoomWalls(ROOM_A),
+      touchedRoomWalls(ROOM_B),
+    ]);
+    expect(scene.finishes?.faces).toEqual([{ ...FACADE_FACE, finish: FINISH.terra }]);
+  });
+
+  test('one room face for wall, one facade face for facade', () => {
+    const scene = draft23();
+    expect(paint(scene, { op: 'set_material', surface: 'wall', face: ROOM_FACE, material: LIB.wallOnly, rotation: 90 }).touched).toEqual([
+      touchedFace(ROOM_FACE),
+    ]);
+    expect(paint(scene, { op: 'set_material', surface: 'facade', face: FACADE_FACE, material: LIB.facadeOnly }).touched).toEqual([
+      touchedFace(FACADE_FACE),
+    ]);
+    expect(scene.finishes?.faces).toEqual([
+      { ...ROOM_FACE, finish: { material: LIB.wallOnly, rotation: 90 } },
+      { ...FACADE_FACE, finish: LIB.facadeOnly },
+    ]);
+  });
+
+  test('the facade itself, clearing the facade’s face overrides', () => {
+    const scene = draft23();
+    paint(scene, { op: 'set_material', surface: 'facade', face: FACADE_FACE, material: FINISH.terra });
+    expect(paint(scene, { op: 'set_material', surface: 'facade', material: LIB.facadeOnly }).touched).toEqual([TOUCHED_FACADE]);
+    expect(scene.finishes?.facade).toBe(LIB.facadeOnly);
+    expect(scene.finishes?.faces).toEqual([]);
+  });
+
+  test('refused combinations leave the document unchanged', () => {
+    const scene = draft23();
+    for (const surface of ['floor', 'ceiling', 'trim'] as const) {
+      expect(refuses(scene, { op: 'set_material', surface, face: ROOM_FACE, material: LIB.paint })).toContain('face is allowed only');
+    }
+    expect(refuses(scene, { op: 'set_material', surface: 'wall', room: ROOM_A, face: ROOM_FACE, material: LIB.paint })).toContain(
+      'room or face',
+    );
+    expect(refuses(scene, { op: 'set_material', surface: 'facade', room: ROOM_A, material: LIB.paint })).toContain('room is not allowed');
+    expect(refuses(scene, { op: 'set_material', surface: 'wall', face: FACADE_FACE, material: LIB.paint })).toContain('needs the room');
+    expect(refuses(scene, { op: 'set_material', surface: 'facade', face: ROOM_FACE, material: LIB.paint })).toContain('owned by no room');
+    expect(refuses(scene, { op: 'set_material', surface: 'floor', room: NEW.ghost, material: LIB.floorScan })).toContain(
+      `Unknown set_material room ${NEW.ghost}`,
+    );
+    expect(refuses(scene, { op: 'set_material', surface: 'wall', face: faceKey(ROOM_A, NEW.ghost, 'L'), material: LIB.paint })).toContain(
+      `unknown wall ${NEW.ghost}`,
+    );
+    expect(refuses(scene, { op: 'set_material', surface: 'roof' as never, material: LIB.paint })).toContain(
+      'is not floor, wall, ceiling, trim or facade',
+    );
+  });
+});
+
+describe('set_material, explicit form: which material, and the value written', () => {
+  test('the surface must be in the material’s apply, strictly: no facade allowance for a wall material', () => {
+    const scene = draft23();
+    expect(refuses(scene, { op: 'set_material', surface: 'ceiling', room: ROOM_A, material: LIB.wallOnly })).toContain(
+      'does not dress the ceiling',
+    );
+    expect(refuses(scene, { op: 'set_material', surface: 'facade', material: LIB.wallOnly })).toContain('does not dress the facade');
+    expect(refuses(scene, { op: 'set_material', surface: 'wall', material: LIB.floorScan })).toContain('does not dress the wall');
+    expect(refuses(scene, { op: 'set_material', surface: 'floor', material: FINISH.sand })).toContain('does not dress the floor');
+    expect(refuses(scene, { op: 'set_material', surface: 'floor', material: NEW.ghost })).toContain(`Unknown finish ${NEW.ghost}`);
+  });
+
+  test('a floor-and-wall material paints exactly the surface named', () => {
+    const scene = draft23();
+    paint(scene, { op: 'set_material', surface: 'wall', room: ROOM_A, material: LIB.floorAndWall });
+    expect(scene.finishes?.rooms?.[ROOM_A]).toEqual({ walls: LIB.floorAndWall });
+  });
+
+  test('colour and rotation are refused with a bundled, a pbr or a generator finish', () => {
+    const scene = draft23();
+    expect(refuses(scene, { op: 'set_material', surface: 'wall', material: FINISH.sand, colour: '#c9d6df' })).toContain(
+      'need a library material',
+    );
+    expect(refuses(scene, { op: 'set_material', surface: 'wall', material: LIB.pbrWall, rotation: 90 })).toContain(
+      'need a library material',
+    );
+    expect(refuses(scene, { op: 'set_material', surface: 'floor', material: LIB.generatorFloor, rotation: 90 })).toContain(
+      'need a library material',
+    );
+  });
+
+  test('a malformed colour or rotation is refused, the document unchanged', () => {
+    const scene = draft23();
+    expect(refuses(scene, { op: 'set_material', surface: 'wall', material: LIB.paint, colour: '#abc' })).toContain('#rrggbb');
+    expect(refuses(scene, { op: 'set_material', surface: 'wall', material: LIB.paint, rotation: Number.POSITIVE_INFINITY })).toContain(
+      'finite',
+    );
+  });
+
+  test('without modifiers the bare UUID is written, with them the finish object', () => {
+    const scene = draft23();
+    paint(scene, { op: 'set_material', surface: 'wall', room: ROOM_A, material: LIB.paint });
+    expect(scene.finishes?.rooms?.[ROOM_A]?.walls).toBe(LIB.paint);
+    paint(scene, { op: 'set_material', surface: 'wall', room: ROOM_A, material: LIB.paint, colour: '#c9d6df' });
+    expect(scene.finishes?.rooms?.[ROOM_A]?.walls).toEqual({ material: LIB.paint, colour: '#c9d6df' });
+    paint(scene, { op: 'set_material', surface: 'floor', room: ROOM_A, material: LIB.floorScan, rotation: 90 });
+    expect(scene.finishes?.rooms?.[ROOM_A]?.floor).toEqual({ material: LIB.floorScan, rotation: 90 });
+  });
+
+  test('a finish object, a ceiling or a trim into a 2.2 document is refused, naming 2.3', () => {
+    const scene = draft23('2.2');
+    expect(refuses(scene, { op: 'set_material', surface: 'wall', room: ROOM_A, material: LIB.paint, colour: '#c9d6df' })).toContain('2.3');
+    expect(refuses(scene, { op: 'set_material', surface: 'ceiling', room: ROOM_A, material: LIB.paint })).toContain('2.3');
+    expect(refuses(scene, { op: 'set_material', surface: 'trim', material: FINISH.sand })).toContain('2.3');
+    // A bare paint of a 2.2 surface is still fine there.
+    paint(scene, { op: 'set_material', surface: 'wall', room: ROOM_A, material: LIB.paint });
+    expect(scene.finishes?.rooms?.[ROOM_A]?.walls).toBe(LIB.paint);
+  });
+
+  test('an operation carrying both surface and target is refused', () => {
+    const both = { op: 'set_material', surface: 'wall', target: 'walls', material: LIB.paint } as unknown as SceneOp;
+    expect(refuses(draft23(), both)).toContain('either target or surface');
+  });
+});
+
+describe('set_material, legacy form on the surface table', () => {
+  test('a room target with a floor-and-wall material paints the floor, as a floor finish always has', () => {
+    const scene = draft23();
+    paint(scene, { op: 'set_material', target: ROOM_A, material: LIB.floorAndWall });
+    expect(scene.finishes?.rooms?.[ROOM_A]).toEqual({ floor: LIB.floorAndWall });
+  });
+
+  test('the facade alias takes a project wall material (the 2.2 rule) and a facade-only one', () => {
+    const scene = draft23();
+    paint(scene, { op: 'set_material', target: 'facade', material: LIB.wallOnly });
+    expect(scene.finishes?.facade).toBe(LIB.wallOnly);
+    paint(scene, { op: 'set_material', target: 'facade', material: LIB.facadeOnly });
+    expect(scene.finishes?.facade).toBe(LIB.facadeOnly);
+  });
+
+  test('the legacy room target refuses a material that dresses neither floors nor walls', () => {
+    const scene = draft23();
+    expect(refuses(scene, { op: 'set_material', target: ROOM_A, material: LIB.facadeOnly })).toContain('not a wall finish');
+    expect(scene.finishes?.rooms?.[ROOM_A]?.walls).toBeUndefined();
+  });
+
+  test('a facade-only material may paint a facade face but not a room’s', () => {
+    const scene = draft23();
+    paint(scene, { op: 'set_material', target: FACADE_FACE, material: LIB.facadeOnly });
+    expect(refuses(scene, { op: 'set_material', target: ROOM_FACE, material: LIB.facadeOnly })).toContain('not a wall finish');
+  });
+});
 
 describe('op vocabulary snapshot on the demo apartment', () => {
   test('every operation of the union is covered', () => {

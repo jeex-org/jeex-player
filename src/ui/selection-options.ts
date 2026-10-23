@@ -41,7 +41,8 @@ import { openingVariantSwatchDataURL, variantsForOpening, type OpeningVariant } 
 import { faceFinishOf, facadeFinishOf, floorFinishOf, roomWallFinishOf, type SceneOp } from '../scene/scene-ops.js';
 import type { OpeningListEntry } from '../geometry/opening-builder.js';
 import type { HighlightKind } from '../render/selection-highlight.js';
-import type { DemoAsset, FaceKey, MirrorAxis, MirrorFacts, OpeningType, SceneData } from '../scene/types.js';
+import type { DemoAsset, FaceKey, FinishSurface, MirrorAxis, MirrorFacts, OpeningType, SceneData } from '../scene/types.js';
+import type { FinishApply, ProjectMaterial } from '../materials/finish-types.js';
 import { allowedMirrorAxes, mirroredAxes } from '../scene/mirror.js';
 import type { MessageKey, Messages } from './messages.js';
 
@@ -114,8 +115,12 @@ export type SelectionScope = {
   readonly ops: {
     /** The narrowest the panel offers: this face, this room's floor. */
     readonly one: SceneOp;
-    /** The broadest: every floor, every wall. */
-    readonly all: SceneOp;
+    /**
+     * The broadest: every floor, every wall. Absent for a library material
+     * whose `apply` does not name the surface it would paint (a facade-only
+     * material has no every-room walls action): omitted, never converted.
+     */
+    readonly all?: SceneOp;
   };
 };
 
@@ -269,6 +274,42 @@ function openingChipBackground(variant: OpeningVariant): string {
 /** An operation plus the hint the built-in panel shows after committing it. */
 export type FinishAction = { op: SceneOp; hint: MessageKey | null };
 
+/** A library material's `apply`: what decides which explicit actions an option of it may carry. */
+export type LibraryChoice = { readonly apply: readonly FinishApply[] };
+
+/** The library material `id` names in `materials`, or `null`: only a material of the `library` member is one. */
+export function libraryChoiceOf(materials: readonly ProjectMaterial[] | undefined, id: string): LibraryChoice | null {
+  const material = materials?.find((candidate) => candidate.id === id);
+  return material !== undefined && 'library' in material ? material : null;
+}
+
+/** An explicit `set_material`, or `null` when the material's `apply` does not name `surface`. */
+function explicitOp(
+  choice: LibraryChoice,
+  surface: FinishSurface,
+  material: string,
+  where: { room?: string; face?: FaceKey } = {},
+): SceneOp | null {
+  if (!choice.apply.includes(surface)) return null;
+  return { op: 'set_material', surface, ...where, material };
+}
+
+/**
+ * One swatch click or scope action for a LIBRARY material, in the explicit
+ * form: the surface it paints is named, and an action whose surface the
+ * material does not dress is omitted (`null`), never turned into another.
+ */
+function libraryAction(target: FinishTarget, choice: LibraryChoice, material: string, scoped: boolean, broad: boolean): SceneOp | null {
+  if (target.surface === 'floor') {
+    if (broad) return explicitOp(choice, 'floor', material);
+    return target.roomId ? explicitOp(choice, 'floor', material, { room: target.roomId }) : null;
+  }
+  const facade = isFacadeTarget(target);
+  if (scoped && target.face) return explicitOp(choice, facade ? 'facade' : 'wall', material, { face: target.face });
+  if (broad) return explicitOp(choice, 'wall', material);
+  return target.roomId ? explicitOp(choice, 'wall', material, { room: target.roomId }) : explicitOp(choice, 'facade', material);
+}
+
 /** Whether a wall target is a facade face: a wall face that belongs to no room. */
 export function isFacadeTarget(target: FinishTarget): boolean {
   return target.surface === 'wall' && target.roomId === undefined;
@@ -281,7 +322,18 @@ export function isFacadeTarget(target: FinishTarget): boolean {
  * target names nothing paintable (a floor with no room), which is exactly when
  * the panel dispatches nothing.
  */
-export function finishPickAction(target: FinishTarget, finishId: string, scopeChecked: boolean): FinishAction | null {
+export function finishPickAction(
+  target: FinishTarget,
+  finishId: string,
+  scopeChecked: boolean,
+  library?: LibraryChoice | null,
+): FinishAction | null {
+  if (library) {
+    const op = libraryAction(target, library, finishId, scopeChecked, false);
+    if (!op) return null;
+    const hint = scopeChecked && target.face ? 'hint.faceApplied' : isFacadeTarget(target) ? 'hint.facadeApplied' : null;
+    return { op, hint };
+  }
   if (target.surface === 'floor') {
     if (!target.roomId) return null;
     return { op: { op: 'set_material', target: target.roomId, material: finishId }, hint: null };
@@ -293,8 +345,24 @@ export function finishPickAction(target: FinishTarget, finishId: string, scopeCh
   return { op: { op: 'set_material', target: 'facade', material: finishId }, hint: 'hint.facadeApplied' };
 }
 
-/** The footer button: the active swatch applied as broadly as the panel offers. */
-export function finishApplyAllAction(target: FinishTarget, finishId: string, scopeChecked: boolean): FinishAction {
+/**
+ * The footer button: the active swatch applied as broadly as the panel offers.
+ * `null` for a library material whose `apply` does not name the surface the
+ * broad action paints.
+ */
+export function finishApplyAllAction(
+  target: FinishTarget,
+  finishId: string,
+  scopeChecked: boolean,
+  library?: LibraryChoice | null,
+): FinishAction | null {
+  if (library) {
+    const op = libraryAction(target, library, finishId, scopeChecked, true);
+    if (!op) return null;
+    const hint =
+      scopeChecked && target.face ? 'hint.faceApplied' : target.surface === 'floor' ? 'hint.allFloorsApplied' : 'hint.allWallsApplied';
+    return { op, hint };
+  }
   if (target.surface === 'floor') {
     return { op: { op: 'set_material', target: 'floors', material: finishId }, hint: 'hint.allFloorsApplied' };
   }
@@ -346,6 +414,37 @@ export function finishCurrentOf(scene: SceneData, target: FinishTarget): string 
 
 // ---------------------------------------------------------------- cores ----
 
+/**
+ * One library material as a core swatch: no canvas generator runs for it.
+ * Its chip is flat — `averageColour`, or the first suggested colour of a
+ * tintable material — and its `preview`, when the manifest names one, is the
+ * picture.
+ */
+function libraryOptionCore(
+  material: Extract<ProjectMaterial, { library: unknown }>,
+  op: SceneOp,
+  bank: VariantBank | undefined,
+): SelectionOptionCore {
+  const { facts } = material.library;
+  const colour = (facts.colourMode === 'tintable' ? facts.tint?.suggestedColours[0]?.hex : undefined) ?? facts.averageColour;
+  const image = bank?.previewUrl?.(material);
+  return {
+    id: material.id,
+    label: material.name,
+    ...(image !== undefined && { image }),
+    thumbnail: null,
+    background: colour,
+    palette: [colour],
+    op,
+  };
+}
+
+/** The surface word a picked target is offered by: `floor`, `wall`, or `facade` for a face no room owns. */
+function surfaceWordOf(target: FinishTarget): FinishSurface {
+  if (target.surface === 'floor') return 'floor';
+  return isFacadeTarget(target) ? 'facade' : 'wall';
+}
+
 /** One finish as a core swatch: the canvas chip, the flat colour, and its op. */
 function finishOptionCore(finish: Finish, op: SceneOp): SelectionOptionCore {
   return {
@@ -365,7 +464,7 @@ function finishOptionCore(finish: Finish, op: SceneOp): SelectionOptionCore {
  * `null` when the target names nothing paintable — a floor click that carried
  * no room, a wall click that carried neither room nor face.
  */
-export function finishCore(scene: SceneData, target: FinishTarget, messages: Messages): SelectionCore | null {
+export function finishCore(scene: SceneData, target: FinishTarget, messages: Messages, bank?: VariantBank): SelectionCore | null {
   if (target.surface === 'floor' && !target.roomId) return null;
   if (target.surface === 'wall' && !target.roomId && !target.face) return null;
   const finishes = target.surface === 'floor' ? FLOOR_FINISHES : WALL_FINISHES;
@@ -382,11 +481,20 @@ export function finishCore(scene: SceneData, target: FinishTarget, messages: Mes
     // `flatMap` rather than `map`: `finishPickAction` judges the TARGET, and a
     // target it refuses was already turned away by the two guards above — the
     // filter is what makes that provable instead of asserted.
-    options: finishes.flatMap((finish) => {
-      const action = finishPickAction(target, finish.id, false);
-      return action ? [finishOptionCore(finish, action.op)] : [];
-    }),
-    scope: current ? finishScope(target, current, messages) : undefined,
+    options: [
+      // The project's library materials for this surface word, in manifest
+      // order, ahead of the bundled bank.
+      ...(bank?.materials ?? []).flatMap((material) => {
+        if (!('library' in material) || !material.apply.includes(surfaceWordOf(target))) return [];
+        const action = finishPickAction(target, material.id, false, material);
+        return action ? [libraryOptionCore(material, action.op, bank)] : [];
+      }),
+      ...finishes.flatMap((finish) => {
+        const action = finishPickAction(target, finish.id, false);
+        return action ? [finishOptionCore(finish, action.op)] : [];
+      }),
+    ],
+    scope: current ? finishScope(target, current, messages, libraryChoiceOf(bank?.materials, current)) : undefined,
   };
 }
 
@@ -401,10 +509,16 @@ export function finishFooterKey(target: FinishTarget): MessageKey {
 }
 
 /** The footer's wording plus the two breadths it and the checkbox commit. */
-function finishScope(target: FinishTarget, finishId: string, messages: Messages): SelectionScope | undefined {
-  const one = finishPickAction(target, finishId, true);
+function finishScope(
+  target: FinishTarget,
+  finishId: string,
+  messages: Messages,
+  library: LibraryChoice | null,
+): SelectionScope | undefined {
+  const one = finishPickAction(target, finishId, true, library);
   if (!one) return undefined;
-  return { label: messages.t(finishFooterKey(target)), ops: { one: one.op, all: finishApplyAllAction(target, finishId, false).op } };
+  const all = finishApplyAllAction(target, finishId, false, library);
+  return { label: messages.t(finishFooterKey(target)), ops: { one: one.op, ...(all !== null && { all: all.op }) } };
 }
 
 /** The variant selection of a furniture placement: its archetype's bank. */
@@ -551,7 +665,7 @@ export function describeSelection(target: DescribeTarget, deps: DescribeDeps): S
   if (target.kind === 'room') {
     const roomId = target.roomId ?? target.id;
     if (!roomId || !scene.rooms.some((room) => room.id === roomId)) return null;
-    const core = finishCore(scene, { surface: 'floor', roomId }, messages);
+    const core = finishCore(scene, { surface: 'floor', roomId }, messages, deps.variants);
     return core ? describeCore(core) : null;
   }
   if (target.kind === 'wall') {
@@ -567,6 +681,7 @@ export function describeSelection(target: DescribeTarget, deps: DescribeDeps): S
       scene,
       { surface: 'wall', ...(target.roomId ? { roomId: target.roomId } : {}), ...(target.face ? { face: target.face } : {}) },
       messages,
+      deps.variants,
     );
     return core ? describeCore(core) : null;
   }

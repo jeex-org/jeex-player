@@ -60,6 +60,7 @@ const CODED = new Set([
   'ViewerDisposedError',
   'MissingShellNodeError',
   'MissingSlotError',
+  'ByteLimitError',
 ]);
 
 describe('ViewerLibError', () => {

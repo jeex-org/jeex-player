@@ -1,5 +1,5 @@
 /**
- * The scene document of schema 2.2 as a `zod/mini` schema: the whole thing —
+ * The scene document of schemas 2.2 and 2.3 as a `zod/mini` schema: the whole thing —
  * every entity `types.ts` declares, in the order it declares them — plus the
  * cheap SHAPE gate that only proves the containers.
  *
@@ -89,7 +89,7 @@
  */
 
 import { z } from 'zod/mini';
-import { SCHEMA_VERSIONS, UUID_V7_PATTERN } from './types.js';
+import { HEX_COLOUR_PATTERN, SCHEMA_VERSIONS, UUID_V7_PATTERN } from './types.js';
 import type { SchemaIssue } from '../shared/schema-issues.js';
 import type { SceneData } from './types.js';
 
@@ -131,12 +131,35 @@ const wallSideSchema = z.enum(['L', 'R']);
  */
 const faceKeySchema = z.strictObject({ room: z.optional(uuidSchema), wallId: uuidSchema, side: wallSideSchema });
 
+/**
+ * `FinishObject` (schema 2.3): strict, its `material` a UUID v7, `colour`
+ * `#rrggbb` (a regex check, so the published JSON Schema carries the pattern),
+ * `rotation` a finite number, and at least one of the two modifiers — an
+ * object with neither is the bare UUID spelled twice. WHICH material it may
+ * name (a library material that dresses the surface) is the validator's
+ * question, like every other finish reference.
+ */
+const finishObjectSchema = z
+  .strictObject({
+    material: uuidSchema,
+    colour: z.optional(z.string().check(z.regex(HEX_COLOUR_PATTERN, { error: 'not a #rrggbb colour' }))),
+    rotation: z.optional(z.number()),
+  })
+  .check(
+    z.refine((value) => value.colour !== undefined || value.rotation !== undefined, {
+      error: 'a finish object needs colour or rotation; use the bare UUID',
+    }),
+  );
+
+/** `FinishRef`: a bare finish UUID (judged against the registries, like every finish) or a `FinishObject`. */
+const finishRefSchema = z.union([z.string(), finishObjectSchema]);
+
 /** `FaceFinish`: one entry of `finishes.faces`, the face plus the finish it wears. */
 const faceFinishSchema = z.strictObject({
   room: z.optional(uuidSchema),
   wallId: uuidSchema,
   side: wallSideSchema,
-  finish: z.string(),
+  finish: finishRefSchema,
 });
 
 const vec2Schema = z.object({ x: z.number(), z: z.number() });
@@ -166,6 +189,29 @@ const siteSchema = z.strictObject(
       issue.code === 'unrecognized_keys' ? `site carries an unknown key: ${issue.keys.join(', ')}` : 'site must be an object',
   },
 );
+
+/**
+ * A 2.2 document carries no library finish: no finish object anywhere, and
+ * no room `ceiling` or `trim`. The issue lands at the first such field, the
+ * path the runtime validator's `finish-needs-schema-2-3` names.
+ */
+const finishesNeedTheirVersion = z.superRefine((scene: { schemaVersion?: unknown; finishes?: unknown }, ctx) => {
+  if (scene.schemaVersion !== '2.2' || typeof scene.finishes !== 'object' || scene.finishes === null) return;
+  const message = "needs schemaVersion '2.3'; a 2.2 document carries no finish object, ceiling or trim";
+  const finishes = scene.finishes as { rooms?: Record<string, Record<string, unknown>>; faces?: { finish?: unknown }[]; facade?: unknown };
+  for (const [room, entry] of Object.entries(finishes.rooms ?? {})) {
+    for (const key of ['floor', 'walls', 'ceiling', 'trim']) {
+      const value = entry?.[key];
+      if (value === undefined || (typeof value === 'string' && key !== 'ceiling' && key !== 'trim')) continue;
+      ctx.addIssue({ code: 'custom', message, path: ['finishes', 'rooms', room, key] });
+      return;
+    }
+  }
+  const face = (finishes.faces ?? []).findIndex((entry) => typeof entry?.finish === 'object' && entry.finish !== null);
+  if (face >= 0) ctx.addIssue({ code: 'custom', message, path: ['finishes', 'faces', face, 'finish'] });
+  else if (typeof finishes.facade === 'object' && finishes.facade !== null)
+    ctx.addIssue({ code: 'custom', message, path: ['finishes', 'facade'] });
+});
 
 /** A 2.2 document carries no `site`: the field is 2.3's. */
 const siteNeedsItsVersion = z.refine(
@@ -264,7 +310,13 @@ const tourCheckpointSchema = z.object({
   name: z.optional(z.string()),
 });
 
-const roomFinishesSchema = z.object({ floor: z.optional(z.string()), walls: z.optional(z.string()) });
+/** `RoomFinishes`. `ceiling` and `trim` are schema 2.3; the validator refuses them in a 2.2 document. */
+const roomFinishesSchema = z.object({
+  floor: z.optional(finishRefSchema),
+  walls: z.optional(finishRefSchema),
+  ceiling: z.optional(finishRefSchema),
+  trim: z.optional(finishRefSchema),
+});
 
 /**
  * `SceneFinishes`. A ROOM key is a room UUID — which room it names is resolved
@@ -275,17 +327,33 @@ const roomFinishesSchema = z.object({ floor: z.optional(z.string()), walls: z.op
 const sceneFinishesSchema = z.object({
   rooms: z.optional(z.record(uuidSchema, roomFinishesSchema)),
   faces: z.optional(z.array(faceFinishSchema)),
-  facade: z.optional(z.string()),
+  facade: z.optional(finishRefSchema),
 });
 
 /** The op vocabulary (`types.ts:385-433`), discriminated by `op` the way a preset's batch is read. */
 export const sceneOpSchema = z.discriminatedUnion('op', [
-  z.object({
-    op: z.literal('set_material'),
-    target: z.union([z.enum(['floors', 'walls', 'facade']), uuidSchema, faceKeySchema]),
-    material: z.string(),
-    scope: z.optional(z.enum(['room', 'face'])),
-  }),
+  // `set_material` has two forms, told apart by `surface` (absent in the
+  // legacy form, which may not carry it) and each forbidding the other's key,
+  // so an operation carrying both `target` and `surface` matches neither.
+  z.discriminatedUnion('surface', [
+    z.object({
+      op: z.literal('set_material'),
+      target: z.union([z.enum(['floors', 'walls', 'facade']), uuidSchema, faceKeySchema]),
+      material: z.string(),
+      scope: z.optional(z.enum(['room', 'face'])),
+      surface: z.optional(z.undefined()),
+    }),
+    z.object({
+      op: z.literal('set_material'),
+      surface: z.enum(['floor', 'wall', 'ceiling', 'trim', 'facade']),
+      room: z.optional(uuidSchema),
+      face: z.optional(faceKeySchema),
+      material: z.string(),
+      colour: z.optional(z.string().check(z.regex(HEX_COLOUR_PATTERN, { error: 'not a #rrggbb colour' }))),
+      rotation: z.optional(z.number()),
+      target: z.optional(z.undefined()),
+    }),
+  ]),
   z.object({ op: z.literal('replace_asset_variant'), assetId: uuidSchema, variant: z.string() }),
   z.object({ op: z.literal('replace_opening_variant'), openingId: uuidSchema, variant: z.string() }),
   z.object({ op: z.literal('set_ceiling'), height: z.number() }),
@@ -487,7 +555,7 @@ const sceneShapeSchema = z
   .check(siteNeedsItsVersion);
 
 /**
- * The whole document of schema 2.2, key for key in `SceneData`'s own
+ * The whole document of schemas 2.2 and 2.3, key for key in `SceneData`'s own
  * declaration order (`types.ts:477-522`) — which is also the order
  * `validate/shape.ts` walks, so the FIRST issue of a document broken in
  * several places is the one the hand-written gate would have reported.
@@ -520,7 +588,7 @@ export const sceneSchema = z
     autotour: autotourSchema,
     tourCheckpoints: z.optional(z.array(tourCheckpointSchema)),
   })
-  .check(siteNeedsItsVersion);
+  .check(siteNeedsItsVersion, finishesNeedTheirVersion);
 
 /** A schema's own path step in this project's vocabulary; a symbol key cannot occur in JSON, and is named rather than dropped. */
 function pathStep(step: PropertyKey): string | number {

@@ -9,13 +9,15 @@ import { defaultOpeningVariant } from '../assets/opening-variants.js';
 import { SceneModel, isApplyOk } from './scene-model.js';
 import { faceFinishOf, floorFinishOf, roomWallFinishOf } from './scene-ops.js';
 import { applyPresetBatch, findPreset, presetBatchOps, presetCoverage, standardPreset } from './interior-presets.js';
-import { faceKey, sameFace, type FaceKey, type SceneData } from './types.js';
+import { faceKey, sameFace, type FaceKey, type FinishRef, type SceneData } from './types.js';
 import { L_SHAPE } from '../fixtures/plan-l-shape-ids.js';
 import { DEMO } from '../demo/demo-ids.js';
 import { OPENING_VARIANT, VARIANT } from '../assets/catalogue-ids.js';
 import { FINISH } from '../materials/finish-ids.js';
 import type { Draft } from '../shared/committed.js';
-import type { InteriorPreset } from './scene-ops.js';
+import type { InteriorPreset, SceneOp } from './scene-ops.js';
+import { DEFAULT_WALL_FINISH as DEFAULT_WALL } from './scene-ops.js';
+import { LIBRARY_FINISH as LIB, LIBRARY_REGISTRIES } from '../fixtures/library-finishes.js';
 
 /** Ids of the presets these tests author, generated once offline. */
 const PRESET = {
@@ -33,7 +35,7 @@ const SOFA = L_SHAPE.asset.sofa;
 const DOOR_AB = L_SHAPE.opening.doorAb;
 
 /** The finish a face wears in a document's `finishes.faces`, or `undefined`. */
-function paintedFinish(document: SceneData, face: FaceKey): string | undefined {
+function paintedFinish(document: SceneData, face: FaceKey): FinishRef | undefined {
   return document.finishes?.faces?.find((entry) => sameFace(entry, face))?.finish;
 }
 
@@ -343,5 +345,93 @@ describe('removing an opening a preset dressed', () => {
     const model = new SceneModel(scene([DRESSES_DOOR, DOOR_ONLY]), CATALOGUE_REGISTRIES);
     model.apply({ baseRev: model.rev, ops: [{ op: 'remove_opening', openingId: DOOR_AB }] });
     expect(model.scene.interiors?.map((preset) => preset.id)).toEqual([PRESET.doors]);
+  });
+});
+
+/* ------------------------------------------- presets and the explicit form --- */
+
+describe('presets read the operation form', () => {
+  const face = faceKey(ROOM_A, L_SHAPE.wall.wPart, 'L');
+  const faceB = faceKey(ROOM_B, L_SHAPE.wall.wPart, 'R');
+
+  /** A 2.3 L-shape model on the library registries, with `presets` and the given face overrides painted. */
+  function libraryModel(presets: readonly InteriorPreset[], painted: readonly FaceKey[] = [face], walls?: FinishRef): SceneModel {
+    const document = scene(presets);
+    (document as { schemaVersion: string }).schemaVersion = '2.3';
+    const model = new SceneModel(document, LIBRARY_REGISTRIES);
+    const ops: SceneOp[] = [];
+    if (walls !== undefined) {
+      const { material, ...modifiers } = typeof walls === 'string' ? { material: walls } : walls;
+      ops.push({ op: 'set_material', surface: 'wall', room: ROOM_A, material, ...modifiers });
+    }
+    for (const target of painted) ops.push({ op: 'set_material', target, material: FINISH.graphite, scope: 'face' });
+    expect(isApplyOk(model.apply({ baseRev: model.rev, ops }))).toBe(true);
+    return model;
+  }
+
+  /** A preset of `ops` alone. */
+  const presetOf = (ops: readonly SceneOp[]): InteriorPreset => ({ ...FLOOR_ONLY, ops });
+
+  test('an explicit wall paint with a floor-and-wall material counts as the walls, and its reset does not overwrite it', () => {
+    const preset = presetOf([{ op: 'set_material', surface: 'wall', room: ROOM_A, material: LIB.floorAndWall }]);
+    const model = libraryModel([preset]);
+    expect(presetCoverage(model.scene, preset)).toEqual({ rooms: [ROOM_A], assets: [], openings: [], faces: [] });
+    expect(presetBatchOps(model.scene, preset, LIBRARY_REGISTRIES)).toEqual([...preset.ops]);
+    expect(isApplyOk(applyPresetBatch(model, preset.id))).toBe(true);
+    expect(model.scene.finishes?.rooms?.[ROOM_A]?.walls).toBe(LIB.floorAndWall);
+    expect(model.scene.finishes?.rooms?.[ROOM_A]?.floor).toBeUndefined();
+    expect(paintedFinish(model.scene, face)).toBeUndefined();
+  });
+
+  test('the same material through the legacy form is inferred as a floor, and the walls get their reset', () => {
+    const preset = presetOf([{ op: 'set_material', target: ROOM_A, material: LIB.floorAndWall }]);
+    const model = libraryModel([preset]);
+    expect(presetBatchOps(model.scene, preset, LIBRARY_REGISTRIES)).toEqual([
+      ...preset.ops,
+      { op: 'set_material', target: ROOM_A, material: roomWallFinishOf(model.scene, ROOM_A) },
+    ]);
+  });
+
+  test('an explicit face operation names its room and the face', () => {
+    const preset = presetOf([{ op: 'set_material', surface: 'wall', face, material: LIB.paint, colour: '#c9d6df' }]);
+    expect(presetCoverage(libraryModel([preset]).scene, preset)).toEqual({ rooms: [ROOM_A], assets: [], openings: [], faces: [face] });
+  });
+
+  test('an explicit every-room wall operation covers every room and needs no reset', () => {
+    const preset = presetOf([{ op: 'set_material', surface: 'wall', material: LIB.paint }]);
+    const model = libraryModel([preset], [face, faceB]);
+    expect(presetCoverage(model.scene, preset).rooms).toEqual([ROOM_A, ROOM_B]);
+    expect(presetBatchOps(model.scene, preset, LIBRARY_REGISTRIES)).toEqual([...preset.ops]);
+  });
+
+  test('an explicit every-room floor operation covers every room and resets their walls', () => {
+    const preset = presetOf([{ op: 'set_material', surface: 'floor', material: LIB.floorScan }]);
+    const model = libraryModel([preset], [face, faceB]);
+    expect(presetCoverage(model.scene, preset).rooms).toEqual([ROOM_A, ROOM_B]);
+    expect(presetBatchOps(model.scene, preset, LIBRARY_REGISTRIES).slice(1)).toEqual([
+      { op: 'set_material', target: ROOM_A, material: DEFAULT_WALL },
+      { op: 'set_material', target: ROOM_B, material: DEFAULT_WALL },
+    ]);
+  });
+
+  test('the reset restores a finish object in its exact spelling, through the explicit form', () => {
+    const walls = { material: LIB.paint, rotation: 90 } as const;
+    const preset = presetOf([{ op: 'set_material', surface: 'floor', room: ROOM_A, material: LIB.floorScan }]);
+    const model = libraryModel([preset], [face], walls);
+    expect(presetBatchOps(model.scene, preset, LIBRARY_REGISTRIES).slice(1)).toEqual([
+      { op: 'set_material', surface: 'wall', room: ROOM_A, material: LIB.paint, rotation: 90 },
+    ]);
+    expect(isApplyOk(applyPresetBatch(model, preset.id))).toBe(true);
+    expect(model.scene.finishes?.rooms?.[ROOM_A]?.walls).toEqual(walls);
+    expect(paintedFinish(model.scene, face)).toBeUndefined();
+  });
+
+  test('a bare finish stays bare, even one the legacy form would route to the floor', () => {
+    const preset = presetOf([{ op: 'set_material', surface: 'floor', room: ROOM_A, material: LIB.floorScan }]);
+    for (const walls of [LIB.paint, LIB.floorAndWall]) {
+      const model = libraryModel([preset], [face], walls);
+      expect(isApplyOk(applyPresetBatch(model, preset.id))).toBe(true);
+      expect({ walls, after: model.scene.finishes?.rooms?.[ROOM_A] }).toEqual({ walls, after: { walls, floor: LIB.floorScan } });
+    }
   });
 });

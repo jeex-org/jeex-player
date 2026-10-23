@@ -1,7 +1,7 @@
 import { describe, expect, test } from 'bun:test';
 import { remapFaceFinishes } from './finish-remap.js';
 import { faceKey } from './types.js';
-import type { FaceFinish, FaceKey, TopologyRemap } from './types.js';
+import type { FaceFinish, FaceKey, FinishRef, TopologyRemap } from './types.js';
 import { FINISH } from '../materials/finish-ids.js';
 
 /**
@@ -37,7 +37,7 @@ const OAK = FINISH.oak;
 const WALNUT = FINISH.walnut;
 const SAGE = FINISH.sage;
 
-const painted = (face: FaceKey, finish: string): FaceFinish => ({ ...face, finish });
+const painted = (face: FaceKey, finish: FinishRef): FaceFinish => ({ ...face, finish });
 
 /** A remap with no `created` faces — the common case. */
 const remapOf = (faces: TopologyRemap['faces']): TopologyRemap => ({ faces, created: [] });
@@ -131,5 +131,30 @@ describe('remapFaceFinishes', () => {
     expect(input).toEqual(before);
     expect(out[2]).toEqual(input[1]);
     expect(out[2]).not.toBe(input[1]);
+  });
+});
+
+describe('remapFaceFinishes carries a finish object whole', () => {
+  /** A library material with both modifiers (the id is a finish UUID; which one does not matter to the remap). */
+  const TINTED = { material: OAK, colour: '#d8cbb5', rotation: 90 } as const;
+
+  test('a split hands both heirs an object deep-equal to the ancestor’s', () => {
+    const out = remapFaceFinishes([painted(A, TINTED)], remapOf([{ from: A, to: [A1, A2], primary: A1, status: 'split' }]));
+    expect(out).toEqual([painted(A1, TINTED), painted(A2, TINTED)]);
+  });
+
+  test('a merge keeps the primary ancestor’s object', () => {
+    const out = remapFaceFinishes(
+      [painted(A, TINTED), painted(B, WALNUT)],
+      remapOf([
+        { from: A, to: [M], primary: A, status: 'merged' },
+        { from: B, to: [M], primary: A, status: 'merged' },
+      ]),
+    );
+    expect(out).toEqual([painted(M, TINTED)]);
+  });
+
+  test('an unmentioned object is carried over as it was', () => {
+    expect(remapFaceFinishes([painted(B, TINTED)], remapOf([]))).toEqual([painted(B, TINTED)]);
   });
 });

@@ -86,7 +86,7 @@ import { mkdirSync, writeFileSync } from 'node:fs';
 import { telemetrySendSchema } from '../src/telemetry/telemetry.schema.js';
 import { TELEMETRY_SCHEMA_VERSION } from '../src/telemetry/vocabulary.js';
 import { join } from 'node:path';
-import { UUID_V7_PATTERN } from '../src/scene/types.js';
+import { HEX_COLOUR_PATTERN, UUID_V7_PATTERN } from '../src/scene/types.js';
 import { readPackageVersion } from './config-input.js';
 
 /** JSON Schema draft this repository publishes. */
@@ -155,12 +155,48 @@ export function generateSchema(target: SchemaTarget, version: string = packageVe
   // `createSchema` emits draft-07's `$schema` unconditionally; `Config` has no
   // draft-selection field, so the repository's own draft is set here instead.
   schema['$schema'] = SCHEMA_DRAFT;
+  if (target.type === 'ViewerOptions') dropHostOnlyOptions(schema);
   if (target.name === SCENE_SCHEMA_TARGET.name && target.type === SCENE_SCHEMA_TARGET.type) {
     allowPublishedSchemaKey(schema, target.type);
     annotateUuidFields(schema);
     forbidSiteBeforeItsVersion(schema, target.type);
+    annotateFinishValues(schema);
+    forbidLibraryFinishesBeforeTheirVersion(schema, target.type);
   }
   return schema;
+}
+
+/**
+ * Viewer options a host passes as live objects and a published schema has no
+ * business describing: a function a JSON document cannot hold. `onLog` stays
+ * for compatibility with the schema already published; a new one stays out.
+ */
+const HOST_ONLY_OPTIONS: readonly string[] = ['resolveTexture'];
+
+/** Removes `HOST_ONLY_OPTIONS` from the generated `ViewerOptions`. */
+function dropHostOnlyOptions(schema: Record<string, unknown>): void {
+  const definition = (schema['definitions'] as Record<string, SchemaNode>)['ViewerOptions'];
+  const properties = definition?.['properties'] as Record<string, unknown> | undefined;
+  if (properties === undefined) throw new Error('schema-gen: expected definitions.ViewerOptions.properties');
+  for (const name of HOST_ONLY_OPTIONS) delete properties[name];
+}
+
+/**
+ * The two runtime rules of a finish value no TypeScript type spells, written
+ * onto the published schema as the Zod twin judges them: a `colour` is
+ * `#rrggbb` (`HEX_COLOUR_PATTERN`, read from `types.ts`), on a finish object
+ * and on the explicit `set_material`; and a finish object carries `colour`
+ * or `rotation` — the one without either is the bare UUID spelled twice.
+ */
+function annotateFinishValues(schema: Record<string, unknown>): void {
+  const definitions = schema['definitions'] as Record<string, SchemaNode>;
+  for (const name of ['FinishObject', 'SetMaterialSurfaceOp']) {
+    const colour = (definitions[name]?.['properties'] as Record<string, SchemaNode> | undefined)?.['colour'];
+    if (colour === undefined) throw new Error(`schema-gen: expected definitions.${name}.properties.colour`);
+    colour['pattern'] = HEX_COLOUR_PATTERN.source;
+  }
+  // Each arm names the property it requires, as strict JSON Schema readers (Ajv `strictRequired`) ask.
+  definitions['FinishObject']!['anyOf'] = ['colour', 'rotation'].map((field) => ({ properties: { [field]: true }, required: [field] }));
 }
 
 /**
@@ -195,6 +231,40 @@ function forbidSiteBeforeItsVersion(schema: Record<string, unknown>, typeName: s
 }
 
 /**
+ * The other half of 2.3's version rule, beside `site`'s: a 2.2 document's
+ * finishes are bare UUIDs only, and a room names no `ceiling` and no `trim`
+ * (the validator's `finish-needs-schema-2-3`). Written on the document, so a
+ * 2.3 document is judged by the full `SceneFinishes`.
+ */
+function forbidLibraryFinishesBeforeTheirVersion(schema: Record<string, unknown>, typeName: string): void {
+  const definitions = schema['definitions'] as Record<string, { properties?: Record<string, unknown>; [key: string]: unknown }> | undefined;
+  const definition = definitions?.[typeName];
+  if (definition?.properties?.['finishes'] === undefined)
+    throw new Error(`schema-gen: expected definitions.${typeName}.properties.finishes`);
+  const bare = { type: 'string' };
+  // Either the document is not 2.2, or its finishes are 2.2's. An `anyOf`
+  // rather than `if`/`then`, which a linter rightly flags as a thenable.
+  definition['anyOf'] = [
+    { not: { properties: { schemaVersion: { const: '2.2' } }, required: ['schemaVersion'] } },
+    {
+      properties: {
+        finishes: {
+          type: 'object',
+          properties: {
+            rooms: {
+              type: 'object',
+              additionalProperties: { type: 'object', properties: { floor: bare, walls: bare }, additionalProperties: false },
+            },
+            faces: { type: 'array', items: { type: 'object', properties: { finish: bare } } },
+            facade: bare,
+          },
+        },
+      },
+    },
+  ];
+}
+
+/**
  * Where a scene document carries a UUID v7, by definition: `value` lists the
  * properties whose value is one (a nullable or optional one included), `keys`
  * the records whose KEYS are room UUIDs, `items` the tuples of UUIDs. Every
@@ -219,7 +289,9 @@ export const UUID_FIELDS: Readonly<
   SceneFinishes: { keys: ['rooms'] },
   FaceKey: { value: ['room', 'wallId'] },
   FaceFinish: { value: ['room', 'wallId'] },
-  SetMaterialOp: { value: ['target'] },
+  FinishObject: { value: ['material'] },
+  SetMaterialTargetOp: { value: ['target'] },
+  SetMaterialSurfaceOp: { value: ['room'] },
   SetCameraTarget: { value: ['room'] },
   ReplaceAssetVariantOp: { value: ['assetId'] },
   ReplaceOpeningVariantOp: { value: ['openingId'] },
