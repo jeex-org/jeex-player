@@ -770,8 +770,8 @@ Rules the validator enforces:
 - Words stay words: `set_material` aliases (`floors`, `walls`, `facade`), furniture `type` words (`'sofa'`), slot names, kinds. The built-in bank's own library id (`starter:interior-v1`) is code vocabulary and never appears in a document.
 - `Opening.center` is measured along the wall centreline from node `a`. Omitted `sill`/`head` mean the defaults for the kind (window 0.9 / 2.2, door 0 / 2.1); `head` must stay 0.05 m under the ceiling.
 - Finish UUIDs resolve through the built-in catalogue; `materials` only adds or overrides.
-- `site` (schema 2.3 only) ties the sun to the plan. `northDeg` is the world azimuth of true north, in degrees clockwise seen from above, from `+Z` towards `+X`, read modulo 360 (absent: 0); `sun` is a preset (absent: `noon`). The presets are artistic, northern hemisphere, not astronomical: `morning` shines from 90° (east of north) at 20° elevation, `noon` from 180° at 55°, `evening` from 270° at 20°. The sun's world azimuth is `northDeg + preset azimuth`. A document without `site` keeps the sun of earlier versions. `site` is a strict object: any other key (`north_deg`), a `northDeg` that is not a finite number or another `sun` is refused as `site-invalid` naming the field, and so is `site` in a 2.2 document.
-- An interior preset dresses what exists: it may not carry an operation that creates an entity (`add_node`, `add_wall`, `split_wall`, `add_room`, `add_opening`, `place_object`).
+- `site` (schema 2.3 only) ties the sun to the plan. `northDeg` is the world azimuth of true north, in degrees clockwise seen from above, from `+Z` towards `+X`, read modulo 360 (absent: 0); `sun` is a preset (absent: `noon`). The presets are artistic, northern hemisphere, not astronomical: `morning` shines from 90° (east of north) at 20° elevation, `noon` from 180° at 55°, `evening` from 270° at 20°. The sun's world azimuth is `northDeg + preset azimuth`. A document without `site` keeps the sun of earlier versions. An editor writes `site` with the `set_site` operation (below), which never leaves an empty `site` behind. `site` is a strict object: any other key (`north_deg`), a `northDeg` that is not a finite number or another `sun` is refused as `site-invalid` naming the field, and so is `site` in a 2.2 document.
+- An interior preset dresses what exists: it may not carry an operation that creates an entity (`add_node`, `add_wall`, `split_wall`, `add_room`, `add_opening`, `place_object`), and it may not change the orientation (`set_site`, refused as `interior-preset-op-site`).
 
 ### Scene finishes
 
@@ -1032,7 +1032,7 @@ if (!isApplyOk(result)) console.error(result.error, result.message, result.issue
 
 The full export list:
 
-- **Op vocabulary** — `applyOp`, `OpError`, `floorFinishOf`, `roomWallFinishOf`, `facadeFinishOf`, `faceFinishOf`, `TOUCHED_SHELL`, `TOUCHED_FACADE`, `isTouchedAsset` (types: `OpOutcome`, `TouchedEntity` — what an op touched, as `{ kind, … }` with faces as `FaceKey` — `SceneOp`, `InteriorPreset`, plus every member of the union by its own name — `SetRoomOp`, `PlaceObjectOp`, … — so an editor panel can be typed to one operation). The twenty-seven operations:
+- **Op vocabulary** — `applyOp`, `OpError`, `floorFinishOf`, `roomWallFinishOf`, `facadeFinishOf`, `faceFinishOf`, `TOUCHED_SHELL`, `TOUCHED_FACADE`, `isTouchedAsset` (types: `OpOutcome`, `TouchedEntity` — what an op touched, as `{ kind, … }` with faces as `FaceKey` — `SceneOp`, `InteriorPreset`, plus every member of the union by its own name — `SetRoomOp`, `PlaceObjectOp`, … — so an editor panel can be typed to one operation). The twenty-eight operations:
 
 | Operation | What it does |
 |---|---|
@@ -1063,6 +1063,7 @@ The full export list:
 | `set_navigation` | Replaces the walk-mode waypoints wholesale. |
 | `set_autotour` | Updates the tour's `path`, `gaze`, `zones` and `speed` (clamped into `TOUR_SPEED`); every `at` has to index the effective path. |
 | `set_tour_checkpoints` | Replaces the tour cameras wholesale, in tour order (each `{ id, position, yaw, pitch, name? }`, ids from the caller); an empty list falls back to the authored `autotour`. |
+| `set_site` | Schema 2.3: sets or clears the plan's orientation and sun preset (`{ northDeg?: number \| null, sun?: 'morning' \| 'noon' \| 'evening' \| null }`, at least one key). A value sets the field, `null` clears it, an omitted key keeps it; `northDeg` is stored normalised to [0, 360). Clearing both removes `site`, so the sun returns to that of documents without orientation. Refused on a 2.2 document (the version is never raised by an operation) and inside interior presets. Touches `site`: the live sun is re-aimed and its shadow refitted, nothing is rebuilt. |
 
 `set_material` has two forms, told apart by their key; an operation carrying both `surface` and `target` is refused.
 

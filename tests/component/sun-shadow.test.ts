@@ -443,6 +443,22 @@ describe('a mounted viewer redraws the sun shadow only when something changed', 
     const state = debug().sunShadow()!;
     expect(state.azimuth).toBeCloseTo(270, 6);
     expect(state.elevation).toBeCloseTo(20, 6);
+    // `set_site` re-aims the live sun and refits its shadow with no reload; a second one restores it.
+    const before = state.fit;
+    const drawsBefore = draws();
+    const morning = debug().applyOps([{ op: 'set_site', sun: 'morning' }]);
+    expect(morning.error).toBeUndefined();
+    await until(() => debug().sunShadow()!.azimuth !== state.azimuth, 'the morning sun');
+    const turned = debug().sunShadow()!;
+    expect(turned.direction).not.toEqual(state.direction);
+    expect(turned.fit).not.toEqual(before);
+    expect(await settle()).toBeGreaterThan(drawsBefore);
+    const back = debug().applyOps([{ op: 'set_site', northDeg: 0, sun: 'evening' }]);
+    expect(back.error).toBeUndefined();
+    await until(() => debug().sunShadow()!.azimuth === state.azimuth, 'the evening sun again');
+    expect(debug().sunShadow()!.direction).toEqual(state.direction);
+    expect(debug().sunShadow()!.fit).toEqual(state.fit);
+
     await handle.loadScene({ document: structuredClone(lShapePlan) });
     await until(() => debug().sunShadow()?.direction[0] === LEGACY_SUN_DIRECTION[0], 'the legacy sun');
     expect(debug().sunShadow()!.direction).toEqual(LEGACY_SUN_DIRECTION);

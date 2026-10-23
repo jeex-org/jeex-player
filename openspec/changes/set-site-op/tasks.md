@@ -10,5 +10,5 @@
 
 ## 2. Live and docs
 
-- [ ] 2.1 Browser test (heavy queue; extend an existing sun-shadow file rather than adding one): the debug `applyOps([{ op: 'set_site', sun: 'morning' }])` re-aims the sun and refits the shadow without a reload; a second `set_site` with the previous values restores the previous direction; verify that file.
-- [ ] 2.2 README (scene operations and the scene-format text on how `site` is written) and CHANGELOG; verify docs tests.
+- [x] 2.1 Browser test (heavy queue; extend an existing sun-shadow file rather than adding one): the debug `applyOps([{ op: 'set_site', sun: 'morning' }])` re-aims the sun and refits the shadow without a reload; a second `set_site` with the previous values restores the previous direction; verify that file.
+- [x] 2.2 README (scene operations and the scene-format text on how `site` is written) and CHANGELOG; verify docs tests.

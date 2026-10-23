@@ -9,6 +9,16 @@ as described under [Versioning](#versioning).
 
 ### Added
 
+- **`set_site`: a scene operation for the plan's orientation and sun preset.**
+  `{ op: 'set_site', northDeg?: number | null, sun?: 'morning' | 'noon' | 'evening' | null }`
+  on schema 2.3 documents: a value sets the field, `null` clears it, an omitted
+  key keeps it; `northDeg` is normalised to [0, 360); clearing both removes
+  `site`. Refused on 2.2 documents and inside interior presets. A change of
+  `site` (by the operation or by a replaced document) reports the new touched
+  kind `site`, and the live viewer re-aims the sun without a rebuild.
+  `SetSiteOp` is exported from `jeex-viewer/ops`; the published scene schema
+  requires one of the two keys.
+
 - **Ambient occlusion and SMAA in walk and tour.** In the two modes where
   nothing is edited, the player renders through a post-processing chain:
   three.js GTAO (0.3 m radius, full resolution, denoised) darkens corners,
