@@ -410,8 +410,21 @@ describe('the runtime and the controller with real loads', () => {
     return { runtime, frame, controller, camera, errors };
   }
 
+  /** Pumps frames until the runtime's first picture, which waits for the scene's shaders (`render/first-draw.ts`). */
+  async function firstPicture(runtime: RenderRuntime, frame: () => void): Promise<void> {
+    await until(
+      () => {
+        frame();
+        return Number.isFinite(runtime.lastDrawnAt);
+      },
+      'the first picture',
+      30_000,
+    );
+  }
+
   test('editing modes draw to the screen with no pass; walk draws through the chain once loaded', async () => {
     const { runtime, frame, controller } = controlled();
+    await firstPicture(runtime, frame);
     const renderSpy = vi.spyOn(WalkPost.prototype, 'render');
     const targets: unknown[] = [];
     const render = runtime.renderer.render.bind(runtime.renderer);

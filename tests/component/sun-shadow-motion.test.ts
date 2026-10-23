@@ -179,11 +179,22 @@ describe('a model upgrade swap', () => {
     async () => {
       const handle = mountViewer(openContainer(), { scene: { url: '/tests/fixtures/project/project.json' }, tour: { mode: 'off' } });
       handles.push(handle);
+      // The shadow draws while the stand-in is still on screen; `ready` follows the
+      // first picture, which waits for the shaders, so the GLB may land before it.
+      let atStandIn = -1;
+      await until(
+        () => {
+          const models = window.__viewerDebug?.assetModels() ?? [];
+          if (models[0]?.state === 'gltf') return true;
+          if (window.__viewerDebug) atStandIn = draws();
+          return false;
+        },
+        'the GLB to replace the stand-in',
+        PROJECT_TIMEOUT_MS,
+      );
       await handle.ready;
-      const atReady = draws();
-      await until(() => debug().assetModels()[0]?.state === 'gltf', 'the GLB to replace the stand-in', PROJECT_TIMEOUT_MS);
       const settled = await settle();
-      expect(settled).toBeGreaterThan(atReady);
+      expect(settled).toBeGreaterThan(atStandIn);
       expect(debug().sunShadow()!.fit).not.toBeNull();
     },
     PROJECT_TIMEOUT_MS,
