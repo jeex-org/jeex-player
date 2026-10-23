@@ -8,9 +8,9 @@
  * Control) this module subscribes to nothing, adds no frame hook and returns
  * a wiring whose every method does nothing.
  *
- * Measurement invariants: `ready` is the first frame the renderer actually
- * DREW after a document was announced (`RenderRuntime.lastDrawnAt`), once per
- * load; frame time counts only intervals between consecutive drawn 3D frames;
+ * Measurement invariants: `ready` is timed by the last frame the renderer
+ * actually DREW once a document was announced (`RenderRuntime.lastDrawnAt`;
+ * the announcement follows the first picture), once per load; frame time counts only intervals between consecutive drawn 3D frames;
  * room time counts the frame loop's ticks, drawn or not, while the camera is
  * inside the apartment (walk and tour); a mode change counts only
  * after the first `ready` and only when the mode really changed.
@@ -193,13 +193,16 @@ function live(telemetry: Telemetry, deps: TelemetryWiringDeps, win: Window): Tel
     const mode = current.mode;
     // A pause (a hidden tab, an off-screen canvas) is no time in a room.
     if (mode !== undefined && ROOM_MODES.has(mode) && tick > 0 && tick <= MAX_FRAME_INTERVAL_MS) dwellFor(current, tick);
-    if (current.runtime.lastDrawnAt !== now) {
+    // `ready` follows the first picture (`render/first-draw.ts`), and a resting
+    // walk may draw nothing after it: the load is timed by the last draw.
+    const drawnAt = current.runtime.lastDrawnAt;
+    if (awaitingDraw && drawnAt >= loadOrigin) {
+      awaitingDraw = false;
+      telemetry.ready((drawnAt - loadOrigin) / 1000);
+    }
+    if (drawnAt !== now) {
       previousDrawn = null;
       return;
-    }
-    if (awaitingDraw) {
-      awaitingDraw = false;
-      telemetry.ready((now - loadOrigin) / 1000);
     }
     // The plan view draws the scene only as a heartbeat: neither its frames nor
     // the gap to the first 3D frame after it are frame times.

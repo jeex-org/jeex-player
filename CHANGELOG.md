@@ -174,6 +174,16 @@ as described under [Versioning](#versioning).
 
 ### Changed
 
+- **The first picture waits for the scene's shaders, and `ready` waits for
+  the first picture.** The player compiles the scene's shaders asynchronously
+  before its first picture (parallel linking off the main thread where the
+  browser has `KHR_parallel_shader_compile`, at most 1 s), so the first frame
+  no longer blocks the page for the links; the walk and tour chain does the
+  same for its own target before it attaches, and so does a restored GPU
+  context. `ready`, `__appReady` and the reveal of the viewer now come after
+  the first picture is drawn (before, they came just before it), so a host
+  that screenshots on `ready` never sees a blank canvas.
+
 - **Walk and tour draw on demand.** In `walk` and `tour` the player draws a
   new picture only when something on screen can have changed (the camera,
   an edit or rebuild, a door or furniture animation, a model or texture that

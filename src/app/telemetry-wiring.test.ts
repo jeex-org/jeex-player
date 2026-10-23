@@ -406,3 +406,19 @@ describe('telemetry wiring under drawing on demand (walk and tour skip draws whi
     subject.wiring.dispose();
   });
 });
+
+describe('telemetry wiring: ready follows the first picture', () => {
+  test('a resting walk that drew before `ready` reports the load at the next tick, timed by that draw', () => {
+    const subject = rig();
+    subject.wiring.attach(subject.stage.stage);
+    subject.stage.setMode('walk');
+    subject.page.advance(800);
+    // The first picture, then `ready` (it now follows the draw), then ticks that draw nothing.
+    subject.stage.frame(16, true);
+    subject.page.advance(3000);
+    subject.ready(SCENE_A);
+    subject.stage.frame(16, false);
+    expect(bodies.at(-1)).toMatchObject({ event: 'ready', load: '<1s' });
+    subject.wiring.dispose();
+  });
+});

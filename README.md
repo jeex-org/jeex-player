@@ -34,6 +34,7 @@ This document is the integration reference.
 - [Scene document](#scene-document)
 - [Project format](#project-format)
 - [Scene operations entry (`jeex-viewer/ops`)](#scene-operations-entry-jeex-viewerops)
+- [First picture](#first-picture)
 - [Rendering in walk and tour](#rendering-in-walk-and-tour)
 - [Lighting standard (`jeex-viewer/lighting`)](#lighting-standard-jeex-viewerlighting)
 - [Development](#development)
@@ -514,7 +515,7 @@ Handle (`viewer.on(...)`) and custom element (`addEventListener(...)`, `detail` 
 
 | Handle event | Element event | Payload |
 |---|---|---|
-| `ready` | `jeex-ready` | `{ options, sceneId }` after the first FRAME of that scene has been drawn — on the first mount and on every `loadScene`, so a host may screenshot on it |
+| `ready` | `jeex-ready` | `{ options, sceneId }` after the first FRAME of that scene has been drawn — on the first mount, on every `loadScene` and after a restored GPU context, so a host may screenshot on it. The first picture waits for the scene's shaders ([First picture](#first-picture)), so `ready` and the reveal of the viewer come after it, never on a blank canvas |
 | `error` | `jeex-error` | A `ViewerLibError` (`{ code, message, path?, detail?, cause? }`); codes in [Errors](#errors). The iframe bridge sends `{ code, message }` only |
 | `scene` | `jeex-scene` | `{ sceneId, rev }` after every committed change |
 | `mode` | `jeex-mode` | `ViewerMode` |
@@ -1108,6 +1109,10 @@ Every operation is atomic inside its batch: `applyOp` mutates a draft and answer
 - **Identifiers** — `UUID_V7_PATTERN` and `isUuidV7` (the validator's own check; the entry exports no generator), `faceKey`, `sameFace`, `isFaceKey` (types `FaceKey`, `FaceFinish`, `FinishRef`, `SetMaterialAlias`, `SetMaterialSurfaceOp`, `TopologyRemap`, `TopologyRemapEntry`, and `NewIdRefusal`: the `OpError.detail.reason` a creating op refuses an id with, `invalid_id` or `duplicate_id`), and `CATALOGUE_ID_BY_SLUG` (types `CatalogueIdBySlug`, `CatalogueSlugTable`), the shipped catalogue's readable slug → UUID table.
 
 A name not on this list is not public, whatever module it lives in — the same façade rule every other library entry follows (`src/embed/ops.test.ts` pins the export surface, sorted, against exactly this list). Nothing above renders anything or touches a document: `src/purity.test.ts` and `.dependency-cruiser.cjs` hold `embed/ops.ts` to the same "no `three`, no DOM" invariant as the rest of the pure layer.
+
+## First picture
+
+Before its first picture, and again after a restored GPU context, the player compiles the scene's shaders asynchronously (three's `compileAsync`; the browser links them in parallel off the main thread where it offers `KHR_parallel_shader_compile`) and draws once they are ready, or after at most 1 s. The frame loop keeps running meanwhile. This takes the shader links out of the first frame's long task, which blocked the page's main thread; a browser without parallel compilation draws as before. The walk and tour chain compiles the scene for its own target before it attaches, drawing directly until then. A capture asked for before compilation finishes links what it needs itself, as before. Models and textures that arrive later still compile when first drawn.
 
 ## Rendering in walk and tour
 
