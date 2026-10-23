@@ -3,6 +3,7 @@ import * as THREE from 'three';
 import { WalkRig } from './walk-rig.js';
 import { createWalkUniforms } from './box-probe-patch.js';
 import { WALK_LIGHTING_TUNING as T } from './walk-lighting-tuning.js';
+import { isArtificialLight } from '../../assets/artificial-light.js';
 
 function setup() {
   const scene = new THREE.Scene();
@@ -26,6 +27,11 @@ describe('WalkRig', () => {
     const ambient = scene.children.find((child) => (child as THREE.AmbientLight).isAmbientLight) as THREE.AmbientLight;
     expect(ambient.intensity).toBe(0);
     expect([sky.intensity, fill.intensity, renderer.toneMappingExposure]).toEqual([0.9, 0.4, 1]);
+  });
+
+  test('the ambient floor is artificial light: a colour temperature tints it', () => {
+    const { rig } = setup();
+    expect(isArtificialLight(rig.ambient)).toBe(true);
   });
 
   test('capture: hemisphere and fill at zero, no ambient floor, standard exposure, diffuse off', () => {

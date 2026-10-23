@@ -128,8 +128,10 @@ export function entryGraph(dir: string, entry: string): string[] {
  */
 export const CONSUMER_SOURCE = `import * as THREE from 'three';
 import {
+  colourTemperatureRgb,
   createLightingContext,
   fitShadowFrustum,
+  isLightTemperature,
   LEGACY_SUN_DIRECTION,
   LIGHTING_ERROR_CODES,
   LIGHTING_STANDARD,
@@ -167,12 +169,14 @@ export function light(canvas: HTMLCanvasElement): { context: LightingContext; ri
   const revision: string = LIGHTING_STANDARD.engineRevision;
   const intensity: number = LIGHTING_STANDARD.apartment.sun.intensity;
   const codes: readonly LightingErrorCode[] = LIGHTING_ERROR_CODES;
+  const kelvin: number = LIGHTING_STANDARD.temperature.max;
+  const tint: readonly [number, number, number] = isLightTemperature(kelvin) ? colourTemperatureRgb(kelvin) : [1, 1, 1];
   try {
     reference.attach(scene);
   } catch (error) {
     if (error instanceof LightingError && codes.includes(error.code)) reference.dispose();
   }
-  return { context, rigs: [apartment, reference], key: \`v\${LIGHTING_STANDARD_VERSION}-\${revision}-\${intensity}\` };
+  return { context, rigs: [apartment, reference], key: \`v\${LIGHTING_STANDARD_VERSION}-\${revision}-\${intensity}-\${tint.join(',')}\` };
 }
 `;
 

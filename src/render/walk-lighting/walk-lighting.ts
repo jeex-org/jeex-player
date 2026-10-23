@@ -19,6 +19,10 @@
  * Refresh: an edit re-bakes only the named rooms' grids and re-captures only
  * the named rooms' probes, synchronously within one frame, so a half-written
  * grid is never on screen; anything wider starts the bake over.
+ *
+ * Relight: a new colour of the artificial light re-captures every room's
+ * probe in place, one room per live frame; the grids stay, since their bake
+ * sees neither the lamps nor the ambient floor.
  */
 
 import { ViewerLibError } from '../../shared/errors.js';
@@ -168,8 +172,21 @@ export class WalkLighting {
       if (!this.probes.step()) return;
       this.current = 'live';
       this.last = this.measure();
+    } else if (!this.probes.done) {
+      // A relight: one room's probe per frame, written into its tile in place.
+      this.probes.step();
     }
     this.show(true);
+  }
+
+  /** Queues every room's probe for a re-capture (the artificial light changed colour); the grids stay. */
+  relight(): void {
+    if (this.volumes && this.probes) this.probes.recapture(this.volumes.probes.map((probe) => probe.roomId));
+  }
+
+  /** Whether a relight still has probes to write while live. */
+  get recapturing(): boolean {
+    return this.current === 'live' && this.probes !== null && !this.probes.done;
   }
 
   /** Refreshes what an edit touched; a scope this cannot narrow, or an edit before the bake ends, starts over. */

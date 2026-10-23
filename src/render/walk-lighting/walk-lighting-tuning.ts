@@ -1,7 +1,7 @@
 /**
  * The walk and tour room lighting's tuning, in one frozen object: the room
  * volumes, the grid bake, the room probes, the box-projection blend and the
- * walk calibration (ambient floor and exposure).
+ * walk calibration (ambient floor, exposure and the sun inside rooms).
  *
  * Invariant: these numbers belong to the walk chunk and never to the lighting
  * standard (`lighting/lighting-standard.ts`); the editing look is untouched by
@@ -56,6 +56,19 @@ export const WALK_LIGHTING_TUNING = Object.freeze({
    * the sky are divided by it, so they keep the editing look.
    */
   walkExposure: 3.5,
+  /**
+   * What direct sunlight is scaled by inside the room boxes in walk and tour,
+   * against the editing look's sun. At the walk exposure a sunlit floor read
+   * at the display maximum and lost its texture; scaling the sun by the
+   * inverse of the exposure gives it back the editing look's level, while
+   * the bake, the ambient floor and the exposure (and with them every ratio
+   * the daylight calibration above set) stay as they are. Facades keep their
+   * sun: they are outside every box. Measured in the browser
+   * (`tests/component/walk-lighting.test.ts`).
+   */
+  walkSunScale: 1 / 3.5,
   /** Quiet time after the last edit in walk before the affected rooms are refreshed, milliseconds. */
   refreshDebounceMs: 1000,
+  /** Quiet time after the last change of the artificial light's colour before the room probes are re-captured, milliseconds. */
+  relightSettleMs: 250,
 });

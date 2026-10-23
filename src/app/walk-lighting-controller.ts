@@ -16,6 +16,11 @@
  * A document the lighting refuses (more room boxes than it takes) keeps the
  * direct look and reports one error until the next document.
  *
+ * Relight: a new colour of the artificial light (`relit`) re-captures every
+ * room's probe once the value has rested `relightSettleMs`, one room per
+ * frame, each frame a draw; the grids are not re-baked, because their bake
+ * hides the furniture (the lamps with it) and zeroes the ambient floor.
+ *
  * Lifetime, as the walk chain's (`walk-post-controller.ts`): disposed on
  * context loss and viewer disposal, a build finished for a lost context or a
  * disposed viewer is disposed at once, and the restore builds it again.
@@ -35,6 +40,10 @@ export type WalkLightingHandle<Doc = WalkDocument> = {
   load(doc: Doc): void;
   frame(eligible: boolean): void;
   refresh(scope: LightingScope): void;
+  /** Queues every room's probe for a re-capture, one per live frame. */
+  relight(): void;
+  /** Whether a relight still has probes to write. */
+  readonly recapturing: boolean;
   dispose(): void;
 };
 
@@ -69,6 +78,8 @@ export class WalkLightingController<Doc = WalkDocument> {
   private failed = false;
   private scope: LightingScope | null = null;
   private lastEdit = 0;
+  /** A relight waits for the value to rest; `null` when none is pending. */
+  private relitAt: number | null = null;
   /** Whether the last frame showed the room lighting (rather than the direct look). */
   private shown = false;
 
@@ -101,6 +112,12 @@ export class WalkLightingController<Doc = WalkDocument> {
         lighting.refresh(scope);
         refreshed = true;
       }
+      if (eligible && this.relitAt !== null && !this.failed && this.deps.now() - this.relitAt >= WALK_LIGHTING_TUNING.relightSettleMs) {
+        this.relitAt = null;
+        lighting.relight();
+      }
+      // A probe written this frame changes what the room reflects.
+      if (eligible && !this.failed && lighting.recapturing) refreshed = true;
       lighting.frame(eligible && !this.failed);
     } catch (error) {
       // A bake or a capture that throws would throw again on every frame: one report, the direct look.
@@ -119,6 +136,11 @@ export class WalkLightingController<Doc = WalkDocument> {
     this.stale = true;
     this.failed = false;
     this.scope = null;
+  }
+
+  /** The artificial light changed colour: the probes are re-captured once it rests. */
+  relit(): void {
+    this.relitAt = this.deps.now();
   }
 
   /** An edit touched what `scope` names. */

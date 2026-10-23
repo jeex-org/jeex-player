@@ -47,6 +47,21 @@ describe('patchFragmentShader', () => {
     expect(physical).toContain('getIBLRetroRadiance( geometryViewDir, geometryNormal, material.roughness )');
   });
 
+  test('scales direct sunlight inside the rooms by the walk sun factor, after the room is located, and nothing else', () => {
+    const begin = physical.indexOf('getDirectionalLightInfo( directionalLight, directLight );');
+    const locate = physical.indexOf('jeexLocate( geometryPosition, geometryNormal );');
+    const scale = physical.indexOf('directLight.color *= jeexSunScale;');
+    expect(locate).toBeGreaterThan(-1);
+    expect(locate).toBeLessThan(begin);
+    expect(scale).toBeGreaterThan(begin);
+    // Once, in the directional loop: point lights (the lamps) and the rest keep their light.
+    expect(physical.split('directLight.color *= jeexSunScale;')).toHaveLength(2);
+    expect(physical.indexOf('getPointLightInfo( pointLight, geometryPosition, directLight );')).toBeLessThan(locate);
+    expect(physical).toContain('float jeexSunScale = mix( 1.0, jeexSun, jeexInRoom );');
+    // A material without the studio environment has no room lookup: its sun is unscaled.
+    expect(physical).toContain('float jeexSunScale = 1.0;');
+  });
+
   test("keeps the grid's irradiance apart so the walk can hand it to the environment's place", () => {
     expect(physical).toContain('jeexGridIrradiance = getLightProbeGridIrradiance( probeWorldPos, probeWorldNormal );');
     expect(physical).toContain('irradiance -= jeexGridIrradiance * jeexMove;');
@@ -88,6 +103,18 @@ describe('uniform states', () => {
     expect(uniforms.jeexOutside.value).toBeCloseTo(1 / WALK_LIGHTING_TUNING.walkExposure, 9);
     setUniformState(uniforms, 'editing');
     expect([uniforms.jeexDiffuse.value, uniforms.jeexBoxProbes.value, uniforms.jeexOutside.value]).toEqual([1, 0, 1]);
+  });
+
+  test('the sun factor: 1 in editing and capture, the walk sun scale in walk', () => {
+    const uniforms = createWalkUniforms();
+    expect(uniforms.jeexSun.value).toBe(1);
+    setUniformState(uniforms, 'walk');
+    expect(uniforms.jeexSun.value).toBe(WALK_LIGHTING_TUNING.walkSunScale);
+    expect(WALK_LIGHTING_TUNING.walkSunScale).toBeCloseTo(1 / 3.5, 9);
+    setUniformState(uniforms, 'capture');
+    expect(uniforms.jeexSun.value).toBe(1);
+    setUniformState(uniforms, 'editing');
+    expect(uniforms.jeexSun.value).toBe(1);
   });
 
   test('room boxes fill the arrays with their tiles and probe points', () => {

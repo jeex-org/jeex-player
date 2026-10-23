@@ -11,6 +11,10 @@
  *   irradiance takes the environment's place in three's image-based path, so
  *   rough metals keep their multiple-scattering energy and nothing is counted
  *   twice;
+ * - direct light from the directional lights (the sun; the fill is off in
+ *   walk) is scaled by `jeexSun` inside the room boxes: 1 in the editing and
+ *   capture states, the walk sun factor in walk and tour, so a sunlit floor
+ *   keeps its texture under the walk exposure while facades keep their sun;
  * - with `jeexBoxProbes` on (walk and tour), specular and clearcoat
  *   reflections come from the room probes in one shared atlas, box-projected
  *   onto the room box chosen per fragment (lookup point pushed along the
@@ -18,7 +22,7 @@
  *   every room reflects the studio environment. The anisotropy and
  *   retroreflection branches keep the studio environment.
  *
- * Invariant: with `jeexDiffuse` 1 and `jeexBoxProbes` 0 the output equals the
+ * Invariant: with `jeexDiffuse` 1, `jeexSun` 1 and `jeexBoxProbes` 0 the output equals the
  * unpatched shader's (pinned in `tests/component/walk-lighting.test.ts`), and
  * switching the uniforms never recompiles: the program key is constant.
  *
@@ -39,7 +43,11 @@ const ROWS_MAX = 8;
 
 /** The exact r186 lines the patch replaces, per chunk. */
 export const ENGINE_CHUNK_ANCHORS = Object.freeze({
-  lights_fragment_begin: ['irradiance += getLightProbeGridIrradiance( probeWorldPos, probeWorldNormal );'],
+  lights_fragment_begin: [
+    'irradiance += getLightProbeGridIrradiance( probeWorldPos, probeWorldNormal );',
+    'DirectionalLight directionalLight;',
+    'getDirectionalLightInfo( directionalLight, directLight );',
+  ],
   lights_fragment_maps: [
     'iblIrradiance += getIBLIrradiance( geometryNormal );',
     'vec3 iblRadiance = getIBLRadiance( geometryViewDir, geometryNormal, material.roughness );',
@@ -56,6 +64,8 @@ export type WalkUniforms = {
   jeexDiffuse: { value: number };
   /** What light outside the rooms is scaled by: the inverse of the walk exposure in walk, so facades keep the editing look. */
   jeexOutside: { value: number };
+  /** What direct sunlight inside the rooms is scaled by: the walk sun factor in walk, 1 otherwise. */
+  jeexSun: { value: number };
   jeexBoxProbes: { value: number };
   jeexBoxCount: { value: number };
   jeexSelMin: { value: THREE.Vector3[] };
@@ -86,6 +96,7 @@ export function createWalkUniforms(): WalkUniforms {
   return {
     jeexDiffuse: { value: 1 },
     jeexOutside: { value: 1 },
+    jeexSun: { value: 1 },
     jeexBoxProbes: { value: 0 },
     jeexBoxCount: { value: 0 },
     jeexSelMin: { value: vectors() },
@@ -124,6 +135,7 @@ export function setUniformState(uniforms: WalkUniforms, state: UniformState): vo
   uniforms.jeexDiffuse.value = state === 'editing' ? 1 : 0;
   uniforms.jeexBoxProbes.value = state === 'walk' ? 1 : 0;
   uniforms.jeexOutside.value = state === 'walk' ? 1 / T.walkExposure : 1;
+  uniforms.jeexSun.value = state === 'walk' ? T.walkSunScale : 1;
 }
 
 /** Where each room's tile sits in the atlas, and the atlas size. */
@@ -161,6 +173,7 @@ const PARS = /* glsl */ `
 #define JEEX_MAX_BOXES ${T.maxBoxes}
 uniform float jeexDiffuse;
 uniform float jeexOutside;
+uniform float jeexSun;
 uniform float jeexBoxProbes;
 uniform int jeexBoxCount;
 uniform vec3 jeexSelMin[ JEEX_MAX_BOXES ];
@@ -248,15 +261,28 @@ vec3 jeexRadiance( const in vec3 viewDir, const in vec3 normal, const in float r
 #endif
 `;
 
-/** The begin chunk with the grid's irradiance kept apart in `jeexGridIrradiance`. */
+/** Locates the fragment's room before the directional lights, for the sun factor. */
+const SUN_SCALE = /* glsl */ `DirectionalLight directionalLight;
+	#if defined( USE_ENVMAP ) && defined( ENVMAP_TYPE_CUBE_UV )
+	jeexLocate( geometryPosition, geometryNormal );
+	float jeexSunScale = mix( 1.0, jeexSun, jeexInRoom );
+	#else
+	float jeexSunScale = 1.0;
+	#endif`;
+
+/**
+ * The begin chunk with the grid's irradiance kept apart in
+ * `jeexGridIrradiance`, and the directional lights' direct light scaled by
+ * the sun factor inside the rooms.
+ */
 function beginChunk(): string {
-  const [line] = ENGINE_CHUNK_ANCHORS.lights_fragment_begin;
+  const [grid, declare, directional] = ENGINE_CHUNK_ANCHORS.lights_fragment_begin;
   return (
     'vec3 jeexGridIrradiance = vec3( 0.0 );\n' +
-    THREE.ShaderChunk.lights_fragment_begin.replace(
-      line,
-      'jeexGridIrradiance = getLightProbeGridIrradiance( probeWorldPos, probeWorldNormal );\n\t\tirradiance += jeexGridIrradiance;',
-    )
+    THREE.ShaderChunk.lights_fragment_begin
+      .replace(grid, 'jeexGridIrradiance = getLightProbeGridIrradiance( probeWorldPos, probeWorldNormal );\n\t\tirradiance += jeexGridIrradiance;')
+      .replace(declare, SUN_SCALE)
+      .replace(directional, `${directional}\n\t\tdirectLight.color *= jeexSunScale;`)
   );
 }
 

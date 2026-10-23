@@ -16,6 +16,7 @@ import { Reflector } from 'three/addons/objects/Reflector.js';
 import { readOptions, type OptionSpec } from './asset-options.js';
 import { put, type BuildKit, type Builder } from './asset-kit.js';
 import { mainPassOnly } from './mirror-capture.js';
+import { tagArtificialLight } from './artificial-light.js';
 
 /* ----------------------------------------------------------------- lighting */
 
@@ -77,7 +78,7 @@ export const buildLamp: Builder = (asset, kit) => {
   put(group, kit.cylinderOpen(shadeTop, shadeBottom, shadeHeight, 26), kit.finishDouble('shade'), { y: stemTop + shadeHeight / 2 });
   put(group, kit.circleRing(shadeTop, 0.012, 0.004), kit.finish('shade'), { y: stemTop + shadeHeight, rx: -Math.PI / 2 });
 
-  const bulb = new THREE.PointLight('#ffd9a4', options.lightIntensity, options.lightDistance, 2);
+  const bulb = tagArtificialLight(new THREE.PointLight('#ffd9a4', options.lightIntensity, options.lightDistance, 2));
   bulb.position.y = stemTop + shadeHeight * 0.45;
   bulb.name = `${asset.placementId}-light`;
   group.add(bulb);
@@ -123,7 +124,7 @@ export const buildPendant: Builder = (asset, kit) => {
     put(group, kit.sphere(0.045, 12), kit.finish('shade'), { y: shadeTopY - shadeHeight * 0.72 });
   }
 
-  const bulb = new THREE.PointLight('#ffd9a4', options.lightIntensity, options.lightDistance, 2);
+  const bulb = tagArtificialLight(new THREE.PointLight('#ffd9a4', options.lightIntensity, options.lightDistance, 2));
   bulb.position.y = shadeTopY - shadeHeight * 0.6;
   bulb.name = `${asset.placementId}-light`;
   group.add(bulb);
@@ -149,7 +150,7 @@ export const buildCeilingLight: Builder = (asset, kit) => {
   put(group, kit.cylinder(radius * 0.92, radius * 0.98, 0.03, 26), kit.finish('metal'), { y: -0.015 });
   put(group, kit.cylinderOpen(radius, radius * 0.72, domeHeight, 26), kit.finishDouble('shade'), { y: -0.03 - domeHeight / 2 });
   put(group, kit.cylinder(radius * 0.72, radius * 0.72, 0.012, 26), kit.finish('shade'), { y: -0.03 - domeHeight - 0.006 });
-  const bulb = new THREE.PointLight('#ffd9a4', options.lightIntensity, options.lightDistance, 2);
+  const bulb = tagArtificialLight(new THREE.PointLight('#ffd9a4', options.lightIntensity, options.lightDistance, 2));
   bulb.position.y = -drop - 0.1;
   bulb.name = `${asset.placementId}-light`;
   group.add(bulb);
