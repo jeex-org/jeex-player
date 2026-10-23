@@ -33,6 +33,7 @@
  */
 
 import { z } from 'zod/mini';
+import { isLightTemperature } from '../lighting/colour-temperature.js';
 import { OPTION_SCHEMA } from '../app/viewer-options.js';
 import { isLocale, locales } from '../ui/messages.js';
 import { cameraPoseSchema } from '../scene/types.schema.js';
@@ -170,6 +171,14 @@ const setModeParamsSchema = z.object({ mode: viewerModeSchema }, { error: 'must 
 const focusRoomParamsSchema = z.object({ roomId: wireUuid }, { error: 'must be an object naming a `roomId`' });
 const setFurnitureVisibleParamsSchema = z.object({ visible: wireBoolean }, { error: 'must be an object naming `visible`' });
 const setLocaleParamsSchema = z.object({ locale: localeSchema }, { error: 'must be an object naming a `locale`' });
+/** A whole step of kelvin inside the lighting standard's range, or `null` for «Original». */
+const lightTemperatureSchema = z.union([z.number().check(z.refine((value) => isLightTemperature(value))), z.null()], {
+  error: 'must be null or a whole multiple of 100 from 2700 to 6500',
+});
+const setLightTemperatureParamsSchema = z.object(
+  { temperature: lightTemperatureSchema },
+  { error: 'must be an object naming a `temperature`' },
+);
 const setSelectionParamsSchema = z.object(
   { target: z.union([selectionTargetSchema, z.null()], { error: 'must be a selection target or null' }) },
   { error: 'must be an object naming a `target`' },
@@ -266,6 +275,7 @@ export const commandSchema = z.discriminatedUnion('method', [
   z.object({ method: z.literal('focusRoom'), params: focusRoomParamsSchema }),
   z.object({ method: z.literal('setFurnitureVisible'), params: setFurnitureVisibleParamsSchema }),
   z.object({ method: z.literal('setLocale'), params: setLocaleParamsSchema }),
+  z.object({ method: z.literal('setLightTemperature'), params: setLightTemperatureParamsSchema }),
   z.object({ method: z.literal('setSelection'), params: setSelectionParamsSchema }),
   z.object({ method: z.literal('loadScene'), params: loadSceneParamsSchema }),
   z.object({ method: z.literal('captureStill'), params: captureStillParamsSchema }),
@@ -376,6 +386,10 @@ export const eventSchema = z.discriminatedUnion('event', [
   z.object({ event: z.literal('state'), payload: z.object({ state: tourStateSchema }) }),
   z.object({ event: z.literal('ended'), payload: z.object({}) }),
   z.object({ event: z.literal('size'), payload: z.object({ width: finiteNumber, height: finiteNumber }) }),
+  z.object({
+    event: z.literal('lightTemperature'),
+    payload: z.object({ temperature: lightTemperatureSchema, source: z.enum(['host', 'panel']) }),
+  }),
   z.object({ event: z.literal('disposed'), payload: z.undefined() }),
 ]);
 

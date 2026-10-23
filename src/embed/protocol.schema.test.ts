@@ -55,6 +55,7 @@ type _EventPayloadsCovered = {
   [E in EventName]: EmbedEventMap[E] extends PayloadOf<E> ? true : ['payload not covered', E];
 };
 const _eventPayloadsCovered: _EventPayloadsCovered = {
+  lightTemperature: true,
   ready: true,
   error: true,
   scene: true,
@@ -208,6 +209,14 @@ describe('readCommand', () => {
     expect(readCommand('capturePanorama', { width: 512, roomId: DEMO.room.living.toUpperCase() }).ok).toBe(false);
   });
 
+  test('setLightTemperature takes a whole step of kelvin in the range, or null', () => {
+    expect(readCommand('setLightTemperature', { temperature: 2700 }).ok).toBe(true);
+    expect(readCommand('setLightTemperature', { temperature: null }).ok).toBe(true);
+    for (const temperature of [2600, 6600, 3050, '3000', undefined])
+      expect(readCommand('setLightTemperature', { temperature }).ok).toBe(false);
+    expect(readCommand('setLightTemperature', {}).ok).toBe(false);
+  });
+
   test('setSelection takes a target or null and nothing else', () => {
     expect(readCommand('setSelection', { target: { kind: 'wall', id: DEMO.wall.spineKitchen } }).ok).toBe(true);
     expect(refusal('setSelection', { target: { kind: 'wall', id: 'w1' } })).toEqual([
@@ -290,6 +299,7 @@ describe('the event union', () => {
     error: { code: 'scene-invalid', message: 'the document is not a scene' },
     scene: { sceneId: DEMO.scene, rev: 3 },
     mode: 'walk',
+    lightTemperature: { temperature: 3000, source: 'panel' },
     select: {
       kind: 'wall',
       id: DEMO.wall.spineKitchen,
