@@ -53,9 +53,9 @@
 
 ## 7. Integration
 
-- [ ] 7.1 Fast tier green, then the full gate once through the machine's gate queue on the final tree; on red re-run only the failed files.
+- [x] 7.1 Fast tier green, then the full gate once through the machine's gate queue on the final tree; on red re-run only the failed files.
 
 ## Workflow follow-up
 
-- OCR review on the finished diff, one answer commit, then the full gate (7.1), merge on its stamp.
-- Archive the change, move brainstorm and review out of the repository, set the archived change to the stock schema, `openspec validate --all --strict`.
+- Review the finished diff, answer it in one commit, then run the full gate (7.1).
+- Archive the change and run `openspec validate --all --strict`.
