@@ -6,13 +6,13 @@
 
 ## 2. Applying the temperature
 
-- [ ] 2.1 Tag the bank's point lights (`buildLamp`, `buildPendant`, `buildCeilingLight`: `userData.artificialLight = { colour }`); `light-temperature.ts` test-first using the real bank builders: luminance kept, «Original» restores exactly, applied on new roots and model swaps, on the offscreen scene of default-state captures, and to the walk ambient floor; invalidates the on-demand gate; verify unit tests.
-- [ ] 2.2 Walk: probe re-capture one room per frame after a 250 ms settle, written in place, each invalidating the gate; grids never re-baked; repeated input coalesces; verify unit/stub tests.
+- [x] 2.1 Tag the bank's point lights (`buildLamp`, `buildPendant`, `buildCeilingLight`: `userData.artificialLight = { colour }`); `light-temperature.ts` test-first using the real bank builders: luminance kept, «Original» restores exactly, applied on new roots and model swaps, on the offscreen scene of default-state captures, and to the walk ambient floor; invalidates the on-demand gate; verify unit tests.
+- [x] 2.2 Walk: probe re-capture one room per frame after a 250 ms settle, written in place, each invalidating the gate; grids never re-baked; repeated input coalesces; verify unit/stub tests.
 - [ ] 2.3 Sun factor in the walk patch (`walkSunScale` in the walk tuning; 1 in editing and capture); a test pins the new loop anchor in the r186 chunk and identity in editing/capture; measure the sunlit floor (64 × 64 px, evening preset) before and after; verify the walk-lighting ratios and the new floor, façade and lamp checks (heavy queue).
 
 ## 3. Host contract (test-first for schema and resolvers)
 
-- [ ] 3.1 Before adding lines, extract wiring as needed so `render-runtime.ts` stays under 700 and `viewer-app.ts` at or under 500.
+- [x] 3.1 Before adding lines, extract wiring as needed so `render-runtime.ts` stays under 700 and `viewer-app.ts` at or under 500.
 - [ ] 3.2 Options, schema, resolvers (invalid attribute/query keeps the current value with one warning; handle throws `bad-option`; removal = «Original»), attributes (live), query parameters, handle method and `getState().lightTemperature`, event `lightTemperature` / `jeex-light-temperature` (no event on unchanged), iframe command and event, bridge and host; each with its unit test and the surface tests (published exports, option sets, protocol lists, debug members if any); verify those tests.
 - [ ] 3.3 Local demo enables `settings`; README options/attributes/events tables and CHANGELOG.
 
