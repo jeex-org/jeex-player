@@ -27,7 +27,7 @@ export function tintArtificialLights(root: THREE.Object3D, temperature: LightTem
   let count = 0;
   root.traverse((object) => {
     const light = object as THREE.Light;
-    if (light.isLight !== true) return;
+    if (!(light as Partial<THREE.Light>).isLight) return;
     const original = artificialColour(light);
     if (original === null) return;
     count += 1;

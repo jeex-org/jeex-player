@@ -35,6 +35,7 @@ function build(overrides: Partial<ViewerChromeDeps> = {}): Harness {
     toggleFullscreen: vi.fn(),
     toggleFurniture: vi.fn(),
     openInteriors: vi.fn(),
+    setLightTemperature: vi.fn(),
   };
   const onModePressed = vi.fn();
   const onCollapseChanged = vi.fn();

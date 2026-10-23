@@ -100,6 +100,12 @@ type SceneMountDeps = {
    * texture is fetched at all.
    */
   textureEnv?: (() => TextureEnv | null) | undefined;
+  /**
+   * Puts the current colour temperature on the artificial lights of a root,
+   * or of what changed under it: called with every new root and after every
+   * commit that swapped an asset (`render/light-temperature.ts`).
+   */
+  artificialLights?: ((root: THREE.Object3D) => void) | undefined;
 };
 
 /** What the last `mount` was called with: everything a context restore must replay. */
@@ -270,6 +276,7 @@ export class SceneMount {
         // which redraws only when a caster or the site really changed.
         if (this.sun?.orient(model.scene.site) !== true) this.sun?.refit();
         if (touched.some((entry) => isTouchedAsset(entry))) {
+          if (this.root) this.deps.artificialLights?.(this.root);
           this.deps.onAssetsChanged(model);
           // A variant swap hands out a freshly BUILT (procedural) body, so the
           // new variant's own model has to be fetched the same way the first
@@ -464,6 +471,7 @@ export class SceneMount {
     this.root = built.root;
     const runtime = this.deps.runtime();
     runtime?.scene.add(built.root);
+    this.deps.artificialLights?.(built.root);
     runtime?.demand?.invalidate();
     if (this.currentModel) this.deps.dollhouse.prepare(this.currentModel.plan, built.root);
     if (this.currentModel && runtime?.sunRig) {

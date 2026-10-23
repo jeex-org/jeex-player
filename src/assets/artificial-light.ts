@@ -26,7 +26,7 @@ export function tagArtificialLight<T extends THREE.Light>(light: T): T {
 
 /** Whether `object` is a light carrying the tag. */
 export function isArtificialLight(object: THREE.Object3D): object is THREE.Light {
-  return (object as THREE.Light).isLight === true && artificialColour(object) !== null;
+  return Boolean((object as Partial<THREE.Light>).isLight) && artificialColour(object) !== null;
 }
 
 /** The original colour a tagged object carries, or `null`. */

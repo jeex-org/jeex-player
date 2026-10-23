@@ -280,7 +280,10 @@ function beginChunk(): string {
   return (
     'vec3 jeexGridIrradiance = vec3( 0.0 );\n' +
     THREE.ShaderChunk.lights_fragment_begin
-      .replace(grid, 'jeexGridIrradiance = getLightProbeGridIrradiance( probeWorldPos, probeWorldNormal );\n\t\tirradiance += jeexGridIrradiance;')
+      .replace(
+        grid,
+        'jeexGridIrradiance = getLightProbeGridIrradiance( probeWorldPos, probeWorldNormal );\n\t\tirradiance += jeexGridIrradiance;',
+      )
       .replace(declare, SUN_SCALE)
       .replace(directional, `${directional}\n\t\tdirectLight.color *= jeexSunScale;`)
   );

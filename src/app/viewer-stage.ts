@@ -90,6 +90,8 @@ export type ViewerStageDeps = {
   onFrameError?: ((error: unknown) => void) | undefined;
   /** Hears accepted camera steps and map use (`shared/usage.ts`). */
   usage?: UsageSink | undefined;
+  /** Puts the current colour temperature on artificial lights added later (the walk's ambient floor). */
+  artificialLights?: ((root: THREE.Object3D) => void) | undefined;
   /**
    * `options.select` and the sink for the `select` event (`app/selection.ts`).
    * `listen: false` attaches no pointer listener at all; the controller is
@@ -257,7 +259,12 @@ export class ViewerStage {
       prepare: (chain) => chain.compile(this.runtime.scene, this.camera),
     });
     this.walkLighting = new WalkLightingController({
-      build: () => loadWalkLighting(this.runtime.renderer, this.runtime.scene),
+      build: async () => {
+        const lighting = await loadWalkLighting(this.runtime.renderer, this.runtime.scene);
+        // The walk's ambient floor is artificial light: it takes the current temperature.
+        deps.artificialLights?.(this.runtime.scene);
+        return lighting;
+      },
       report: (error) => deps.onFrameError?.(error),
       chainReady: () => this.walkPost.state() === 'on',
       document: () => this.lightingDocument?.document() ?? null,

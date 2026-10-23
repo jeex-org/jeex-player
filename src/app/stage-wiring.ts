@@ -74,6 +74,7 @@ export function stageWiring(deps: StageWiringDeps): ViewerStageDeps {
       if (deps.stage()?.director?.travelToRoom(roomId) === true) deps.usage?.('minimap');
     },
     usage: deps.usage,
+    artificialLights: (root) => deps.handle().lightTemperature.apply(root),
     onContextLost: deps.onContextLost,
     onContextRestored: deps.onContextRestored,
     signal: deps.signal,

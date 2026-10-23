@@ -38,7 +38,7 @@ function asset(builder: string, dims: [number, number, number]): ResolvedAsset {
     options: {},
     finishes: {},
     pricing: { model: 'free' },
-  } as ResolvedAsset;
+  };
 }
 
 const kit = makeBuildKit(new GeometryCache(), new FinishRegistry([]), {}, () => undefined);

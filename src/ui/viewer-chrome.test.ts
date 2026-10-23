@@ -124,6 +124,7 @@ function harness() {
       },
       toggleFurniture: () => calls.push('toggleFurniture'),
       openInteriors: () => calls.push('openInteriors'),
+      setLightTemperature: () => calls.push('setLightTemperature'),
     },
     onModePressed: () => calls.push('modePressed'),
     onCollapseChanged: () => calls.push('collapse'),

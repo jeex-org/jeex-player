@@ -24,6 +24,7 @@ import type { AssetEdit, AssetEditRefused } from '../edit/asset-edit.js';
 // The union itself lives in `shared/errors.ts`, one layer below everything that
 // raises it, and is re-exported here because `ViewerError` is what a host
 // subscribes to.
+import type { LightTemperatureChange } from './light-temperature-control.js';
 export type { ViewerErrorCode } from '../shared/errors.js';
 
 export type ViewerError = {
@@ -92,6 +93,12 @@ export type ViewerEventMap = {
    * (a host editor's selection card) while it moves. Edges only, never per frame.
    */
   assetMoveState: AssetMoveStateEvent;
+  /**
+   * The colour temperature of the artificial light changed: `temperature` in
+   * kelvin or `null` for «Original», `source` says whether the host or the
+   * viewer's settings panel changed it. Never raised for an unchanged value.
+   */
+  lightTemperature: LightTemperatureChange;
 };
 
 /** The `assetMoveState` payload. */
@@ -140,6 +147,7 @@ export class ViewerEvents {
       assetEdit: fanout('assetEdit'),
       assetEditRefused: fanout('assetEditRefused'),
       assetMoveState: fanout('assetMoveState'),
+      lightTemperature: fanout('lightTemperature'),
     };
   }
 

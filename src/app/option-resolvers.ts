@@ -31,13 +31,12 @@ import { resolveLocaleTag, type Locale } from '../ui/messages.js';
 import { judgeOption, type OptionSpec } from './viewer-options.schema.js';
 
 /**
- * `OptionKind` and `OptionSpec` are declared in `viewer-options.schema.ts`
- * now (`judgeOption` needs them, and importing them back from here would
- * close a cycle — see that file's header) and re-exported here so that every
- * existing `import { type OptionSpec } from './option-resolvers.js'`
+ * `OptionSpec` is declared in `viewer-options.schema.ts` now (`judgeOption`
+ * needs it, and importing it back from here would close a cycle — see that
+ * file's header) and re-exported here so that every existing
+ * `import { type OptionSpec } from './option-resolvers.js'`
  * (`viewer-options.ts`, `viewer-options.test.ts`) keeps working unedited.
  */
-export type { OptionKind } from './viewer-options.schema.js';
 export type { OptionSpec };
 
 /**
@@ -167,6 +166,15 @@ function resolveLocale(path: string, value: unknown, spec: OptionSpec): Locale {
   return fallback;
 }
 
+/** `temperature`: a whole step of kelvin inside the range, or `null` for «Original» (the default). */
+function resolveTemperature(path: string, value: unknown, spec: OptionSpec): number | null {
+  const fallback = spec.default as number | null;
+  if (value === undefined) return fallback;
+  if (judgeOption(spec, value).ok) return value as number | null;
+  warn(path, value, fallback);
+  return fallback;
+}
+
 /** Validates one raw value against its `OptionSpec`, dispatching on `kind`. */
 export function resolveBySpec(path: string, value: unknown, spec: OptionSpec): unknown {
   switch (spec.kind) {
@@ -187,6 +195,8 @@ export function resolveBySpec(path: string, value: unknown, spec: OptionSpec): u
       return resolveSwitch(path, value);
     case 'list':
       return resolveList(path, value, spec);
+    case 'temperature':
+      return resolveTemperature(path, value, spec);
   }
 }
 
