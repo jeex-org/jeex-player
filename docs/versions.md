@@ -25,3 +25,13 @@ Never take a version from memory or from another project's lockfile.
 Five of the former pins were caret ranges (`@playwright/test`, `@axe-core/playwright`,
 `vitest`, `@vitest/browser-playwright`, `@vitest/coverage-v8`); they are exact now. The other
 pins did not change in this update.
+
+## 2026-10-24: knip for a Zod advisory
+
+`bun audit` reported GHSA-mrhx-c7xc-m3w5 (high: Zod before 4.6.6 can exhaust memory while
+validating oversized constrained collections) through `knip > zod@4.5.4`. knip 6.42.1 depends
+on `zod ^4.6.5`, which resolves to the patched release the project already uses.
+
+| Package | Version  | Was      | Command                  |
+| ------- | -------- | -------- | ------------------------ |
+| `knip`  | `6.42.1` | `6.34.0` | `npm view knip version`  |

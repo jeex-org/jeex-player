@@ -1,4 +1,4 @@
-import { describe, expect, test } from 'bun:test';
+import { afterEach, describe, expect, test } from 'bun:test';
 import * as THREE from 'three';
 import { attachLibraryMaps, createLibraryMaterial, libraryMapFormat } from './library-material.js';
 import type { LibraryDraw } from './room-finish.js';
@@ -267,5 +267,27 @@ describe('attachLibraryMaps', () => {
     attachLibraryMaps(material, draw(PAINT), {});
     expect(material.version).toBe(version);
     expect(hexOf(material)).toBe('#f1eee8');
+  });
+});
+
+describe('the diagnostic switches', () => {
+  const page = globalThis as { __JEEX_DEBUG_FLAGS__?: unknown };
+  afterEach(() => {
+    delete page.__JEEX_DEBUG_FLAGS__;
+  });
+
+  test('`noTransmission` keeps a library material’s transmission at 0', () => {
+    page.__JEEX_DEBUG_FLAGS__ = { noTransmission: true };
+    const material = createLibraryMaterial(withPbr(NATURAL_SCAN, { transmission: 0.7 })) as THREE.MeshPhysicalMaterial;
+    expect(material.transmission).toBe(0);
+  });
+
+  test('`noArm` attaches no ARM view and keeps the roughness and occlusion scalars', () => {
+    page.__JEEX_DEBUG_FLAGS__ = { noArm: true };
+    const material = createLibraryMaterial(draw(NATURAL_SCAN));
+    const scalars = [material.roughness, material.aoMapIntensity, material.metalness];
+    attachLibraryMaps(material, draw(NATURAL_SCAN), { arm: new THREE.Texture() });
+    expect([material.aoMap, material.roughnessMap, material.metalnessMap]).toEqual([null, null, null]);
+    expect([material.roughness, material.aoMapIntensity, material.metalness]).toEqual(scalars);
   });
 });

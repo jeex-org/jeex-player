@@ -1,0 +1,152 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>JEEX embed — a host page with aggressive global CSS</title>
+    <style>
+      /*
+        The page's own box for the viewer, by id, the way a host sizes its own
+        container. Everything below this rule is the HOSTILE sheet.
+      */
+      #stage {
+        position: fixed;
+        inset: 0;
+      }
+    </style>
+    <style id="host-hostile">
+      /*
+        A typical agency or CMS theme: a universal reset, body typography,
+        unlayered element rules for every form control, link, icon and image,
+        and a theme class on the content wrapper. None of it names the viewer.
+        `tests/e2e/host-css.spec.ts` measures the chrome with this sheet on and
+        off; the two must match.
+      */
+      *,
+      *::before,
+      *::after {
+        box-sizing: content-box;
+        margin: 0;
+        padding: 0;
+        font-family: Georgia, 'Times New Roman', serif;
+        line-height: 1.8;
+      }
+      html {
+        font-size: 62.5%;
+      }
+      body {
+        font:
+          300 18px/1.8 Georgia,
+          serif;
+        letter-spacing: 0.04em;
+        word-spacing: 0.1em;
+        color: #222;
+        text-align: center;
+        text-transform: capitalize;
+        text-shadow: 0 1px 0 #fff;
+        background: #f4efe6;
+      }
+      div {
+        line-height: 2;
+      }
+      span {
+        display: inline-block;
+        padding: 2px 4px;
+        font-size: 1.6rem;
+      }
+      p,
+      h1,
+      label {
+        display: block;
+        margin: 0 0 1.5em;
+        font-size: 2.4rem;
+        font-weight: 700;
+      }
+      a {
+        color: #c00;
+        font-weight: 700;
+        text-decoration: underline;
+      }
+      a:hover {
+        color: #900;
+      }
+      /* The exact rule a pilot page shipped, unscoped. */
+      select,
+      button {
+        font: inherit;
+        color: #e6e8eb;
+        background: #191d24;
+        border: 1px solid #2a303a;
+        border-radius: 6px;
+        padding: 8px 10px;
+        min-height: 40px;
+      }
+      button,
+      input,
+      select {
+        min-width: 44px;
+        height: auto;
+        width: auto;
+        margin: 4px;
+        box-shadow: 0 2px 0 #000;
+        text-transform: uppercase;
+        letter-spacing: 0.1em;
+        appearance: none;
+        outline: 3px solid #0f0;
+      }
+      button:hover,
+      button:focus {
+        background: #333;
+      }
+      input[type='checkbox'] {
+        width: 20px;
+        height: 20px;
+        border: 2px solid #222;
+      }
+      svg {
+        display: block;
+        width: 100%;
+        height: auto;
+        fill: currentColor;
+      }
+      img {
+        display: block;
+        max-width: 100%;
+        height: auto;
+        border: 2px solid #222;
+      }
+      canvas {
+        max-width: 100%;
+      }
+      /* A theme class on the content wrapper, the way CMS kits scope their rules. */
+      .site-content button {
+        background: #ff2d8a;
+        border-radius: 0;
+      }
+      .site-content img,
+      .site-content a {
+        border-bottom: 3px solid #ff2d8a;
+      }
+      /* The nesting CMS themes write: one class and two element names. */
+      .site-content main button {
+        padding: 14px 18px;
+        background: #ffd400;
+      }
+      .entry-content div span,
+      .entry-content div a {
+        letter-spacing: 0.3em;
+        font-size: 2rem;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="site-content">
+      <main>
+        <div class="entry-content">
+          <div id="stage"></div>
+        </div>
+      </main>
+    </div>
+    <script type="module" src="/dev/host-css.ts"></script>
+  </body>
+</html>

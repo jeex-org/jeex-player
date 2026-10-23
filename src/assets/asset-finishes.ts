@@ -38,6 +38,7 @@ export { finishById, resolveFinishId } from '../materials/asset-finish-catalogue
 
 import type { FinishDefinition, FinishGenerator } from '../materials/asset-finish-catalogue.js';
 import { finishById } from '../materials/asset-finish-catalogue.js';
+import { debugFlags } from '../shared/debug-flags.js';
 
 /** Roughness of the grey a finish nothing resolved is painted with. */
 const FALLBACK_FINISH_ROUGHNESS = 0.8;
@@ -217,7 +218,8 @@ export class FinishRegistry {
       physical.clearcoatRoughness = pbr.clearcoatRoughness ?? 0.3;
     }
     if (pbr.transmission !== undefined) {
-      physical.transmission = pbr.transmission;
+      // A diagnostic switch can keep transmission off, so three.js runs no transmission pass.
+      physical.transmission = debugFlags().noTransmission ? 0 : pbr.transmission;
       physical.ior = pbr.ior ?? 1.5;
       physical.thickness = 0.01;
       physical.transparent = true;
