@@ -88,6 +88,9 @@ export default defineConfig({
     // `--strictPort` on purpose: a server that quietly moved to another port
     // would leave every spec pointing at whatever else is on 3701.
     command: `vite --port ${E2E_PORT} --strictPort --host 127.0.0.1`,
+    // No file watcher on this server, so nothing reloads a page behind a spec's
+    // back (`vite.config.ts`, `E2E_SERVER`).
+    env: { JEEX_E2E_SERVER: '1' },
     url: E2E_BASE_URL,
     reuseExistingServer: !process.env['CI'],
     timeout: 120_000,

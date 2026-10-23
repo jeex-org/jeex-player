@@ -100,6 +100,7 @@ export function fakeCanvas(size: { width: number; height: number } = { width: 80
       set.add(handler);
       listeners.set(type, set);
       if (options?.passive !== undefined) passive.set(type, options.passive);
+      // listener-policy: allow fake-canvas-abort-bookkeeping
       options?.signal?.addEventListener('abort', () => set.delete(handler), { once: true });
     },
     removeEventListener(type: string, handler: Listener): void {

@@ -8,7 +8,7 @@ import { describe, expect, test } from 'bun:test';
 import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { codeOnly, defectsOf, entryGraph } from './lighting-entry-check.ts';
+import { bundledRevisions, codeOnly, defectsOf, engineDefects, entryGraph } from './lighting-entry-check.ts';
 
 describe('defectsOf', () => {
   test('a clean entry has no defects, prose and messages included', () => {
@@ -51,5 +51,56 @@ describe('entryGraph', () => {
     } finally {
       rmSync(dir, { recursive: true, force: true });
     }
+  });
+});
+
+describe('the bundled engine', () => {
+  // How three.js registers itself, as the ES build and the IIFE build spell it.
+  const es = 'dispatchEvent(new CustomEvent("register", { detail: { revision: "186" } }))';
+  const iife = 'dispatchEvent(new CustomEvent(`register`,{detail:{revision:`186`}}))';
+
+  test('reads the revision in either quoting, and not a scene revision', () => {
+    expect(bundledRevisions(es)).toEqual(['186']);
+    expect(bundledRevisions(iife)).toEqual(['186']);
+    expect(bundledRevisions('const state = { revision: "12" }; ({ w, h, revision: this.revision })')).toEqual([]);
+  });
+
+  test('passes the calibrated revision, and names the file that bundles another', () => {
+    expect(
+      engineDefects(
+        new Map([
+          ['a.js', es],
+          ['b.iife.js', iife],
+        ]),
+        '186',
+      ),
+    ).toEqual([]);
+    expect(engineDefects(new Map([['a.js', es.replace('186', '185')]]), '186')).toEqual([
+      { file: 'a.js', problem: 'bundles three.js revision 185, the lighting standard requires 186' },
+    ]);
+  });
+
+  test('a build with no readable three.js fails rather than passing in silence', () => {
+    expect(engineDefects(new Map([['a.js', 'export const x = 1;']]), '186')).toHaveLength(1);
+  });
+
+  test('a file that carries three.js but spells its revision unreadably fails, even when another file passes', () => {
+    expect(
+      engineDefects(
+        new Map([
+          ['a.js', es],
+          ['b.iife.js', 'window.__THREE__?w():window.__THREE__=Ga;dispatchEvent(new CustomEvent(`register`,{detail:{revision:Ga}}))'],
+        ]),
+        '186',
+      ),
+    ).toEqual([{ file: 'b.iife.js', problem: 'bundles three.js whose revision cannot be read' }]);
+  });
+
+  test('a second copy of three.js in a file with no readable revision fails', () => {
+    const copy = `window.__THREE__?w():window.__THREE__=1;${es}`;
+    expect(engineDefects(new Map([['a.js', copy]]), '186')).toEqual([]);
+    expect(engineDefects(new Map([['a.js', `${copy};window.__THREE__?w():window.__THREE__=Ga`]]), '186')).toEqual([
+      { file: 'a.js', problem: 'bundles three.js whose revision cannot be read' },
+    ]);
   });
 });
