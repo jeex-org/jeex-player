@@ -45,8 +45,11 @@ export const ENGINE_CHUNK_ANCHORS = Object.freeze({
     'vec3 iblRadiance = getIBLRadiance( geometryViewDir, geometryNormal, material.roughness );',
     'clearcoatRadiance += getIBLRadiance( geometryViewDir, geometryClearcoatNormal, material.clearcoatRoughness );',
   ],
-  cube_uv_reflection_fragment: ['highp vec2 uv = getUV( direction, face ) * ( faceSize - 2.0 ) + 1.0;', 'uv.y += 4.0 * ( exp2( CUBEUV_MAX_MIP ) - faceSize );'],
-});
+  cube_uv_reflection_fragment: [
+    'highp vec2 uv = getUV( direction, face ) * ( faceSize - 2.0 ) + 1.0;',
+    'uv.y += 4.0 * ( exp2( CUBEUV_MAX_MIP ) - faceSize );',
+  ],
+} as const);
 
 /** The uniforms every patched material shares. */
 export type WalkUniforms = {
@@ -191,9 +194,9 @@ vec3 jeexProbeSample( vec3 direction, float roughness, vec2 tile ) {
 	float mip = clamp( roughnessToMip( roughness ), cubeUV_m0, CUBEUV_MAX_MIP );
 	float mipF = fract( mip );
 	float mipInt = floor( mip );
-	vec3 color0 = jeexBilinear( direction, mipInt, tile );
-	if ( mipF == 0.0 ) return color0;
-	return mix( color0, jeexBilinear( direction, mipInt + 1.0, tile ), mipF );
+	vec3 near = jeexBilinear( direction, mipInt, tile );
+	if ( mipF == 0.0 ) return near;
+	return mix( near, jeexBilinear( direction, mipInt + 1.0, tile ), mipF );
 }
 
 vec3 jeexRadiance( const in vec3 viewDir, const in vec3 normal, const in float roughness ) {
@@ -225,14 +228,18 @@ function beginChunk(): string {
   const [line] = ENGINE_CHUNK_ANCHORS.lights_fragment_begin;
   return (
     'vec3 jeexGridIrradiance = vec3( 0.0 );\n' +
-    THREE.ShaderChunk.lights_fragment_begin.replace(line, 'jeexGridIrradiance = getLightProbeGridIrradiance( probeWorldPos, probeWorldNormal );\n\t\tirradiance += jeexGridIrradiance;')
+    THREE.ShaderChunk.lights_fragment_begin.replace(
+      line,
+      'jeexGridIrradiance = getLightProbeGridIrradiance( probeWorldPos, probeWorldNormal );\n\t\tirradiance += jeexGridIrradiance;',
+    )
   );
 }
 
 /** The maps chunk with the switches, preceded by the room lookup and followed by the grid hand-over. */
 function mapsChunk(): string {
   const [diffuse, specular, clearcoat] = ENGINE_CHUNK_ANCHORS.lights_fragment_maps;
-  const maps = THREE.ShaderChunk.lights_fragment_maps.replace(diffuse, 'iblIrradiance += getIBLIrradiance( geometryNormal ) * jeexDiffuseScale;')
+  const maps = THREE.ShaderChunk.lights_fragment_maps
+    .replace(diffuse, 'iblIrradiance += getIBLIrradiance( geometryNormal ) * jeexDiffuseScale;')
     .replace(specular, 'vec3 iblRadiance = jeexRadiance( geometryViewDir, geometryNormal, material.roughness );')
     .replace(clearcoat, 'clearcoatRadiance += jeexRadiance( geometryViewDir, geometryClearcoatNormal, material.clearcoatRoughness );');
   return /* glsl */ `

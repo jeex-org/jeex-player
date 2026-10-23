@@ -21,7 +21,13 @@ const L_ROOM = [
 
 describe('rectilinearBoxes', () => {
   test('a rectangle with a collinear vertex is one box', () => {
-    const polygon = [{ x: 0, z: 0 }, { x: 2, z: 0 }, { x: 4, z: 0 }, { x: 4, z: 3 }, { x: 0, z: 3 }];
+    const polygon = [
+      { x: 0, z: 0 },
+      { x: 2, z: 0 },
+      { x: 4, z: 0 },
+      { x: 4, z: 3 },
+      { x: 0, z: 3 },
+    ];
     expect(rectilinearBoxes(polygon)).toEqual([{ minX: 0, maxX: 4, minZ: 0, maxZ: 3 }]);
   });
 
@@ -75,12 +81,26 @@ describe('probePoint', () => {
 
 describe('roomOrder', () => {
   test('puts the room a door leaf swings into before the room on the other side', () => {
-    expect(roomOrder(['hall', 'bath', 'bed'], [{ into: 'bath', other: 'hall' }, { into: 'bed', other: 'hall' }])).toEqual(['bath', 'bed', 'hall']);
+    expect(
+      roomOrder(
+        ['hall', 'bath', 'bed'],
+        [
+          { into: 'bath', other: 'hall' },
+          { into: 'bed', other: 'hall' },
+        ],
+      ),
+    ).toEqual(['bath', 'bed', 'hall']);
   });
 
   test('keeps the input order where no door decides, and survives a cycle', () => {
     expect(roomOrder(['a', 'b', 'c'], [])).toEqual(['a', 'b', 'c']);
-    const cyclic = roomOrder(['a', 'b'], [{ into: 'a', other: 'b' }, { into: 'b', other: 'a' }]);
+    const cyclic = roomOrder(
+      ['a', 'b'],
+      [
+        { into: 'a', other: 'b' },
+        { into: 'b', other: 'a' },
+      ],
+    );
     expect([...cyclic].sort()).toEqual(['a', 'b']);
   });
 });
@@ -120,7 +140,11 @@ describe('roomVolumes', () => {
   });
 
   test(`refuses more than ${T.maxBoxes} room boxes`, () => {
-    const rooms = Array.from({ length: T.maxBoxes + 1 }, (_, i) => ({ roomId: `r${i}`, polygon: square(i * 2, 0, i * 2 + 1.9, 2), halfWall: 0.05 }));
+    const rooms = Array.from({ length: T.maxBoxes + 1 }, (_, i) => ({
+      roomId: `r${i}`,
+      polygon: square(i * 2, 0, i * 2 + 1.9, 2),
+      halfWall: 0.05,
+    }));
     const result = roomVolumes({ ...input, rooms, doors: [] });
     expect(result.ok).toBe(false);
     if (!result.ok) expect(result.error).toContain(String(T.maxBoxes));

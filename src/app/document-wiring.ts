@@ -62,7 +62,7 @@ export function seedForDocument(deps: DocumentWiringDeps, model: SceneModel): vo
     model.scene.rooms.map((room) => room.name),
   );
   deps.dollhouse.setState(deps.dollhouse.state, stage?.camera);
-  stage?.setDocument(model);
+  stage?.setDocument(model, () => deps.mount.sceneRoot);
   deps.doors.seed();
   // A host may have driven the tour before there was a clip to drive.
   replayPendingTourCommand(deps.tour);

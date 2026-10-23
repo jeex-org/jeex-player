@@ -148,7 +148,9 @@ describe('rebaseOpeningFrames', () => {
     const builder = new OpeningBuilder(ctx);
     const root = new THREE.Group();
     builder.build(root);
-    const group = root.children.find((child) => child.children.some((leaf) => leaf.userData['isDoorLeaf'] === true && !leaf.userData['isExteriorWall']))!;
+    const group = root.children.find((child) =>
+      child.children.some((leaf) => leaf.userData['isDoorLeaf'] === true && !leaf.userData['isExteriorWall']),
+    )!;
     const before = snapshot(group);
     rebaseOpeningFrames(group);
     const after = snapshot(group);

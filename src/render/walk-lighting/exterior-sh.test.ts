@@ -56,7 +56,8 @@ describe('packAtlas', () => {
     const coefficients = Array.from({ length: 9 }, (_, i) => [i * 3 + 1, i * 3 + 2, i * 3 + 3] as Rgb);
     const { data, width, height, depth } = packAtlas(coefficients, 2);
     expect([width, height, depth]).toEqual([2, 2, 7 * 4]);
-    const texel = (x: number, y: number, z: number) => Array.from(data.slice(((z * height + y) * width + x) * 4, ((z * height + y) * width + x) * 4 + 4));
+    const texel = (x: number, y: number, z: number) =>
+      Array.from(data.slice(((z * height + y) * width + x) * 4, ((z * height + y) * width + x) * 4 + 4));
     expect(texel(0, 0, 0)).toEqual([1, 2, 3, 4]);
     expect(texel(1, 1, 3)).toEqual([1, 2, 3, 4]);
     expect(texel(0, 1, 4)).toEqual([5, 6, 7, 8]);

@@ -171,7 +171,10 @@ export function rectilinearBoxes(polygon: readonly Vec2[]): Rect[] {
   for (const runs of rows) {
     const next: Rect[] = [];
     for (const run of runs) {
-      const above = open.find((box) => Math.abs(box.minX - run.minX) <= SNAP_M && Math.abs(box.maxX - run.maxX) <= SNAP_M && Math.abs(box.maxZ - run.minZ) <= SNAP_M);
+      const above = open.find(
+        (box) =>
+          Math.abs(box.minX - run.minX) <= SNAP_M && Math.abs(box.maxX - run.maxX) <= SNAP_M && Math.abs(box.maxZ - run.minZ) <= SNAP_M,
+      );
       if (above) {
         above.maxZ = run.maxZ;
         next.push(above);
@@ -252,7 +255,12 @@ export function roomVolumes(input: VolumeInput): VolumesResult {
   for (const roomId of order) {
     const room = byId.get(roomId)!;
     for (const rect of rectilinearBoxes(room.polygon)) {
-      const sampling = box({ minX: rect.minX + inset, maxX: rect.maxX - inset, minZ: rect.minZ + inset, maxZ: rect.maxZ - inset }, inset, height - inset, 0);
+      const sampling = box(
+        { minX: rect.minX + inset, maxX: rect.maxX - inset, minZ: rect.minZ + inset, maxZ: rect.maxZ - inset },
+        inset,
+        height - inset,
+        0,
+      );
       boxes.push({
         roomId,
         projection: box(rect, 0, height, 0),

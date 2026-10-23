@@ -41,5 +41,3 @@ export const WALK_LIGHTING_TUNING = Object.freeze({
   /** Quiet time after the last edit in walk before the affected rooms are refreshed, milliseconds. */
   refreshDebounceMs: 1000,
 });
-
-export type WalkLightingTuning = typeof WALK_LIGHTING_TUNING;

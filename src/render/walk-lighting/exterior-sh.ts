@@ -39,7 +39,12 @@ function basis(d: Direction): number[] {
 export function evaluateSH(coefficients: readonly Rgb[], n: Direction): number[] {
   const { x, y, z } = n;
   const weights = [K0, K1 * y, K1 * z, K1 * x, K2 * x * y, K2 * y * z, 0.743125 * z * z - 0.247708, K2 * x * z, 0.429043 * (x * x - y * y)];
-  return [0, 1, 2].map((c) => Math.max(0, weights.reduce((sum, w, i) => sum + w * coefficients[i]![c]!, 0)));
+  return [0, 1, 2].map((c) =>
+    Math.max(
+      0,
+      weights.reduce((sum, w, i) => sum + w * coefficients[i]![c]!, 0),
+    ),
+  );
 }
 
 /** Coefficients whose irradiance is three's hemisphere light: `mix(ground, sky, 0.5 n.y + 0.5)`. */
@@ -87,7 +92,10 @@ export function exteriorSH(lights: ExteriorLights): Rgb[] {
  * side: seven RGBA sub-volumes stacked along z, each `size + 2` slices deep
  * (one padding slice at each end), every texel of a sub-volume the same.
  */
-export function packAtlas(coefficients: readonly Rgb[], size: number): { data: Float32Array; width: number; height: number; depth: number } {
+export function packAtlas(
+  coefficients: readonly Rgb[],
+  size: number,
+): { data: Float32Array; width: number; height: number; depth: number } {
   const c = coefficients;
   const packs = [
     [c[0]![0], c[0]![1], c[0]![2], c[1]![0]],
@@ -103,7 +111,7 @@ export function packAtlas(coefficients: readonly Rgb[], size: number): { data: F
   const data = new Float32Array(size * size * depth * 4);
   for (let z = 0; z < depth; z += 1) {
     const pack = packs[Math.floor(z / padded)]!;
-    for (let i = 0; i < size * size; i += 1) data.set(pack as number[], (z * size * size + i) * 4);
+    for (let i = 0; i < size * size; i += 1) data.set(pack, (z * size * size + i) * 4);
   }
   return { data, width: size, height: size, depth };
 }

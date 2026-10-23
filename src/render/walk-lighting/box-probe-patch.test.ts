@@ -36,8 +36,12 @@ describe('patchFragmentShader', () => {
   test('routes diffuse, specular and clearcoat through the switches, keeps anisotropy and retroreflection', () => {
     expect(physical).toContain('iblIrradiance += getIBLIrradiance( geometryNormal ) * jeexDiffuseScale;');
     expect(physical).toContain('vec3 iblRadiance = jeexRadiance( geometryViewDir, geometryNormal, material.roughness );');
-    expect(physical).toContain('clearcoatRadiance += jeexRadiance( geometryViewDir, geometryClearcoatNormal, material.clearcoatRoughness );');
-    expect(physical).toContain('getIBLAnisotropyRadiance( geometryViewDir, geometryNormal, material.roughness, material.anisotropyB, material.anisotropy )');
+    expect(physical).toContain(
+      'clearcoatRadiance += jeexRadiance( geometryViewDir, geometryClearcoatNormal, material.clearcoatRoughness );',
+    );
+    expect(physical).toContain(
+      'getIBLAnisotropyRadiance( geometryViewDir, geometryNormal, material.roughness, material.anisotropyB, material.anisotropy )',
+    );
     expect(physical).toContain('getIBLRetroRadiance( geometryViewDir, geometryNormal, material.roughness )');
   });
 
@@ -61,7 +65,11 @@ describe('installWalkPatch', () => {
     expect(shared.customProgramCacheKey()).toBe(PROGRAM_KEY);
     expect(basic.customProgramCacheKey()).not.toBe(PROGRAM_KEY);
     expect(installWalkPatch(root, uniforms)).toBe(0);
-    const shader = { uniforms: {} as Record<string, THREE.IUniform>, fragmentShader: THREE.ShaderLib.standard.fragmentShader, vertexShader: '' };
+    const shader = {
+      uniforms: {} as Record<string, THREE.IUniform>,
+      fragmentShader: THREE.ShaderLib.standard.fragmentShader,
+      vertexShader: '',
+    };
     shared.onBeforeCompile(shader as unknown as THREE.WebGLProgramParametersWithUniforms, {} as THREE.WebGLRenderer);
     expect(shader.uniforms['jeexDiffuse']).toBe(uniforms.jeexDiffuse);
   });
@@ -88,7 +96,15 @@ describe('uniform states', () => {
       resolution: { x: 2, y: 2, z: 2 },
     });
     const layout = atlasLayout(2);
-    setRoomBoxes(uniforms, [box(0), box(2)], [{ roomId: 'r0', position: { x: 0.5, y: 1.5, z: 0.5 } }, { roomId: 'r2', position: { x: 2.5, y: 1.5, z: 0.5 } }], layout);
+    setRoomBoxes(
+      uniforms,
+      [box(0), box(2)],
+      [
+        { roomId: 'r0', position: { x: 0.5, y: 1.5, z: 0.5 } },
+        { roomId: 'r2', position: { x: 2.5, y: 1.5, z: 0.5 } },
+      ],
+      layout,
+    );
     expect(uniforms.jeexBoxCount.value).toBe(2);
     expect(uniforms.jeexBoxMax.value[1]!.toArray()).toEqual([3, 2.5, 1]);
     expect(uniforms.jeexSelMin.value[0]!.toArray()).toEqual([-0.05, -0.2, -0.05]);

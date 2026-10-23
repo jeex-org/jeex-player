@@ -37,6 +37,9 @@ import { withScenePass } from '../shared/scene-pass.js';
 import { withOccludersOnly } from './ao-occluders.js';
 import type { PostProcessor } from './post-processor.js';
 
+// The walk and tour room lighting travels in this chunk: one lazy load for everything walk adds.
+export { WalkLighting } from './walk-lighting/walk-lighting.js';
+
 /** The chain's tuning, in one place. */
 export const WALK_POST_TUNING = Object.freeze({
   /** GTAO sampling radius in world space, metres. */
