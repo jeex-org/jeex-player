@@ -29,6 +29,7 @@ import type { SolvedPlan } from '../plan/plan-solver.js';
 import { createBuilderContext, type BuilderContext } from './builder-context.js';
 import type { LibraryTextures } from './library-surface.js';
 import { ShellBuilder } from './shell-builder.js';
+import { rebaseOpeningFrames, rebaseShellOrigins } from './shell-origins.js';
 import { OpeningBuilder } from './opening-builder.js';
 import type { SceneModel } from '../scene/scene-model.js';
 import { facadeFinishRefOf, floorFinishRefOf, roomWallFinishRefOf, type TouchedEntity } from '../scene/scene-ops.js';
@@ -211,6 +212,8 @@ export class SceneBuilder {
     shell.name = 'parametric-shell';
     this.shell.build(shell);
     this.openings.build(shell);
+    // Origins inside the rooms, vertices unchanged: walk lighting picks a mesh's grid by its origin.
+    rebaseShellOrigins(shell, this.plan, this.scene.ceilingHeight);
     root.add(shell);
 
     let degradedAssets = 0;
@@ -410,7 +413,10 @@ export class SceneBuilder {
    * family. Only that opening's group is rebuilt.
    */
   rebuildOpening(openingId: string, variantId: string): boolean {
-    return this.openings.rebuildOpening(openingId, variantId);
+    const rebuilt = this.openings.rebuildOpening(openingId, variantId);
+    const group = rebuilt ? this.openings.groupOf(openingId) : null;
+    if (group) rebaseOpeningFrames(group);
+    return rebuilt;
   }
 
   /** Variant id currently shown for an opening, or `null` when it is unknown. */
