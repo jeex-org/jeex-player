@@ -10,7 +10,8 @@ See proposal.md and brainstorm.md. `render-runtime.ts` is at 690 of 700 lines an
 2. **Runtime**: in `frame`, after the hooks, update the camera's world matrix, ask `shouldDraw`; draw and `commit` only after a successful display draw (a throwing draw keeps the demand). The keep-warm heartbeat applies only when rendering is disabled and never in walk or tour. A capture never commits.
 3. **Dirty wiring** (each calls the runtime's internal `invalidate`): `SceneModel.onRevision` and scene-mount rebuilds; shell visibility and layer changes (dollhouse state, `CameraDirector.setMode`, `engageTour`); selection highlight set, clear (it restores materials at once) and recolour; the door and furniture moved readings in `viewer-frame.ts` (reuse the existing drain, including final frames); each `onSwapped` body of a model upgrade; library surfaces after maps are attached; selection highlight while its fade changes and the selection glow while an aura exists; floor-ring position or visibility changes; sun-shadow redraw requests; walk chain attach and detach; the room lighting on look change, completion, failure fallback and refresh completion; resize, pixel ratio, `visibilitychange` to visible, context restore; the restart after `captureFrames`; a canvas reattached after the detached-canvas pause.
 4. **Telemetry**: frame-interval sampling resets after a skipped draw; room dwell accumulates on hook time; first-draw readiness unchanged.
-5. **Debug surface**: cumulative display-draw and tick counters (two-file change).
+5. **Post-render hooks**: none may draw to the screen in walk or tour on a skipped tick (the drawing buffer is not preserved, so it would replace the picture with a cleared one); today the only drawing hook, the checkpoint inset preview, shows in authoring modes only (`PREVIEW_MODES`).
+6. **Debug surface**: cumulative display-draw and tick counters (two-file change).
 
 ## Risks / Trade-offs
 

@@ -104,4 +104,4 @@ Still, panorama and video captures SHALL render on their own paths regardless of
 
 #### Scenario: Video restores
 - **WHEN** a video clip is captured in tour
-- **THEN** its frames are deterministic as before, and after it the live pose and size are restored with exactly one display draw before resting
+- **THEN** its frames are deterministic as before, and after it the live pose and size are restored with at least one display draw, after which the view rests if nothing else changes
