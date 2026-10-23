@@ -19,6 +19,7 @@
  * would recompile its program every frame).
  */
 
+import { ViewerLibError } from '../../shared/errors.js';
 import * as THREE from 'three';
 import { LightProbeGridWebGL } from 'three/addons/lighting/LightProbeGridWebGL.js';
 import type { Box, RoomBox } from './room-volumes.js';
@@ -68,7 +69,7 @@ export class RoomGrid extends LightProbeGridWebGL {
 /** The fixed grid of everything outside the rooms; `bake` is refused. */
 class ExteriorGrid extends LightProbeGridWebGL {
   override bake(): void {
-    throw new Error('the exterior grid is computed, never baked');
+    throw new ViewerLibError('internal', 'the exterior grid is computed, never baked');
   }
 
   override dispose(): void {

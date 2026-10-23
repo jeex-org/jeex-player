@@ -14,6 +14,7 @@
  * tile offset; `step` fails loudly when the capture's layout differs.
  */
 
+import { ViewerLibError } from '../../shared/errors.js';
 import * as THREE from 'three';
 import type { AtlasLayout, UniformState } from './box-probe-patch.js';
 import type { RoomProbe, Vec3 } from './room-volumes.js';
@@ -76,7 +77,8 @@ export class RoomProbes {
       const probe = this.deps.capture(this.deps.probes[index]!.position);
       try {
         if (probe.height !== this.deps.expectedHeight) {
-          throw new Error(
+          throw new ViewerLibError(
+            'internal',
             `a room probe's cube-UV layout is ${probe.width} x ${probe.height}; the studio environment's is ${this.deps.expectedHeight} high`,
           );
         }

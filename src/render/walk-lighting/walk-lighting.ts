@@ -21,6 +21,7 @@
  * grid is never on screen; anything wider starts the bake over.
  */
 
+import { ViewerLibError } from '../../shared/errors.js';
 import * as THREE from 'three';
 import { LIGHTING_STANDARD } from '../../lighting/lighting-standard.js';
 import { roomVolumes, type RoomVolumes, type VolumeInput } from './room-volumes.js';
@@ -120,7 +121,7 @@ export class WalkLighting {
    */
   load(doc: WalkDocument): void {
     const result = roomVolumes(doc.volumes);
-    if (!result.ok) throw new Error(result.error);
+    if (!result.ok) throw new ViewerLibError('internal', result.error);
     this.release();
     const volumes = result.volumes;
     this.volumes = volumes;
