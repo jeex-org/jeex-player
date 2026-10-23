@@ -55,6 +55,14 @@ test('twenty mount/dispose cycles leave no canvases and no runaway heap', async 
   test.slow();
   await page.goto('/');
   await waitForBoot(page, 'window.__appReady === true');
+  // The demo page's own viewer is disposed before the cycles start. It draws
+  // a frame on every animation frame, and every step of a cycle's boot that
+  // waits for a task queues behind that frame: under SwiftShader on a loaded
+  // machine a frame took 2.4 s and a cycle 7 s with the page's viewer drawing,
+  // 1.1 s with it disposed, so twenty cycles ran past the 180 s budget on
+  // frame cost alone. Its modules stay loaded, which is all the cycles reuse,
+  // and the first heap reading is taken after it is gone.
+  await page.evaluate(() => window.jeexViewer?.dispose());
 
   const result = await page.evaluate(async (cycles: number) => {
     const load = <T>(path: string): Promise<T> => import(/* @vite-ignore */ path) as Promise<T>;
@@ -106,6 +114,9 @@ test('twenty mount/dispose cycles leave no canvases and no runaway heap', async 
 test('a disposed ViewerApp is collected once the page drops its last reference', async ({ page }) => {
   await page.goto('/');
   await waitForBoot(page, 'window.__appReady === true');
+  // Disposed first for the reason the twenty-cycle test gives: its frames
+  // would stretch the probe's boot past the 60 s budget on a loaded machine.
+  await page.evaluate(() => window.jeexViewer?.dispose());
 
   const client = await page.context().newCDPSession(page);
   await client.send('HeapProfiler.enable');

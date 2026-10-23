@@ -17,15 +17,23 @@
  *    package's own `exports` map. It is written into a scratch folder inside
  *    `dist-lib` (so the package's self-reference resolves) and removed again.
  *
+ * 3. THE BUNDLED ENGINE IS THE CALIBRATED ONE. Every copy of three.js the
+ *    other entries bundle (found by the revision three registers itself under,
+ *    `detail: { revision: "…" }`) is `LIGHTING_STANDARD.engineRevision`, so the
+ *    player never ships an engine its own lighting context refuses (a
+ *    `dist-lib` built from a stale install once carried r185 beside an r186
+ *    standard).
+ *
  * It runs at the end of `build:lib`, like `css-contract-check.ts`, so a build
  * that emits a broken entry fails the build that emitted it.
  *
  * Usage: `bun run scripts/lighting-entry-check.ts [dist-lib-dir]`.
  */
 
-import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 import { staticImports } from './budget-check.ts';
+import { LIGHTING_STANDARD } from '../src/lighting/lighting-standard.ts';
 
 /** The entry file the `lighting` pass of `vite.lib.config.ts` writes. */
 export const LIGHTING_ENTRY = 'jeex-viewer-lighting.js';
@@ -43,6 +51,40 @@ const THREE_SIGNS: readonly { readonly pattern: RegExp; readonly name: string }[
 
 /** DOM roots the entry must not name. */
 const DOM_ROOTS = /\b(document|window)\b/;
+
+/** The revision three.js registers itself under, as its bundled code spells it. */
+const BUNDLED_REVISION = /\bdetail:\s*\{\s*revision:\s*["'`](\d+)["'`]/g;
+
+/** One bundled copy of three.js: each checks `window.__THREE__` for a second instance. */
+const BUNDLED_COPY = /__THREE__\s*\?/g;
+
+/** Every three.js revision bundled in `source`. Pure: the unit test feeds it text. */
+export function bundledRevisions(source: string): string[] {
+  return [...source.matchAll(BUNDLED_REVISION)].map((match) => match[1]!);
+}
+
+/**
+ * The defects of the bundled engine across `files` (name → source): a revision
+ * other than `expected`, a file that carries more copies of three.js (each
+ * checks `__THREE__`) than revisions that can be read, or no bundled three.js
+ * at all.
+ */
+export function engineDefects(files: ReadonlyMap<string, string>, expected: string): EntryDefect[] {
+  const defects: EntryDefect[] = [];
+  let found = 0;
+  for (const [file, source] of files) {
+    const revisions = bundledRevisions(source);
+    if (revisions.length < [...source.matchAll(BUNDLED_COPY)].length)
+      defects.push({ file, problem: 'bundles three.js whose revision cannot be read' });
+    for (const revision of revisions) {
+      found += 1;
+      if (revision !== expected)
+        defects.push({ file, problem: `bundles three.js revision ${revision}, the lighting standard requires ${expected}` });
+    }
+  }
+  if (found === 0) defects.push({ file: '(dist-lib)', problem: 'bundles no three.js the revision can be read from' });
+  return defects;
+}
 
 /** Code with comments and string literals blanked, so prose and messages are not references. */
 export function codeOnly(source: string): string {
@@ -160,9 +202,19 @@ if (import.meta.main) {
   const files = entryGraph(dir, LIGHTING_ENTRY);
   const defects = files.flatMap((file) => defectsOf(file, readFileSync(join(dir, file), 'utf8')));
   for (const defect of defects) console.error(`Lighting entry check FAILED: ${defect.file} ${defect.problem}`);
+  const bundles = new Map(
+    readdirSync(dir, { recursive: true, encoding: 'utf8' })
+      .filter((file) => file.endsWith('.js') && !files.includes(file))
+      .map((file) => [file, readFileSync(join(dir, file), 'utf8')] as const),
+  );
+  const engine = engineDefects(bundles, LIGHTING_STANDARD.engineRevision);
+  for (const defect of engine) console.error(`Lighting entry check FAILED: ${defect.file} ${defect.problem}`);
+  defects.push(...engine);
   const compiler = typecheckConsumer(dir);
   if (compiler !== null)
     console.error(`Lighting entry check FAILED: the consumer fixture does not typecheck against the declarations:\n${compiler}`);
   if (defects.length > 0 || compiler !== null) process.exit(1);
-  console.log(`Lighting entry check OK: ${files.join(', ')} carry no three.js and no DOM; the consumer fixture typechecks`);
+  console.log(
+    `Lighting entry check OK: ${files.join(', ')} carry no three.js and no DOM; the bundled three.js is revision ${LIGHTING_STANDARD.engineRevision}; the consumer fixture typechecks`,
+  );
 }

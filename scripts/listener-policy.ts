@@ -18,7 +18,16 @@
  *   right-hand side names `signal` — the codebase's own
  *   `const listener = { signal }` / `const listener = listenerOptions(signal)`
  *   pattern (`shared/abort.ts`'s `listenerOptions`); or
- * - is listed in the dated `ALLOWLIST` below, each entry with a reason.
+ * - carries an allow marker, `// listener-policy: allow <id>`, on the call's
+ *   own line or the line directly above it, and `<id>` is named by a dated,
+ *   reasoned entry of the `ALLOWLIST` below for that file.
+ *
+ * Entries are matched by marker, not by line number, so an import added above
+ * the call does not break the gate. The marker and the list are kept honest
+ * from both sides: a marker id must be unique within its file, and every one of
+ * these is itself a failure — a marker with no entry (an unexplained exception),
+ * an entry whose marker is not in its file (a stale exception), and a marker
+ * that sits on no failing call (an exception nobody needs any more).
  *
  * The parser is intentionally NOT a full TypeScript parser — a bracket/string
  * -aware scanner that finds the matching close paren of the call and splits
@@ -37,20 +46,28 @@ export type ListenerCall = { readonly file: string; readonly line: number };
 export type ListenerViolation = ListenerCall & { readonly reason: string };
 export type AllowlistEntry = {
   readonly file: string;
-  readonly line: number;
+  readonly marker: string;
   readonly date: string;
   readonly reason: string;
 };
+/**
+ * An allow marker as found in a file. `covers` is the one line it exempts: its
+ * own line when code precedes it there, otherwise the line below it.
+ */
+export type AllowMarker = { readonly file: string; readonly id: string; readonly line: number; readonly covers: number };
+/** A problem with the allowlist itself rather than with a call. */
+export type AllowlistProblem = { readonly file: string; readonly line: number | null; readonly reason: string };
 
 /**
- * The dated, reasoned exceptions. Each entry names the exact call site — a
- * new call at the same file, wherever it lands, is NOT covered by someone
- * else's entry, because line numbers are matched exactly.
+ * The dated, reasoned exceptions. Each entry names a marker id that must sit
+ * on (or directly above) the exempted call in that file — a new call in the
+ * same file, wherever it lands, is NOT covered by someone else's entry,
+ * because a marker covers only the call on its own line or the next one.
  */
 export const ALLOWLIST: readonly AllowlistEntry[] = [
   {
     file: 'src/fixtures/stubs.ts',
-    line: 103,
+    marker: 'fake-canvas-abort-bookkeeping',
     date: '2026-09-08',
     reason:
       "the fake canvas's own bookkeeping listener on the CALLER's abort signal, registered with { once: true } so it self-unregisters the one time that signal can fire — passing `signal` here would mean the signal removing a listener on its own 'abort' event, which is circular. FakeCanvas is a per-test throwaway object besides.",
@@ -60,6 +77,7 @@ export const ALLOWLIST: readonly AllowlistEntry[] = [
 const IDENTIFIER_RE = /^[A-Za-z_$][A-Za-z0-9_$]*$/;
 const SIGNAL_RE = /\bsignal\b/;
 const CALL_RE = /\.addEventListener\(/g;
+const MARKER_RE = /\/\/\s*listener-policy:\s*allow\s+([A-Za-z0-9_-]+)/g;
 
 /**
  * Blanks `/* … *\/` block comments AND `// …` line comments (newlines kept, so
@@ -92,6 +110,44 @@ function stripComments(source: string): string {
       const end = next === '*' ? source.indexOf('*/', i + 2) : source.indexOf('\n', i + 2);
       const stop = end === -1 ? source.length : next === '*' ? end + 2 : end;
       out += source.slice(i, stop).replaceAll(/[^\n]/g, ' ');
+      i = stop - 1;
+      continue;
+    }
+    out += ch;
+  }
+  return out;
+}
+
+/**
+ * `source` with the contents of string and template literals blanked (quotes
+ * and newlines kept) and comments left as they are, so a marker spelled inside
+ * a string is not a marker.
+ */
+function blankStrings(source: string): string {
+  let out = '';
+  let inString: string | null = null;
+  for (let i = 0; i < source.length; i += 1) {
+    const ch = source[i] as string;
+    if (inString) {
+      if (ch === '\\' && i + 1 < source.length) {
+        out += source[i + 1] === '\n' ? ' \n' : '  ';
+        i += 1;
+      } else if (ch === inString) {
+        inString = null;
+        out += ch;
+      } else out += ch === '\n' ? '\n' : ' ';
+      continue;
+    }
+    if (ch === '"' || ch === "'" || ch === '`') {
+      inString = ch;
+      out += ch;
+      continue;
+    }
+    const next = source[i + 1];
+    if (ch === '/' && (next === '*' || next === '/')) {
+      const end = next === '*' ? source.indexOf('*/', i + 2) : source.indexOf('\n', i + 2);
+      const stop = end === -1 ? source.length : next === '*' ? end + 2 : end;
+      out += source.slice(i, stop);
       i = stop - 1;
       continue;
     }
@@ -239,19 +295,97 @@ export function scanSource(file: string, rawSource: string): ListenerViolation[]
   return violations;
 }
 
-/** Splits raw violations into real ones and ones a dated allowlist entry covers, by exact file+line. */
+/**
+ * Every `// listener-policy: allow <id>` marker in `rawSource`, read from the
+ * raw text (the marker IS a comment, so the comment-stripped copy would not
+ * have it).
+ */
+export function scanMarkers(file: string, rawSource: string): AllowMarker[] {
+  const markers: AllowMarker[] = [];
+  const source = blankStrings(rawSource);
+  MARKER_RE.lastIndex = 0;
+  let match: RegExpExecArray | null;
+  while ((match = MARKER_RE.exec(source))) {
+    const line = lineAt(source, match.index);
+    const lineStart = source.lastIndexOf('\n', match.index - 1) + 1;
+    const trailing = source.slice(lineStart, match.index).trim() !== '';
+    markers.push({ file, id: match[1] as string, line, covers: trailing ? line : line + 1 });
+  }
+  return markers;
+}
+
+/**
+ * Splits raw violations into real ones and ones an allowlist entry covers,
+ * through the marker on the call's line or the line above it (one marker
+ * exempts one call: a second failing call on the covered line stays real and
+ * is reported), and reports
+ * every way the markers and the list disagree: a duplicated marker id in one
+ * file, a marker with no entry, a marker on no failing call, and an entry
+ * whose marker is missing. `scannedFiles` bounds that last check to the files
+ * this run actually read, so a scan of a subdirectory does not call every
+ * entry elsewhere stale.
+ */
 export function applyAllowlist(
   violations: readonly ListenerViolation[],
+  markers: readonly AllowMarker[],
+  scannedFiles: ReadonlySet<string>,
   allowlist: readonly AllowlistEntry[] = ALLOWLIST,
-): { readonly real: ListenerViolation[]; readonly allowlisted: AllowlistEntry[] } {
+): {
+  readonly real: ListenerViolation[];
+  readonly allowlisted: AllowlistEntry[];
+  readonly problems: AllowlistProblem[];
+} {
   const real: ListenerViolation[] = [];
   const allowlisted: AllowlistEntry[] = [];
+  const problems: AllowlistProblem[] = [];
+  const used = new Set<AllowMarker>();
+  const seen = new Map<string, AllowMarker>();
+  for (const marker of markers) {
+    const key = `${marker.file}\0${marker.id}`;
+    const first = seen.get(key);
+    if (first) {
+      problems.push({
+        file: marker.file,
+        line: marker.line,
+        reason: `allow marker "${marker.id}" repeats the one on line ${first.line}; a marker id is unique per file`,
+      });
+    } else seen.set(key, marker);
+  }
   for (const violation of violations) {
-    const entry = allowlist.find((candidate) => candidate.file === violation.file && candidate.line === violation.line);
+    const marker = markers.find((candidate) => candidate.file === violation.file && candidate.covers === violation.line);
+    if (marker && used.has(marker)) {
+      problems.push({
+        file: marker.file,
+        line: marker.line,
+        reason: `allow marker "${marker.id}" covers more than one addEventListener call without { signal }; one marker exempts one call`,
+      });
+      real.push(violation);
+      continue;
+    }
+    const entry = marker && allowlist.find((candidate) => candidate.file === marker.file && candidate.marker === marker.id);
+    if (marker) used.add(marker);
     if (entry) allowlisted.push(entry);
     else real.push(violation);
   }
-  return { real, allowlisted };
+  for (const marker of markers) {
+    const entry = allowlist.find((candidate) => candidate.file === marker.file && candidate.marker === marker.id);
+    if (!entry) {
+      problems.push({ file: marker.file, line: marker.line, reason: `allow marker "${marker.id}" has no ALLOWLIST entry` });
+    } else if (!used.has(marker)) {
+      problems.push({
+        file: marker.file,
+        line: marker.line,
+        reason: `allow marker "${marker.id}" sits on no addEventListener call without { signal }; remove it and its entry`,
+      });
+    }
+  }
+  for (const entry of allowlist) {
+    if (!scannedFiles.has(entry.file)) continue;
+    if (!markers.some((marker) => marker.file === entry.file && marker.id === entry.marker)) {
+      problems.push({ file: entry.file, line: null, reason: `ALLOWLIST entry "${entry.marker}" has no allow marker in the file` });
+    }
+  }
+  return { real, allowlisted, problems };
 }
 
 function walk(dir: string): string[] {
@@ -270,19 +404,30 @@ if (import.meta.main) {
   const root = process.argv[2] ?? 'src';
   const files = walk(root);
   const violations: ListenerViolation[] = [];
+  const markers: AllowMarker[] = [];
+  const scanned = new Set<string>();
   for (const file of files) {
     const relativePath = relative('.', file);
-    violations.push(...scanSource(relativePath, readFileSync(file, 'utf8')));
+    const source = readFileSync(file, 'utf8');
+    scanned.add(relativePath);
+    violations.push(...scanSource(relativePath, source));
+    markers.push(...scanMarkers(relativePath, source));
   }
-  const { real, allowlisted } = applyAllowlist(violations);
+  const { real, allowlisted, problems } = applyAllowlist(violations, markers, scanned);
   if (real.length > 0) {
     console.error('addEventListener without a { signal } reachable in one hop:');
     for (const violation of real) console.error(`  ${violation.file}:${violation.line} — ${violation.reason}`);
-    process.exit(1);
   }
+  if (problems.length > 0) {
+    console.error('listener-policy allowlist out of step with the allow markers:');
+    for (const problem of problems) {
+      console.error(`  ${problem.file}${problem.line === null ? '' : `:${problem.line}`} — ${problem.reason}`);
+    }
+  }
+  if (real.length > 0 || problems.length > 0) process.exit(1);
   const allowlistNote =
     allowlisted.length > 0
-      ? `, ${allowlisted.length} allowlisted (${allowlisted.map((entry) => `${entry.file}:${entry.line}`).join(', ')})`
+      ? `, ${allowlisted.length} allowlisted (${allowlisted.map((entry) => `${entry.file} ${entry.marker}`).join(', ')})`
       : '';
   console.log(`Listener policy OK: 0 addEventListener without { signal } over ${root}${allowlistNote}`);
 }

@@ -5,7 +5,7 @@
  */
 
 import { describe, expect, test } from 'bun:test';
-import { ALLOWLIST, applyAllowlist, scanSource } from './listener-policy.js';
+import { ALLOWLIST, applyAllowlist, scanMarkers, scanSource, type AllowlistEntry } from './listener-policy.js';
 
 describe('scanSource: passing shapes', () => {
   test('an inline object literal naming signal passes', () => {
@@ -157,34 +157,149 @@ describe('scanSource: failing shapes', () => {
 });
 
 describe('applyAllowlist', () => {
-  test('an allowlisted file:line is filtered out and reported separately', () => {
-    const violations = [
-      { file: 'src/fixtures/stubs.ts', line: 103, reason: 'options argument "{ once: true }" has no { signal } reachable in one hop' },
-    ];
-    const { real, allowlisted } = applyAllowlist(violations);
+  const FILE = 'src/widget.ts';
+  const ENTRY: AllowlistEntry = {
+    file: FILE,
+    marker: 'self-abort',
+    date: '2026-10-22',
+    reason: 'a reason long enough to explain the call',
+  };
+
+  /** Scans a fixture and applies a one-entry list to it, the way the script runs over the tree. */
+  function run(source: string, allowlist: readonly AllowlistEntry[] = [ENTRY]) {
+    return applyAllowlist(scanSource(FILE, source), scanMarkers(FILE, source), new Set([FILE]), allowlist);
+  }
+
+  test('a marker on the line above the call, named by an entry, covers it', () => {
+    const { real, allowlisted, problems } = run(`
+      // listener-policy: allow self-abort
+      signal.addEventListener('abort', onAbort, { once: true });
+    `);
     expect(real).toEqual([]);
-    expect(allowlisted).toHaveLength(1);
-    expect(allowlisted[0]?.reason.length).toBeGreaterThan(0);
+    expect(problems).toEqual([]);
+    expect(allowlisted).toEqual([ENTRY]);
   });
 
-  test('a violation at a different line in an allowlisted file is NOT covered', () => {
-    const violations = [{ file: 'src/fixtures/stubs.ts', line: 99, reason: 'no { signal }' }];
-    const { real, allowlisted } = applyAllowlist(violations);
+  test('a marker on the call line itself covers it', () => {
+    const { real, problems } = run(`
+      signal.addEventListener('abort', onAbort, { once: true }); // listener-policy: allow self-abort
+    `);
+    expect(real).toEqual([]);
+    expect(problems).toEqual([]);
+  });
+
+  test('lines added above the call do not break the entry — it is matched by marker, not line', () => {
+    const { real, problems } = run(`
+      import { a } from './a.js';
+      import { b } from './b.js';
+      import { c } from './c.js';
+      // listener-policy: allow self-abort
+      signal.addEventListener('abort', onAbort, { once: true });
+    `);
+    expect(real).toEqual([]);
+    expect(problems).toEqual([]);
+  });
+
+  test('another failing call in the same file is NOT covered by that marker', () => {
+    const { real } = run(`
+      // listener-policy: allow self-abort
+      signal.addEventListener('abort', onAbort, { once: true });
+      target.addEventListener('click', onClick, { once: true });
+    `);
     expect(real).toHaveLength(1);
-    expect(allowlisted).toEqual([]);
+    expect(real[0]?.line).toBe(4);
   });
 
-  test('every allowlist entry carries a non-empty reason and a date', () => {
+  test('a marker at the end of a call line does not reach the call on the next line', () => {
+    const { real } = run(`
+      signal.addEventListener('abort', onAbort, { once: true }); // listener-policy: allow self-abort
+      target.addEventListener('click', onClick, { once: true });
+    `);
+    expect(real).toHaveLength(1);
+    expect(real[0]?.line).toBe(3);
+  });
+
+  test('a marker exempts one call: a second failing call on the covered line stays real and is reported', () => {
+    const { real, allowlisted, problems } = run(`
+      // listener-policy: allow self-abort
+      signal.addEventListener('abort', onAbort, { once: true }); target.addEventListener('click', onClick, { once: true });
+    `);
+    expect(allowlisted).toEqual([ENTRY]);
+    expect(real).toHaveLength(1);
+    expect(problems).toEqual([{ file: FILE, line: 2, reason: expect.stringContaining('covers more than one') }]);
+  });
+
+  test('marker text inside a string or template literal is not a marker', () => {
+    const { real } = run(`
+      const help = '// listener-policy: allow self-abort';
+      signal.addEventListener('abort', onAbort, { once: true });
+      target.addEventListener('// listener-policy: allow self-abort', onClick, { once: true });
+    `);
+    expect(real).toHaveLength(2);
+  });
+
+  test('a marker two lines above the call does not reach it', () => {
+    const { real, problems } = run(`
+      // listener-policy: allow self-abort
+
+      signal.addEventListener('abort', onAbort, { once: true });
+    `);
+    expect(real).toHaveLength(1);
+    expect(problems.map((problem) => problem.reason)).toEqual([expect.stringContaining('sits on no addEventListener call')]);
+  });
+
+  test('a marker with no entry fails, and does not exempt its call', () => {
+    const { real, problems } = run(
+      `
+      // listener-policy: allow unexplained
+      signal.addEventListener('abort', onAbort, { once: true });
+    `,
+      [],
+    );
+    expect(real).toHaveLength(1);
+    expect(problems).toEqual([{ file: FILE, line: 2, reason: expect.stringContaining('has no ALLOWLIST entry') }]);
+  });
+
+  test('an entry whose marker is not in its file fails as stale', () => {
+    const { problems } = run(`target.addEventListener('click', onClick, { signal });`);
+    expect(problems).toEqual([{ file: FILE, line: null, reason: expect.stringContaining('has no allow marker') }]);
+  });
+
+  test('an entry for a file this run did not scan is not reported', () => {
+    const { problems } = applyAllowlist([], [], new Set([FILE]), [{ ...ENTRY, file: 'src/elsewhere.ts' }]);
+    expect(problems).toEqual([]);
+  });
+
+  test('a marker on a call that already passes fails as unneeded', () => {
+    const { problems } = run(`
+      // listener-policy: allow self-abort
+      target.addEventListener('click', onClick, { signal });
+    `);
+    expect(problems.map((problem) => problem.reason)).toEqual([expect.stringContaining('sits on no addEventListener call')]);
+  });
+
+  test('a marker id repeated in one file fails', () => {
+    const { problems } = run(`
+      // listener-policy: allow self-abort
+      signal.addEventListener('abort', onAbort, { once: true });
+      // listener-policy: allow self-abort
+      other.addEventListener('abort', onAbort, { once: true });
+    `);
+    expect(problems).toContainEqual({ file: FILE, line: 4, reason: expect.stringContaining('unique per file') });
+  });
+
+  test('every allowlist entry carries a non-empty reason, a date and a marker id', () => {
     for (const entry of ALLOWLIST) {
       expect(entry.reason.length).toBeGreaterThan(20);
       expect(entry.date).toMatch(/^\d{4}-\d{2}-\d{2}$/);
+      expect(entry.marker).toMatch(/^[A-Za-z0-9_-]+$/);
     }
   });
 });
 
 describe('the real tree', () => {
-  test('src/fixtures/stubs.ts:103 is the ONLY allowlist entry — a shrinking-residue check', () => {
+  test('the fake canvas abort bookkeeping in src/fixtures/stubs.ts is the ONLY allowlist entry — a shrinking-residue check', () => {
     expect(ALLOWLIST).toHaveLength(1);
-    expect(ALLOWLIST[0]).toMatchObject({ file: 'src/fixtures/stubs.ts', line: 103 });
+    expect(ALLOWLIST[0]).toMatchObject({ file: 'src/fixtures/stubs.ts', marker: 'fake-canvas-abort-bookkeeping' });
   });
 });

@@ -12,6 +12,18 @@ const PAGES = {
 /** `package.json#version`, judged by `scripts/config-input.ts` like every other config input. */
 const VERSION = readPackageVersion(new URL('package.json', import.meta.url));
 
+/**
+ * Set by `playwright.config.ts` for the e2e suite's own server: that server
+ * runs without a file watcher. A watcher pushes a full page reload to every
+ * open page when a watched file changes — any `tsconfig.json` in the tree
+ * does it on its own, and `scripts/lighting-entry-check.ts` writes one under
+ * `dist-lib/` during `bun run build:lib` — so a build, an edit or a sibling
+ * check in the same checkout reloaded whichever specs were open at that
+ * moment, which then failed with "Execution context was destroyed". The suite
+ * edits nothing, so it has nothing to watch.
+ */
+const E2E_SERVER = process.env['JEEX_E2E_SERVER'] === '1';
+
 export default defineConfig({
   base: './',
   // The dev server listens on 3700. The repository's other configs use 3701
@@ -20,7 +32,7 @@ export default defineConfig({
   // `JEEX_COMPONENT_PORT`). `strictPort` because a dev server that quietly
   // moved to the next port is not the one an open tab, or a check's
   // `VIEWER_URL`, points at.
-  server: { port: 3700, strictPort: true },
+  server: { port: 3700, strictPort: true, ...(E2E_SERVER ? { watch: null } : {}) },
   // Feeds `src/shared/version.ts`'s `__JEEX_VIEWER_VERSION__` (declared in
   // `src/assets.d.ts`). The demo pages import the same embed entry the
   // library ships, so they need the real substitution too, not just the

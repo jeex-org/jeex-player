@@ -13,6 +13,7 @@ import {
   expectCanvasScreenshot,
   expectChromeScreenshot,
   expectNoNewA11yViolations,
+  holdFrames,
   waitForBoot,
   waitForCameraStill,
   waitForChromeIdle,
@@ -78,6 +79,7 @@ test('the run stays paused: scrolling scrubs, it does not start playback', async
 });
 
 test('the host page looks as it did', async ({ page }) => {
+  await holdFrames(page);
   await expectChromeScreenshot(page, 'scroll-tour-chrome.png');
 });
 
@@ -87,6 +89,7 @@ test('the apartment is still being rendered behind the copy', async ({ page }) =
   await waitForCameraStill(page);
   // And of the resting chrome: input is off here, so the bar always collapses.
   await waitForChromeIdle(page);
+  await holdFrames(page);
   await expectCanvasScreenshot(page.locator('[data-jeex="scene-canvas"]'), 'scroll-tour-canvas.png');
 });
 
