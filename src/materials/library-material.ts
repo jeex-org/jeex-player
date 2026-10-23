@@ -12,7 +12,7 @@
  */
 
 import * as THREE from 'three';
-import type { LibraryMapRole, LibraryPbr } from './finish-types.js';
+import type { LibraryMapRole, LibraryPbr, LibraryTint } from './finish-types.js';
 import type { LibraryDraw } from './room-finish.js';
 
 /** A library material's THREE material: standard, or physical when a field needs it. */
@@ -34,6 +34,26 @@ const PHYSICAL_FIELDS: readonly (keyof LibraryPbr)[] = [
   'attenuationColour',
 ];
 
+/**
+ * How much a tint recipe darkened the map it wrote, so the tint can win it
+ * back: the map's colour factor is `tint × gain`. `luma-mid@1` normalises the
+ * scan's linear luminance to the linear value of sRGB 0.5 (about 0.214),
+ * so a tint in the scan's own colour reproduces the scan only when it is
+ * scaled by the inverse of that mean. A future recipe declares its own gain
+ * here; the map data is never rewritten to hold a mean of 1 (8-bit maps
+ * would clip).
+ */
+const TINT_RECIPE_GAIN: { readonly [recipe in LibraryTint['recipe']]: number } = {
+  'luma-mid@1': 1 / new THREE.Color().setRGB(0.5, 0.5, 0.5, THREE.SRGBColorSpace).r,
+};
+
+/** The gain of a tintable scan's recipe, else 1 (natural materials and tintable parameters carry no tint map). */
+function tintGainOf(draw: LibraryDraw): number {
+  const { facts, kind } = draw.material;
+  if (kind !== 'scan' || facts.colourMode !== 'tintable' || facts.tint === undefined) return 1;
+  return TINT_RECIPE_GAIN[facts.tint.recipe];
+}
+
 /** The tint a tintable draw is drawn in: its finish colour, else the first suggested colour. */
 export function tintOf(draw: LibraryDraw): string | undefined {
   const { facts } = draw.material;
@@ -43,15 +63,16 @@ export function tintOf(draw: LibraryDraw): string | undefined {
 
 /**
  * The colour a surface shows before any map arrives: `averageColour` for a
- * natural material, `averageColour × tint` for a tintable scan, and the tint
- * itself for a tintable parameters material, which has no map to arrive.
+ * natural material, `averageColour × tint × gain` for a tintable scan (the
+ * gain of its tint recipe, see `TINT_RECIPE_GAIN`), and the tint itself for a
+ * tintable parameters material, which has no map to arrive.
  */
 export function firstFrameColour(draw: LibraryDraw): THREE.Color {
   const { facts, kind } = draw.material;
   const tint = tintOf(draw);
   if (tint === undefined) return new THREE.Color(facts.averageColour);
   if (kind === 'parameters') return new THREE.Color(tint);
-  return new THREE.Color(facts.averageColour).multiply(new THREE.Color(tint));
+  return new THREE.Color(facts.averageColour).multiply(new THREE.Color(tint)).multiplyScalar(tintGainOf(draw));
 }
 
 /** The material of one library draw, flat in its first-frame colour. */
@@ -95,7 +116,7 @@ export type LibraryMapViews = { readonly [role in LibraryMapRole]?: THREE.Textur
  * Attaches the views that arrived to `material`, by glTF rules.
  *
  * A colour map turns the colour into the factor the map is multiplied by: the
- * tint for a tintable scan, else white, times a scan's own `baseColour` when
+ * tint times its recipe gain for a tintable scan, else white, times a scan's own `baseColour` when
  * it has one. One ARM view feeds ambient occlusion (red), roughness (green)
  * and metalness (blue); the scalars stay the multipliers they are, so an
  * absent metalness (0) keeps the surface non-metallic whatever the blue
@@ -109,7 +130,7 @@ export function attachLibraryMaps(material: LibraryThreeMaterial, draw: LibraryD
   if (colourMap !== undefined) {
     material.map = colourMap;
     const tint = tintOf(draw);
-    material.color.set(tint ?? '#ffffff');
+    material.color.set(tint ?? '#ffffff').multiplyScalar(tint === undefined ? 1 : tintGainOf(draw));
     if (facts.pbr.baseColour !== undefined) material.color.multiply(new THREE.Color(facts.pbr.baseColour));
   }
   if (views.arm !== undefined) {
