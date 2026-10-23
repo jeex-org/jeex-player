@@ -28,6 +28,30 @@ type BootUI = {
 };
 
 /**
+ * The first picture a started loop owes (`RenderRuntime.firstDraw.next`; it
+ * waits for the scene's shaders, `render/first-draw.ts`), then the frame after
+ * it; just that frame when no picture is owed. A rejection when the viewer is
+ * disposed first. `ready`, the app-ready flag and the reveal wait on it.
+ */
+export async function firstPicture(signal: AbortSignal, picture: Promise<void> | undefined): Promise<void> {
+  if (picture !== undefined) {
+    await new Promise<void>((resolve, reject) => {
+      if (signal.aborted) {
+        reject(new ViewerDisposedError());
+        return;
+      }
+      const own = new AbortController();
+      signal.addEventListener('abort', () => reject(new ViewerDisposedError()), { once: true, signal: own.signal });
+      void picture.then(() => {
+        own.abort();
+        resolve();
+      });
+    });
+  }
+  await nextFrame(signal);
+}
+
+/**
  * One painted frame, or a rejection when the viewer is disposed first.
  *
  * A bare `requestAnimationFrame` promise never settles in a tab that is never

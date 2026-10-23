@@ -21,10 +21,9 @@ import type { SceneModel } from '../scene/scene-model.js';
 import type { SceneMount } from './scene-mount.js';
 import type { ViewerError } from './viewer-events.js';
 
-/** The part of `ViewerUI` the two cards are raised through. */
+/** The part of `ViewerUI` the error card is raised through; the reveal waits for the first picture (`announceReady`). */
 type RecoveryUI = {
   showError: (title: string, message: string, retry: boolean, keepCanvas?: boolean) => void;
-  showViewer: () => void;
 };
 
 type ContextRecoveryDeps = {
@@ -62,7 +61,6 @@ export function contextRecovery(deps: ContextRecoveryDeps): { onLost: () => void
       // `mount(model)` here once dropped a project's resolver, materials and
       // catalogue and drew it from the shipped bank.
       mount.remount();
-      deps.ui().showViewer();
       deps.syncMinimap();
       deps.announceReady(model);
     },

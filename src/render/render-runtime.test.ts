@@ -9,7 +9,8 @@
 
 import { describe, expect, test } from 'bun:test';
 import * as THREE from 'three';
-import { KEEP_WARM_MS, RenderRuntime, createRenderRuntime, hasWebGL, measureEntry } from './render-runtime.js';
+import { KEEP_WARM_MS, RenderRuntime, createRenderRuntime, hasWebGL } from './render-runtime.js';
+import { measureEntry } from './viewport-box.js';
 import { stubLighting, stubRuntime } from '../fixtures/stubs.js';
 import { apartmentEnvironmentIntensity, LIGHTING_STANDARD } from '../lighting/lighting-standard.js';
 import { scenePassOf } from '../shared/scene-pass.js';
@@ -201,6 +202,7 @@ describe('the post-processor seam', () => {
     const chain: PostProcessor = {
       render: (scene, camera) => calls.push(`render ${scene.type} ${camera.type}`),
       renderTo: () => calls.push('renderTo'),
+      compile: () => Promise.resolve(),
       setSize: (width, height, ratio) => sizes.push([width, height, ratio]),
       dispose: () => calls.push('dispose'),
     };
@@ -367,7 +369,13 @@ describe('drawing on demand in walk and tour', () => {
 
   test('attaching or detaching the post-processing chain draws once', () => {
     const { runtime, stub, tick } = resting();
-    const chain: PostProcessor = { render: () => undefined, renderTo: () => undefined, setSize: () => undefined, dispose: () => undefined };
+    const chain: PostProcessor = {
+      render: () => undefined,
+      renderTo: () => undefined,
+      compile: () => Promise.resolve(),
+      setSize: () => undefined,
+      dispose: () => undefined,
+    };
     runtime.setPostProcessor(chain);
     tick(16);
     tick(16);
@@ -385,6 +393,118 @@ describe('drawing on demand in walk and tour', () => {
     tick(KEEP_WARM_MS + 1);
     expect(stub.renders).toBe(1);
     runtime.dispose();
+  });
+});
+
+describe('the first picture waits for asynchronous shader compilation', () => {
+  /** A runtime whose renderer compiles asynchronously, with the compilation in hand. */
+  function compiling(mode?: string) {
+    let finish: () => void = () => undefined;
+    const compiled: Array<[unknown, unknown]> = [];
+    const rig = harness(mode === undefined ? {} : { mode: () => mode });
+    (rig.runtime.renderer as unknown as { compileAsync: (scene: unknown, camera: unknown) => Promise<unknown> }).compileAsync = (
+      scene,
+      camera,
+    ) => {
+      compiled.push([scene, camera]);
+      return new Promise<void>((resolve) => {
+        finish = resolve;
+      });
+    };
+    const camera = new THREE.PerspectiveCamera();
+    rig.runtime.setCamera(camera);
+    return { ...rig, camera, compiled, finish: () => finish() };
+  }
+
+  const settle = async (): Promise<void> => {
+    for (let turn = 0; turn < 5; turn += 1) await Promise.resolve();
+  };
+
+  test('hooks run while the scene compiles; the first draw follows the compilation, and the signal follows the draw', async () => {
+    const { runtime, stub, tick, compiled, camera, finish } = compiling();
+    let hooks = 0;
+    runtime.addFrameHook(() => {
+      hooks += 1;
+    });
+    let announced = false;
+    runtime.start();
+    void runtime.firstDraw.next.then(() => (announced = true));
+    expect(compiled).toEqual([[runtime.scene, camera]]);
+    tick(16);
+    tick(16);
+    expect(hooks).toBe(2);
+    expect(stub.renders).toBe(0);
+    await settle();
+    expect(announced).toBe(false);
+    finish();
+    await settle();
+    tick(16);
+    expect(stub.renders).toBe(1);
+    await settle();
+    expect(announced).toBe(true);
+    runtime.dispose();
+  });
+
+  test('a redraw asked for while compiling survives, and nothing counts as drawn meanwhile', async () => {
+    const { runtime, stub, tick, finish } = compiling('walk');
+    runtime.start();
+    tick(16);
+    runtime.demand.invalidate();
+    tick(16);
+    expect(runtime.lastDrawnAt).toBe(Number.NEGATIVE_INFINITY);
+    expect(runtime.demand.counters().draws).toBe(0);
+    finish();
+    await settle();
+    tick(16);
+    tick(16);
+    expect(stub.renders).toBe(1);
+    runtime.dispose();
+  });
+
+  test('a renderer without asynchronous compilation draws the first tick, as before', async () => {
+    const { runtime, stub, tick } = harness();
+    runtime.setCamera(new THREE.PerspectiveCamera());
+    let announced = false;
+    runtime.start();
+    void runtime.firstDraw.next.then(() => (announced = true));
+    tick(16);
+    expect(stub.renders).toBe(1);
+    await settle();
+    expect(announced).toBe(true);
+    runtime.dispose();
+  });
+
+  test('a lost context owes a new first picture; the restore compiles again before drawing it', async () => {
+    const { canvas, fire } = fakeCanvas();
+    const rig = harness({ canvas });
+    let finish: () => void = () => undefined;
+    let compiles = 0;
+    (rig.runtime.renderer as unknown as { compileAsync: () => Promise<unknown> }).compileAsync = () => {
+      compiles += 1;
+      return new Promise<void>((resolve) => {
+        finish = resolve;
+      });
+    };
+    rig.runtime.setCamera(new THREE.PerspectiveCamera());
+    rig.runtime.start();
+    finish();
+    await settle();
+    rig.tick(16);
+    expect(rig.stub.renders).toBe(1);
+    fire('webglcontextlost');
+    let announced = false;
+    void rig.runtime.firstDraw.next.then(() => (announced = true));
+    fire('webglcontextrestored');
+    expect(compiles).toBe(2);
+    rig.tick(16);
+    expect(rig.stub.renders).toBe(1);
+    finish();
+    await settle();
+    rig.tick(16);
+    expect(rig.stub.renders).toBe(2);
+    await settle();
+    expect(announced).toBe(true);
+    rig.runtime.dispose();
   });
 });
 

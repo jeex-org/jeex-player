@@ -58,7 +58,7 @@ import { DoorController } from './door-controller.js';
 import { contextRecovery } from './context-recovery.js';
 import { uiCommands } from './ui-commands.js';
 import { stageWiring } from './stage-wiring.js';
-import { applyStartView, nextFrame, showBootStep } from './viewer-boot.js';
+import { applyStartView, firstPicture, nextFrame, showBootStep } from './viewer-boot.js';
 import { ViewerStage } from './viewer-stage.js';
 import type { Logger } from '../shared/logger.js';
 import { instanceLogger, raiseFailure } from './viewer-failure.js';
@@ -308,8 +308,6 @@ export class ViewerApp {
       this.ui.setTourBarEnabled(this.options.tour.progressBar);
       showBootStep(this.ui, this.messages, 'ready');
       await nextFrame(this.context.signal);
-      this.ui.showViewer();
-      this.globals.publishReady();
       this.ui.setHintForMode('orbit');
       // The mode the page opens in, and whether the tour runs behind it.
       const { options, ui, tour } = this;
@@ -327,6 +325,10 @@ export class ViewerApp {
       this.ui.wakeControls();
       const { dollhouse, animator, doors, mount } = this;
       this.stage?.start(frameHooksFor({ stage: () => this.stage, dollhouse, animator, doors, mount, anchor: this.context.anchor }));
+      // Revealed and announced after the first picture, which waits for the shaders (`render/first-draw.ts`).
+      await firstPicture(this.context.signal, this.stage?.runtime.firstDraw.next);
+      this.ui.showViewer();
+      this.globals.publishReady();
       this.booted = true;
       this.events.emit('ready', { options: this.options, sceneId: model.scene.id });
     } catch (error) {
@@ -390,14 +392,12 @@ export class ViewerApp {
   }
 
   /**
-   * `ready` for `model`, emitted after the first frame that actually SHOWS it.
-   *
-   * Both `init()` and `loadScene` wait for that frame: emitting in the same task as the mount
-   * would hand a host that swapped scenes and screenshotted on `ready` the previous frame.
-   * One meaning of the event, whichever path raised it.
+   * `ready` for `model` after the frame that SHOWS it (a restored context: after its first
+   * picture, and the reveal with it), as `init()` does; one meaning whichever path raised it.
    */
   private async announceReady(model: SceneModel): Promise<void> {
-    await nextFrame(this.context.signal);
+    await firstPicture(this.context.signal, this.stage?.runtime.firstDraw.next);
+    this.ui.showViewer();
     this.events.emit('ready', { options: this.options, sceneId: model.scene.id });
   }
 

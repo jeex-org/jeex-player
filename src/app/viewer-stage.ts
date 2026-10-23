@@ -250,6 +250,8 @@ export class ViewerStage {
       build: () => loadWalkPost(this.runtime.renderer, this.runtime.scene, this.camera),
       attach: (chain) => this.runtime.setPostProcessor(chain),
       report: (error) => deps.onFrameError?.(error),
+      // The scene's programs for the chain's own target, linked before the first frame through it.
+      prepare: (chain) => chain.compile(this.runtime.scene, this.camera),
     });
     this.walkLighting = new WalkLightingController({
       build: () => loadWalkLighting(this.runtime.renderer, this.runtime.scene),

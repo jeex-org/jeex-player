@@ -12,6 +12,12 @@
  * processing chain attached with `setPostProcessor` (walk and tour). In walk
  * and tour the draw happens only on demand (`render-demand.ts`, `demand`).
  *
+ * First-picture invariant: a started loop draws its first picture only once
+ * the scene's programs were compiled asynchronously, or the bound passed
+ * (`first-draw.ts`); the hooks run meanwhile, nothing counts as drawn, and
+ * `firstDraw` resolves after that picture. Every `start()` of a stopped loop
+ * (the boot, a context restore, the end of a video capture) arms both again.
+ *
  * Visibility invariant: the loop runs only when the canvas could actually be
  * seen. `document.hidden` and `checkVisibility()` gate it, and the frame clock
  * is re-synchronised on resume so a tab that was away for a minute does not
@@ -49,6 +55,8 @@ import { installShadowLayerPass } from './shadow-layer-pass.js';
 import { withScenePass } from '../shared/scene-pass.js';
 import type { PostProcessor } from './post-processor.js';
 import { RenderDemand } from './render-demand.js';
+import { FirstDrawGate, FirstDrawSignal } from './first-draw.js';
+import { devicePixelRatioOf, measureEntry, observeBox, type ObservedBox, type ViewportBox } from './viewport-box.js';
 
 /** Device pixel ratio cap: above this the fill cost outgrows the visible gain. */
 const PIXEL_RATIO_CAP = 1.7;
@@ -75,17 +83,6 @@ const FOG_FAR = 72; // metres
 
 /** Per-frame callback: `delta` in seconds, `now` in milliseconds. */
 export type FrameHook = (delta: number, now: number) => void;
-
-/**
- * Element box the drawing buffer follows.
- *
- * `element` is optional so a unit harness can hand over a plain measurement,
- * but a real mount always passes one: it is what the `ResizeObserver` watches,
- * and a container that changes size without the WINDOW resizing (a flex
- * reflow, a `<details>` opening, a host layout change) is exactly the case a
- * `window` resize listener never saw.
- */
-type ViewportBox = { clientWidth: number; clientHeight: number; element?: HTMLElement };
 
 type RenderRuntimeOptions = {
   canvas: HTMLCanvasElement;
@@ -122,35 +119,6 @@ type RenderRuntimeOptions = {
   mode?: (() => string | undefined) | undefined;
 };
 
-/**
- * One `ResizeObserver` reading, in both units.
- *
- * The device box is the load-bearing half: computing it as `cssBox ×
- * devicePixelRatio` after CSS has already rounded the layout leaves a
- * half-pixel of blur on a fractional-DPR display, which is exactly what
- * `devicePixelContentBoxSize` exists to avoid. It is Chromium 84+ / Firefox
- * 108+ and NOT Baseline (no Safari), so both paths ship.
- */
-type ObservedBox = { cssWidth: number; cssHeight: number; deviceWidth: number; deviceHeight: number };
-
-/**
- * Measures one observer entry in CSS and in device pixels; `null` for a box
- * with no area (a hidden container reports zero and must not resize anything).
- */
-export function measureEntry(entry: ResizeObserverEntry, pixelRatio: number): ObservedBox | null {
-  const content = entry.contentBoxSize?.[0];
-  const cssWidth = content ? content.inlineSize : entry.contentRect.width;
-  const cssHeight = content ? content.blockSize : entry.contentRect.height;
-  if (cssWidth <= 0 || cssHeight <= 0) return null;
-  const device = entry.devicePixelContentBoxSize?.[0];
-  return {
-    cssWidth,
-    cssHeight,
-    deviceWidth: device ? device.inlineSize : Math.round(cssWidth * pixelRatio),
-    deviceHeight: device ? device.blockSize : Math.round(cssHeight * pixelRatio),
-  };
-}
-
 function defaultRenderer(canvas: HTMLCanvasElement): THREE.WebGLRenderer {
   return new THREE.WebGLRenderer({ canvas, antialias: true, powerPreference: 'high-performance' });
 }
@@ -181,6 +149,13 @@ export class RenderRuntime {
   private readonly mode: () => string | undefined;
   /** Whether a tick draws; `invalidate()` it for anything visible that changed. */
   readonly demand = new RenderDemand();
+  /** Holds the first display draw of a started loop until its shaders compiled. */
+  private readonly gate = new FirstDrawGate({
+    setTimeout: (run, ms) => setTimeout(run, ms) as unknown as number,
+    clearTimeout: (handle) => clearTimeout(handle),
+  });
+  /** «The first picture since `start()` is on screen»: the viewer's `ready` waits on it. */
+  readonly firstDraw = new FirstDrawSignal();
   private readonly canvas: HTMLCanvasElement;
   private readonly pixelRatioCap: number;
   /** Watches the viewport box; `null` where there is no `ResizeObserver`. */
@@ -395,6 +370,8 @@ export class RenderRuntime {
         event.preventDefault();
         this.contextLost = true;
         this.stop();
+        // Owed from now: the restore's own announcement reads it before `start()`.
+        this.firstDraw.arm();
         onLost?.();
       },
       { signal },
@@ -524,8 +501,18 @@ export class RenderRuntime {
 
   start(): void {
     if (this.disposed) return;
+    if (!this.running) this.armFirstDraw();
     this.running = true;
     this.resume();
+  }
+
+  /** A first picture is owed, drawn once the scene compiled asynchronously (`first-draw.ts`). */
+  private armFirstDraw(): void {
+    this.firstDraw.arm();
+    const camera = this.camera;
+    const renderer = this.renderer as Partial<THREE.WebGLRenderer>;
+    const compile = renderer.compileAsync?.bind(renderer);
+    this.gate.arm(camera && compile ? () => compile(this.scene, camera) : null);
   }
 
   stop(): void {
@@ -612,10 +599,17 @@ export class RenderRuntime {
     this.hooks.emit(delta, now);
     // Committed only after the draw returned: a throwing draw keeps the demand.
     const camera = this.camera;
-    if (camera && this.demand.shouldDraw(camera, this.mode()) && (this.renderEnabled || now - this.lastDrawn >= KEEP_WARM_MS)) {
+    // The first-picture gate first: while it holds, nothing commits and nothing counts as drawn.
+    if (
+      camera &&
+      this.gate.open &&
+      this.demand.shouldDraw(camera, this.mode()) &&
+      (this.renderEnabled || now - this.lastDrawn >= KEEP_WARM_MS)
+    ) {
       this.draw(camera, delta);
       this.lastDrawn = now;
       this.demand.commit(camera);
+      this.firstDraw.drawn();
     }
     // The post-render hooks run on skipped ticks too (plan2d, a resting walk):
     // the camera-preview card's visibility sync lives there. A drawing hook
@@ -663,35 +657,6 @@ export function hasWebGL(): boolean {
   context?.getExtension('WEBGL_lose_context')?.loseContext();
   webglSupport = context !== null;
   return webglSupport;
-}
-
-/**
- * Watches a viewport box for size changes.
- *
- * The observer sees the CONTAINER, so an embedded viewer follows its own box
- * rather than the window; a box with no element (a unit harness) and an
- * environment with no `ResizeObserver` both simply get no watch, which is the
- * truthful answer — never a `window` listener standing in for one, because
- * that reports the wrong element's size.
- */
-function observeBox(box: ViewportBox, onObserve: ResizeObserverCallback): ResizeObserver | null {
-  if (!box.element || typeof ResizeObserver === 'undefined') return null;
-  const observer = new ResizeObserver(onObserve);
-  // `device-pixel-content-box` is asked for explicitly: without it the entry
-  // carries no `devicePixelContentBoxSize` even where the browser supports it.
-  // A browser that does not know the value throws, and the CSS box is then the
-  // only reading there is.
-  try {
-    observer.observe(box.element, { box: 'device-pixel-content-box' });
-  } catch {
-    observer.observe(box.element);
-  }
-  return observer;
-}
-
-/** `window.devicePixelRatio` where there is a window, 1 elsewhere. */
-function devicePixelRatioOf(): number {
-  return typeof window === 'undefined' ? 1 : window.devicePixelRatio;
 }
 
 export function createRenderRuntime(options: RenderRuntimeOptions): RenderRuntime {

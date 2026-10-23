@@ -13,7 +13,7 @@ import type { PostProcessor } from '../render/post-processor.js';
 type FakeChain = PostProcessor & { readonly id: number; disposed: number };
 
 /** A loader whose builds the test resolves or rejects by hand. */
-function harness() {
+function harness(options: { prepare?: (chain: PostProcessor) => Promise<unknown> } = {}) {
   let next = 0;
   const builds: Array<{ resolve: (chain: FakeChain) => void; reject: (error: unknown) => void; chain: FakeChain }> = [];
   const attached: Array<PostProcessor | null> = [];
@@ -27,6 +27,7 @@ function harness() {
           disposed: 0,
           render: () => undefined,
           renderTo: () => undefined,
+          compile: () => Promise.resolve(),
           setSize: () => undefined,
           dispose() {
             this.disposed += 1;
@@ -36,6 +37,7 @@ function harness() {
       }),
     attach: (chain) => attached.push(chain),
     report: (error) => errors.push(error),
+    ...(options.prepare && { prepare: options.prepare }),
   });
   /** Resolves build `index` and lets its continuation run. */
   async function finish(index: number): Promise<FakeChain> {
@@ -203,5 +205,46 @@ describe('WalkPostController', () => {
     expect(await pending).toBeNull();
     expect(await h.controller.forCapture('walk')).toBeNull();
     expect(h.errors.length).toBe(1);
+  });
+});
+
+describe('WalkPostController compiles the scene for the chain before attaching it', () => {
+  test('draws directly until the compilation for the chain resolves, then attaches', async () => {
+    let compiled: () => void = () => undefined;
+    const prepared: PostProcessor[] = [];
+    const { controller, finish, attached } = harness({
+      prepare: (chain) => {
+        prepared.push(chain);
+        return new Promise<void>((resolve) => {
+          compiled = resolve;
+        });
+      },
+    });
+    controller.update('walk');
+    const chain = await finish(0);
+    expect(prepared).toEqual([chain]);
+    controller.update('walk');
+    expect(attached).toEqual([]);
+    expect(controller.state()).toBe('loading');
+    compiled();
+    await settle();
+    controller.update('walk');
+    expect(attached).toEqual([chain]);
+  });
+
+  test('a compilation that throws or rejects attaches at once', async () => {
+    const thrown = harness({
+      prepare: () => {
+        throw new Error('no compileAsync');
+      },
+    });
+    thrown.controller.update('tour');
+    const chain = await thrown.finish(0);
+    expect(thrown.attached).toEqual([chain]);
+    const rejected = harness({ prepare: () => Promise.reject(new Error('lost')) });
+    rejected.controller.update('walk');
+    const other = await rejected.finish(0);
+    rejected.controller.update('walk');
+    expect(rejected.attached).toEqual([other]);
   });
 });

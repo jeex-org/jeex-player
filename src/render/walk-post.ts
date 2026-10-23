@@ -189,6 +189,18 @@ export class WalkPost implements PostProcessor {
     }
   }
 
+  compile(scene: THREE.Scene, camera: THREE.Camera): Promise<unknown> {
+    const previous = this.renderer.getRenderTarget();
+    // `compileAsync` creates every program synchronously, before its first
+    // await: the target bound here is the one their keys are made with.
+    this.renderer.setRenderTarget(this.composer.readBuffer);
+    try {
+      return this.renderer.compileAsync(scene, camera);
+    } finally {
+      this.renderer.setRenderTarget(previous);
+    }
+  }
+
   setSize(width: number, height: number, pixelRatio: number): void {
     // `WebGLRenderer.setSize` floors the same product for the drawing buffer.
     this.liveWidth = Math.max(1, Math.floor(width * pixelRatio));

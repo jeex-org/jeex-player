@@ -28,6 +28,13 @@ export type PostProcessor = {
    * resizes once and the next live frame draws as it would have.
    */
   renderTo(target: THREE.WebGLRenderTarget, scene: THREE.Scene, camera: THREE.Camera, width: number, height: number): void;
+  /**
+   * Compiles `scene`'s programs as this chain's scene pass draws them (its
+   * colour target bound: three keys a program by the target it is drawn
+   * into), asynchronously where the renderer can (`compileAsync`); puts the
+   * bound target back before returning.
+   */
+  compile(scene: THREE.Scene, camera: THREE.Camera): Promise<unknown>;
   /** Follows the renderer: logical size in CSS pixels and the effective pixel ratio. */
   setSize(width: number, height: number, pixelRatio: number): void;
   /** Releases every GPU resource the chain owns. */

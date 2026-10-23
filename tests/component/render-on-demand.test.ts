@@ -11,11 +11,12 @@
 
 import { afterAll, beforeAll, describe, expect, test, vi } from 'vitest';
 import { page } from 'vitest/browser';
-import type * as THREE from 'three';
+import * as THREE from 'three';
 import { InlineSceneRepository, mountViewer } from '../../src/app/viewer-api.js';
 import type { ViewerHandle } from '../../src/app/viewer-handle.js';
 import { RenderDemand, type DemandCounters } from '../../src/render/render-demand.js';
 import { WalkLighting } from '../../src/render/walk-post.js';
+import { FloorRing } from '../../src/camera/floor-ring.js';
 import { closeContainers, demoScene, nextFrame, openContainer, until } from './support.js';
 
 const MOUNT_TIMEOUT_MS = 300_000;
@@ -64,6 +65,24 @@ async function follow(change: () => void): Promise<{ ticks: number; draws: numbe
   return { ticks: last.ticks - start.ticks, draws: last.draws - start.draws };
 }
 
+/** Share of pixels of two PNG screenshots (base64) that differ by more than 8 levels in any channel. */
+async function differingShare(a: string, b: string): Promise<number> {
+  const pixels = async (png: string): Promise<Uint8ClampedArray> => {
+    const bitmap = await createImageBitmap(await (await fetch(`data:image/png;base64,${png}`)).blob());
+    const canvas = new OffscreenCanvas(bitmap.width, bitmap.height);
+    const context = canvas.getContext('2d')!;
+    context.drawImage(bitmap, 0, 0);
+    return context.getImageData(0, 0, bitmap.width, bitmap.height).data;
+  };
+  const [left, right] = [await pixels(a), await pixels(b)];
+  let differing = 0;
+  for (let i = 0; i < left.length; i += 4) {
+    if (Math.max(Math.abs(left[i]! - right[i]!), Math.abs(left[i + 1]! - right[i + 1]!), Math.abs(left[i + 2]! - right[i + 2]!)) > 8)
+      differing += 1;
+  }
+  return differing / (left.length / 4);
+}
+
 /** The compositor's picture of the page, as PNG base64. */
 async function shot(): Promise<string> {
   return page.screenshot({ save: false });
@@ -73,8 +92,15 @@ describe('walk and tour draw on demand', { timeout: MOUNT_TIMEOUT_MS }, () => {
   let handle: ViewerHandle;
   let container: HTMLElement;
   let camera: THREE.Camera | null = null;
+  /** The walk floor ring the camera controller made. */
+  let ringOf: () => FloorRing = () => {
+    throw new Error('no floor ring yet');
+  };
 
   beforeAll(async () => {
+    // The walk floor ring, as the camera controller made it: the receiver of its first `show`.
+    const shows = vi.spyOn(FloorRing.prototype, 'show');
+    ringOf = () => shows.mock.contexts[0] as FloorRing;
     // The live camera, as the gate reads it.
     const shouldDraw = Object.getOwnPropertyDescriptor(RenderDemand.prototype, 'shouldDraw')!.value as RenderDemand['shouldDraw'];
     vi.spyOn(RenderDemand.prototype, 'shouldDraw').mockImplementation(function (this: RenderDemand, live, mode) {
@@ -181,6 +207,51 @@ describe('walk and tour draw on demand', { timeout: MOUNT_TIMEOUT_MS }, () => {
     await rest('after the refresh');
     expect(counters().draws).toBeGreaterThan(drawsAtRefresh);
     refresh.mockRestore();
+  });
+
+  test('the floor ring the walk puts on the floor draws on a move and on hiding while the camera rests', async () => {
+    // The walk asks the ring to stand where a hovering pointer meets the floor
+    // (`CameraController.flushHover`); this asks it the same way, at a floor
+    // point 1.5 m ahead of the resting camera.
+    const live = camera as THREE.PerspectiveCamera;
+    const ahead = live.getWorldDirection(new THREE.Vector3()).setY(0).normalize().multiplyScalar(1.5);
+    const point = live.getWorldPosition(new THREE.Vector3()).add(ahead).setY(0);
+    await rest('before the ring');
+    const without = await shot();
+    const shown = await follow(() => ringOf().show(point));
+    expect(shown.draws).toBeGreaterThanOrEqual(1);
+    const withRing = await shot();
+    expect(await differingShare(without, withRing)).toBeGreaterThan(0);
+    const moved = await follow(() => ringOf().show(point.clone().add(new THREE.Vector3(0.3, 0, 0))));
+    expect(moved.draws).toBeGreaterThanOrEqual(1);
+    const hidden = await follow(() => ringOf().show(null));
+    expect(hidden.draws).toBeGreaterThanOrEqual(1);
+    expect(await differingShare(without, await shot())).toBe(0);
+    // Hiding a hidden ring changes nothing and draws nothing.
+    const again = await follow(() => ringOf().show(null));
+    expect(again.draws).toBe(0);
+  });
+
+  test('a lost and restored GPU context draws the walk again, the same picture, then rests', async () => {
+    await rest('before the loss');
+    const before = await shot();
+    const canvas = container.querySelector<HTMLCanvasElement>('[data-jeex="scene-canvas"]')!;
+    const lose = canvas.getContext('webgl2')!.getExtension('WEBGL_lose_context')!;
+    const lost = new Promise((resolve) => {
+      canvas.addEventListener('webglcontextlost', resolve, { once: true });
+    });
+    lose.loseContext();
+    await lost;
+    const atLoss = counters();
+    // Nothing is drawn while the context is gone.
+    await nextFrame();
+    await nextFrame();
+    expect(counters().draws).toBe(atLoss.draws);
+    lose.restoreContext();
+    await until(() => counters().draws > atLoss.draws, 'a draw after the restore', TICKS_TIMEOUT_MS);
+    await until(() => debug().walkLighting().state === 'live', 'room lighting live again', MOUNT_TIMEOUT_MS - 60_000);
+    await rest('after the restore');
+    expect(await differingShare(before, await shot())).toBeLessThan(0.01);
   });
 
   test('a resize draws a complete picture, then rests', async () => {
