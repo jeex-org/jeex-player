@@ -82,6 +82,7 @@ const READ_ONLY_KEYS = [
   'wallFinish',
   'wallJoints',
   'walkPost',
+  'walkLighting',
 ];
 
 /** The ones that change or export the draft, plus the two lazy layout reads. */
@@ -118,6 +119,7 @@ function host(overrides: Partial<ViewerDebugHost> = {}): ViewerDebugHost {
     sceneRoot: () => undefined,
     sun: () => undefined,
     walkPost: () => undefined,
+    walkLighting: () => undefined,
     director: () => stubDirector(),
     editor: () => stubEditor(),
     builder: () => stubBuilder(),
@@ -301,6 +303,11 @@ describe('the getters project the model', () => {
     const state = { direction: [0, 1, 0] as const, azimuth: 0, elevation: 90, fit: null, draws: 3 };
     const sun = { state: () => state } as unknown as SunShadow;
     expect(installViewerDebug(host({ sun: () => sun })).sunShadow()).toEqual(state);
+  });
+
+  test('walkLighting is off without a stage and the controller state with one', () => {
+    expect(installViewerDebug(host()).walkLighting()).toEqual({ state: 'off', stats: null });
+    expect(installViewerDebug(host({ walkLighting: () => ({ state: 'baking', stats: null }) })).walkLighting().state).toBe('baking');
   });
 
   test('walkPost is off without a stage and the controller state with one', () => {

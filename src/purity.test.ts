@@ -59,6 +59,7 @@ const PURE_MODULES = [
   'plan/plan-solver',
   'plan/plan-drawing',
   'plan/plan-rooms',
+  'plan/search-lattice',
   'plan/opening-arc',
   'plan/opening-geometry',
   'shared/readonly-map',

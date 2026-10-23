@@ -1118,6 +1118,16 @@ In `walk` and `tour`, the modes where a visitor looks around and nothing is edit
 - **Mirrors** reflect the room once per frame, with or without the chain.
 - **Resources:** the chain follows the viewer's size and pixel ratio, is kept while you switch to an editing mode and back, is rebuilt after a lost GPU context and releases all its GPU memory when the viewer is disposed.
 
+### Room lighting in walk and tour
+
+In `walk` and `tour` each room is lit by its own light: a windowless bathroom is darker than a living room with a window, light bounces once through a doorway, and glossy floors, cabinets and metals reflect the room they stand in instead of a grey studio.
+
+- **How:** every room gets a three.js light-probe grid (about one probe per metre, two layers in height), baked on entry with one bounce, and one reflection probe at 1.5 m, box-projected onto the room and blended over 0.4 m across a shared boundary. The light that ignores walls (the sky light, the fill and the environment's diffuse term) is switched off inside the rooms; a small ambient floor and a walk exposure keep rooms readable. Facades, the ground and anything outside the rooms keep the editing look. A plan with more than 16 room boxes (a concave room counts one box per rectangle) keeps the direct look and emits one `error` event.
+- **When:** the bake starts once the post-processing chain is ready and runs over a number of frames, a fixed number of probes per frame; until it is done the view looks as before, then switches in one frame. An edit in walk refreshes only the rooms it touched, about a second after the last change; loading a scene, a plan change, a sun change or a lost GPU context bakes everything again.
+- **Editing modes** (`plan2d`, `plan3d`, `orbit`) are unchanged, and leaving walk restores them exactly.
+- **Captures:** stills, video frames and panoramas of the live view in walk or tour show the room lighting once it is baked (before that, the direct look). Captures of other states (another camera's preview, an exported file) show the editing look.
+- **Cost:** the code travels in the walk chunk (about 12 KB gzip more). GPU memory is about 1.6 MB per room for the reflection probe plus a few kilobytes per grid.
+
 ## Lighting standard (`jeex-viewer/lighting`)
 
 The player lights every scene with one standard, and publishes it so another application that renders the same content (an asset review page, a store preview, an editor) shows it exactly the same way:

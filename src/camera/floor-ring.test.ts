@@ -33,6 +33,24 @@ describe('floorRingPoint', () => {
 });
 
 describe('FloorRing', () => {
+  test('draws the same white under any renderer exposure', () => {
+    const ring = new FloorRing();
+    const draw = (exposure: number): number => {
+      ring.object.onBeforeRender(
+        { toneMappingExposure: exposure } as never,
+        null as never,
+        null as never,
+        null as never,
+        null as never,
+        null as never,
+      );
+      return ring.object.material.color.r;
+    };
+    expect(draw(1)).toBe(1);
+    expect(draw(4)).toBe(0.25);
+    ring.dispose();
+  });
+
   test('starts hidden, follows show(), sits just above the floor, and hides on null', () => {
     const ring = new FloorRing();
     expect(ring.visible).toBe(false);

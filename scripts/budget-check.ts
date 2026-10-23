@@ -120,14 +120,16 @@ export const LAZY_CHUNK_FAIL_BYTES = 256 * 1024;
  * `lazy-jeex-viewer-walk-post`: the walk and tour post-processing chain
  * (`src/render/walk-post.ts`: three's composer, GTAO, SMAA with its two
  * embedded lookup images, the output pass), loaded on the first entry into
- * walk or tour rather than at boot. The limit is the last measured size of the
- * ES build's chunk (50,747 gzip bytes, from `measureBundle('dist-lib')` right
- * after `bun run build:lib`; the demo build's is 49,596) plus 1 KB, so a
+ * walk or tour rather than at boot, and the walk room lighting with three's
+ * light-probe grid (`src/render/walk-lighting/`).
+ * The limit is the last measured size of the ES build's chunk (62,682 gzip
+ * bytes, from `measureBundle('dist-lib')` right after `bun run build:lib`; the
+ * demo build's is 60,559; 50,773 before the room lighting) plus 1 KB, so a
  * second effect added to the chain is noticed here. The IIFE build cannot split
  * code and carries the chain inline, inside the 700 KB boot budget.
  */
 export const LAZY_LIMITS: Readonly<Record<string, number>> = {
-  'lazy-jeex-viewer-walk-post': 50_747 + 1024,
+  'lazy-jeex-viewer-walk-post': 62_682 + 1024,
   // three's KTX2 loader with its container parser and Zstd decoder
   // (`src/materials/ktx2.ts`), loaded by the first KTX2 asset: 25,052 gzip
   // bytes in the ES build (24,175 in the demo build) from `measureBundle`

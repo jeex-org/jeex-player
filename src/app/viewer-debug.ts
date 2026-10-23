@@ -50,7 +50,13 @@ import type { ViewerSelection, ViewerSelectionTarget } from './selection.js';
 import type { SelectionDescription } from '../ui/selection-options.js';
 import type { AssetMoveDebug } from '../edit/asset-move-session.js';
 import type { WalkPostState } from './walk-post-controller.js';
+import type { WalkLightingState } from './walk-lighting-controller.js';
+import type { WalkLightingStats } from '../render/walk-lighting/walk-lighting.js';
+
 import { freeSpaceModule, layoutLintModule, loadLayoutModules } from './debug-layout-modules.js';
+
+/** The room lighting as the debug surface reads it. */
+type WalkLightingDebug = { state: WalkLightingState; stats: WalkLightingStats | null };
 
 /** What `__viewerDebug.minimap()` answers (`minimap.ts`). */
 type MinimapState = {
@@ -105,6 +111,8 @@ type ViewerDebugApi = {
   sunShadow: () => SunShadowState | null;
   /** The walk and tour post-processing chain: `off`, `loading`, `on` (drawing the frame) or `failed`. */
   walkPost: () => WalkPostState;
+  /** The walk and tour room lighting: its phase and the last full bake's measurement (`walk-lighting-controller.ts`). */
+  walkLighting: () => WalkLightingDebug;
   /**
    * What every furniture body on screen actually IS, right now: the placement
    * id, whether its body is procedural, a `dims` stand-in waiting for a GLB or
@@ -353,6 +361,7 @@ type SceneDebug = {
   editor: () => ViewerEditor | undefined;
   sun: () => SunShadow | undefined;
   walkPost: () => WalkPostState | undefined;
+  walkLighting: () => WalkLightingDebug | undefined;
   furnitureVisible: () => boolean;
   /** This instance's catalogue; `setLocale` replaces it. */
   messages: () => Messages;
@@ -479,6 +488,7 @@ export function installViewerDebug(host: ViewerDebugHost): ViewerDebugApi {
     furnitureRendered: () => host.sceneRoot()?.getObjectByName(FURNITURE_GROUP_NAME)?.visible ?? null,
     sunShadow: () => host.sun()?.state() ?? null,
     walkPost: () => host.walkPost() ?? 'off',
+    walkLighting: () => host.walkLighting() ?? { state: 'off', stats: null },
     assetModels: () => {
       const furniture = host.sceneRoot()?.getObjectByName(FURNITURE_GROUP_NAME);
       if (!furniture) return [];

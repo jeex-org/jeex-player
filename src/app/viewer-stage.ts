@@ -43,6 +43,9 @@ import { ViewerSelectionController, type ViewerSelection } from './selection.js'
 import type { Picker } from '../geometry/picker.js';
 import type { AssetMoveControl } from '../edit/asset-move-session.js';
 import { loadWalkPost, WalkPostController } from './walk-post-controller.js';
+import { loadWalkLighting, WalkLightingController } from './walk-lighting-controller.js';
+import { wireWalkLighting } from './walk-lighting-wiring.js';
+import type { WalkDocument } from '../render/walk-lighting/walk-lighting.js';
 import type { PostProcessor } from '../render/post-processor.js';
 
 /**
@@ -195,6 +198,10 @@ export class ViewerStage {
   private cameraDirector?: CameraDirector;
   /** The walk and tour post-processing chain: loaded on demand, attached in those modes (`walk-post-controller.ts`). */
   readonly walkPost: WalkPostController;
+  /** The walk and tour room lighting: built after the chain, baked on entry (`walk-lighting-controller.ts`). */
+  readonly walkLighting: WalkLightingController;
+  /** The document the room lighting is built for, and the end of its edit subscription. */
+  private lightingDocument: { document: () => WalkDocument | null; off: () => void } | null = null;
   private disposed = false;
   /** The asset move tool's switch, once `handle.setAssetMoveTool` was first called (`asset-move-wiring.ts`). */
   assetMove: AssetMoveControl | null = null;
@@ -216,10 +223,12 @@ export class ViewerStage {
       viewport: deps.viewport,
       onContextLost: () => {
         this.walkPost.contextLost();
+        this.walkLighting.contextLost();
         deps.onContextLost?.();
       },
       onContextRestored: () => {
         this.walkPost.contextRestored();
+        this.walkLighting.contextRestored();
         deps.onContextRestored?.();
       },
       signal: deps.signal,
@@ -239,6 +248,13 @@ export class ViewerStage {
       build: () => loadWalkPost(this.runtime.renderer, this.runtime.scene, this.camera),
       attach: (chain) => this.runtime.setPostProcessor(chain),
       report: (error) => deps.onFrameError?.(error),
+    });
+    this.walkLighting = new WalkLightingController({
+      build: () => loadWalkLighting(this.runtime.renderer, this.runtime.scene),
+      report: (error) => deps.onFrameError?.(error),
+      chainReady: () => this.walkPost.state() === 'on',
+      document: () => this.lightingDocument?.document() ?? null,
+      now: () => performance.now(),
     });
     this.planModes = new PlanModes({
       container: deps.roots.viewport,
@@ -394,8 +410,11 @@ export class ViewerStage {
    * re-seeds it on every later one, and hands the plan to the overlay and the
    * map.
    */
-  setDocument(model: SceneModel): void {
+  setDocument(model: SceneModel, root: () => THREE.Object3D | undefined = () => undefined): void {
     this.planModes.setDocument(model.plan, model.scene);
+    // The room lighting loads this document on its next walk frame and refreshes after its edits.
+    this.lightingDocument?.off();
+    this.lightingDocument = wireWalkLighting(this.walkLighting, model, root);
     this.minimap.setDocument();
     // The overlay rebuilds from the committed list; an active focus survives
     // when the document still carries its checkpoint.
@@ -457,6 +476,8 @@ export class ViewerStage {
       this.overlay.frame();
       // Walk and tour render through the chain, once it has loaded.
       this.walkPost.update(mode);
+      // The room lighting bakes after the chain is attached and shows once baked.
+      this.walkLighting.update(mode);
     };
     for (const hook of orderFrameHooks(cameraHook, hooks)) this.runtime.addFrameHook(hook);
     this.runtime.start();
@@ -510,6 +531,8 @@ export class ViewerStage {
     this.overlay.dispose();
     this.selection.dispose();
     this.scrollHint.dispose();
+    this.lightingDocument?.off();
+    this.walkLighting.dispose();
     this.walkPost.dispose();
     this.runtime.dispose();
   }
