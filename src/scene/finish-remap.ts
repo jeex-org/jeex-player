@@ -29,7 +29,7 @@
  * Pure module: no `three`, no DOM.
  */
 
-import { FaceMap, faceKey, sameFace, type FaceFinish, type FaceKey, type TopologyRemap } from './types.js';
+import { FaceMap, faceKey, sameFace, type FaceFinish, type FaceKey, type FinishRef, type TopologyRemap } from './types.js';
 
 /** The bare key of a painted entry, without its `finish`. */
 function keyOf(face: FaceKey): FaceKey {
@@ -39,15 +39,19 @@ function keyOf(face: FaceKey): FaceKey {
 /**
  * `faces` after `remap`: the same finishes under the faces the edit gave them.
  *
+ * A finish value travels by reference, whichever spelling it has: it is
+ * immutable data, so an heir wears the very object its ancestor wore and a
+ * colour or a rotation can never be lost on the way.
+ *
  * The result is a plain list of fresh entries, so it drops straight into a
  * `SceneFinishes.faces` field.
  */
 export function remapFaceFinishes(faces: readonly FaceFinish[], remap: TopologyRemap): FaceFinish[] {
   // The finish each heir inherits, decided once from the remap alone.
-  const finishOf = new FaceMap<string>();
+  const finishOf = new FaceMap<FinishRef>();
   for (const entry of faces) finishOf.set(keyOf(entry), entry.finish);
   const heirsOf = new FaceMap<FaceKey[]>();
-  const inherited = new FaceMap<string>();
+  const inherited = new FaceMap<FinishRef>();
   for (const entry of remap.faces) {
     heirsOf.set(entry.from, [...entry.to]);
     const finish = finishOf.get(entry.from);
@@ -58,7 +62,7 @@ export function remapFaceFinishes(faces: readonly FaceFinish[], remap: TopologyR
     for (const heir of entry.to) inherited.set(heir, finish);
   }
 
-  const out = new FaceMap<string>();
+  const out = new FaceMap<FinishRef>();
   for (const entry of faces) {
     const face = keyOf(entry);
     const heirs = heirsOf.get(face);

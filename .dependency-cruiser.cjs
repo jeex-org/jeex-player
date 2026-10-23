@@ -77,11 +77,13 @@ const KNOWN_VIOLATIONS = {};
  * `scene/types.schema.ts` is the SAME layer as `scene/types.ts`: it is the
  * document schema's zod twin, and it sits next to the types because
  * `embed/ops.ts` — the `jeex-viewer/ops` entry an editor host reads it
- * through — publishes the two together.
+ * through — publishes the two together. `scene/types.finishes.ts` is the
+ * same layer too: the painted faces and finish values split out of
+ * `scene/types.ts`, which re-exports them; so is `scene/types.site.ts`.
  */
 function layerPath(layer) {
-  if (layer === 'scene/types') return '^src/scene/types(\\.schema)?\\.ts$';
-  if (layer === 'scene') return '^src/scene/(?!types(\\.schema)?\\.ts$)';
+  if (layer === 'scene/types') return '^src/scene/types(\\.schema|\\.finishes|\\.site)?\\.ts$';
+  if (layer === 'scene') return '^src/scene/(?!types(\\.schema|\\.finishes|\\.site)?\\.ts$)';
   if (layer === 'layout/issue') return '^src/layout/layout-issue\\.ts$';
   if (layer === 'layout') return '^src/layout/(?!layout-issue\\.ts$)';
   return `^src/${layer}/`;

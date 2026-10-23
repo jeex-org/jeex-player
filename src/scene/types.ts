@@ -6,9 +6,9 @@
  * (`shared/committed.ts`), which is the exact inverse and can only be obtained
  * from `draftOf` — a private deep copy nothing else holds.
  *
- * This module imports nothing of its own (code-ranker ADP): every other
- * module in the data/geometry layer imports FROM here, so an import back
- * into any of them — even type-only — closes a cycle. `SceneOp` (the op
+ * This module imports only `types.finishes.ts` and `types.site.ts`, which it
+ * re-exports and which import nothing (code-ranker ADP): every other module in the data/geometry
+ * layer imports FROM here, so an import back into any of them closes a cycle. `SceneOp` (the op
  * vocabulary) and `InteriorPreset` (built from it) live here for exactly
  * that reason: both are scene DATA shapes, and `SceneData.interiors` needs
  * `InteriorPreset` precisely typed without this file importing anything
@@ -25,6 +25,14 @@
  * ever: a published `.d.ts` built from `z.infer` would carry `zod`'s own
  * types into the package (`check:pkg`).
  */
+
+import type { FaceKey, FinishSurface, SceneFinishes, WallSide } from './types.finishes.js';
+import type { SceneSite } from './types.site.js';
+
+export type { SceneSite, SiteSun } from './types.site.js';
+
+export { HEX_COLOUR_PATTERN, isHexColour } from './types.finishes.js';
+export type { FaceFinish, FaceKey, FinishRef, FinishSurface, RoomFinishes, SceneFinishes, WallSide } from './types.finishes.js';
 
 export type Vec2 = { readonly x: number; readonly z: number };
 export type Vec3 = { readonly x: number; readonly y: number; readonly z: number };
@@ -62,9 +70,6 @@ export type WallRole = 'bearing' | 'partition' | 'facade';
 /** Kind of a room. Omitted on the document means `'room'`; a loggia has no ceiling. */
 export type RoomKind = 'room' | 'loggia';
 
-/** Which side of its wall a face is on: `'L'` is the left of `a -> b`. */
-export type WallSide = 'L' | 'R';
-
 /** True for the opening kinds that reach the floor and can be walked through. */
 export function isDoorLike(type: OpeningType): boolean {
   return type === 'door' || type === 'passage';
@@ -90,21 +95,6 @@ export function isUuidV7(value: unknown): value is string {
 }
 
 // -------------------------------------------------------------- face keys --
-
-/**
- * One paintable wall face: the side of a wall as seen from the room that owns
- * it. `room` is omitted for the facade, the outside face no room owns.
- *
- * A face is DERIVED, not an entity: it has no id of its own, only the UUIDs of
- * the things it is made of plus a side. So it travels as this structure on
- * every surface — a document's `finishes.faces`, a `set_material` target, a
- * `select` event, an export — and is compared with `sameFace`. A joined string
- * exists only as `FaceMap`'s private key, below.
- */
-export type FaceKey = { readonly room?: string; readonly wallId: string; readonly side: WallSide };
-
-/** A painted face in `SceneFinishes.faces`: the face and the finish it wears. */
-export type FaceFinish = FaceKey & { readonly finish: string };
 
 /** The face of `wallId` on `side`, owned by `room`, or the facade's for `null`. */
 export function faceKey(room: string | null, wallId: string, side: WallSide): FaceKey {
@@ -419,23 +409,6 @@ export const TOUR_CHECKPOINT_HEIGHT_MIN_M = 0.3;
  */
 export const TOUR_CHECKPOINT_HEIGHT_MARGIN_M = 0.2;
 
-/**
- * Painted state of the shell, so a repainted scene can be exported and reloaded.
- *
- * Resolution order for a wall face: its entry in `faces` -> the owner's entry
- * (`rooms[roomId].walls`, or `facade`) -> `DEFAULT_WALL_FINISH`. A room floor
- * falls back to `Room.floorMaterial`. Every finish is a catalogue UUID, and a
- * face appears in `faces` at most once.
- */
-export type SceneFinishes = {
-  readonly rooms?: Readonly<Record<string, RoomFinishes>>;
-  readonly faces?: readonly FaceFinish[];
-  readonly facade?: string;
-};
-
-/** Painted floor and wall finish of one room; both optional, both catalogue UUIDs. */
-export type RoomFinishes = { readonly floor?: string; readonly walls?: string };
-
 // -------------------------------------------------------- topology remap --
 //
 // The contract a future wall operation (split, merge, move a node) answers
@@ -493,20 +466,49 @@ export type TopologyRemap = { readonly faces: readonly TopologyRemapEntry[]; rea
 export type SetMaterialAlias = 'floors' | 'walls' | 'facade';
 
 /**
- * Paints a surface. `target` is one of the aliases `floors` / `walls` /
+ * Paints a surface, in one of two forms told apart by their key: `target`
+ * (the legacy form, which infers the surface) or `surface` (the explicit
+ * form, which names it). An operation carrying both is refused.
+ */
+export type SetMaterialOp = SetMaterialTargetOp | SetMaterialSurfaceOp;
+
+/**
+ * The legacy form. `target` is one of the aliases `floors` / `walls` /
  * `facade`, a room UUID, or a `FaceKey`; `scope` only matters for a face
  * target, where `'face'` (the default) paints that face alone and `'room'`
  * hands the face's owner — a room or the facade — the finish instead.
  *
- * A room target is routed by the finish itself: a floor finish paints the
- * floor, a wall finish paints the room's walls. Floor and wall catalogue ids
- * are disjoint, so the routing is total and unambiguous.
+ * A room target is routed by the finish itself: a finish that dresses floors
+ * paints the floor, else one that dresses walls paints the room's walls. Only
+ * this form infers the surface.
  */
-export type SetMaterialOp = {
+export type SetMaterialTargetOp = {
   readonly op: 'set_material';
   readonly target: SetMaterialAlias | (string & {}) | FaceKey;
   readonly material: string;
   readonly scope?: 'room' | 'face';
+  readonly surface?: never;
+};
+
+/**
+ * The explicit form: `surface` names what is painted, `room` or `face` where.
+ *
+ * `face` is allowed only for `wall` (a room-owned face) and `facade` (a face
+ * no room owns), never beside `room`; without either, `floor`, `wall`,
+ * `ceiling` and `trim` paint every room and `facade` the facade. The material
+ * must dress the surface by its `apply`; `colour` and `rotation` are allowed
+ * only with a project LIBRARY material, and the value written is the bare
+ * UUID when neither is given, the `FinishObject` otherwise.
+ */
+export type SetMaterialSurfaceOp = {
+  readonly op: 'set_material';
+  readonly surface: FinishSurface;
+  readonly room?: string;
+  readonly face?: FaceKey;
+  readonly material: string;
+  readonly colour?: string;
+  readonly rotation?: number;
+  readonly target?: never;
 };
 
 export type ReplaceAssetVariantOp = { readonly op: 'replace_asset_variant'; readonly assetId: string; readonly variant: string };
@@ -782,19 +784,16 @@ export type InteriorPreset = {
  * fields — `asset` is a bare UUID and `library` names its library — so the
  * composite `library:asset` string of 2.0 and 2.1 is gone. That changes what
  * an existing field means, so an older document is refused, never
- * reinterpreted, and its producer converts it. 2.3 adds the optional `site`;
- * 2.2 stays readable and may not carry it.
+ * reinterpreted, and its producer converts it. 2.3 adds the optional `site`
+ * and the library finishes: a finish value may be an object (`FinishRef`),
+ * and a room may name its `ceiling` and its `trim`. Nothing of 2.2 changed
+ * meaning, so both are read; a 2.2 document that uses a field new in 2.3 is
+ * refused.
  */
 export type SchemaVersion = '2.2' | '2.3';
 
 /** The versions a reader accepts, oldest first; the last is what a writer writes (a document is never re-versioned by an op). */
 export const SCHEMA_VERSIONS = ['2.2', '2.3'] as const satisfies readonly SchemaVersion[];
-
-/** The sun presets a `site` may name (schema 2.3). */
-export type SiteSun = 'morning' | 'noon' | 'evening';
-
-/** Where the plan faces (schema 2.3): `northDeg` is true north's world azimuth, degrees clockwise from +Z towards +X; absent 0. `sun` absent is `noon`. */
-export type SceneSite = { readonly northDeg?: number; readonly sun?: SiteSun };
 
 /**
  * The only length unit this schema speaks. Explicit on the document, so an

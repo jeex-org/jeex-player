@@ -40,6 +40,8 @@ export function touchedText(entity: TouchedEntity): string {
   switch (entity.kind) {
     case 'floor':
     case 'walls':
+    case 'ceiling':
+    case 'trim':
       return `${entity.kind} ${entity.room}`;
     case 'face':
       return `face ${faceText(entity.face)}`;

@@ -1,0 +1,87 @@
+# Tasks
+
+Every task starts from the failing test it names (TDD: red, then green, then refactor). Unit tests run with `bun test <file>`; component tests with `bun run test:component`, browser tests with `bun run test:browser` and end-to-end tests with `bun run test:e2e` (or `bunx playwright test <spec>` for one file). Browser tiers are heavy: run them one at a time, never in parallel, with the runner caps of the repository. On a red full check (`bun run check`) only the failed files are re-run. Groups 1 to 3 (manifest and scene schema) form the first review slice and are reviewed before group 4 starts.
+
+## 1. Start
+
+- [x] 1.1 Rebase the branch on the current `main`; if `main` already has scene schema `2.3`, record which fields it added so group 3 joins them instead of adding the version again (verify: `bun test src/scene/types.schema.test.ts` green on the rebased tree)
+
+## 2. Manifest `library` member (review slice, part 1)
+
+- [x] 2.1 Test first in a new `src/shared/limits.test.ts`: `MAX_TEXTURE_FILE_BYTES` = 2 097 152, `MAX_PROJECT_TEXTURE_BYTES` = 50 331 648, `MAX_PROJECT_TEXTURE_FILES` = 512 exported by name; then add them next to `MAX_PROJECT_BYTES` with their enforcement points in the doc comment (verify: test green)
+- [x] 2.2 Test first in the manifest schema test: `apply` accepts `ceiling`, `facade`, `trim` and still refuses an unknown word; extend the `FinishApply` vocabulary in types and schema (verify: test green, existing manifest tests unchanged)
+- [x] 2.3 Test first: the compile-time agreement check between the hand-written types and the schema fails for a missing `library` member; declare `LibraryMaterial`, `LibraryFacts`, `LibraryPbr`, map role and size types in `materials/finish-types.ts`, re-export from `assets/project-manifest.ts` (verify: typecheck and the agreement test green)
+- [x] 2.4 Tests first for the strict shape: a valid natural scan, tintable scan and parameters material parse and come back as the same object (`toBe`); unknown keys at every depth, a v4 `versionId`, bad `averageColour`, `normalStrength: 0`, an unknown role are refused with their paths; then add the strict `library` member (verify: tests green)
+- [x] 2.5 Tests first for the PBR ranges (each unit-interval field at -0.01 and 1.01, `ior` at 0.99 and 2.34, negative distances and intensity, `NaN`, bad colour strings); then add the ranges (verify: tests green)
+- [x] 2.6 Tests first for colour mode rules (tint iff tintable, `suggestedColours` min 1, natural scan without `albedoTint`, tintable scan without `albedo`, scan `tileM` non-null); then the refinements (verify: tests green)
+- [x] 2.7 Tests first for map rules (colour space by role, `convention` only on `normal` as `opengl`, `arm` versus `roughness`/`ao`, `ao` alone refused, same size set across maps, at least one size, size keys only 128/256/384/512/768); then the refinements (verify: tests green)
+- [x] 2.8 Tests first for parameters (`maps: {}`, `tileM: null`, `baseColour` required, `averageColour` equal case-insensitively); then the refinements (verify: tests green)
+- [x] 2.9 Tests first for paths (exact `tex/<versionId>/<role>.<px>.webp`, own version, size key agrees with file, `.ktx2` and `.png` refused) and the manifest-wide checks (duplicate path refused at its second occurrence, 512 files accepted, 513 refused naming the limit); then the checks on the root schema (verify: tests green)
+- [x] 2.10 Test that `pbr` and `generator` manifests still parse and draw as before (existing fixtures unchanged); document the member in the manifest schema's module comment and in the README's project manifest section (verify: tests green, `bash scripts/no-docs-refs.sh` clean)
+
+## 3. Scene schema 2.3, finish values and `set_material` (review slice, part 2)
+
+- [x] 3.1 Tests first in `src/scene/types.schema.test.ts`: `2.2` and `2.3` accepted, `2.4` refused naming both; then `SCHEMA_VERSIONS = ['2.2', '2.3']` and the version comment (verify: tests green)
+- [x] 3.2 Tests first: finish objects accepted at all six places, strict keys, `#rrggbb` colour, finite rotation, at least one modifier (bare `<m>`, `{ material, colour }` and `{ material, rotation }` accepted, `{ material }` refused with «use the bare UUID»); `ceiling` and `trim` on room finishes; then `FinishRef` in `scene/types.ts` and the Zod schema, with a shared hex refinement (verify: tests green)
+- [x] 3.2a Rejection tests through `SceneModel.load` at every finish location (room floor, walls, ceiling, trim, facade, face entries) for an unknown key, a bad colour, a non-finite rotation and a modifier-free object; then one pure finish shape check called by the runtime scene validator (verify: tests green; the runtime path refuses without the Zod schema)
+- [x] 3.3 Tests first in the validator tests: a `2.2` document with an object, `ceiling` or `trim` refused naming `2.3`; every existing `2.2` fixture still valid; then the version gate (verify: tests green)
+- [x] 3.4 Tests first in `src/scene/registries.test.ts`: the surface table (bundled floor `{floor}`, bundled wall `{wall, facade, ceiling, trim}`, project material by `apply`, `floor`+`wall` material dressing both, bare-UUID `wall → facade` allowance), `isLibraryMaterial`; then the table, with `finishKind` derived from it (verify: tests green, legacy registry tests unchanged)
+- [x] 3.5 Tests first in the validator tests: wrong-surface and unknown-material issues for objects and bare UUIDs at every place, a bundled finish, a `pbr` and a `generator` project material in object form refused, bare UUIDs of `pbr` and `generator` project materials still accepted (compatibility), the legacy facade case accepted; then the checks through `finishMaterialOf` (verify: tests green)
+- [x] 3.6 Tests first in `src/scene/finish-remap.test.ts`: a split carries a finish object deep-equal to both heirs, merges keep the primary's object; then move the remap to `FinishRef` (verify: tests green)
+- [x] 3.7 Tests first in `src/scene/scene-ops.test.ts` for the explicit form: every addressing row of the spec (each surface with room, face, neither; refused combinations), the strict `apply` check, `colour`/`rotation` refused with a bundled, `pbr` or `generator` finish, malformed `colour` (`'#abc'`) and `rotation` (`Infinity`) refused through `apply` with the document unchanged, bare UUID written without them, object written with them, object/ceiling/trim into a `2.2` document refused, both `surface` and `target` refused, touched entries for ceiling and trim; then the explicit branch (verify: tests green)
+- [x] 3.8 Test that every legacy `set_material` test passes unchanged, including room routing by inferred surface; keep the legacy branch on the new table (verify: tests green)
+- [x] 3.9 Tests first in `src/scene/interior-presets.test.ts`: coverage and the appended reset read `surface` for explicit operations (an explicit wall paint with a floor-and-wall material counts as walls and is not overwritten by the reset; an explicit face operation; an explicit every-room operation), legacy operations still inferred; capture and restore keep the exact spelling (bare stays bare, objects with colour or rotation deep-equal); then branch coverage and reset by operation form and emit the explicit form for object finishes (verify: tests green)
+- [x] 3.10 Test first: an exported `2.3` document with finish objects reloads deep-equal; then fix any export path that assumed strings (verify: test green)
+- [x] 3.11 Regenerate the JSON schemas (`bun run scripts/schema-gen.ts --out <tmp>` and `bash scripts/schema-gate.sh`); the scene schema shows `FinishRef`, `ceiling`, `trim` and `2.3`, the viewer options schema is unchanged (verify: the schema gate and `scripts/schema-check.test.ts` green)
+- [x] 3.12 Ops bundle measured per file with `bun run build:lib` then `bun run check:budget:lib`; if over, shrink first, and raise the ops budget only with the measured figure and its reason beside the constant (verify: budget check green)
+- [x] 3.13 README sections on scene finishes and `set_material` (both forms, addressing table, version note) and CHANGELOG entries for groups 2 and 3 (verify: `bash scripts/no-docs-refs.sh` clean; review slice handed over)
+
+## 4. Texture source
+
+- [x] 4.1 Test first: the capped streaming reader moved to `shared/` keeps every existing model-source test green and refuses a stream over its limit without `Content-Length`; then move it and make `geometry/model-source.ts` use it (verify: model-source and new reader tests green)
+- [x] 4.2 Tests first for size choice: low/mid/high give 256/512/768, nearest listed size, tie to the smaller, `none` loads nothing; then the pure chooser (verify: tests green)
+- [x] 4.3 Tests first for location: baked path against the manifest folder, a host resolver called once per fetched logical path and never for unused sizes; accepted results are absolute `http:`/`https:` and `blob:` URLs (a `blob:` URL loads successfully); a relative path, a `data:` URL, a throwing or a rejecting resolver leave the entry failed with a warning; then the location step (verify: tests green)
+- [x] 4.3a Tests first with fake timers: `TEXTURE_FETCH_DEADLINE_MS` = 30 000 exported from `src/shared/limits.ts`; a resolver promise that never settles and a response stream that stalls after its headers each abort the job at the deadline, free its concurrency slot (the next queued job starts), leave the entry failed and log a warning; a late resolver result is ignored; then the constant and the per-job deadline (verify: tests green)
+- [x] 4.4 Tests first with a stub fetch: a file over 2 MiB is cancelled and fails; the document counter stops queued and active work at 48 MiB and warns naming the limit; cache hits cost nothing; concurrent requests for one key share one fetch; a new document starts at zero (verify: tests green)
+- [x] 4.5 Tests first with a stub decoder: decode options (`flipY`, no colour conversion, no premultiplication), a size mismatch fails with a warning; then the decode step (verify: tests green)
+- [x] 4.6 Tests first for ownership: acquire/release by owner, the image closed and texture disposed after the last owner only, encoded bytes kept for the document, release of a stale completion after a generation change or disposal; then the cache (verify: tests green)
+- [x] 4.7 Test first: texture views share one `Source`, use repeat wrapping, mipmaps, trilinear filtering, bounded anisotropy, sRGB for colour roles and no colour space for the others (verify: test green)
+
+## 5. Library material factory and resolver
+
+- [x] 5.1 Tests first: the resolver returns a legacy `Finish` for bundled, generator and `pbr` finishes and a library draw for library materials, from bare UUIDs and objects (verify: tests green)
+- [x] 5.2 Tests first for the factory's first frame: natural `averageColour`, tintable scan `averageColour × tint` in linear light, tintable parameters the tint or the first suggested colour, natural ignoring `colour`, a tintable parameters material with a non-white `baseColour` (`#806040`) and `colour: '#2050a0'` draws exactly the tint from the first frame with no `averageColour` product, physical material for each of sheen, sheenColour, clearcoat, clearcoatRoughness, transmission, ior, thicknessM, attenuationDistanceM and attenuationColour and only then, an `ior`-only material physical with `ior` 1.5 (verify: tests green)
+- [x] 5.3 Tests first for attaching maps: colour becomes white or the tint (times scan `baseColour` when present), `needsUpdate` on map presence change, ARM view on AO/roughness/metalness with AO channel 0, normal scale from `normalStrength`, defaults metalness 0, roughness 1, opaque, mask cutoff 0.5 (verify: tests green)
+- [x] 5.4 Tests first for the texture transform: rotation then `1/tileM` per axis, the same matrix on every map, floor grain along the longest outline edge with a deterministic tie, `along_v` adding 90°, `none`/`unknown` not turned, finish rotation added (verify: tests green)
+- [x] 5.5 Component-tier browser tests (`bun run test:component tests/component/library-material.test.ts`, Vitest in a real WebGL context, run alone) with deterministic fixtures under fixed lights: tint (red over mid-grey), UV scale (tile count along a known length), grain (planks along the long side), normal direction under a known light (+U lit brighter than −U), ARM (roughness halves differ in highlight sharpness, metalness only with `metalness: 1`), mask cutoff, upright marker on a wall (verify: browser tests green)
+
+## 6. Shell geometry and repaint
+
+- [x] 6.1 Tests first in `src/geometry/builder-uv.test.ts`: reveal strips have their own metre UVs with the front plane's texel density; then the reveal vertices (verify: tests green, triangle counts updated in their tests)
+- [x] 6.2 Tests first: baseboards carry metre UVs (three tiles of `tileM: [1, 1]` on a 3 m board) instead of normalised box UVs; then the trim geometry (verify: tests green)
+- [x] 6.3 Tests first in the shell builder tests: per-room ceiling and trim materials only for rooms with a finish, default plaster and trim otherwise, no extra materials for a legacy scene; library surfaces start flat; then the builder changes (verify: tests green, legacy shell tests unchanged)
+- [x] 6.4 Tests first in `src/geometry/shell-paint.test.ts`: repainting one of two rooms that share a scan keeps the other's texture and fetches nothing; repainting releases through the source instead of disposing maps; a late completion after a repaint is not applied; ceiling and trim repaint from their touched entries; then shell paint (verify: tests green)
+- [x] 6.5 Test first: unmount releases every texture and image the document created (leak check over GPU texture counts); then wire disposal (verify: test green; `bunx playwright test tests/e2e/leaks.spec.ts` green)
+
+## 7. App wiring, live resolver and context restore
+
+- [x] 7.1 Tests first in the viewer options tests: `resolveTexture` is a host object, copied verbatim, not read from an attribute or query, absent from the published viewer options schema; then the option. (verify: tests green, schema gate green)
+- [x] 7.2 Tests first: the project context creates one texture source per document with the GPU class value (telemetry on or off), the resolver or the manifest folder, and the renderer's anisotropy; texture work is queued after the first frame; no texture is fetched without a WebGL context (verify: tests green)
+- [x] 7.3 Test first reproducing the defect: after a simulated context loss and restore, a project remount keeps its model resolver, materials, catalogue, variants and source key; then `remount()` in the scene mount and its use in context recovery (verify: test green)
+- [x] 7.4 End-to-end test (`bunx playwright test tests/e2e/context-loss.spec.ts`): a restored project renders its library surfaces again from kept bytes with no new texture request (verify: `tests/e2e/context-loss.spec.ts` extended and green)
+- [x] 7.5 End-to-end test (`bunx playwright test tests/e2e/project.spec.ts`) with delayed texture responses: the viewer reports ready and library surfaces read their flat colours before any texture arrives, then the maps (verify: new case in `tests/e2e/project.spec.ts` green)
+- [x] 7.6 End-to-end test: the per-file cap and the document budget leave surfaces flat with warnings and no further requests (verify: `bun run test:e2e` green, run alone)
+
+## 8. Swatches and selection descriptions
+
+- [x] 8.1 Tests first in the selection options tests: project materials listed by surface word before the bundled finishes, facade faces by `facade`, bare scenes unchanged; then `finishCore` (verify: tests green)
+- [x] 8.2 Tests first: scope actions follow the destination surface (a facade face with an `apply: ['facade']` material offers only the facade actions and no every-room walls footer; `['facade', 'wall']` offers both); library options and their scope operations use the explicit form with the picked room or face; current finish is the material UUID of an object or bare value; flat chip from `averageColour` or the first suggested colour, `preview` when present; then the option builder (verify: tests green)
+- [x] 8.3 Component test of the selection panel with a project library (`bun run test:component`, run alone): picking a scan for one room applies the explicit operation and the surface repaints (verify: component test green)
+- [x] 8.4 README section on project library materials in swatches and `describeSelection`, and its CHANGELOG entry (verify: `bash scripts/no-docs-refs.sh` clean)
+
+## 9. Documentation and integration
+
+- [x] 9.1 README: a «Library materials» section (manifest member summary, texture paths, sizes by device class, the three limits and where each is enforced, the live resolver option, tint and first-frame behaviour) and the CHANGELOG entry for groups 4 to 7 (verify: `bash scripts/no-docs-refs.sh` clean, no machine paths or internal names in the repository diff)
+- [x] 9.2 Budgets: `bun run build` and `bun run check:budget`, `bun run build:lib` and `bun run check:budget:lib`; the viewer stays under 700 KiB gzip, lazy chunks under their cap, the ops entry under its recorded budget (verify: both budget checks green)
+- [x] 9.3 Static checks: typecheck, lint, format check, dependency layers (`materials` imports nothing above it; the GPU class arrives as a value), dead-code check (verify: all green)
+- [x] 9.4 Full check once with `bun run check`; on red, only the failed files re-run at their tier (verify: the check is green)

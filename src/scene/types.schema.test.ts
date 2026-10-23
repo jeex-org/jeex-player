@@ -17,6 +17,7 @@ import type { Opening, SceneData, SceneOp, Wall } from './types.js';
 import { L_SHAPE } from '../fixtures/plan-l-shape-ids.js';
 import { ARCHETYPE, OPENING_VARIANT, VARIANT } from '../assets/catalogue-ids.js';
 import { FINISH } from '../materials/finish-ids.js';
+import { LIBRARY_FINISH } from '../fixtures/library-finishes.js';
 
 const WALL = L_SHAPE.wall;
 const OPENING = L_SHAPE.opening;
@@ -336,6 +337,113 @@ describe('sceneSchema — site (schema 2.3)', () => {
   });
 });
 
+describe('scene schema versions 2.2 and 2.3', () => {
+  test('a 2.2 and a 2.3 document are both read, by the schema and by the shape gate', () => {
+    for (const version of ['2.2', '2.3']) {
+      const document = withField(lShapePlan, 'schemaVersion', version);
+      expect({ version, schema: documentPaths(document), shape: sceneShapeIssues(document) }).toEqual({ version, schema: [], shape: [] });
+    }
+  });
+
+  test('2.4 is refused, and the refusal names both readable versions', () => {
+    const document = withField(lShapePlan, 'schemaVersion', '2.4');
+    const result = z.safeParse(sceneSchema, document);
+    expect(result.success).toBe(false);
+    expect(result.error?.issues[0]?.message).toBe("Unsupported scene schema; expected '2.2' or '2.3'");
+  });
+});
+
+describe('sceneSchema — finish values (schema 2.3)', () => {
+  const M = LIBRARY_FINISH.paint;
+  const FACE = { room: ROOM.a, wallId: WALL.wPart, side: 'L' } as const;
+
+  /** `lShapePlan` as 2.3 with `value` at one of the six finish places. */
+  const at = (place: string, value: unknown): Record<string, unknown> => {
+    const finishes =
+      place === 'facade'
+        ? { facade: value }
+        : place === 'face'
+          ? { faces: [{ ...FACE, finish: value }] }
+          : { rooms: { [ROOM.a]: { [place]: value } } };
+    return { ...withField(lShapePlan, 'schemaVersion', '2.3'), finishes };
+  };
+  /** Where an issue lands for `place`. */
+  const pathAt = (place: string): string =>
+    place === 'facade' ? 'finishes.facade' : place === 'face' ? 'finishes.faces[0].finish' : `finishes.rooms.${ROOM.a}.${place}`;
+  const PLACES = ['floor', 'walls', 'ceiling', 'trim', 'facade', 'face'] as const;
+
+  test('the bare UUID and an object with colour, rotation or both are accepted at all six places', () => {
+    for (const place of PLACES) {
+      for (const value of [
+        M,
+        { material: M, colour: '#c9d6df' },
+        { material: M, rotation: 90 },
+        { material: M, colour: '#D8CBB5', rotation: -45 },
+      ]) {
+        expect({ place, value, issues: documentPaths(at(place, value)) }).toEqual({ place, value, issues: [] });
+      }
+    }
+  });
+
+  test('a modifier-free object is refused at its place, saying to use the bare UUID', () => {
+    for (const place of PLACES) {
+      const result = z.safeParse(sceneSchema, at(place, { material: M }));
+      const issues = result.error?.issues ?? [];
+      expect({ place, paths: documentPaths(at(place, { material: M })) }).toEqual({ place, paths: [pathAt(place)] });
+      expect(JSON.stringify(issues)).toContain('use the bare UUID');
+    }
+  });
+
+  test('an unknown key, a colour that is not #rrggbb, a rotation that is not finite and a material that is not a UUID v7 are refused', () => {
+    for (const place of PLACES) {
+      for (const value of [
+        { material: M, colour: '#c9d6df', scale: 2 },
+        { material: M, colour: 'beige' },
+        { material: M, colour: '#abc' },
+        { material: M, rotation: Number.POSITIVE_INFINITY },
+        { material: M, rotation: Number.NaN },
+        { material: M, rotation: '90' },
+        { material: 'oak', colour: '#c9d6df' },
+      ]) {
+        expect({ place, value, refused: documentPaths(at(place, value)).length > 0 }).toEqual({ place, value, refused: true });
+      }
+    }
+  });
+
+  test('a room carries ceiling and trim beside floor and walls', () => {
+    const finishes = {
+      rooms: { [ROOM.a]: { floor: FINISH.oak, walls: FINISH.sand, ceiling: FINISH.sand, trim: { material: M, colour: '#ffffff' } } },
+    };
+    expect(documentPaths({ ...withField(lShapePlan, 'schemaVersion', '2.3'), finishes })).toEqual([]);
+  });
+});
+
+describe('sceneOpSchema — the two set_material forms', () => {
+  const M = LIBRARY_FINISH.paint;
+  const opIssues = (op: unknown): number => sceneOpsIssues([op]).length;
+
+  test('the explicit form parses with room, with face and with neither', () => {
+    expect(opIssues({ op: 'set_material', surface: 'ceiling', room: ROOM.a, material: M, colour: '#c9d6df' })).toBe(0);
+    expect(
+      opIssues({ op: 'set_material', surface: 'wall', face: { room: ROOM.a, wallId: WALL.wPart, side: 'L' }, material: M, rotation: 90 }),
+    ).toBe(0);
+    expect(opIssues({ op: 'set_material', surface: 'facade', material: M })).toBe(0);
+  });
+
+  test('the legacy form still parses', () => {
+    expect(opIssues({ op: 'set_material', target: 'floors', material: FINISH.oak })).toBe(0);
+    expect(
+      opIssues({ op: 'set_material', target: { room: ROOM.a, wallId: WALL.wPart, side: 'L' }, material: FINISH.sand, scope: 'room' }),
+    ).toBe(0);
+  });
+
+  test('both target and surface, an unknown surface word and a malformed colour are refused', () => {
+    expect(opIssues({ op: 'set_material', surface: 'wall', target: 'walls', material: M })).toBeGreaterThan(0);
+    expect(opIssues({ op: 'set_material', surface: 'roof', material: M })).toBeGreaterThan(0);
+    expect(opIssues({ op: 'set_material', surface: 'wall', material: M, colour: '#abc' })).toBeGreaterThan(0);
+  });
+});
+
 describe('sceneSchema — UUID v7 ids and face keys', () => {
   test('a v4 UUID is refused where an entity id belongs', () => {
     const v4 = '3b241101-e2bb-4255-8caf-4136c566a962';
@@ -464,6 +572,29 @@ const RULE_CASES: readonly RuleCase[] = [
     rule: 'finish-wrong-family',
     kind: 'semantic',
     document: () => brokenScene((scene) => put(scene.rooms[0]!, 'floorMaterial', FINISH.terra)),
+  },
+  {
+    rule: 'finish-invalid',
+    kind: 'structural',
+    document: () =>
+      brokenScene((scene) => {
+        put(scene, 'schemaVersion', '2.3');
+        put(scene, 'finishes', { facade: { material: FINISH.sand, colour: 'beige' } });
+      }),
+  },
+  {
+    rule: 'finish-needs-schema-2-3',
+    kind: 'structural',
+    document: () => brokenScene((scene) => put(scene, 'finishes', { rooms: { [ROOM.a]: { ceiling: FINISH.sand } } })),
+  },
+  {
+    rule: 'finish-modifiers-need-library',
+    kind: 'semantic',
+    document: () =>
+      brokenScene((scene) => {
+        put(scene, 'schemaVersion', '2.3');
+        put(scene, 'finishes', { facade: { material: FINISH.sand, colour: '#c9d6df' } });
+      }),
   },
 
   // ---- validate/plan-entities.ts

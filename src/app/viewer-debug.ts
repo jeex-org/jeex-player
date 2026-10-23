@@ -113,6 +113,8 @@ type ViewerDebugApi = {
    * `openings`: it reports what is drawn and changes nothing.
    */
   assetModels: () => Array<{ id: string; state: string; degraded?: string; triangles: number }>;
+  /** The colour, map slots and colour-map size the shell mesh `name` is drawn with now (a library surface gains maps late); ungated. */
+  surfaceMaterial: (name: string) => { colour: string; maps: string[]; mapSize: number | null } | null;
   selectedFurniture: () => string | null;
   assetVariant: (id: string) => string | null;
   selectedOpening: () => string | null;
@@ -527,6 +529,13 @@ export function installViewerDebug(host: ViewerDebugHost): ViewerDebugApi {
           triangles: countTriangles(group),
         };
       });
+    },
+    surfaceMaterial: (name) => {
+      const material = (host.sceneRoot()?.getObjectByName(name) as THREE.Mesh | undefined)?.material;
+      if (!(material instanceof THREE.MeshStandardMaterial)) return null;
+      const width = (material.map?.image as { width?: unknown } | undefined)?.width;
+      const maps = (['map', 'normalMap', 'aoMap', 'roughnessMap', 'metalnessMap'] as const).filter((slot) => material[slot] !== null);
+      return { colour: `#${material.color.getHexString()}`, maps, mapSize: typeof width === 'number' ? width : null };
     },
     selectedFurniture: () => host.editor()?.selectedFurniture() ?? null,
     assetVariant: (id) => model().scene.assets.find((asset) => asset.id === id)?.variant ?? null,

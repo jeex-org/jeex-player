@@ -35,6 +35,7 @@ const FAKE = {
 /** Every key the read-only half of the contract must always expose. */
 const READ_ONLY_KEYS = [
   'assetModels',
+  'surfaceMaterial',
   'assetMove',
   'assetVariant',
   'camera',
@@ -257,6 +258,24 @@ describe('the getters project the model', () => {
     expect(api.floorAt(0.9, -0.9)).toBe(L_SHAPE.room.a);
     expect(api.floorAt(4, 0)).toBeNull();
     expect(installViewerDebug(host()).floorAt(0, 0)).toBeNull();
+  });
+
+  test('surfaceMaterial reports what a named surface is drawn with: its colour and which maps it samples', () => {
+    const root = new THREE.Group();
+    const material = new THREE.MeshStandardMaterial({ color: '#9a7b56' });
+    const image = { width: 512, height: 512 };
+    material.map = new THREE.Texture(image as never);
+    material.aoMap = new THREE.Texture();
+    const floor = new THREE.Mesh(new THREE.BoxGeometry(1, 0.1, 1), material);
+    floor.name = `floor-${L_SHAPE.room.a}`;
+    root.add(floor);
+    const api = installViewerDebug(host({ sceneRoot: () => root }));
+    expect(api.surfaceMaterial(`floor-${L_SHAPE.room.a}`)).toEqual({
+      colour: '#9a7b56',
+      maps: ['map', 'aoMap'],
+      mapSize: 512,
+    });
+    expect(api.surfaceMaterial('nothing-by-that-name')).toBeNull();
   });
 
   test('navigable and focusRoom pass the host answer through unchanged', () => {

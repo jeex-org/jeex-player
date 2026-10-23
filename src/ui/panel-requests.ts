@@ -58,6 +58,8 @@ type FinishPanelArgs = {
   /** The committed document: the owner's name and the finish in force come from it. */
   scene: SceneData;
   target: FinishTarget;
+  /** The loaded project's bank: its library materials are offered first. Absent for a bare scene. */
+  variants?: VariantBank | undefined;
   anchor: { x: number; y: number };
   onPick: (finishId: string, scopeChecked: boolean) => void;
   onApplyToAll: (finishId: string | null, scopeChecked: boolean) => void;
@@ -72,7 +74,7 @@ type FinishPanelArgs = {
  * `describeSelection` answers `null` too — one rule, one place.
  */
 export function finishPanelRequest(args: FinishPanelArgs): PanelRequest | null {
-  const core = finishCore(args.scene, args.target, args.messages);
+  const core = finishCore(args.scene, args.target, args.messages, args.variants);
   if (!core) return null;
   const { target } = args;
   return {

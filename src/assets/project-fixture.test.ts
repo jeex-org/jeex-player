@@ -24,7 +24,7 @@ import type { SceneData } from '../scene/types.js';
 import { CATALOGUE_REGISTRIES } from './catalogue-registries.js';
 import { isProjectDocument, projectLibraryOf } from './project-manifest.js';
 import { parseProjectManifest, projectManifestIssues } from './project-manifest.schema.js';
-import { INVALID_PROJECT_FIXTURE, PROJECT_FIXTURE as FIXTURE } from '../../tests/fixtures/project/fixture-ids.js';
+import { INVALID_PROJECT_FIXTURE, LIBRARY_PROJECT_FIXTURE, PROJECT_FIXTURE as FIXTURE } from '../../tests/fixtures/project/fixture-ids.js';
 
 /** The fixture folder, relative to this module — `src/assets` -> repository root. */
 const FIXTURE_DIR = join(import.meta.dirname, '..', '..', 'tests', 'fixtures', 'project');
@@ -116,5 +116,42 @@ describe('tests/fixtures/project-invalid', () => {
     expect(isProjectDocument(document)).toBe(true);
     expect(projectManifestIssues(document).map((issue) => issue.path.join('.'))).toEqual(['scene']);
     expect((document as { projectId: string }).projectId).toBe(INVALID_PROJECT_FIXTURE.projectId);
+  });
+});
+
+describe('tests/fixtures/project-library', () => {
+  const dir = join(import.meta.dirname, '..', '..', 'tests', 'fixtures', 'project-library');
+  const manifest = parseProjectManifest(read('project.json', dir));
+
+  test('its manifest passes the schema and agrees with fixture-ids.ts', () => {
+    expect(manifest.projectId).toBe(LIBRARY_PROJECT_FIXTURE.projectId);
+    expect(manifest.bakeId).toBe(LIBRARY_PROJECT_FIXTURE.bakeId);
+    const library = manifest.library.materials.filter((material) => 'library' in material).map((material) => material.id);
+    expect(library).toEqual([LIBRARY_PROJECT_FIXTURE.material.scan, LIBRARY_PROJECT_FIXTURE.material.paint]);
+  });
+
+  test('its scene is a 2.3 document that validates against the project library', () => {
+    const scene = read('scene.json', dir) as SceneData;
+    expect(scene.schemaVersion).toBe('2.3');
+    expect(() => validateScene(scene, registriesFromLibrary(projectLibraryOf(manifest), CATALOGUE_REGISTRIES))).not.toThrow();
+  });
+
+  test('every texture file the manifest lists is in the folder, at the size it is listed under', () => {
+    for (const material of manifest.library.materials) {
+      if (!('library' in material)) continue;
+      for (const map of Object.values(material.library.maps)) {
+        for (const [size, path] of Object.entries(map.files)) {
+          const bytes = readFileSync(join(dir, path));
+          // A WebP: `RIFF` … `WEBP`, and a lossless VP8L header carries the width.
+          expect({ path, riff: bytes.subarray(0, 4).toString('latin1'), webp: bytes.subarray(8, 12).toString('latin1') }).toEqual({
+            path,
+            riff: 'RIFF',
+            webp: 'WEBP',
+          });
+          const width = 1 + (bytes[21]! | ((bytes[22]! & 0x3f) << 8));
+          expect({ path, width }).toEqual({ path, width: Number(size) });
+        }
+      }
+    }
   });
 });

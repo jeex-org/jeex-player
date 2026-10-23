@@ -172,6 +172,37 @@ describe('the Zod schema and the published JSON Schema accept the same documents
     ['a painted face joined into a string key', () => ({ ...draftOf(lShapePlan), finishes: { faces: { 'a:w-part:L': 'sage' } } })],
     ['a unit that is not metres', () => ({ ...draftOf(lShapePlan), units: 'ft' })],
     [
+      'a 2.2 document with a room ceiling finish (2.3 only)',
+      () => ({
+        ...draftOf(lShapePlan),
+        finishes: { rooms: { [lShapePlan.rooms[0]!.id]: { ceiling: lShapePlan.rooms[0]!.floorMaterial } } },
+      }),
+    ],
+    [
+      'a 2.2 document with a finish object (2.3 only)',
+      () => ({ ...draftOf(lShapePlan), finishes: { facade: { material: lShapePlan.rooms[0]!.id, rotation: 90 } } }),
+    ],
+    [
+      'a finish object whose colour is not #rrggbb',
+      () => ({
+        ...draftOf(lShapePlan),
+        schemaVersion: '2.3',
+        finishes: { facade: { material: lShapePlan.rooms[0]!.id, colour: 'beige' } },
+      }),
+    ],
+    [
+      'a finish object with neither colour nor rotation',
+      () => ({ ...draftOf(lShapePlan), schemaVersion: '2.3', finishes: { facade: { material: lShapePlan.rooms[0]!.id } } }),
+    ],
+    [
+      'a finish object with a key it does not have',
+      () => ({
+        ...draftOf(lShapePlan),
+        schemaVersion: '2.3',
+        finishes: { facade: { material: lShapePlan.rooms[0]!.id, rotation: 90, scale: 2 } },
+      }),
+    ],
+    [
       'a wall thickness that is a string',
       () => {
         const scene = draftOf(lShapePlan);
@@ -214,6 +245,16 @@ describe('the Zod schema and the published JSON Schema accept the same documents
         zod: true,
       });
     }
+  });
+
+  test('a schema 2.3 document with finish objects, a ceiling and a trim: both accept it', () => {
+    const scene = { ...draftOf(lShapePlan), schemaVersion: '2.3' } as Record<string, unknown>;
+    const room = (scene['rooms'] as { id: string }[])[0]!.id;
+    scene['finishes'] = {
+      rooms: { [room]: { walls: { material: room, colour: '#C9D6DF' }, ceiling: { material: room, rotation: 90 }, trim: room } },
+      facade: { material: room, colour: '#d8cbb5', rotation: -45 },
+    };
+    expect({ ajv: validateSceneSchema(scene), zod: z.safeParse(sceneSchema, scene).success }).toEqual({ ajv: true, zod: true });
   });
 
   test('a schema 2.1 placement mirrored on x and z: both accept it', () => {

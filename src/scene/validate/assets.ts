@@ -12,16 +12,17 @@
  */
 
 import type { SolvedPlan } from '../../plan/plan-solver.js';
-import { isFiniteVec3, ownKeys, requireFinishFamily, type ValidationContext } from './context.js';
+import { isFiniteVec3, ownKeys, requireFinishOn, type ValidationContext } from './context.js';
 import { assetRefOf, findArchetype, type CatalogueArchetype } from '../registries.js';
-import { isUuidV7, FaceMap, faceKey, isFaceKey, type FaceFinish, type FaceKey, type SceneFinishes } from '../types.js';
+import { isUuidV7, FaceMap, faceKey, isFaceKey, type FaceFinish, type FaceKey, type FinishSurface, type SceneFinishes } from '../types.js';
 import { isMirrorState } from '../mirror.js';
 
 /**
  * Painted overrides (`SceneData.finishes`).
  *
- * Every finish must resolve in the finish catalogue AND belong to the right
- * family, every room key must be a real room, and every face entry must name a
+ * Every finish value must be well formed, resolve in the finish catalogue AND
+ * dress the surface it stands on (`requireFinishOn`), every room key must be a
+ * real room, and every face entry must name a
  * face the solver actually produced, at most once — an override the renderer
  * cannot apply would make the exported draft and the rendered scene disagree
  * the moment it commits, which is why this section runs AFTER `solvePlan`.
@@ -37,15 +38,31 @@ export function checkFinishes(ctx: ValidationContext, plan: SolvedPlan): void {
     if (!entry || typeof entry !== 'object') {
       ctx.fail('finishes-room-not-object', path, `Scene finishes for room ${roomId} must be an object`);
     }
-    for (const key of ['floor', 'walls'] as const) {
-      const id = entry[key];
-      if (id === undefined) continue;
-      requireFinishFamily(ctx, id, key === 'floor' ? 'floor' : 'wall', `Scene finishes room ${roomId} ${key}`, `${path}.${key}`);
+    for (const key of ROOM_FINISH_KEYS) {
+      const value = entry[key];
+      if (value === undefined) continue;
+      if ((key === 'ceiling' || key === 'trim') && ctx.scene.schemaVersion === '2.2') {
+        ctx.fail(
+          'finish-needs-schema-2-3',
+          `${path}.${key}`,
+          `Scene finishes room ${roomId} ${key} needs scene schema 2.3; this document is 2.2`,
+        );
+      }
+      requireFinishOn(ctx, value, ROOM_SURFACE[key], `Scene finishes room ${roomId} ${key}`, `${path}.${key}`);
     }
   }
   checkFaceFinishes(ctx, plan, finishes.faces);
-  if (finishes.facade !== undefined) requireFinishFamily(ctx, finishes.facade, 'wall', 'Scene finishes facade', 'finishes.facade');
+  if (finishes.facade !== undefined) requireFinishOn(ctx, finishes.facade, 'facade', 'Scene finishes facade', 'finishes.facade');
 }
+
+/** The finishes a room may name, in the order they are judged. */
+const ROOM_FINISH_KEYS = ['floor', 'walls', 'ceiling', 'trim'] as const;
+
+/** The surface each room finish stands on. */
+const ROOM_SURFACE = { floor: 'floor', walls: 'wall', ceiling: 'ceiling', trim: 'trim' } as const satisfies Record<
+  (typeof ROOM_FINISH_KEYS)[number],
+  FinishSurface
+>;
 
 /**
  * `finishes.faces`: a list of `{ room?, wallId, side, finish }`, each a face
@@ -70,7 +87,9 @@ function checkFaceFinishes(ctx: ValidationContext, plan: SolvedPlan, faces: read
       ctx.fail('finishes-duplicate-face', path, `Scene finishes list the face at finishes.faces[${first}] twice`, { first });
     }
     seen.set(face, index);
-    requireFinishFamily(ctx, entry.finish, 'wall', `Scene finishes face ${index}`, `${path}.finish`);
+    // A room's face is a wall; a face no room owns is the facade.
+    const surface = entry.room === undefined ? 'facade' : 'wall';
+    requireFinishOn(ctx, entry.finish, surface, `Scene finishes face ${index}`, `${path}.finish`);
   }
 }
 

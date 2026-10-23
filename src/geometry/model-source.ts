@@ -30,6 +30,7 @@ import * as THREE from 'three';
 import type { AssetDims } from '../assets/asset-types.js';
 import { ViewerLibError } from '../shared/errors.js';
 import { MAX_MODEL_BYTES } from '../shared/limits.js';
+import { ByteLimitError, readCapped } from '../shared/capped-read.js';
 import { readGlbContainer } from './glb-container.js';
 
 /** One placement's ask: which file, for which catalogue entry, at which size. */
@@ -242,46 +243,16 @@ function disposeScene(scene: THREE.Object3D): void {
 type CacheEntry = { scene: THREE.Group; warnings: readonly string[]; bytes: number };
 
 /**
- * The response body as bytes, refusing anything over `limit`.
- *
- * Read off the STREAM, exactly as `scene/scene-source.readCapped` reads a JSON
- * document and for the same reason: a `Content-Length` is the server's claim
- * about a body it has not sent yet, and a chunked response carries none. A
- * response with no readable stream (a test fake) falls back to
- * `arrayBuffer()`, which is honest about what it can promise - nothing was
- * streamed, so nothing was capped, and the size is still checked afterwards.
+ * The response body as bytes under `limit` (`shared/capped-read.ts`), the
+ * overflow refused in this source's own words.
  */
 async function readModelCapped(response: Response, url: string, limit: number): Promise<ArrayBuffer> {
-  const refuse = (bytes: number): never => {
-    throw new ViewerLibError('scene-load', `model ${url} is over ${limit} bytes`, { detail: { url, limit, bytes } });
-  };
-  const body = response.body;
-  if (!body) {
-    const buffer = await response.arrayBuffer();
-    if (buffer.byteLength > limit) refuse(buffer.byteLength);
-    return buffer;
+  try {
+    return await readCapped(response, limit);
+  } catch (error) {
+    if (!(error instanceof ByteLimitError)) throw error;
+    throw new ViewerLibError('scene-load', `model ${url} is over ${limit} bytes`, { detail: { url, limit, bytes: error.bytes } });
   }
-  const reader = body.getReader();
-  const chunks: Uint8Array[] = [];
-  let total = 0;
-  for (;;) {
-    const { done, value } = await reader.read();
-    if (done) break;
-    if (!value) continue;
-    total += value.byteLength;
-    if (total > limit) {
-      await reader.cancel();
-      refuse(total);
-    }
-    chunks.push(value);
-  }
-  const bytes = new Uint8Array(total);
-  let offset = 0;
-  for (const chunk of chunks) {
-    bytes.set(chunk, offset);
-    offset += chunk.byteLength;
-  }
-  return bytes.buffer;
 }
 
 /**

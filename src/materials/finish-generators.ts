@@ -196,11 +196,12 @@ function repeated(texture: THREE.Texture | null, repeatX: number, repeatY: numbe
 /**
  * The THREE material one `materials[]` entry of a baked project becomes.
  *
- * Three outcomes, none of them a throw:
+ * Four outcomes, none of them a throw:
  *  - a generator this build knows → a textured `MeshStandardMaterial` (flat in
  *    the generator's tone where there is no canvas to draw on);
  *  - a generator it does not → the same material, flat, plus
  *    `unknown-generator:<kind>`;
+ *  - `library` → flat in its average colour (its maps dress room surfaces);
  *  - `pbr` → flat, plus `pbr-textures-deferred`. Loading the KTX2 maps is not
  *    implemented yet; accepting the material now is what lets the whole format load
  *    today rather than half of it.
@@ -209,9 +210,25 @@ function repeated(texture: THREE.Texture | null, repeatX: number, repeatY: numbe
  * `map` — and disposes both (`assets/asset-finishes.FinishRegistry`).
  */
 export function materialFromProject(material: ProjectMaterial, log: Logger = defaultLogger): THREE.Material {
-  const built = 'pbr' in material ? deferredPbr(material, log) : fromGenerator(material, log);
+  const built =
+    'pbr' in material ? deferredPbr(material, log) : 'library' in material ? flatLibrary(material) : fromGenerator(material, log);
   built.name = material.id;
   return built;
+}
+
+/**
+ * A library material on an object slot: flat in its `averageColour` at its
+ * roughness and metalness. Object slots keep the GLB's own materials; this is
+ * the answer for a slot finish that names a library material, and its maps
+ * are drawn only on room surfaces.
+ */
+function flatLibrary(material: Extract<ProjectMaterial, { library: unknown }>): THREE.MeshStandardMaterial {
+  const { facts } = material.library;
+  return new THREE.MeshStandardMaterial({
+    color: new THREE.Color(facts.averageColour),
+    roughness: facts.pbr.roughness ?? 1,
+    metalness: facts.pbr.metalness ?? 0,
+  });
 }
 
 function deferredPbr(material: Extract<ProjectMaterial, { pbr: unknown }>, log: Logger): THREE.MeshStandardMaterial {

@@ -31,6 +31,7 @@ import {
   describeSelection as describeSelectionCore,
   finishApplyAllAction,
   finishPickAction,
+  libraryChoiceOf,
   openingLabel,
   type DescribeTarget,
   type FinishTarget,
@@ -134,13 +135,15 @@ export class ViewerEditor {
         }
       }
     },
-    // `facade`/`floor`/`walls`/`face` are `SceneBuilder`'s to paint; `shell`
+    // `facade`/`floor`/`walls`/`ceiling`/`trim`/`face` are `SceneBuilder`'s to paint; `shell`
     // never reaches this table (`applyRevision` returns before it does);
     // cameras, navigation and the tour have consumers of their own. None of
     // them touch furniture or opening groups.
     facade: () => undefined,
     floor: () => undefined,
     walls: () => undefined,
+    ceiling: () => undefined,
+    trim: () => undefined,
     face: () => undefined,
     shell: () => undefined,
     camera: () => undefined,
@@ -250,6 +253,7 @@ export class ViewerEditor {
       messages: this.messages,
       scene: this.deps.model.scene,
       target,
+      variants: this.deps.variants,
       anchor: { x: clientX, y: clientY },
       onPick: (finishId, scopeChecked) => this.applyFinish(finishId, scopeChecked),
       onApplyToAll: (finishId, scopeChecked) => this.applyFinishToAll(finishId, scopeChecked),
@@ -447,7 +451,7 @@ export class ViewerEditor {
   private applyFinish(finishId: string, scopeChecked: boolean): void {
     const target = this.panelTarget;
     if (!target || target.kind !== 'surface') return;
-    const action = finishPickAction(target, finishId, scopeChecked);
+    const action = finishPickAction(target, finishId, scopeChecked, libraryChoiceOf(this.deps.variants?.materials, finishId));
     if (!action) return;
     this.dispatch(action.op);
     if (action.hint) this.deps.ui.setHint(this.messages.t(action.hint));
@@ -457,9 +461,9 @@ export class ViewerEditor {
   private applyFinishToAll(finishId: string | null, scopeChecked: boolean): void {
     const target = this.panelTarget;
     if (!finishId || !target || target.kind !== 'surface') return;
-    const action = finishApplyAllAction(target, finishId, scopeChecked);
-    this.dispatch(action.op);
-    if (action.hint) this.deps.ui.setHint(this.messages.t(action.hint));
+    const action = finishApplyAllAction(target, finishId, scopeChecked, libraryChoiceOf(this.deps.variants?.materials, finishId));
+    if (action) this.dispatch(action.op);
+    if (action?.hint) this.deps.ui.setHint(this.messages.t(action.hint));
     this.closePanel();
   }
 

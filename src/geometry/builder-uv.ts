@@ -17,7 +17,7 @@
  */
 
 import type { FaceQuad } from '../plan/plan-openings.js';
-import type { Vec2 } from '../scene/types.js';
+import type { Vec2, Vec3 } from '../scene/types.js';
 
 /** UV of a face point, in metres. `t0` is the face's own offset along the wall. */
 export function faceUV(t0: number, t: number, y: number): { u: number; v: number } {
@@ -25,85 +25,140 @@ export function faceUV(t0: number, t: number, y: number): { u: number; v: number
 }
 
 type PrismMesh = {
-  /** 8 corner vertices, xyz interleaved, in face-local coordinates. */
+  /** 24 vertices, four per face (front, back, start, end, bottom, top), xyz interleaved, in face-local coordinates. */
   positions: number[];
-  /** 8 UVs in metres, uv interleaved. */
+  /** 24 UVs in metres, uv interleaved. */
   uvs: number[];
   /** 12 triangles wound so that every face points out of the solid. */
   indices: number[];
 };
+
+type Corner = readonly [number, number, number];
 
 /**
  * Closed box of one wall quad: the face rectangle extruded by `depth` into the
  * wall. `faceT0` shifts the UVs so the quad keeps its place in the face's own
  * `u` parameterisation (a pier that starts at `t = 1.6` gets `u = faceT0 + 1.6`).
  *
+ * Every face of the box has its own four vertices and its own metre UVs. The
+ * front and the back read the face's `(u, v)`; a reveal strip — the jambs, the
+ * sill and the head of an opening — unfolds from the edge it shares with the
+ * front, so its texture carries on round the corner at the front's density
+ * instead of a whole tile smeared across a few centimetres of depth.
+ *
  * Winding note: the local frame is mirrored (`+z` into the wall), so mapping
  * these vertices through `placeFaceLocal` reverses orientation. The indices
  * below are wound for the WORLD result — the front plane (`z = 0`) then faces
- * along `+face.normal`, i.e. into the room.
+ * along `+face.normal`, i.e. into the room. The front's two triangles come
+ * first and the back's next, which `shell-builder`'s arc normals rely on.
  */
 export function quadPrism(quad: FaceQuad, faceT0: number, depth: number): PrismMesh {
   const { t0, t1, y0, y1 } = quad;
-  const corners: Array<[number, number, number]> = [
-    [t0, y0, 0],
-    [t1, y0, 0],
-    [t1, y1, 0],
-    [t0, y1, 0],
-    [t0, y0, depth],
-    [t1, y0, depth],
-    [t1, y1, depth],
-    [t0, y1, depth],
+  const d = depth;
+  // Each face: its four corners and the UV of a point on it.
+  const faces: readonly { corners: readonly Corner[]; uv: (x: number, y: number, z: number) => [number, number] }[] = [
+    // front (face plane, towards the room) and back (inside the wall)
+    {
+      corners: [
+        [t0, y0, 0],
+        [t1, y0, 0],
+        [t1, y1, 0],
+        [t0, y1, 0],
+      ],
+      uv: (x, y) => [faceT0 + x, y],
+    },
+    {
+      corners: [
+        [t0, y0, d],
+        [t1, y0, d],
+        [t1, y1, d],
+        [t0, y1, d],
+      ],
+      uv: (x, y) => [faceT0 + x, y],
+    },
+    // start (-x) and end (+x) caps: the jambs
+    {
+      corners: [
+        [t0, y0, 0],
+        [t0, y1, 0],
+        [t0, y1, d],
+        [t0, y0, d],
+      ],
+      uv: (_, y, z) => [faceT0 + t0 - z, y],
+    },
+    {
+      corners: [
+        [t1, y0, 0],
+        [t1, y0, d],
+        [t1, y1, d],
+        [t1, y1, 0],
+      ],
+      uv: (_, y, z) => [faceT0 + t1 + z, y],
+    },
+    // bottom and top: the sill and the head
+    {
+      corners: [
+        [t0, y0, 0],
+        [t0, y0, d],
+        [t1, y0, d],
+        [t1, y0, 0],
+      ],
+      uv: (x, _, z) => [faceT0 + x, y0 - z],
+    },
+    {
+      corners: [
+        [t0, y1, 0],
+        [t1, y1, 0],
+        [t1, y1, d],
+        [t0, y1, d],
+      ],
+      uv: (x, _, z) => [faceT0 + x, y1 + z],
+    },
+  ];
+  // Two triangles per face, over its own four corners; the back face winds the other way round.
+  const TRIANGLES = [
+    [0, 1, 2, 0, 2, 3],
+    [0, 2, 1, 0, 3, 2],
+    [0, 1, 2, 0, 2, 3],
+    [0, 1, 2, 0, 2, 3],
+    [0, 1, 2, 0, 2, 3],
+    [0, 1, 2, 0, 2, 3],
   ];
   const positions: number[] = [];
   const uvs: number[] = [];
-  for (const [x, y, z] of corners) {
-    positions.push(x, y, z);
-    // All eight corners share the front-plane UV: the four reveal strips are at
-    // most half a wall thickness deep, so stretching them costs nothing visible
-    // and keeps the prism at eight vertices.
-    const uv = faceUV(faceT0, x, y);
-    uvs.push(uv.u, uv.v);
-  }
-  const indices = [
-    0,
-    1,
-    2,
-    0,
-    2,
-    3, // front  (face plane, towards the room)
-    4,
-    6,
-    5,
-    4,
-    7,
-    6, // back   (inside the wall)
-    0,
-    3,
-    7,
-    0,
-    7,
-    4, // start end cap (-x)
-    1,
-    5,
-    6,
-    1,
-    6,
-    2, // end cap (+x)
-    0,
-    4,
-    5,
-    0,
-    5,
-    1, // bottom
-    3,
-    2,
-    6,
-    3,
-    6,
-    7, // top
-  ];
+  const indices: number[] = [];
+  faces.forEach((face, index) => {
+    const base = index * 4;
+    for (const [x, y, z] of face.corners) {
+      positions.push(x, y, z);
+      uvs.push(...face.uv(x, y, z));
+    }
+    for (const corner of TRIANGLES[index]!) indices.push(base + corner);
+  });
   return { positions, uvs, indices };
+}
+
+/** A baseboard box in its own frame: centred on the origin, its length along x, its depth along z. */
+export type BoardFrame = {
+  /** The face `u` of the board's centre, so a board keeps its place in the face's parameterisation. */
+  readonly centreU: number;
+  readonly height: number;
+  readonly depth: number;
+};
+
+/**
+ * The metre UV of a baseboard vertex, from its position and normal in the
+ * board's own frame (before it is placed): the front and the back run along
+ * the face and up the height, the top and the bottom along the face and
+ * across the depth, the two ends across the depth and up the height.
+ */
+export function boardUV(position: Vec3, normal: Vec3, board: BoardFrame): [number, number] {
+  const along = board.centreU + position.x;
+  const up = position.y + board.height / 2;
+  const across = position.z + board.depth / 2;
+  if (Math.abs(normal.y) > 0.5) return [along, across];
+  if (Math.abs(normal.x) > 0.5) return [across, up];
+  return [along, up];
 }
 
 /**

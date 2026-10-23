@@ -60,9 +60,56 @@ export const MAX_MODEL_BYTES = 16 * 1024 * 1024;
 export const MAX_PROJECT_BYTES = 96 * 1024 * 1024;
 
 /**
+ * Largest single texture file of a project library material, in bytes.
+ *
+ * Enforced at FETCH: the read counts the bytes it receives, without trusting
+ * `Content-Length`, and cancels the response once a file passes this, leaving
+ * that surface its flat colour. A catalogue bake refuses a larger file before
+ * it writes a manifest.
+ */
+export const MAX_TEXTURE_FILE_BYTES = 2 * 1024 * 1024;
+
+/**
+ * How many texture bytes one document may fetch over its lifetime: cache hits
+ * excluded, concurrent fetches included. A budget of its own beside
+ * `MAX_PROJECT_BYTES`, which stays the model budget.
+ *
+ * Enforced at FETCH, after the downloads, as the model budget is: the viewer
+ * draws one size per material and cannot weigh the sizes it never loads, so
+ * the sum of every listed size is the bake's to check. Once reached, queued
+ * and active texture work stops and unloaded surfaces keep their flat colours.
+ */
+export const MAX_PROJECT_TEXTURE_BYTES = 48 * 1024 * 1024;
+
+/**
+ * Most texture files a project manifest may LIST, counting every role and
+ * size of every library material, sizes the viewer will not draw included.
+ *
+ * Enforced at VALIDATION (`assets/project-manifest.schema.ts`): a manifest
+ * over it is refused before anything is fetched.
+ */
+export const MAX_PROJECT_TEXTURE_FILES = 512;
+
+/**
  * How many object models may be in flight at once. Four keeps the connection
  * pool available for the textures and the scene itself; the queue is ordered
  * by distance to the presentation camera, so the wait is spent on what is out
  * of shot.
  */
 export const MAX_MODEL_PARALLEL = 4;
+
+/**
+ * How many library-material texture jobs may be in flight at once. A job is
+ * small (a map of at most 768 px), so four keep the surfaces filling in while
+ * the models, which are queued the same way, still get connections.
+ */
+export const MAX_TEXTURE_PARALLEL = 4;
+
+/**
+ * How long one texture job may take, in milliseconds, from the moment its URL
+ * is asked for (a host's live resolver included) to its last byte. A resolver
+ * promise cannot be cancelled, so on expiry the job stops waiting for it,
+ * aborts its fetch, frees its slot and leaves the surface flat with a warning;
+ * a later answer is ignored.
+ */
+export const TEXTURE_FETCH_DEADLINE_MS = 30_000;

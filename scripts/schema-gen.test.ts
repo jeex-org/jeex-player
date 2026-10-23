@@ -23,7 +23,7 @@ import {
   generateSchema,
   writeSchemas,
 } from './schema-gen.js';
-import { UUID_V7_PATTERN } from '../src/scene/types.js';
+import { HEX_COLOUR_PATTERN, UUID_V7_PATTERN } from '../src/scene/types.js';
 import {
   OPENING_HINGES,
   OPENING_SHAPES,
@@ -106,6 +106,7 @@ describe('the UUID v7 grammar in the scene schema', () => {
     anyOf?: Node[];
     const?: unknown;
     enum?: unknown;
+    required?: string[];
   };
   const definitions = (): Record<string, Node> => generateSchema(SCENE_TARGET, FIXED_VERSION)['definitions'] as Record<string, Node>;
 
@@ -122,7 +123,9 @@ describe('the UUID v7 grammar in the scene schema', () => {
     const all = definitions();
     for (const [name, fields] of Object.entries(UUID_FIELDS)) {
       const definition = all[name]!;
-      const holders = definition.anyOf?.filter((arm) => arm.properties !== undefined) ?? [definition];
+      // A union's object arms hold the fields; an object's own properties come first (`FinishObject`'s
+      // `anyOf` arms only name which modifier is present).
+      const holders = [definition, ...(definition.anyOf?.filter((arm) => arm.properties !== undefined) ?? [])];
       const property = (field: string): Node => holders.map((holder) => holder.properties?.[field]).find((node) => node !== undefined)!;
       for (const field of fields.value ?? []) {
         const node = property(field);
@@ -148,6 +151,13 @@ describe('the UUID v7 grammar in the scene schema', () => {
 
   test('a document may declare 2.2 or 2.3 and nothing else', () => {
     expect((definitions()['SchemaVersion'] as { enum?: unknown }).enum).toEqual(['2.2', '2.3']);
+  });
+
+  test('a finish colour is #rrggbb, and a finish object needs colour or rotation', () => {
+    const all = definitions();
+    expect(all['FinishObject']?.properties?.['colour']?.pattern).toBe(HEX_COLOUR_PATTERN.source);
+    expect(all['SetMaterialSurfaceOp']?.properties?.['colour']?.pattern).toBe(HEX_COLOUR_PATTERN.source);
+    expect(all['FinishObject']?.anyOf?.map((arm) => arm.required)).toEqual([['colour'], ['rotation']]);
   });
 });
 
@@ -223,5 +233,12 @@ describe('the telemetry schema', () => {
     expect(validate(view)).toBe(true);
     expect(validate({ ...view, visitor: 'x' })).toBe(false);
     expect(validate({ ...view, page: '/flat?email=a@b.example' })).toBe(false);
+  });
+});
+
+describe('host objects stay out of the published viewer options', () => {
+  test('resolveTexture is named nowhere in viewer-options.schema.json', () => {
+    const options = SCHEMA_TARGETS.find((target) => target.name === 'viewer-options')!;
+    expect(JSON.stringify(generateSchema(options, FIXED_VERSION))).not.toContain('resolveTexture');
   });
 });

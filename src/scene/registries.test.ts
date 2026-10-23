@@ -12,12 +12,22 @@ import { CATALOGUE_REGISTRIES } from '../assets/catalogue-registries.js';
 import { interiorLibrary } from '../assets/asset-catalogue.js';
 import { lShapePlan } from '../fixtures/plan-l-shape.js';
 import { draftOf, type Draft } from '../shared/committed.js';
-import { assetRefOf, findArchetype, registriesFromLibrary, type ProjectLibrary } from './registries.js';
+import {
+  assetRefOf,
+  findArchetype,
+  isLibraryMaterialIn,
+  registriesFromLibrary,
+  surfacesIn,
+  type ProjectLibrary,
+  type SceneRegistries,
+} from './registries.js';
+import { applyOp } from './scene-ops.js';
 import { validateScene } from './scene-validator.js';
 import type { SceneData } from './types.js';
 import { ARCHETYPE, OPENING_VARIANT } from '../assets/catalogue-ids.js';
 import { FINISH } from '../materials/finish-ids.js';
 import { L_SHAPE } from '../fixtures/plan-l-shape-ids.js';
+import { LIBRARY_FINISH as LIB, LIBRARY_PROJECT, LIBRARY_REGISTRIES } from '../fixtures/library-finishes.js';
 
 /**
  * Fixed ids for these tests, generated once offline. A project library is
@@ -281,5 +291,82 @@ describe('validateScene against several libraries', () => {
 
   test('the demo path is unchanged: no assetLibrary means the default one', () => {
     expect(() => validateScene(draftOf(lShapePlan), CATALOGUE_REGISTRIES)).not.toThrow();
+  });
+});
+
+/* ------------------------------------------------- the surface table --- */
+
+describe('finishSurfaces and isLibraryMaterial', () => {
+  /** A set as a sorted list, so a table compares by value. */
+  const sorted = (set: ReadonlySet<string>): string[] => [...set].sort();
+
+  test('a bundled floor finish dresses floors and a bundled wall finish every other room surface', () => {
+    expect(sorted(surfacesIn(CATALOGUE_REGISTRIES, FINISH.oak))).toEqual(['floor']);
+    expect(sorted(surfacesIn(CATALOGUE_REGISTRIES, FINISH.sand))).toEqual(['ceiling', 'facade', 'trim', 'wall']);
+    expect(sorted(surfacesIn(CATALOGUE_REGISTRIES, ID.nowhere))).toEqual([]);
+  });
+
+  test('a project material dresses the surface words of its apply, several of them at once', () => {
+    expect(sorted(surfacesIn(LIBRARY_REGISTRIES, LIB.floorAndWall))).toEqual(['floor', 'wall']);
+    expect(sorted(surfacesIn(LIBRARY_REGISTRIES, LIB.paint))).toEqual(['ceiling', 'facade', 'trim', 'wall']);
+    expect(sorted(surfacesIn(LIBRARY_REGISTRIES, LIB.facadeOnly))).toEqual(['facade']);
+    expect(sorted(surfacesIn(LIBRARY_REGISTRIES, LIB.fabric))).toEqual([]);
+  });
+
+  test('the table is strict: a project wall material is not listed for the facade (that allowance belongs to a bare UUID)', () => {
+    expect(surfacesIn(LIBRARY_REGISTRIES, LIB.wallOnly).has('facade')).toBe(false);
+  });
+
+  test('a bundled finish answers through the base behind a project library', () => {
+    expect(sorted(surfacesIn(LIBRARY_REGISTRIES, FINISH.oak))).toEqual(['floor']);
+  });
+
+  test('finishKind is derived from the table, floor first', () => {
+    expect(LIBRARY_REGISTRIES.finishKind(LIB.floorAndWall)).toBe('floor');
+    expect(LIBRARY_REGISTRIES.finishKind(LIB.paint)).toBe('wall');
+    expect(LIBRARY_REGISTRIES.finishKind(LIB.facadeOnly)).toBeNull();
+    expect(LIBRARY_REGISTRIES.finishKind(FINISH.sand)).toBe('wall');
+  });
+
+  test('isSurfaceFinish holds for a material that dresses any room surface, ceilings and the facade included', () => {
+    expect(LIBRARY_REGISTRIES.isSurfaceFinish(LIB.facadeOnly)).toBe(true);
+    expect(LIBRARY_REGISTRIES.isSurfaceFinish(LIB.fabric)).toBe(false);
+  });
+
+  test('isLibraryMaterial holds only for a project material of the library member', () => {
+    expect(isLibraryMaterialIn(LIBRARY_REGISTRIES, LIB.paint)).toBe(true);
+    expect(isLibraryMaterialIn(LIBRARY_REGISTRIES, LIB.pbrWall)).toBe(false);
+    expect(isLibraryMaterialIn(LIBRARY_REGISTRIES, LIB.generatorFloor)).toBe(false);
+    expect(isLibraryMaterialIn(LIBRARY_REGISTRIES, FINISH.sand)).toBe(false);
+    expect(isLibraryMaterialIn(CATALOGUE_REGISTRIES, FINISH.sand)).toBe(false);
+  });
+});
+
+describe('a hand-built registry without the surface table', () => {
+  /** The shipped registries as a host might have written them before the surface table existed. */
+  const { finishSurfaces: _surfaces, isLibraryMaterial: _library, ...handBuilt } = CATALOGUE_REGISTRIES;
+  void _surfaces;
+  void _library;
+  const legacy: SceneRegistries = handBuilt;
+
+  test('its surfaces are derived from its finish family, and no finish is a library material', () => {
+    expect([...surfacesIn(legacy, FINISH.oak)]).toEqual(['floor']);
+    expect([...surfacesIn(legacy, FINISH.sand)].sort()).toEqual(['ceiling', 'facade', 'trim', 'wall']);
+    expect(surfacesIn(legacy, ID.nowhere).size).toBe(0);
+    expect(isLibraryMaterialIn(legacy, FINISH.sand)).toBe(false);
+  });
+
+  test('a document and a set_material still validate and apply against it', () => {
+    const scene = draftOf(lShapePlan);
+    expect(() => validateScene(scene, legacy)).not.toThrow();
+    expect(applyOp(scene, { op: 'set_material', surface: 'wall', material: FINISH.sand }, legacy).touched.length).toBe(2);
+    expect(applyOp(scene, { op: 'set_material', target: 'floors', material: FINISH.oak }, legacy).touched.length).toBe(2);
+  });
+
+  test('a project library layered on it falls back to the derived defaults', () => {
+    const layered = registriesFromLibrary(LIBRARY_PROJECT, legacy);
+    expect([...surfacesIn(layered, FINISH.oak)]).toEqual(['floor']);
+    expect(isLibraryMaterialIn(layered, LIB.paint)).toBe(true);
+    expect(isLibraryMaterialIn(layered, FINISH.sand)).toBe(false);
   });
 });

@@ -291,14 +291,24 @@ export type { SceneReport, SceneReportEntry, SceneReportSeverity } from '../scen
  * ids and never mints one, so a host gets the very check the validator runs —
  * `UUID_V7_PATTERN` and `isUuidV7` — and nothing that generates. Faces are
  * derived, not entities, and travel as `FaceKey`; `faceKey`, `sameFace` and
- * `isFaceKey` build, compare and judge one; `NewIdRefusal` names the two
+ * `isFaceKey` build, compare and judge one; `FinishRef` is the finish value a
+ * face or a room wears and `SetMaterialSurfaceOp` the explicit `set_material`
+ * that writes it (types only); `NewIdRefusal` names the two
  * `OpError.detail.reason` values a creating op refuses an id with.
  * `CATALOGUE_ID_BY_SLUG` is the shipped bank's readable slug -> UUID table
  * per kind, for a host translating a 1.x document; the structural ids (walls, nodes, rooms, openings,
  * placements, checkpoints) have no table — the host mints new UUIDs for them.
  */
 export { UUID_V7_PATTERN, isUuidV7, faceKey, sameFace, isFaceKey } from '../scene/types.js';
-export type { FaceKey, FaceFinish, SetMaterialAlias, TopologyRemap, TopologyRemapEntry } from '../scene/types.js';
+export type {
+  FaceKey,
+  FaceFinish,
+  FinishRef,
+  SetMaterialAlias,
+  SetMaterialSurfaceOp,
+  TopologyRemap,
+  TopologyRemapEntry,
+} from '../scene/types.js';
 export type { NewIdRefusal, TouchedEntity } from '../scene/scene-ops.js';
 export { CATALOGUE_ID_BY_SLUG } from '../assets/catalogue-slugs.js';
 export type { CatalogueIdBySlug, CatalogueSlugTable } from '../assets/catalogue-slugs.js';

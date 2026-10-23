@@ -23,6 +23,7 @@
 import { ifcGuid } from '../shared/uuid.js';
 import { faceGuid } from './guid.js';
 import { FaceMap } from './types.js';
+import { finishMaterialOf } from './finish-value.js';
 import { documentLibraryOf } from './registries.js';
 import type { SceneData, WallSide } from './types.js';
 import type { SolvedPlan } from '../plan/plan-solver.js';
@@ -93,7 +94,7 @@ export function metadataTable(scene: SceneData, plan: SolvedPlan): ElementRow[] 
   }
 
   const painted = new FaceMap<string>();
-  for (const entry of scene.finishes?.faces ?? []) painted.set(entry, entry.finish);
+  for (const entry of scene.finishes?.faces ?? []) painted.set(entry, finishMaterialOf(entry.finish));
   for (const face of plan.faces.values()) {
     const finish = painted.get(face.key);
     rows.push(
@@ -107,7 +108,8 @@ export function metadataTable(scene: SceneData, plan: SolvedPlan): ElementRow[] 
   }
 
   for (const roomEntry of scene.rooms) {
-    const finish = scene.finishes?.rooms?.[roomEntry.id]?.floor ?? roomEntry.floorMaterial;
+    const override = scene.finishes?.rooms?.[roomEntry.id]?.floor;
+    const finish = override === undefined ? roomEntry.floorMaterial : finishMaterialOf(override);
     rows.push(row('room', roomEntry.id, { finish }));
   }
 

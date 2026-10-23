@@ -45,7 +45,7 @@ import type { Messages } from '../ui/messages.js';
 import { FullscreenController } from '../ui/fullscreen-controller.js';
 import { Dollhouse } from '../geometry/dollhouse.js';
 import { FurnitureAnimator } from '../geometry/furniture-animator.js';
-import { SceneMount } from './scene-mount.js';
+import { SceneMount, textureEnvOf } from './scene-mount.js';
 import { editsWiring } from './edits-wiring.js';
 import { createTourControls, TourEvents, type TourControls } from '../camera/tour-controls.js';
 import type { ViewerOptions } from './viewer-options.js';
@@ -233,6 +233,7 @@ export class ViewerApp {
       onError: (error) => this.events.emit('error', error),
       onModelsSettled: (model, result) => this.telemetry.modelsSettled(model, result),
       usage: this.usage,
+      textureEnv: () => textureEnvOf(this.stage?.runtime.renderer, this.options.resolveTexture, this.log),
     });
     this.telemetry = telemetryWiring({
       ...embedding,

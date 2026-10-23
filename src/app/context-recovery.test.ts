@@ -26,7 +26,7 @@ function harness(options: { committed?: boolean; released?: boolean } = {}) {
   const model = { scene: { id: SCENE_ID } } as SceneModel;
   const mount = {
     model: (options.committed ?? true) ? model : undefined,
-    mount: () => calls.push('mount'),
+    remount: () => calls.push('remount'),
   } as unknown as SceneMount;
   const recovery = contextRecovery({
     ui: () => ({
@@ -71,10 +71,10 @@ describe('a lost context', () => {
 });
 
 describe('a restored context', () => {
-  test('re-mounts the committed document, shows the viewer and announces ready', () => {
+  test('re-mounts the committed document with its project options, shows the viewer and announces ready', () => {
     const { recovery, calls } = harness();
     recovery.onRestored();
-    expect(calls).toEqual(['mount', 'showViewer', 'minimap', 'ready']);
+    expect(calls).toEqual(['remount', 'showViewer', 'minimap', 'ready']);
   });
 
   test('does nothing once the viewer has been released', () => {

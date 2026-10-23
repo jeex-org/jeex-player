@@ -24,6 +24,53 @@ as described under [Versioning](#versioning).
   standard publishes the sun presets and the shadow fit tuning.
   `LIGHTING_STANDARD_VERSION` stays 1: no existing rig value changed.
   Existing rigs keep working unchanged.
+- **Project library materials in the manifest.** A project material may now
+  be a `library` member, `{ versionId, kind: 'scan' | 'parameters', facts,
+  maps }`, the shape a catalogue bake writes for a scanned texture set or a
+  parameter-only material. It is strict at every depth and judged whole:
+  colour map by colour mode, `arm` or `roughness`, colour space by role, one
+  size set per material from 128, 256, 384, 512 and 768, the exact
+  `tex/<versionId>/<role>.<px>.webp` path of every file, glTF value ranges,
+  no texture path listed twice. Nothing is defaulted while reading. `apply`
+  gains `ceiling`, `facade` and `trim`. A refusal inside a material names the
+  member's own field, and an unknown key is named in the message.
+- **Texture limits.** `MAX_TEXTURE_FILE_BYTES` (2 MiB per file),
+  `MAX_PROJECT_TEXTURE_BYTES` (48 MiB per document) and
+  `MAX_PROJECT_TEXTURE_FILES` (512 listed files) in the shared limits module;
+  a manifest listing more than 512 texture files is refused.
+- **Scene schema 2.3: library finishes** (the same 2.3 as `site`). A finish value may be a finish object,
+  `{ material, colour?, rotation? }`, naming a project library material with a
+  tint or a texture rotation, wherever a finish UUID stands; a room may name
+  its `ceiling` and its `trim`. 2.2 documents are still read; a 2.2 document
+  that uses a 2.3 field is refused with `finish-needs-schema-2-3`. The new
+  validation rules are `finish-invalid`, `finish-needs-schema-2-3` and
+  `finish-modifiers-need-library`. The published scene JSON Schema carries the
+  finish value, the colour pattern and the new version.
+- **Library materials drawn on room surfaces.** A project's `library`
+  materials dress floors, walls, ceilings, facades and baseboards with their
+  maps: flat on the first frame, the maps fetched afterwards at one size per
+  document by the WebGL context's capability class, shared between surfaces,
+  released on repaint and unmount, and rebuilt from kept bytes after a lost
+  rendering context. Wall reveals and baseboards carry metre UVs. A room's
+  ceiling and trim finishes are drawn. New warnings: `texture-location`,
+  `texture-fetch`, `texture-decode`, `texture-size-mismatch`,
+  `texture-too-large`, `texture-budget`, `texture-deadline`.
+- **`resolveTexture` viewer option** (object spelling only): a host resolver
+  that turns a logical texture path into the URL to fetch, called lazily per
+  size loaded; absent from the published viewer options schema.
+- **Library materials in the swatches and `describeSelection`**, listed by
+  surface word before the bundled finishes, with explicit `set_material`
+  operations; `SelectionScope.ops.all` is absent when the material cannot
+  dress the surface the broad action paints.
+- **`set_material` explicit form**, `{ surface, room?, face?, material,
+  colour?, rotation? }`: the surface is named, never inferred, and checked
+  strictly against the material's `apply`. Its results touch the new
+  `ceiling` and `trim` kinds per room. `SceneRegistries` gains
+  `finishSurfaces(id)` and `isLibraryMaterial(id)`, and `LibraryFinish` an
+  optional `library` flag that `projectLibraryOf` sets. Both registry members
+  are optional: registries a host built by hand derive the surfaces from
+  `finishKind` and name no library material. `jeex-viewer/ops` exports the
+  types `FinishRef` and `SetMaterialSurfaceOp`.
 
 - **`jeex-viewer/lighting`: the lighting standard as a public entry.**
   `createLightingContext(three, renderer)` binds it to your own three.js
@@ -60,6 +107,18 @@ as described under [Versioning](#versioning).
   shadow, so in an overview sunlight reaches the floors only through windows
   and doors. Scenes look different where light used to fall through the
   missing ceilings: that is intended.
+- **`set_material` legacy form reads the surface table.** A facade-only
+  project material may paint the facade and a facade face through the legacy
+  form. Two legacy cases change on purpose: a room `target` now refuses a
+  material that dresses neither floors nor walls (one whose `apply` names
+  only, say, `furniture`, which used to land on the walls), and a project
+  material that dresses both floors and walls may now dress walls in a 2.2
+  document too. Everything else a 2.2 document could do behaves as before. Interior
+  presets read the explicit form's `surface` for their coverage and reset,
+  and restore a finish object through the explicit form in its exact
+  spelling.
+- **`jeex-viewer/ops` budget** raised to 78.8 KB gzip for the library
+  member and the finish values it now carries.
 
 - **The player lights with the new standard: PBR Neutral instead of ACES
   Filmic.** Neutral keeps a material's hue and saturation where ACES washed
@@ -82,6 +141,23 @@ as described under [Versioning](#versioning).
 
 ### Changed (breaking)
 
+- **Scene finish types widen to `FinishRef`.** `RoomFinishes.floor` and
+  `walls`, `SceneFinishes.facade` and `FaceFinish.finish` are now
+  `FinishRef` (a material UUID, or `{ material, colour?, rotation? }`), and
+  `SetMaterialOp` is a union of the legacy `target` form and
+  `SetMaterialSurfaceOp`. A TypeScript host that reads these fields as
+  strings, or reads `op.target` without narrowing, gets the material UUID
+  through `floorFinishOf`, `roomWallFinishOf`, `facadeFinishOf` and
+  `faceFinishOf`, and narrows the operation on `'surface' in op`.
+- **`TouchedEntity` gains `ceiling` and `trim`.** A host that switches over
+  every kind handles the two new ones.
+- **A project material may be a `library` member.** Next to `pbr` and
+  `generator`, a material in `manifest.library.materials` may carry
+  `library` instead; code that reads `m.pbr` whenever `generator` is absent
+  checks for `library` first. `FinishApply` (and `apply` of a library
+  finish) gains `ceiling`, `facade` and `trim`.
+- **`SelectionScope.ops.all` is optional.** It is absent when the material
+  cannot dress the surface the broad action paints; a host hides that action.
 - **Scene schema `2.2`: a placement's catalogue reference is two fields.**
   `DemoAsset.asset` and the `place_object` operation's `asset` are a bare
   archetype or variant UUID; the new optional `library` is the UUID of the
@@ -116,6 +192,11 @@ as described under [Versioning](#versioning).
   `assetLibrary`) and are absent for the built-in bank.
 
 ### Fixed
+
+- **A restored rendering context keeps the project.** Recovery remounted the
+  committed document without its project options, so a restored bake lost
+  its model resolver, materials and catalogue; it now remounts with
+  everything the document was mounted with.
 
 - **The demo tour no longer walks through door leaves, grazes walls or stares
   into them.** The demo flat's authored tour walked through the open leaves

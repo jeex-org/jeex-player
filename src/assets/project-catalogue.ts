@@ -77,7 +77,7 @@ export function projectBank(manifest: BakedProjectManifest, baseUrl: string): Pr
     // would ask it for a file no bake ever wrote; answering `undefined` keeps
     // the entry on the procedural body it has always had.
     modelUrl: (asset) => (own.has(asset.archetypeId) ? resolve(asset) : undefined),
-    variants: { catalogue, previewUrl: projectPreviewUrl(baseUrl) },
+    variants: { catalogue, previewUrl: projectPreviewUrl(baseUrl), materials: library.materials },
   };
 }
 
