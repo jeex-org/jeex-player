@@ -39,7 +39,7 @@ export function checkpointsWiring(deps: {
     plan: () => deps.mount().model?.plan ?? null,
     obstacles: () => {
       const model = deps.mount().model;
-      return model ? obstaclesFor(model.scene) : [];
+      return model ? obstaclesFor(model.scene, deps.mount().assetFacts()) : [];
     },
     rev: () => deps.mount().model?.rev ?? 0,
     pose: () => deps.stage()?.director?.controller.getPose() ?? null,

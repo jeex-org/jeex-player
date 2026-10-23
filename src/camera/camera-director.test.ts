@@ -8,6 +8,7 @@
  * pure sinks from the director's side — are stubbed.
  */
 
+import { projectAssetFacts, type AssetFactsSource } from '../assets/asset-facts.js';
 import { afterEach, beforeEach, describe, expect, test } from 'bun:test';
 import { draftOf } from '../shared/committed.js';
 import * as THREE from 'three';
@@ -19,6 +20,7 @@ import { planViewPose } from './plan-view-pose.js';
 import { fieldOfViewFor } from './camera-tuning.js';
 import { Picker } from '../geometry/picker.js';
 import { solvePlan } from '../plan/plan-solver.js';
+import { roomCentre } from '../navigation/room-graph.js';
 import { lShapePlan } from '../fixtures/plan-l-shape.js';
 import { L_SHAPE } from '../fixtures/plan-l-shape-ids.js';
 import { FINISH } from '../materials/finish-ids.js';
@@ -53,7 +55,7 @@ const fakeWindow = fakeWindowHooks();
 beforeEach(fakeWindow.install);
 afterEach(fakeWindow.restore);
 
-function harness(options: { pauseOnInput?: boolean; scene?: SceneData; wireInput?: boolean } = {}) {
+function harness(options: { pauseOnInput?: boolean; scene?: SceneData; wireInput?: boolean; assetFacts?: () => AssetFactsSource } = {}) {
   const scene = options.scene ?? lShapePlan;
   const camera = new THREE.PerspectiveCamera(55, 4 / 3, 0.1, 200);
   const canvasStub = fakeCanvas();
@@ -71,6 +73,7 @@ function harness(options: { pauseOnInput?: boolean; scene?: SceneData; wireInput
     onHint: (message) => {
       hints.push(message);
     },
+    assetFacts: options.assetFacts,
   });
   const poses: Array<{ position: THREE.Vector3; target: THREE.Vector3 }> = [];
   const tour = new TourPlayer(
@@ -693,6 +696,50 @@ describe('travelToRoom: what a mini-map click does in each mode', () => {
     expect(hints.at(-1)).toBe(t('hint.noClearPath'));
     // `flyToRoom` is an orbit move: the fallback says which room, in 360.
     expect(controller.getMode()).toBe('orbit');
+  });
+
+  test('a baked project’s own furniture blocks the route, read from the document’s bank', () => {
+    const archetype = '01a16a50-4000-7000-8000-000000000001';
+    const variant = '01a16a50-4000-7000-8000-000000000002';
+    // A store-id wardrobe with no `collision`: only the project library can size it.
+    const facts = projectAssetFacts({
+      objects: [{ id: archetype, anchor: 'floor', dims: [4.8, 2, 3.2], defaultVariant: variant, variants: [{ id: variant }] }],
+    });
+    // The barricade alone, so nothing but it can stand in the way.
+    const blocked: SceneData = {
+      ...lShapePlan,
+      assets: [{ id: ID.barricade, type: archetype, asset: archetype, position: { x: 6, y: 0, z: 2.5 } }],
+    };
+    const withLibrary = harness({ scene: blocked, assetFacts: () => facts });
+    withLibrary.director.setMode('walk');
+    withLibrary.camera.position.set(3, 1.65, 6);
+    expect(withLibrary.director.routeToRoom(L_SHAPE.room.b)).toBeNull();
+    const bankOnly = harness({ scene: blocked });
+    bankOnly.director.setMode('walk');
+    bankOnly.camera.position.set(3, 1.65, 6);
+    expect(bankOnly.director.routeToRoom(L_SHAPE.room.b)).not.toBeNull();
+  });
+
+  test('the room graph stands the arrival clear of a baked project’s own furniture', () => {
+    const archetype = '01a16a50-4000-7000-8000-000000000003';
+    const variant = '01a16a50-4000-7000-8000-000000000004';
+    const facts = projectAssetFacts({
+      objects: [{ id: archetype, anchor: 'floor', dims: [1.2, 1, 1.2], defaultVariant: variant, variants: [{ id: variant }] }],
+    });
+    const empty: SceneData = { ...lShapePlan, assets: [] };
+    const centre = roomCentre(solvePlan(empty), empty, L_SHAPE.room.b, []);
+    // A store-id table on the spot the graph would otherwise walk the camera to.
+    const table: SceneData = {
+      ...lShapePlan,
+      assets: [{ id: ID.barricade, type: archetype, asset: archetype, position: { x: centre.x, y: 0, z: centre.z } }],
+    };
+    const { director, camera } = harness({ scene: table, assetFacts: () => facts });
+    director.setMode('walk');
+    camera.position.set(3, 1.65, 6);
+    const route = director.routeToRoom(L_SHAPE.room.b);
+    expect(route).not.toBeNull();
+    const end = route!.at(-1)!;
+    expect(Math.max(Math.abs(end.x - centre.x), Math.abs(end.z - centre.z))).toBeGreaterThan(0.6);
   });
 
   test('the route respects the furniture only while the walker collides with it', () => {

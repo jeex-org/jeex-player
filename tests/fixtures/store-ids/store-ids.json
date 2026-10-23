@@ -1,0 +1,1622 @@
+{
+  "library": {
+    "id": "01a168a0-5fdf-7032-b550-1c3a768da0f1",
+    "objects": [
+      {
+        "id": "01a16a26-3725-7366-855c-8e5de49ce5c9",
+        "name": "Three-seat sofa",
+        "category": "furniture/sofas",
+        "dims": [1.56, 0.825, 0.805],
+        "anchor": "floor",
+        "wallSnap": true,
+        "clearance": 0.6,
+        "defaultVariant": "01a16a26-3725-77fd-8503-5463501b0fd6",
+        "variants": [
+          {
+            "id": "01a16a26-3725-77fd-8503-5463501b0fd6",
+            "dims": [1.56, 0.825, 0.805]
+          },
+          {
+            "id": "01a16a26-3725-78be-895d-a5155348bddb",
+            "dims": [1.56, 0.825, 0.805]
+          },
+          {
+            "id": "01a16a26-3725-7424-8ab4-5387c274d024",
+            "dims": [1.56, 0.825, 0.805]
+          }
+        ]
+      },
+      {
+        "id": "01a16a26-3725-7e50-954b-af01e82262f4",
+        "name": "Lounge armchair",
+        "category": "furniture/armchairs",
+        "dims": [0.84, 0.82, 0.855],
+        "anchor": "floor",
+        "wallSnap": false,
+        "clearance": 0.5,
+        "defaultVariant": "01a16a26-3725-784c-8292-b7e6b3a4091c",
+        "variants": [
+          {
+            "id": "01a16a26-3725-784c-8292-b7e6b3a4091c",
+            "dims": [0.84, 0.82, 0.855]
+          },
+          {
+            "id": "01a16a26-3725-74c4-8b1b-9be601a793ff",
+            "dims": [0.84, 0.82, 0.855]
+          },
+          {
+            "id": "01a16a26-3725-76c4-b708-7e92aa9a43a3",
+            "dims": [0.84, 0.82, 0.855]
+          }
+        ]
+      },
+      {
+        "id": "01a16a26-3725-792a-aaa6-de68f735be27",
+        "name": "Dining chair",
+        "category": "furniture/chairs",
+        "dims": [0.42, 0.88, 0.497],
+        "anchor": "floor",
+        "wallSnap": false,
+        "clearance": 0.55,
+        "defaultVariant": "01a16a26-3725-7289-8132-6239d5633c27",
+        "variants": [
+          {
+            "id": "01a16a26-3725-7289-8132-6239d5633c27",
+            "dims": [0.42, 0.88, 0.497]
+          },
+          {
+            "id": "01a16a26-3725-7b76-9dfd-4e8e48da5632",
+            "dims": [0.42, 0.88, 0.497]
+          },
+          {
+            "id": "01a16a26-3725-7de1-ba6a-ce02b56ca071",
+            "dims": [0.42, 0.88, 0.497]
+          }
+        ]
+      },
+      {
+        "id": "01a16a26-3725-7d83-868f-0a94d3131348",
+        "name": "Dining table",
+        "category": "furniture/tables/dining",
+        "dims": [1.1, 0.72, 1.1],
+        "anchor": "floor",
+        "wallSnap": false,
+        "clearance": 0.75,
+        "defaultVariant": "01a16a26-3725-7590-a5ff-d3c820c88c7c",
+        "variants": [
+          {
+            "id": "01a16a26-3725-7590-a5ff-d3c820c88c7c",
+            "dims": [1.1, 0.72, 1.1]
+          },
+          {
+            "id": "01a16a26-3725-7aa9-b0ce-f8777de028a8",
+            "dims": [1.1, 0.72, 1.1]
+          },
+          {
+            "id": "01a16a26-3725-724d-a04e-94b3cef6dfd8",
+            "dims": [1.1, 0.72, 1.1]
+          }
+        ]
+      },
+      {
+        "id": "01a16a26-3725-769a-bc1f-f4c2afec9a37",
+        "name": "Side table",
+        "category": "furniture/tables/side",
+        "dims": [0.56, 0.55, 0.56],
+        "anchor": "floor",
+        "wallSnap": false,
+        "clearance": 0.3,
+        "defaultVariant": "01a16a26-3725-7a85-9608-768fa667f3ed",
+        "variants": [
+          {
+            "id": "01a16a26-3725-7a85-9608-768fa667f3ed",
+            "dims": [0.56, 0.55, 0.56]
+          },
+          {
+            "id": "01a16a26-3725-756a-855c-920f5bc68ea1",
+            "dims": [0.56, 0.55, 0.56]
+          },
+          {
+            "id": "01a16a26-3725-70f1-afe8-e2069e3f9ca3",
+            "dims": [0.56, 0.55, 0.56]
+          }
+        ]
+      },
+      {
+        "id": "01a16a26-3725-7f73-9b18-626a667e9a8e",
+        "name": "Writing desk",
+        "category": "furniture/tables/desks",
+        "dims": [1.24, 0.75, 0.62],
+        "anchor": "floor",
+        "wallSnap": true,
+        "clearance": 0.7,
+        "defaultVariant": "01a16a26-3725-79b5-a660-d74b8effe815",
+        "variants": [
+          {
+            "id": "01a16a26-3725-79b5-a660-d74b8effe815",
+            "dims": [1.24, 0.75, 0.62]
+          },
+          {
+            "id": "01a16a26-3725-7973-957d-9d30bcedddd4",
+            "dims": [1.24, 0.75, 0.62]
+          },
+          {
+            "id": "01a16a26-3725-732e-b934-059c87e35d40",
+            "dims": [1.24, 0.75, 0.62]
+          }
+        ]
+      },
+      {
+        "id": "01a16a26-3725-7f56-a285-cf5f2d813ff4",
+        "name": "Double bed",
+        "category": "furniture/beds",
+        "dims": [1.92, 1.12, 2.32],
+        "anchor": "floor",
+        "wallSnap": true,
+        "clearance": 0.7,
+        "defaultVariant": "01a16a26-3725-7ba0-8734-512997e7e995",
+        "variants": [
+          {
+            "id": "01a16a26-3725-7ba0-8734-512997e7e995",
+            "dims": [1.92, 1.12, 2.32]
+          },
+          {
+            "id": "01a16a26-3725-7d13-8c19-4187b4838bdb",
+            "dims": [1.92, 1.12, 2.32]
+          }
+        ]
+      },
+      {
+        "id": "01a16a26-3725-7393-aac8-31510b608ade",
+        "name": "Nightstand",
+        "category": "furniture/storage/nightstands",
+        "dims": [0.44, 0.5, 0.434],
+        "anchor": "floor",
+        "wallSnap": true,
+        "clearance": 0.35,
+        "defaultVariant": "01a16a26-3725-75df-8f7b-1f8e83e5d30e",
+        "variants": [
+          {
+            "id": "01a16a26-3725-75df-8f7b-1f8e83e5d30e",
+            "dims": [0.44, 0.5, 0.434]
+          },
+          {
+            "id": "01a16a26-3725-7c38-8a3f-5b52488e37db",
+            "dims": [0.44, 0.5, 0.434]
+          },
+          {
+            "id": "01a16a26-3725-7f45-bb2f-b5707b4543fc",
+            "dims": [0.44, 0.5, 0.434]
+          },
+          {
+            "id": "01a16a26-3725-73b5-a405-942ad22380a0",
+            "dims": [0.44, 0.5, 0.434]
+          }
+        ]
+      },
+      {
+        "id": "01a16a26-3725-709f-81e2-38f81f908a3f",
+        "name": "Chest of drawers",
+        "category": "furniture/storage/dressers",
+        "dims": [1.33, 0.84, 0.529],
+        "anchor": "floor",
+        "wallSnap": true,
+        "clearance": 0.6,
+        "layout": {
+          "caseGood": true
+        },
+        "defaultVariant": "01a16a26-3725-7686-b96a-15d2cbf2e4b1",
+        "variants": [
+          {
+            "id": "01a16a26-3725-7686-b96a-15d2cbf2e4b1",
+            "dims": [1.33, 0.84, 0.529]
+          },
+          {
+            "id": "01a16a26-3725-73ab-b6b4-83f4508c2f9c",
+            "dims": [1.33, 0.84, 0.529]
+          },
+          {
+            "id": "01a16a26-3725-7cff-bfae-f92081624d3b",
+            "dims": [1.33, 0.84, 0.529]
+          }
+        ]
+      },
+      {
+        "id": "01a16a26-3725-797b-8f97-4ba97bee89a3",
+        "name": "Hallway console",
+        "category": "furniture/storage/consoles",
+        "dims": [0.93, 0.82, 0.409],
+        "anchor": "floor",
+        "wallSnap": true,
+        "clearance": 0.4,
+        "layout": {
+          "caseGood": true
+        },
+        "defaultVariant": "01a16a26-3725-70b1-9807-ef4f52c830ad",
+        "variants": [
+          {
+            "id": "01a16a26-3725-70b1-9807-ef4f52c830ad",
+            "dims": [0.93, 0.82, 0.409]
+          },
+          {
+            "id": "01a16a26-3725-7159-a06b-5c413ee3cb07",
+            "dims": [0.93, 0.82, 0.409]
+          },
+          {
+            "id": "01a16a26-3725-7f3f-bcee-2ac100f6e59b",
+            "dims": [0.93, 0.82, 0.409]
+          },
+          {
+            "id": "01a16a26-3725-7bbc-a907-ccd48d39cde4",
+            "dims": [0.93, 0.82, 0.409]
+          }
+        ]
+      },
+      {
+        "id": "01a16a26-3725-7690-baec-79da4e2ef399",
+        "name": "Shoe cabinet",
+        "category": "furniture/storage/hall",
+        "dims": [0.97, 1.1, 0.429],
+        "anchor": "floor",
+        "wallSnap": true,
+        "clearance": 0.5,
+        "layout": {
+          "caseGood": true
+        },
+        "defaultVariant": "01a16a26-3725-759e-bf09-88f440cfc913",
+        "variants": [
+          {
+            "id": "01a16a26-3725-759e-bf09-88f440cfc913",
+            "dims": [0.97, 1.1, 0.429]
+          },
+          {
+            "id": "01a16a26-3725-7936-9230-b46bfdc9bdf1",
+            "dims": [0.97, 1.1, 0.429]
+          },
+          {
+            "id": "01a16a26-3725-7610-94dc-c8d78c9ac5cf",
+            "dims": [0.97, 1.1, 0.429]
+          }
+        ]
+      },
+      {
+        "id": "01a16a26-3725-7d93-b7c6-82e42335a2a5",
+        "name": "Wall cabinet",
+        "category": "furniture/storage/kitchen",
+        "dims": [1.24, 0.75, 0.413],
+        "anchor": "wall",
+        "wallSnap": true,
+        "clearance": 0,
+        "layout": {
+          "mount": {
+            "bottom": 1.45
+          }
+        },
+        "defaultVariant": "01a16a26-3725-7860-9d03-3bf30d4433ef",
+        "variants": [
+          {
+            "id": "01a16a26-3725-7860-9d03-3bf30d4433ef",
+            "dims": [1.24, 0.75, 0.413]
+          },
+          {
+            "id": "01a16a26-3725-76af-ab79-418bca76ef6c",
+            "dims": [1.24, 0.75, 0.413]
+          },
+          {
+            "id": "01a16a26-3725-7fa1-b37e-5830d2dd64a0",
+            "dims": [1.24, 0.75, 0.413]
+          }
+        ]
+      },
+      {
+        "id": "01a16a26-3725-7366-9cd3-a4522817e1ec",
+        "name": "Wardrobe",
+        "category": "furniture/storage/wardrobes",
+        "dims": [1.75, 2.34, 0.669],
+        "anchor": "floor",
+        "wallSnap": true,
+        "clearance": 0.8,
+        "layout": {
+          "caseGood": true
+        },
+        "defaultVariant": "01a16a26-3725-7adf-9aa3-4c49391bac05",
+        "variants": [
+          {
+            "id": "01a16a26-3725-7adf-9aa3-4c49391bac05",
+            "dims": [1.75, 2.34, 0.669]
+          },
+          {
+            "id": "01a16a26-3725-7de8-b985-3b80ab1b4e22",
+            "dims": [1.75, 2.34, 0.669]
+          },
+          {
+            "id": "01a16a26-3725-72f8-8567-56a72d1f6aa2",
+            "dims": [1.75, 2.34, 0.669]
+          }
+        ]
+      },
+      {
+        "id": "01a16a26-3725-7bd3-af48-c9f92fed67fb",
+        "name": "Open bookshelf",
+        "category": "furniture/storage/shelving",
+        "dims": [1.58, 1.86, 0.312],
+        "anchor": "floor",
+        "wallSnap": true,
+        "clearance": 0.5,
+        "layout": {
+          "caseGood": true
+        },
+        "defaultVariant": "01a16a26-3725-7f90-bf98-4538f04a3515",
+        "variants": [
+          {
+            "id": "01a16a26-3725-7f90-bf98-4538f04a3515",
+            "dims": [1.58, 1.86, 0.312]
+          },
+          {
+            "id": "01a16a26-3725-7470-a5e0-ba0ce072a7bd",
+            "dims": [1.58, 1.86, 0.312]
+          },
+          {
+            "id": "01a16a26-3725-7a82-8fdd-2578711b73b5",
+            "dims": [1.58, 1.86, 0.312]
+          }
+        ]
+      },
+      {
+        "id": "01a16a26-3725-73fc-b392-ca7a4270cc11",
+        "name": "Media unit with screen",
+        "category": "furniture/storage/media",
+        "dims": [1.8, 1.366, 0.472],
+        "anchor": "floor",
+        "wallSnap": true,
+        "clearance": 0.6,
+        "layout": {
+          "caseGood": true
+        },
+        "defaultVariant": "01a16a26-3725-73b4-8250-3da34eb8ac3c",
+        "variants": [
+          {
+            "id": "01a16a26-3725-73b4-8250-3da34eb8ac3c",
+            "dims": [1.8, 1.366, 0.472]
+          },
+          {
+            "id": "01a16a26-3725-723f-9844-3338314e6df7",
+            "dims": [1.8, 1.366, 0.472]
+          },
+          {
+            "id": "01a16a26-3725-7fff-97a7-5aecabdb757c",
+            "dims": [1.8, 1.366, 0.472]
+          }
+        ]
+      },
+      {
+        "id": "01a16a26-3725-725f-bbce-a3d14cf483e8",
+        "name": "Kitchen island",
+        "category": "furniture/kitchen/islands",
+        "dims": [2.3, 1.196, 1.235],
+        "anchor": "floor",
+        "wallSnap": false,
+        "clearance": 0.9,
+        "layout": {
+          "blockingHeight": 0.92
+        },
+        "defaultVariant": "01a16a26-3725-70d4-8d98-2be86787bbb9",
+        "variants": [
+          {
+            "id": "01a16a26-3725-70d4-8d98-2be86787bbb9",
+            "dims": [2.3, 1.196, 1.235]
+          },
+          {
+            "id": "01a16a26-3725-7ed3-be44-24fed27a3c76",
+            "dims": [2.3, 1.196, 1.235]
+          },
+          {
+            "id": "01a16a26-3725-7434-b806-afb26d7a9eb7",
+            "dims": [2.3, 1.196, 1.235]
+          }
+        ]
+      },
+      {
+        "id": "01a16a26-3725-7545-b79a-34aa59571c12",
+        "name": "Kitchen counter run",
+        "category": "furniture/kitchen/counters",
+        "dims": [2.43, 1.48, 0.689],
+        "anchor": "floor",
+        "wallSnap": true,
+        "clearance": 0.9,
+        "layout": {
+          "caseGood": true,
+          "kitchenBase": true,
+          "blockingHeight": 0.92
+        },
+        "defaultVariant": "01a16a26-3725-7722-af72-dc1caf75af4b",
+        "variants": [
+          {
+            "id": "01a16a26-3725-7722-af72-dc1caf75af4b",
+            "dims": [2.43, 1.48, 0.689]
+          },
+          {
+            "id": "01a16a26-3725-7df6-9a44-151b1992cc5a",
+            "dims": [2.43, 1.48, 0.689]
+          },
+          {
+            "id": "01a16a26-3725-7cd1-bfed-282720fa2ba3",
+            "dims": [2.43, 1.48, 0.689]
+          }
+        ]
+      },
+      {
+        "id": "01a16a26-3725-7a35-8508-b312c7d71e37",
+        "name": "Freestanding cooker",
+        "category": "appliances/cooking",
+        "dims": [0.74, 0.96, 0.684],
+        "anchor": "floor",
+        "wallSnap": true,
+        "clearance": 0.9,
+        "layout": {
+          "caseGood": true,
+          "kitchenBase": true
+        },
+        "defaultVariant": "01a16a26-3725-7134-b819-11594cf236d8",
+        "variants": [
+          {
+            "id": "01a16a26-3725-7134-b819-11594cf236d8",
+            "dims": [0.74, 0.96, 0.684]
+          },
+          {
+            "id": "01a16a26-3725-796d-8460-d97d169c292e",
+            "dims": [0.74, 0.96, 0.684]
+          },
+          {
+            "id": "01a16a26-3725-7d42-9a73-7b209d741f76",
+            "dims": [0.74, 0.96, 0.684]
+          },
+          {
+            "id": "01a16a26-3725-721e-a195-fe2d84bec9e1",
+            "dims": [0.74, 0.96, 0.684]
+          }
+        ]
+      },
+      {
+        "id": "01a16a26-3725-715f-b64a-6992cdd69857",
+        "name": "Extractor hood",
+        "category": "appliances/ventilation",
+        "dims": [0.9, 0.8, 0.524],
+        "anchor": "wall",
+        "wallSnap": true,
+        "clearance": 0,
+        "defaultVariant": "01a16a26-3725-722f-bc8e-f50e856c4033",
+        "variants": [
+          {
+            "id": "01a16a26-3725-722f-bc8e-f50e856c4033",
+            "dims": [0.9, 0.8, 0.524]
+          },
+          {
+            "id": "01a16a26-3725-7425-8fd3-e47e8be5bd26",
+            "dims": [0.9, 0.8, 0.524]
+          },
+          {
+            "id": "01a16a26-3725-772c-9af3-30571fb3db4f",
+            "dims": [0.9, 0.8, 0.524]
+          },
+          {
+            "id": "01a16a26-3725-7843-9b47-a53b31d4c015",
+            "dims": [0.9, 0.8, 0.524]
+          }
+        ]
+      },
+      {
+        "id": "01a16a26-3725-79d4-a700-488686c01968",
+        "name": "Tall refrigerator",
+        "category": "appliances/refrigeration",
+        "dims": [0.78, 1.92, 0.774],
+        "anchor": "floor",
+        "wallSnap": true,
+        "clearance": 0.9,
+        "layout": {
+          "caseGood": true
+        },
+        "defaultVariant": "01a16a26-3725-758f-9e85-04923d7b16eb",
+        "variants": [
+          {
+            "id": "01a16a26-3725-758f-9e85-04923d7b16eb",
+            "dims": [0.78, 1.92, 0.774]
+          },
+          {
+            "id": "01a16a26-3725-7993-a9da-012404413600",
+            "dims": [0.78, 1.92, 0.774]
+          }
+        ]
+      },
+      {
+        "id": "01a16a26-3725-7445-8b89-ccc3edbd580f",
+        "name": "Vanity with basin",
+        "category": "sanitary/vanities",
+        "dims": [1.02, 1.137, 0.562],
+        "anchor": "floor",
+        "wallSnap": true,
+        "clearance": 0.7,
+        "layout": {
+          "caseGood": true
+        },
+        "defaultVariant": "01a16a26-3725-701b-9a9a-c9f8a4d0de27",
+        "variants": [
+          {
+            "id": "01a16a26-3725-701b-9a9a-c9f8a4d0de27",
+            "dims": [1.02, 1.137, 0.562]
+          },
+          {
+            "id": "01a16a26-3725-71eb-ac22-0be6477f292c",
+            "dims": [1.02, 1.137, 0.562]
+          },
+          {
+            "id": "01a16a26-3725-79fd-9195-05a31f883486",
+            "dims": [1.02, 1.137, 0.562]
+          }
+        ]
+      },
+      {
+        "id": "01a16a26-3725-78a6-b24c-0bb9007d4e58",
+        "name": "Floor-standing WC",
+        "category": "sanitary/wc",
+        "dims": [0.4, 0.872, 0.707],
+        "anchor": "floor",
+        "wallSnap": true,
+        "clearance": 0.6,
+        "defaultVariant": "01a16a26-3725-71ea-b334-a6d9795feab7",
+        "variants": [
+          {
+            "id": "01a16a26-3725-71ea-b334-a6d9795feab7",
+            "dims": [0.4, 0.872, 0.707]
+          },
+          {
+            "id": "01a16a26-3725-70a0-9606-eecd4b6a8cfb",
+            "dims": [0.4, 0.872, 0.707]
+          },
+          {
+            "id": "01a16a26-3725-7eb0-9501-744cd7d9cdff",
+            "dims": [0.4, 0.872, 0.707]
+          }
+        ]
+      },
+      {
+        "id": "01a16a26-3725-77e4-8e7d-7a7828797e24",
+        "name": "Freestanding bath",
+        "category": "sanitary/baths",
+        "dims": [1.7, 0.855, 0.8],
+        "anchor": "floor",
+        "wallSnap": true,
+        "clearance": 0.6,
+        "defaultVariant": "01a16a26-3725-718e-9e32-b0697d754434",
+        "variants": [
+          {
+            "id": "01a16a26-3725-718e-9e32-b0697d754434",
+            "dims": [1.7, 0.855, 0.8]
+          },
+          {
+            "id": "01a16a26-3725-7cc7-afa9-7c5a2dd817e5",
+            "dims": [1.7, 0.855, 0.8]
+          },
+          {
+            "id": "01a16a26-3725-767c-9d24-aed7469b7f88",
+            "dims": [1.7, 0.855, 0.8]
+          }
+        ]
+      },
+      {
+        "id": "01a16a26-3725-7553-8b82-93e75f61f4d0",
+        "name": "Floor lamp",
+        "category": "lighting/floor",
+        "dims": [0.467, 0.254, 0.467],
+        "anchor": "floor",
+        "wallSnap": false,
+        "clearance": 0.3,
+        "defaultVariant": "01a16a26-3725-7628-8f06-4e9af14f1c3f",
+        "variants": [
+          {
+            "id": "01a16a26-3725-7628-8f06-4e9af14f1c3f",
+            "dims": [0.467, 0.254, 0.467]
+          },
+          {
+            "id": "01a16a26-3725-7e92-8b85-3006c6ac3b50",
+            "dims": [0.467, 0.254, 0.467]
+          },
+          {
+            "id": "01a16a26-3725-7c5d-8c42-702bcd3772f4",
+            "dims": [0.467, 0.254, 0.467]
+          },
+          {
+            "id": "01a16a26-3725-7468-be1b-e3a0a6958daa",
+            "dims": [0.467, 0.254, 0.467]
+          }
+        ]
+      },
+      {
+        "id": "01a16a26-3725-707a-b6db-8e73857d0eec",
+        "name": "Table lamp",
+        "category": "lighting/table",
+        "dims": [0.298, 0.524, 0.3],
+        "anchor": "floor",
+        "wallSnap": false,
+        "clearance": 0.1,
+        "defaultVariant": "01a16a26-3725-72f3-b3be-a77852c3a4d2",
+        "variants": [
+          {
+            "id": "01a16a26-3725-72f3-b3be-a77852c3a4d2",
+            "dims": [0.298, 0.524, 0.3]
+          },
+          {
+            "id": "01a16a26-3725-7fed-8690-265331fd3ab9",
+            "dims": [0.298, 0.524, 0.3]
+          },
+          {
+            "id": "01a16a26-3725-75f6-a577-d53eeacbb4d7",
+            "dims": [0.298, 0.524, 0.3]
+          }
+        ]
+      },
+      {
+        "id": "01a16a26-3725-70f1-b515-5b5cee960929",
+        "name": "Pendant lamp",
+        "category": "lighting/pendants",
+        "dims": [0.36, 1.052, 0.36],
+        "anchor": "ceiling",
+        "wallSnap": false,
+        "clearance": 0,
+        "defaultVariant": "01a16a26-3725-74fd-aa62-d6647ec0c873",
+        "variants": [
+          {
+            "id": "01a16a26-3725-74fd-aa62-d6647ec0c873",
+            "dims": [0.36, 1.052, 0.36]
+          },
+          {
+            "id": "01a16a26-3725-76f1-8713-3a1a1944e666",
+            "dims": [0.223, 1.05, 0.223]
+          },
+          {
+            "id": "01a16a26-3725-72ca-b6d5-57ee35be4def",
+            "dims": [0.36, 1.05, 0.36]
+          }
+        ]
+      },
+      {
+        "id": "01a16a26-3725-7b9c-8210-cd6412a77862",
+        "name": "Bird of paradise",
+        "category": "decor/plants",
+        "dims": [0.83, 1.594, 0.634],
+        "anchor": "floor",
+        "wallSnap": false,
+        "clearance": 0.2,
+        "layout": {
+          "footprint": 0.42
+        },
+        "defaultVariant": "01a16a26-3725-7aa0-a770-efe26e35da0d",
+        "variants": [
+          {
+            "id": "01a16a26-3725-7aa0-a770-efe26e35da0d",
+            "dims": [0.83, 1.594, 0.634]
+          },
+          {
+            "id": "01a16a26-3725-760b-8195-8478dedf5a01",
+            "dims": [0.624, 1.6, 0.844]
+          },
+          {
+            "id": "01a16a26-3725-7911-8514-a2edba0678c5",
+            "dims": [0.941, 1.582, 0.825]
+          }
+        ]
+      },
+      {
+        "id": "01a16a26-3725-791a-bb0f-60961eea47c2",
+        "name": "Fiddle-leaf fig",
+        "category": "decor/plants",
+        "dims": [0.653, 1.61, 0.777],
+        "anchor": "floor",
+        "wallSnap": false,
+        "clearance": 0.2,
+        "layout": {
+          "footprint": 0.62
+        },
+        "defaultVariant": "01a16a26-3725-7715-be70-232a2f0dbd30",
+        "variants": [
+          {
+            "id": "01a16a26-3725-7715-be70-232a2f0dbd30",
+            "dims": [0.653, 1.61, 0.777]
+          },
+          {
+            "id": "01a16a26-3725-7908-b69b-56bb29db3b15",
+            "dims": [0.84, 1.583, 0.799]
+          },
+          {
+            "id": "01a16a26-3725-76e6-9e6c-e32400b41bb4",
+            "dims": [0.74, 1.655, 0.697]
+          }
+        ]
+      },
+      {
+        "id": "01a16a26-3725-7db1-bd93-6779019d2789",
+        "name": "Upright bird of paradise",
+        "category": "decor/plants",
+        "dims": [0.656, 1.399, 0.632],
+        "anchor": "floor",
+        "wallSnap": false,
+        "clearance": 0.15,
+        "layout": {
+          "footprint": 0.86
+        },
+        "defaultVariant": "01a16a26-3725-7936-b0aa-38b97282c6d4",
+        "variants": [
+          {
+            "id": "01a16a26-3725-7936-b0aa-38b97282c6d4",
+            "dims": [0.656, 1.399, 0.632]
+          },
+          {
+            "id": "01a16a26-3725-7f20-9178-dbe3572350e7",
+            "dims": [0.627, 1.399, 0.632]
+          },
+          {
+            "id": "01a16a26-3725-7880-a201-809cf1dd4cfb",
+            "dims": [0.671, 1.4, 0.632]
+          }
+        ]
+      },
+      {
+        "id": "01a16a26-3725-7ece-a5a0-094b19f45465",
+        "name": "Rectangular rug",
+        "category": "decor/rugs",
+        "dims": [2.97, 0.03, 2],
+        "anchor": "floor",
+        "wallSnap": false,
+        "clearance": 0,
+        "defaultVariant": "01a16a26-3725-7248-b763-f9eba8873591",
+        "variants": [
+          {
+            "id": "01a16a26-3725-7248-b763-f9eba8873591",
+            "dims": [2.97, 0.03, 2]
+          },
+          {
+            "id": "01a16a26-3725-7573-a1b9-22028a1df61c",
+            "dims": [2.97, 0.03, 2]
+          },
+          {
+            "id": "01a16a26-3725-71b1-9d5d-53829a5ce942",
+            "dims": [2.97, 0.03, 2]
+          }
+        ]
+      },
+      {
+        "id": "01a16a26-3725-74d5-a5c5-75149cfd6be2",
+        "name": "Door mat",
+        "category": "decor/rugs",
+        "dims": [0.85, 0.03, 0.48],
+        "anchor": "floor",
+        "wallSnap": false,
+        "clearance": 0,
+        "defaultVariant": "01a16a26-3725-79cd-b34b-63e1c0e64628",
+        "variants": [
+          {
+            "id": "01a16a26-3725-79cd-b34b-63e1c0e64628",
+            "dims": [0.85, 0.03, 0.48]
+          },
+          {
+            "id": "01a16a26-3725-733b-b1f4-93d041f2775a",
+            "dims": [0.85, 0.03, 0.48]
+          },
+          {
+            "id": "01a16a26-3725-7f2c-ab56-4f0c5041bd68",
+            "dims": [0.85, 0.03, 0.48]
+          }
+        ]
+      },
+      {
+        "id": "01a16a26-3725-7abf-892d-0a7c94f10695",
+        "name": "Framed artwork",
+        "category": "decor/art",
+        "dims": [1.06, 0.78, 0.05],
+        "anchor": "wall",
+        "wallSnap": true,
+        "clearance": 0,
+        "layout": {
+          "mount": {
+            "centre": 1.5
+          }
+        },
+        "defaultVariant": "01a16a26-3725-71e0-8922-fe195f133a47",
+        "variants": [
+          {
+            "id": "01a16a26-3725-71e0-8922-fe195f133a47",
+            "dims": [1.06, 0.78, 0.05]
+          },
+          {
+            "id": "01a16a26-3725-7c72-bac6-66e4094c3a6e",
+            "dims": [1.06, 0.78, 0.05]
+          }
+        ]
+      },
+      {
+        "id": "01a16a26-3725-7d3b-a8ed-31c173a345cd",
+        "name": "Wall mirror",
+        "category": "decor/mirrors",
+        "dims": [0.76, 0.76, 0.06],
+        "anchor": "wall",
+        "wallSnap": true,
+        "clearance": 0,
+        "layout": {
+          "mount": {
+            "centre": 1.6
+          }
+        },
+        "defaultVariant": "01a16a26-3725-7004-958e-96d7ee841c4c",
+        "variants": [
+          {
+            "id": "01a16a26-3725-7004-958e-96d7ee841c4c",
+            "dims": [0.76, 0.76, 0.06]
+          },
+          {
+            "id": "01a16a26-3725-7dd9-8c58-1abccc18fd00",
+            "dims": [0.76, 0.76, 0.06]
+          }
+        ]
+      }
+    ]
+  },
+  "assets": [
+    {
+      "id": "01a15f1b-dbbd-7638-aa79-9f2e674724da",
+      "room": "01a15f1b-dbbd-762f-9872-443f368b292a",
+      "position": {
+        "x": 1.35,
+        "y": 0,
+        "z": 0.46
+      },
+      "rotationY": 0,
+      "type": "01a16a26-3725-7545-b79a-34aa59571c12",
+      "asset": "01a16a26-3725-7545-b79a-34aa59571c12",
+      "variant": "01a16a26-3725-7722-af72-dc1caf75af4b"
+    },
+    {
+      "id": "01a15f1b-dbbd-7639-981f-d38ec21a8369",
+      "room": "01a15f1b-dbbd-762f-9872-443f368b292a",
+      "position": {
+        "x": 2.91,
+        "y": 0,
+        "z": 0.45
+      },
+      "rotationY": 0,
+      "type": "01a16a26-3725-7a35-8508-b312c7d71e37",
+      "asset": "01a16a26-3725-7a35-8508-b312c7d71e37",
+      "variant": "01a16a26-3725-7134-b819-11594cf236d8"
+    },
+    {
+      "id": "01a15f1b-dbbd-763a-8186-7a2941dd0f52",
+      "room": "01a15f1b-dbbd-762f-9872-443f368b292a",
+      "position": {
+        "x": 2.91,
+        "y": 1.64,
+        "z": 0.41
+      },
+      "rotationY": 0,
+      "type": "01a16a26-3725-715f-b64a-6992cdd69857",
+      "asset": "01a16a26-3725-715f-b64a-6992cdd69857",
+      "variant": "01a16a26-3725-722f-bc8e-f50e856c4033"
+    },
+    {
+      "id": "01a15f1b-dbbd-763b-9386-48e9c98df04a",
+      "room": "01a15f1b-dbbd-762f-9872-443f368b292a",
+      "position": {
+        "x": 1.35,
+        "y": 1.81,
+        "z": 0.325
+      },
+      "rotationY": 0,
+      "type": "01a16a26-3725-7d93-b7c6-82e42335a2a5",
+      "asset": "01a16a26-3725-7d93-b7c6-82e42335a2a5",
+      "variant": "01a16a26-3725-7860-9d03-3bf30d4433ef"
+    },
+    {
+      "id": "01a15f1b-dbbd-763c-8b7d-0385d0e286fa",
+      "room": "01a15f1b-dbbd-762f-9872-443f368b292a",
+      "position": {
+        "x": 4,
+        "y": 0,
+        "z": 0.54
+      },
+      "rotationY": -1.5707963267948966,
+      "type": "01a16a26-3725-79d4-a700-488686c01968",
+      "asset": "01a16a26-3725-79d4-a700-488686c01968",
+      "variant": "01a16a26-3725-758f-9e85-04923d7b16eb"
+    },
+    {
+      "id": "01a15f1b-dbbd-763d-9bcc-60a0a48395e7",
+      "room": "01a15f1b-dbbd-762f-9872-443f368b292a",
+      "position": {
+        "x": 2,
+        "y": 0,
+        "z": 2.15
+      },
+      "rotationY": 0,
+      "type": "01a16a26-3725-725f-bbce-a3d14cf483e8",
+      "asset": "01a16a26-3725-725f-bbce-a3d14cf483e8",
+      "variant": "01a16a26-3725-70d4-8d98-2be86787bbb9"
+    },
+    {
+      "id": "01a15f1b-dbbd-763e-bbfa-a54aedc8f642",
+      "room": "01a15f1b-dbbd-762f-9872-443f368b292a",
+      "position": {
+        "x": 0.6,
+        "y": 0,
+        "z": 3
+      },
+      "scale": 0.75,
+      "type": "01a16a26-3725-7db1-bd93-6779019d2789",
+      "asset": "01a16a26-3725-7db1-bd93-6779019d2789",
+      "variant": "01a16a26-3725-7936-b0aa-38b97282c6d4"
+    },
+    {
+      "id": "01a15f1b-dbbd-763f-8bc9-2f1a53969f95",
+      "room": "01a15f1b-dbbd-7630-93f2-2522489e6e62",
+      "position": {
+        "x": 5.6,
+        "y": 0,
+        "z": 0.55
+      },
+      "type": "01a16a26-3725-77e4-8e7d-7a7828797e24",
+      "asset": "01a16a26-3725-77e4-8e7d-7a7828797e24",
+      "variant": "01a16a26-3725-718e-9e32-b0697d754434"
+    },
+    {
+      "id": "01a15f1b-dbbd-7640-a5bb-cf4f49cf6f3d",
+      "room": "01a15f1b-dbbd-7630-93f2-2522489e6e62",
+      "position": {
+        "x": 4.8,
+        "y": 0,
+        "z": 1.9
+      },
+      "rotationY": -1.5707963267948966,
+      "type": "01a16a26-3725-78a6-b24c-0bb9007d4e58",
+      "asset": "01a16a26-3725-78a6-b24c-0bb9007d4e58",
+      "variant": "01a16a26-3725-71ea-b334-a6d9795feab7"
+    },
+    {
+      "id": "01a15f1b-dbbd-7641-ba0e-1bbc461b93b7",
+      "room": "01a15f1b-dbbd-7630-93f2-2522489e6e62",
+      "position": {
+        "x": 6.5,
+        "y": 0,
+        "z": 1.6
+      },
+      "rotationY": -1.5707963267948966,
+      "type": "01a16a26-3725-7445-8b89-ccc3edbd580f",
+      "asset": "01a16a26-3725-7445-8b89-ccc3edbd580f",
+      "variant": "01a16a26-3725-701b-9a9a-c9f8a4d0de27"
+    },
+    {
+      "id": "01a15f1b-dbbd-7642-a88c-b7ade92af6d7",
+      "room": "01a15f1b-dbbd-7630-93f2-2522489e6e62",
+      "position": {
+        "x": 6.72,
+        "y": 1.55,
+        "z": 1.6
+      },
+      "rotationY": -1.5707963267948966,
+      "type": "01a16a26-3725-7d3b-a8ed-31c173a345cd",
+      "asset": "01a16a26-3725-7d3b-a8ed-31c173a345cd",
+      "variant": "01a16a26-3725-7004-958e-96d7ee841c4c"
+    },
+    {
+      "id": "01a15f1b-dbbd-7643-9e35-9d356f41ebc0",
+      "room": "01a15f1b-dbbd-7630-93f2-2522489e6e62",
+      "position": {
+        "x": 5.6,
+        "y": 0,
+        "z": 1.3
+      },
+      "type": "01a16a26-3725-74d5-a5c5-75149cfd6be2",
+      "asset": "01a16a26-3725-74d5-a5c5-75149cfd6be2",
+      "variant": "01a16a26-3725-79cd-b34b-63e1c0e64628"
+    },
+    {
+      "id": "01a15f1b-dbbd-7644-90b2-4b4370ef0a2c",
+      "room": "01a15f1b-dbbd-7631-9892-f955c42ec958",
+      "position": {
+        "x": 7.5,
+        "y": 0,
+        "z": 0.5
+      },
+      "rotationY": 3.141592653589793,
+      "type": "01a16a26-3725-78a6-b24c-0bb9007d4e58",
+      "asset": "01a16a26-3725-78a6-b24c-0bb9007d4e58",
+      "variant": "01a16a26-3725-71ea-b334-a6d9795feab7"
+    },
+    {
+      "id": "01a15f1b-dbbd-7645-82c0-8901f62784fa",
+      "room": "01a15f1b-dbbd-7631-9892-f955c42ec958",
+      "position": {
+        "x": 7.9,
+        "y": 0,
+        "z": 2
+      },
+      "rotationY": -1.5707963267948966,
+      "type": "01a16a26-3725-7445-8b89-ccc3edbd580f",
+      "asset": "01a16a26-3725-7445-8b89-ccc3edbd580f",
+      "variant": "01a16a26-3725-701b-9a9a-c9f8a4d0de27"
+    },
+    {
+      "id": "01a15f1b-dbbd-7646-9e3c-16995aee1b51",
+      "room": "01a15f1b-dbbd-7631-9892-f955c42ec958",
+      "position": {
+        "x": 8.12,
+        "y": 1.55,
+        "z": 2
+      },
+      "rotationY": -1.5707963267948966,
+      "type": "01a16a26-3725-7d3b-a8ed-31c173a345cd",
+      "asset": "01a16a26-3725-7d3b-a8ed-31c173a345cd",
+      "variant": "01a16a26-3725-7004-958e-96d7ee841c4c"
+    },
+    {
+      "id": "01a15f1b-dbbd-7647-a2e2-c55e6adc6206",
+      "room": "01a15f1b-dbbd-7632-b5d0-a3ad05b51b6e",
+      "position": {
+        "x": 11.93,
+        "y": 0,
+        "z": 1.75
+      },
+      "rotationY": 1.5707963267948966,
+      "type": "01a16a26-3725-7f56-a285-cf5f2d813ff4",
+      "asset": "01a16a26-3725-7f56-a285-cf5f2d813ff4",
+      "variant": "01a16a26-3725-7ba0-8734-512997e7e995"
+    },
+    {
+      "id": "01a15f1b-dbbd-7648-9f0a-55e083a1f598",
+      "room": "01a15f1b-dbbd-7632-b5d0-a3ad05b51b6e",
+      "position": {
+        "x": 12.84,
+        "y": 0,
+        "z": 0.56
+      },
+      "rotationY": -1.5707963267948966,
+      "type": "01a16a26-3725-7393-aac8-31510b608ade",
+      "asset": "01a16a26-3725-7393-aac8-31510b608ade",
+      "variant": "01a16a26-3725-75df-8f7b-1f8e83e5d30e"
+    },
+    {
+      "id": "01a15f1b-dbbd-7649-9f0f-75cd0202888c",
+      "room": "01a15f1b-dbbd-7632-b5d0-a3ad05b51b6e",
+      "position": {
+        "x": 12.84,
+        "y": 0,
+        "z": 2.94
+      },
+      "rotationY": -1.5707963267948966,
+      "type": "01a16a26-3725-7393-aac8-31510b608ade",
+      "asset": "01a16a26-3725-7393-aac8-31510b608ade",
+      "variant": "01a16a26-3725-75df-8f7b-1f8e83e5d30e"
+    },
+    {
+      "id": "01a15f1b-dbbd-764a-90b8-84dbe9962bfc",
+      "room": "01a15f1b-dbbd-7632-b5d0-a3ad05b51b6e",
+      "position": {
+        "x": 12.84,
+        "y": 0.56,
+        "z": 0.56
+      },
+      "type": "01a16a26-3725-707a-b6db-8e73857d0eec",
+      "asset": "01a16a26-3725-707a-b6db-8e73857d0eec",
+      "variant": "01a16a26-3725-72f3-b3be-a77852c3a4d2"
+    },
+    {
+      "id": "01a15f1b-dbbd-764b-9079-509e0ea28cc1",
+      "room": "01a15f1b-dbbd-7632-b5d0-a3ad05b51b6e",
+      "position": {
+        "x": 8.55,
+        "y": 0,
+        "z": 1.4
+      },
+      "rotationY": 1.5707963267948966,
+      "type": "01a16a26-3725-7366-9cd3-a4522817e1ec",
+      "asset": "01a16a26-3725-7366-9cd3-a4522817e1ec",
+      "variant": "01a16a26-3725-7adf-9aa3-4c49391bac05"
+    },
+    {
+      "id": "01a15f1b-dbbd-764c-9018-d95fcf5a7560",
+      "room": "01a15f1b-dbbd-7632-b5d0-a3ad05b51b6e",
+      "position": {
+        "x": 13.025,
+        "y": 1.5,
+        "z": 1.75
+      },
+      "rotationY": -1.5707963267948966,
+      "type": "01a16a26-3725-7abf-892d-0a7c94f10695",
+      "asset": "01a16a26-3725-7abf-892d-0a7c94f10695",
+      "variant": "01a16a26-3725-71e0-8922-fe195f133a47"
+    },
+    {
+      "id": "01a15f1b-dbbd-764d-a4bd-b8d483cfcf0f",
+      "room": "01a15f1b-dbbd-7632-b5d0-a3ad05b51b6e",
+      "position": {
+        "x": 11,
+        "y": 0,
+        "z": 1.75
+      },
+      "rotationY": 1.5707963267948966,
+      "scale": 0.6,
+      "type": "01a16a26-3725-7ece-a5a0-094b19f45465",
+      "asset": "01a16a26-3725-7ece-a5a0-094b19f45465",
+      "variant": "01a16a26-3725-7248-b763-f9eba8873591"
+    },
+    {
+      "id": "01a15f1b-dbbd-764e-8610-0745d60b3040",
+      "room": "01a15f1b-dbbd-7633-9ef2-d1fabf41b1e7",
+      "position": {
+        "x": 12.55,
+        "y": 0,
+        "z": 4.4
+      },
+      "type": "01a16a26-3725-74d5-a5c5-75149cfd6be2",
+      "asset": "01a16a26-3725-74d5-a5c5-75149cfd6be2",
+      "variant": "01a16a26-3725-79cd-b34b-63e1c0e64628"
+    },
+    {
+      "id": "01a15f1b-dbbd-764f-9c22-a6d082562db7",
+      "room": "01a15f1b-dbbd-7633-9ef2-d1fabf41b1e7",
+      "position": {
+        "x": 11.2,
+        "y": 0,
+        "z": 3.89
+      },
+      "rotationY": 0,
+      "type": "01a16a26-3725-797b-8f97-4ba97bee89a3",
+      "asset": "01a16a26-3725-797b-8f97-4ba97bee89a3",
+      "variant": "01a16a26-3725-70b1-9807-ef4f52c830ad"
+    },
+    {
+      "id": "01a15f1b-dbbd-7650-81ad-ca7fba0898f1",
+      "room": "01a15f1b-dbbd-7633-9ef2-d1fabf41b1e7",
+      "position": {
+        "x": 11.2,
+        "y": 1.6,
+        "z": 3.75
+      },
+      "rotationY": 0,
+      "type": "01a16a26-3725-7d3b-a8ed-31c173a345cd",
+      "asset": "01a16a26-3725-7d3b-a8ed-31c173a345cd",
+      "variant": "01a16a26-3725-7004-958e-96d7ee841c4c"
+    },
+    {
+      "id": "01a15f1b-dbbd-7651-a459-a1ac17878693",
+      "room": "01a15f1b-dbbd-7633-9ef2-d1fabf41b1e7",
+      "position": {
+        "x": 10.07,
+        "y": 0,
+        "z": 3.9
+      },
+      "rotationY": 0,
+      "type": "01a16a26-3725-7690-baec-79da4e2ef399",
+      "asset": "01a16a26-3725-7690-baec-79da4e2ef399",
+      "variant": "01a16a26-3725-759e-bf09-88f440cfc913"
+    },
+    {
+      "id": "01a15f1b-dbbd-7659-9661-2d3f8c34b399",
+      "room": "01a15f1b-dbbd-7634-b8b8-af9c8008284d",
+      "position": {
+        "x": 0.36,
+        "y": 0,
+        "z": 6
+      },
+      "rotationY": 1.5707963267948966,
+      "type": "01a16a26-3725-73fc-b392-ca7a4270cc11",
+      "asset": "01a16a26-3725-73fc-b392-ca7a4270cc11",
+      "variant": "01a16a26-3725-73b4-8250-3da34eb8ac3c"
+    },
+    {
+      "id": "01a15f1b-dbbd-765a-9faf-abae0641c1f3",
+      "room": "01a15f1b-dbbd-7634-b8b8-af9c8008284d",
+      "position": {
+        "x": 2.86,
+        "y": 0,
+        "z": 6
+      },
+      "rotationY": 1.5707963267948966,
+      "type": "01a16a26-3725-7366-855c-8e5de49ce5c9",
+      "asset": "01a16a26-3725-7366-855c-8e5de49ce5c9",
+      "variant": "01a16a26-3725-77fd-8503-5463501b0fd6"
+    },
+    {
+      "id": "01a15f1b-dbbd-765b-be4e-63b0602a1c99",
+      "room": "01a15f1b-dbbd-7634-b8b8-af9c8008284d",
+      "position": {
+        "x": 1.705,
+        "y": 0,
+        "z": 6
+      },
+      "type": "01a16a26-3725-769a-bc1f-f4c2afec9a37",
+      "asset": "01a16a26-3725-769a-bc1f-f4c2afec9a37",
+      "variant": "01a16a26-3725-7a85-9608-768fa667f3ed"
+    },
+    {
+      "id": "01a15f1b-dbbd-765d-b80d-1b836f326b82",
+      "room": "01a15f1b-dbbd-7634-b8b8-af9c8008284d",
+      "position": {
+        "x": 1.9,
+        "y": 0,
+        "z": 6
+      },
+      "rotationY": 1.5707963267948966,
+      "scale": 0.6,
+      "type": "01a16a26-3725-7ece-a5a0-094b19f45465",
+      "asset": "01a16a26-3725-7ece-a5a0-094b19f45465",
+      "variant": "01a16a26-3725-7248-b763-f9eba8873591"
+    },
+    {
+      "id": "01a15f1b-dbbd-765c-b4e2-1e8089a6c213",
+      "room": "01a15f1b-dbbd-7634-b8b8-af9c8008284d",
+      "position": {
+        "x": 2.86,
+        "y": 0,
+        "z": 7.45
+      },
+      "type": "01a16a26-3725-7553-8b82-93e75f61f4d0",
+      "asset": "01a16a26-3725-7553-8b82-93e75f61f4d0",
+      "variant": "01a16a26-3725-7628-8f06-4e9af14f1c3f"
+    },
+    {
+      "id": "01a15f1b-dbbd-7658-ba4d-08feb429ebdf",
+      "room": "01a15f1b-dbbd-7634-b8b8-af9c8008284d",
+      "position": {
+        "x": 1.6,
+        "y": 1.5,
+        "z": 3.745
+      },
+      "rotationY": 0,
+      "type": "01a16a26-3725-7abf-892d-0a7c94f10695",
+      "asset": "01a16a26-3725-7abf-892d-0a7c94f10695",
+      "variant": "01a16a26-3725-71e0-8922-fe195f133a47"
+    },
+    {
+      "id": "01a15f1b-dbbd-765f-b87f-75dbe1a36162",
+      "room": "01a15f1b-dbbd-7634-b8b8-af9c8008284d",
+      "position": {
+        "x": 0.55,
+        "y": 0,
+        "z": 4.4
+      },
+      "scale": 0.7,
+      "type": "01a16a26-3725-7b9c-8210-cd6412a77862",
+      "asset": "01a16a26-3725-7b9c-8210-cd6412a77862",
+      "variant": "01a16a26-3725-7aa0-a770-efe26e35da0d"
+    },
+    {
+      "id": "01a15f1b-dbbd-7652-b36a-7f6a7c7c464a",
+      "room": "01a15f1b-dbbd-7634-b8b8-af9c8008284d",
+      "position": {
+        "x": 5.5,
+        "y": 0,
+        "z": 7.06
+      },
+      "type": "01a16a26-3725-7d83-868f-0a94d3131348",
+      "asset": "01a16a26-3725-7d83-868f-0a94d3131348",
+      "variant": "01a16a26-3725-7590-a5ff-d3c820c88c7c"
+    },
+    {
+      "id": "01a15f1b-dbbd-7653-98e0-fe18116240e6",
+      "room": "01a15f1b-dbbd-7634-b8b8-af9c8008284d",
+      "position": {
+        "x": 5.15,
+        "y": 0,
+        "z": 6.255
+      },
+      "rotationY": 0,
+      "type": "01a16a26-3725-792a-aaa6-de68f735be27",
+      "asset": "01a16a26-3725-792a-aaa6-de68f735be27",
+      "variant": "01a16a26-3725-7289-8132-6239d5633c27"
+    },
+    {
+      "id": "01a15f1b-dbbd-7654-8361-e0e665bfade7",
+      "room": "01a15f1b-dbbd-7634-b8b8-af9c8008284d",
+      "position": {
+        "x": 5.85,
+        "y": 0,
+        "z": 6.255
+      },
+      "rotationY": 0,
+      "type": "01a16a26-3725-792a-aaa6-de68f735be27",
+      "asset": "01a16a26-3725-792a-aaa6-de68f735be27",
+      "variant": "01a16a26-3725-7289-8132-6239d5633c27"
+    },
+    {
+      "id": "01a15f1b-dbbd-7655-86af-17f65dfda6c0",
+      "room": "01a15f1b-dbbd-7634-b8b8-af9c8008284d",
+      "position": {
+        "x": 5.15,
+        "y": 0,
+        "z": 7.865
+      },
+      "rotationY": 3.141592653589793,
+      "type": "01a16a26-3725-792a-aaa6-de68f735be27",
+      "asset": "01a16a26-3725-792a-aaa6-de68f735be27",
+      "variant": "01a16a26-3725-7289-8132-6239d5633c27"
+    },
+    {
+      "id": "01a15f1b-dbbd-7656-ba27-0462826387ec",
+      "room": "01a15f1b-dbbd-7634-b8b8-af9c8008284d",
+      "position": {
+        "x": 5.85,
+        "y": 0,
+        "z": 7.865
+      },
+      "rotationY": 3.141592653589793,
+      "type": "01a16a26-3725-792a-aaa6-de68f735be27",
+      "asset": "01a16a26-3725-792a-aaa6-de68f735be27",
+      "variant": "01a16a26-3725-7289-8132-6239d5633c27"
+    },
+    {
+      "id": "01a15f1b-dbbd-7657-ab60-6f840ab91f11",
+      "room": "01a15f1b-dbbd-7634-b8b8-af9c8008284d",
+      "position": {
+        "x": 5.5,
+        "y": 0,
+        "z": 7.06
+      },
+      "type": "01a16a26-3725-70f1-b515-5b5cee960929",
+      "asset": "01a16a26-3725-70f1-b515-5b5cee960929",
+      "variant": "01a16a26-3725-74fd-aa62-d6647ec0c873"
+    },
+    {
+      "id": "01a15f1b-dbbd-765e-9988-0f16de97ddd7",
+      "room": "01a15f1b-dbbd-7634-b8b8-af9c8008284d",
+      "position": {
+        "x": 6.8,
+        "y": 0,
+        "z": 6.1
+      },
+      "rotationY": -1.5707963267948966,
+      "type": "01a16a26-3725-7bd3-af48-c9f92fed67fb",
+      "asset": "01a16a26-3725-7bd3-af48-c9f92fed67fb",
+      "variant": "01a16a26-3725-7f90-bf98-4538f04a3515"
+    },
+    {
+      "id": "01a15f1b-dbbd-7660-93c5-47508ede6b3f",
+      "room": "01a15f1b-dbbd-7634-b8b8-af9c8008284d",
+      "position": {
+        "x": 2.6,
+        "y": 0,
+        "z": 9.3
+      },
+      "rotationY": 3.141592653589793,
+      "type": "01a16a26-3725-7e50-954b-af01e82262f4",
+      "asset": "01a16a26-3725-7e50-954b-af01e82262f4",
+      "variant": "01a16a26-3725-784c-8292-b7e6b3a4091c"
+    },
+    {
+      "id": "01a15f1b-dbbd-7661-b7be-2b9225f58aad",
+      "room": "01a15f1b-dbbd-7634-b8b8-af9c8008284d",
+      "position": {
+        "x": 3.4,
+        "y": 0,
+        "z": 9.1
+      },
+      "type": "01a16a26-3725-769a-bc1f-f4c2afec9a37",
+      "asset": "01a16a26-3725-769a-bc1f-f4c2afec9a37",
+      "variant": "01a16a26-3725-7a85-9608-768fa667f3ed"
+    },
+    {
+      "id": "01a15f1b-dbbd-7662-9f34-50a198098978",
+      "room": "01a15f1b-dbbd-7635-94d9-15be23331ba5",
+      "position": {
+        "x": 9.83,
+        "y": 0,
+        "z": 7.15
+      },
+      "rotationY": 1.5707963267948966,
+      "type": "01a16a26-3725-7f56-a285-cf5f2d813ff4",
+      "asset": "01a16a26-3725-7f56-a285-cf5f2d813ff4",
+      "variant": "01a16a26-3725-7ba0-8734-512997e7e995"
+    },
+    {
+      "id": "01a15f1b-dbbd-7663-a290-79286d5dbbb5",
+      "room": "01a15f1b-dbbd-7635-94d9-15be23331ba5",
+      "position": {
+        "x": 10.74,
+        "y": 0,
+        "z": 5.96
+      },
+      "rotationY": -1.5707963267948966,
+      "type": "01a16a26-3725-7393-aac8-31510b608ade",
+      "asset": "01a16a26-3725-7393-aac8-31510b608ade",
+      "variant": "01a16a26-3725-75df-8f7b-1f8e83e5d30e"
+    },
+    {
+      "id": "01a15f1b-dbbd-7664-aad1-fd2605d96362",
+      "room": "01a15f1b-dbbd-7635-94d9-15be23331ba5",
+      "position": {
+        "x": 10.74,
+        "y": 0,
+        "z": 8.34
+      },
+      "rotationY": -1.5707963267948966,
+      "type": "01a16a26-3725-7393-aac8-31510b608ade",
+      "asset": "01a16a26-3725-7393-aac8-31510b608ade",
+      "variant": "01a16a26-3725-75df-8f7b-1f8e83e5d30e"
+    },
+    {
+      "id": "01a15f1b-dbbd-7665-adad-add4ec7b77ff",
+      "room": "01a15f1b-dbbd-7635-94d9-15be23331ba5",
+      "position": {
+        "x": 10.74,
+        "y": 0.56,
+        "z": 5.96
+      },
+      "type": "01a16a26-3725-707a-b6db-8e73857d0eec",
+      "asset": "01a16a26-3725-707a-b6db-8e73857d0eec",
+      "variant": "01a16a26-3725-72f3-b3be-a77852c3a4d2"
+    },
+    {
+      "id": "01a15f1b-dbbd-7666-8305-6fe7793655ca",
+      "room": "01a15f1b-dbbd-7635-94d9-15be23331ba5",
+      "position": {
+        "x": 10.74,
+        "y": 0.56,
+        "z": 8.34
+      },
+      "type": "01a16a26-3725-707a-b6db-8e73857d0eec",
+      "asset": "01a16a26-3725-707a-b6db-8e73857d0eec",
+      "variant": "01a16a26-3725-72f3-b3be-a77852c3a4d2"
+    },
+    {
+      "id": "01a15f1b-dbbd-7667-b36a-a7ae928f69b6",
+      "room": "01a15f1b-dbbd-7635-94d9-15be23331ba5",
+      "position": {
+        "x": 10.925,
+        "y": 1.5,
+        "z": 7.15
+      },
+      "rotationY": -1.5707963267948966,
+      "type": "01a16a26-3725-7abf-892d-0a7c94f10695",
+      "asset": "01a16a26-3725-7abf-892d-0a7c94f10695",
+      "variant": "01a16a26-3725-71e0-8922-fe195f133a47"
+    },
+    {
+      "id": "01a15f1b-dbbd-7668-9e7a-089eb1b90c56",
+      "room": "01a15f1b-dbbd-7635-94d9-15be23331ba5",
+      "position": {
+        "x": 7.35,
+        "y": 0,
+        "z": 7.06
+      },
+      "rotationY": 1.5707963267948966,
+      "type": "01a16a26-3725-7366-9cd3-a4522817e1ec",
+      "asset": "01a16a26-3725-7366-9cd3-a4522817e1ec",
+      "variant": "01a16a26-3725-7adf-9aa3-4c49391bac05"
+    },
+    {
+      "id": "01a15f1b-dbbd-766a-9f62-ff62c1b341b6",
+      "room": "01a15f1b-dbbd-7635-94d9-15be23331ba5",
+      "position": {
+        "x": 9.45,
+        "y": 0,
+        "z": 5.48
+      },
+      "rotationY": 0,
+      "type": "01a16a26-3725-709f-81e2-38f81f908a3f",
+      "asset": "01a16a26-3725-709f-81e2-38f81f908a3f",
+      "variant": "01a16a26-3725-7686-b96a-15d2cbf2e4b1"
+    },
+    {
+      "id": "01a15f1b-dbbd-7669-b964-852ee779330d",
+      "room": "01a15f1b-dbbd-7635-94d9-15be23331ba5",
+      "position": {
+        "x": 9,
+        "y": 0,
+        "z": 7.15
+      },
+      "rotationY": 1.5707963267948966,
+      "scale": 0.7,
+      "type": "01a16a26-3725-7ece-a5a0-094b19f45465",
+      "asset": "01a16a26-3725-7ece-a5a0-094b19f45465",
+      "variant": "01a16a26-3725-7248-b763-f9eba8873591"
+    },
+    {
+      "id": "01a15f1b-dbbd-766b-b95e-66b7d1401823",
+      "room": "01a15f1b-dbbd-7636-b928-6da8a03a5ea7",
+      "position": {
+        "x": 12.05,
+        "y": 0,
+        "z": 8.74
+      },
+      "rotationY": 3.141592653589793,
+      "type": "01a16a26-3725-7f73-9b18-626a667e9a8e",
+      "asset": "01a16a26-3725-7f73-9b18-626a667e9a8e",
+      "variant": "01a16a26-3725-79b5-a660-d74b8effe815"
+    },
+    {
+      "id": "01a15f1b-dbbd-766c-b42d-329f085f3baf",
+      "room": "01a15f1b-dbbd-7636-b928-6da8a03a5ea7",
+      "position": {
+        "x": 12.05,
+        "y": 0,
+        "z": 8.1
+      },
+      "rotationY": 0,
+      "type": "01a16a26-3725-792a-aaa6-de68f735be27",
+      "asset": "01a16a26-3725-792a-aaa6-de68f735be27",
+      "variant": "01a16a26-3725-7289-8132-6239d5633c27"
+    },
+    {
+      "id": "01a15f1b-dbbd-766d-932d-2e4539c9c459",
+      "room": "01a15f1b-dbbd-7636-b928-6da8a03a5ea7",
+      "position": {
+        "x": 11.65,
+        "y": 0.75,
+        "z": 8.74
+      },
+      "type": "01a16a26-3725-707a-b6db-8e73857d0eec",
+      "asset": "01a16a26-3725-707a-b6db-8e73857d0eec",
+      "variant": "01a16a26-3725-72f3-b3be-a77852c3a4d2"
+    },
+    {
+      "id": "01a15f1b-dbbd-766e-bc61-1d0b173ff0ae",
+      "room": "01a15f1b-dbbd-7636-b928-6da8a03a5ea7",
+      "position": {
+        "x": 11.2,
+        "y": 0,
+        "z": 7.2
+      },
+      "rotationY": 1.5707963267948966,
+      "type": "01a16a26-3725-7bd3-af48-c9f92fed67fb",
+      "asset": "01a16a26-3725-7bd3-af48-c9f92fed67fb",
+      "variant": "01a16a26-3725-7f90-bf98-4538f04a3515"
+    },
+    {
+      "id": "01a15f1b-dbbd-766f-a11d-8f53df5fea92",
+      "room": "01a15f1b-dbbd-7636-b928-6da8a03a5ea7",
+      "position": {
+        "x": 12.6,
+        "y": 0,
+        "z": 5.8
+      },
+      "scale": 0.7,
+      "type": "01a16a26-3725-791a-bb0f-60961eea47c2",
+      "asset": "01a16a26-3725-791a-bb0f-60961eea47c2",
+      "variant": "01a16a26-3725-7715-be70-232a2f0dbd30"
+    },
+    {
+      "id": "01a15f1b-dbbd-7673-9ba6-5a8e77ab9791",
+      "room": "01a15f1b-dbbd-7637-89b1-94e4020f12ff",
+      "position": {
+        "x": 9.7,
+        "y": 0,
+        "z": 9.95
+      },
+      "scale": 0.4,
+      "type": "01a16a26-3725-7ece-a5a0-094b19f45465",
+      "asset": "01a16a26-3725-7ece-a5a0-094b19f45465",
+      "variant": "01a16a26-3725-7248-b763-f9eba8873591"
+    },
+    {
+      "id": "01a15f1b-dbbd-7670-8157-5f1f358ea66a",
+      "room": "01a15f1b-dbbd-7637-89b1-94e4020f12ff",
+      "position": {
+        "x": 9.7,
+        "y": 0,
+        "z": 9.95
+      },
+      "rotationY": 3.141592653589793,
+      "type": "01a16a26-3725-7e50-954b-af01e82262f4",
+      "asset": "01a16a26-3725-7e50-954b-af01e82262f4",
+      "variant": "01a16a26-3725-784c-8292-b7e6b3a4091c"
+    },
+    {
+      "id": "01a15f1b-dbbd-7671-a181-c9db9818aea3",
+      "room": "01a15f1b-dbbd-7637-89b1-94e4020f12ff",
+      "position": {
+        "x": 10.5,
+        "y": 0,
+        "z": 9.95
+      },
+      "type": "01a16a26-3725-769a-bc1f-f4c2afec9a37",
+      "asset": "01a16a26-3725-769a-bc1f-f4c2afec9a37",
+      "variant": "01a16a26-3725-7a85-9608-768fa667f3ed"
+    }
+  ]
+}

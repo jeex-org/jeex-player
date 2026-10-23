@@ -2,20 +2,33 @@
  * How big a placement is on the floor, and the obstacle list the walk collides
  * with.
  *
- * This is a CATALOGUE question — the answer comes from the resolved variant's
- * own dimensions — so it lives with the object bank. What consumes it is
- * `navigation/`, four layers below, which is why the answer is handed down as
- * data (`Obstacle[]`) rather than looked up from there.
+ * This is a CATALOGUE question, so it lives with the object bank, and it is
+ * answered from ONE source (`asset-facts.ts`): the bank the document was
+ * loaded with, a baked project's own library over the shipped one. What
+ * consumes it is `navigation/`, four layers below, which is why the answer is
+ * handed down as data (`Obstacle[]`) rather than looked up from there.
  *
- * Invariant: the order is the placement's explicit `collision`, then the object
- * bank, then the legacy per-type table; whatever the source, the result is
- * multiplied by the placement's footprint scale, so a scaled-up sofa is a
- * scaled-up obstacle.
+ * Which floor objects are obstacles (the walk rule, in this order):
+ * 1. the placement's explicit `collision`, always;
+ * 2. else an object the bank knows: floor-anchored, and at least
+ *    `MIN_COLLIDABLE_HEIGHT` tall — `layout.blockingHeight` when the archetype
+ *    declares one, else its `dims` height — so a rug or a door mat is walked
+ *    over while a sofa, a bath or a table lamp is walked around; its plan size
+ *    is `dims` times `layout.footprint` (a FRACTION of the plan size: a plant's
+ *    pot rather than its canopy) when declared, else all of `dims`;
+ *    wall and ceiling pieces are walked under, never around;
+ * 3. else the legacy per-type table, for a `type` word the bank has no entry
+ *    for;
+ * 4. else nothing: a placement no bank can size is left out rather than given
+ *    a guess.
+ * Whatever the source, the result is multiplied by the placement's footprint
+ * scale, so a scaled-up sofa is a scaled-up obstacle.
  *
  * Pure module: no `three`, no DOM.
  */
 
-import { footprintFor } from './asset-catalogue.js';
+import { MIN_COLLIDABLE_HEIGHT } from './asset-catalogue.js';
+import { shippedAssetFacts, type AssetFacts, type AssetFactsSource } from './asset-facts.js';
 import { effectiveAsset, footprintScaleOf } from '../scene/types.js';
 import type { Obstacle } from '../navigation/navigation.js';
 import type { DemoAsset, DemoAssetType, SceneData } from '../scene/types.js';
@@ -50,34 +63,43 @@ const DEFAULT_FOOTPRINTS: Partial<Record<DemoAssetType, { hx: number; hz: number
 };
 
 /**
- * Collision footprint of one placement, metres of half-extent before rotation.
- *
- * Order: the placement's explicit `collision`, then the object bank (the
- * resolved variant's own `dims`, so a size variant collides at its real size),
- * then the legacy per-type table. Whatever the source, the result is multiplied
- * by the absolute placement scale, so a scaled-up sofa is a scaled-up obstacle.
+ * The floor share of an archetype's plan size, half-extents in metres before
+ * rotation and before the placement scale; `null` for anything walked over or
+ * under (rule 2 of the module header).
  */
-export function footprintOf(asset: DemoAsset): { hx: number; hz: number } | null {
+function factsFootprint(facts: AssetFacts): { hx: number; hz: number } | null {
+  if (facts.anchor !== 'floor') return null;
+  const height = facts.layout?.blockingHeight ?? facts.dims[1];
+  if (height < MIN_COLLIDABLE_HEIGHT) return null;
+  const standing = facts.layout?.footprint ?? 1;
+  return { hx: (facts.dims[0] / 2) * standing, hz: (facts.dims[2] / 2) * standing };
+}
+
+/**
+ * Collision footprint of one placement, metres of half-extent before rotation,
+ * by the walk rule of the module header; `source` is the document's bank.
+ */
+export function footprintOf(asset: DemoAsset, source: AssetFactsSource = shippedAssetFacts): { hx: number; hz: number } | null {
   const scale = footprintScaleOf(asset);
   const explicit = asset.collision;
   if (explicit) return { hx: explicit.hx * scale, hz: explicit.hz * scale };
-  const ref = asset.variant ?? asset.asset ?? asset.type;
-  const catalogue = footprintFor(ref) ?? (ref === asset.type ? null : footprintFor(asset.type));
-  const footprint = catalogue ?? DEFAULT_FOOTPRINTS[asset.type];
+  const facts = source(asset);
+  const footprint = facts ? factsFootprint(facts) : DEFAULT_FOOTPRINTS[asset.type];
   if (!footprint) return null;
   return { hx: footprint.hx * scale, hz: footprint.hz * scale };
 }
 
 /**
- * Every placement of the scene as a walk obstacle, in authoring order.
+ * Every placement of the scene as a walk obstacle, in authoring order, sized
+ * against `source` — the bank the document was loaded with.
  *
  * A placement the bank cannot size is left out rather than given a guess: an
  * obstacle nobody can see the size of is worse than none at all.
  */
-export function obstaclesFor(scene: SceneData): Obstacle[] {
+export function obstaclesFor(scene: SceneData, source: AssetFactsSource = shippedAssetFacts): Obstacle[] {
   const obstacles: Obstacle[] = [];
   for (const placement of scene.assets) {
-    const footprint = footprintOf(placement);
+    const footprint = footprintOf(placement, source);
     if (!footprint) continue;
     const asset = effectiveAsset(placement);
     obstacles.push({

@@ -91,9 +91,17 @@ async function untilAnchorStill(handle: ViewerHandle, what: string): Promise<{ x
   return last!;
 }
 
-/** The boxes for `names`, built into the shell the same way `viewer-context` will. */
+/** Ends the notice-lift observer of the shell under test (`viewer-context` hands HostSlots its own lifetime). */
+let lifetime = new AbortController();
+
+/** The boxes for `names`, built into the shell the same way `viewer-context` builds them. */
 function build(names: readonly SlotName[]): HostSlots {
-  return new HostSlots(shell.roots.root, names);
+  return new HostSlots(shell.roots.root, names, {
+    notice: shell.roots.byName('degraded-notice'),
+    hint: shell.roots.byName('hint-card'),
+    triggers: [shell.roots.byName('tour-bar')],
+    signal: lifetime.signal,
+  });
 }
 
 /** Every slot box currently in the shell, in document order. */
@@ -144,9 +152,11 @@ function contrast(front: Colour, back: Colour): number {
 
 beforeEach(() => {
   shell = openShell();
+  lifetime = new AbortController();
 });
 
 afterEach(() => {
+  lifetime.abort();
   for (const handle of handles.splice(0)) handle.dispose();
   closeContainers();
 });
@@ -262,11 +272,15 @@ describe('the degraded notice steps aside for a claimed corner', () => {
     expect(root.dataset['jeexSlotBottomLeft']).toBe('false');
   });
 
-  test('does not overlap a requested bottom-right slot box', () => {
+  test('does not overlap a requested bottom-right slot box', async () => {
     const slots = build(['bottom-right']);
     fillSlot(slots.get('bottom-right'));
+    // Revealed as `ViewerChrome` reveals it: under a hidden `viewer-ui` every rect is the zero rect.
+    shell.roots.byName('viewer-ui').classList.remove('is-hidden');
     const notice = shell.roots.byName('degraded-notice');
     notice.classList.remove('is-hidden');
+    await nextFrame();
+    expect(notice.getBoundingClientRect().height).toBeGreaterThan(0);
     const overlap = intersects(notice.getBoundingClientRect(), slots.get('bottom-right').getBoundingClientRect());
     expect(overlap).toBe(false);
   });
@@ -286,23 +300,33 @@ describe('the degraded notice steps aside for a claimed corner', () => {
     expect(style.insetInlineEnd).not.toBe('auto');
   });
 
-  test('stacks above the bottom band when both bottom corners are claimed, clearing both boxes', () => {
+  test('stacks above the bottom band when both bottom corners are claimed, clearing both boxes', async () => {
     const slots = build(['bottom-right', 'bottom-left']);
     fillSlot(slots.get('bottom-right'));
     fillSlot(slots.get('bottom-left'));
+    shell.roots.byName('viewer-ui').classList.remove('is-hidden');
     const notice = shell.roots.byName('degraded-notice');
     notice.classList.remove('is-hidden');
+    await until(
+      () => !intersects(notice.getBoundingClientRect(), slots.get('bottom-left').getBoundingClientRect()),
+      'the notice lifted over the bottom band',
+    );
     const noticeRect = notice.getBoundingClientRect();
+    expect(noticeRect.height).toBeGreaterThan(0);
     expect(intersects(noticeRect, slots.get('bottom-right').getBoundingClientRect())).toBe(false);
     expect(intersects(noticeRect, slots.get('bottom-left').getBoundingClientRect())).toBe(false);
   });
 
-  test("every rect involved stays inside the viewer's own viewport", () => {
+  test("every rect involved stays inside the viewer's own viewport", async () => {
     const slots = build(['bottom-right', 'bottom-left']);
     fillSlot(slots.get('bottom-right'));
     fillSlot(slots.get('bottom-left'));
+    shell.roots.byName('viewer-ui').classList.remove('is-hidden');
     const notice = shell.roots.byName('degraded-notice');
     notice.classList.remove('is-hidden');
+    await nextFrame();
+    await nextFrame();
+    expect(notice.getBoundingClientRect().height).toBeGreaterThan(0);
     // "The viewport" is the mounted container, not the test runner's window —
     // a host may embed the viewer at any size, anywhere on its page.
     const viewport = shell.container.getBoundingClientRect();
@@ -738,5 +762,139 @@ describe('through the public surface', () => {
     expect(boxesIn(container)).toHaveLength(2);
     handle.dispose();
     expect(boxesIn(container)).toHaveLength(0);
+  });
+});
+
+/**
+ * The notice is lifted above whatever sits under it — a filled bottom host box
+ * (left, center or right) and the viewer's own hint card — by 8 px, measured
+ * live: found with a bottom-center host bar that covered it completely, and at
+ * phone width with no host boxes at all, where it already lay on the hint.
+ */
+describe('the degraded notice clears whatever sits under it', () => {
+  const GAP = 8;
+
+  /** The notice shown the way `ViewerChrome` shows it: its `viewer-ui` ancestor revealed first (a hidden ancestor measures zero). */
+  function shownNotice(): HTMLElement {
+    shell.roots.byName('viewer-ui').classList.remove('is-hidden');
+    const notice = shell.roots.byName('degraded-notice');
+    notice.classList.remove('is-hidden');
+    return notice;
+  }
+
+  const rendered = (element: HTMLElement): boolean => element.getBoundingClientRect().height > 0;
+
+  /** Whether two rects share a horizontal span. */
+  const sideBySide = (a: DOMRect, b: DOMRect): boolean => a.left < b.right && a.right > b.left;
+
+  /** Every rect under the notice stays `GAP` below it, and the notice stays inside the viewer. */
+  function clear(notice: HTMLElement, under: readonly HTMLElement[]): boolean {
+    const own = notice.getBoundingClientRect();
+    const viewport = shell.container.getBoundingClientRect();
+    if (own.top < viewport.top || own.bottom > viewport.bottom || own.left < viewport.left || own.right > viewport.right) return false;
+    return under.every((element) => {
+      const rect = element.getBoundingClientRect();
+      if (rect.width === 0 || rect.height === 0 || !sideBySide(own, rect)) return true;
+      return rect.top - own.bottom >= GAP - 0.5;
+    });
+  }
+
+  function phone(): void {
+    shell = openShell(390, 844);
+  }
+
+  test('a bottom-center host at 390x844', async () => {
+    phone();
+    const slots = build(['bottom-center']);
+    fillSlot(slots.get('bottom-center'));
+    const notice = shownNotice();
+    const hint = shell.roots.byName('hint-card');
+    expect(rendered(notice) && rendered(slots.get('bottom-center'))).toBe(true);
+    await until(() => clear(notice, [slots.get('bottom-center'), hint]), 'the notice above the bottom-center box and the hint');
+    expect(intersects(notice.getBoundingClientRect(), slots.get('bottom-center').getBoundingClientRect())).toBe(false);
+    expect(intersects(notice.getBoundingClientRect(), hint.getBoundingClientRect())).toBe(false);
+  });
+
+  test('no host boxes at 390x844: the notice stands above the hint card', async () => {
+    phone();
+    build([]);
+    const notice = shownNotice();
+    const hint = shell.roots.byName('hint-card');
+    expect(rendered(hint)).toBe(true);
+    expect(sideBySide(notice.getBoundingClientRect(), hint.getBoundingClientRect())).toBe(true);
+    await until(() => clear(notice, [hint]), 'the notice above the hint');
+    expect(intersects(notice.getBoundingClientRect(), hint.getBoundingClientRect())).toBe(false);
+  });
+
+  test('bottom-left and bottom-right hosts at 390x844', async () => {
+    phone();
+    const slots = build(['bottom-left', 'bottom-right']);
+    fillSlot(slots.get('bottom-left'));
+    fillSlot(slots.get('bottom-right'));
+    const notice = shownNotice();
+    const under = [slots.get('bottom-left'), slots.get('bottom-right'), shell.roots.byName('hint-card')];
+    await until(() => clear(notice, under), 'the notice above both corner boxes and the hint');
+    for (const element of under) expect(intersects(notice.getBoundingClientRect(), element.getBoundingClientRect())).toBe(false);
+  });
+
+  test('nothing in the way on a desktop: the default inset, unchanged', async () => {
+    build([]);
+    const notice = shownNotice();
+    await nextFrame();
+    await nextFrame();
+    const viewport = shell.container.getBoundingClientRect();
+    expect(viewport.bottom - notice.getBoundingClientRect().bottom).toBeCloseTo(18, 0);
+  });
+
+  test('it follows a host box that grows, then empties', async () => {
+    phone();
+    const slots = build(['bottom-center']);
+    const box = slots.get('bottom-center');
+    fillSlot(box);
+    const notice = shownNotice();
+    const hint = shell.roots.byName('hint-card');
+    await until(() => clear(notice, [box, hint]), 'the notice above the 56px box');
+    const before = notice.getBoundingClientRect().bottom;
+    (box.firstElementChild as HTMLElement).style.setProperty('block-size', '160px');
+    await until(() => clear(notice, [box, hint]) && notice.getBoundingClientRect().bottom < before - 50, 'the notice above the grown box');
+    box.replaceChildren();
+    await until(
+      () => Math.abs(hint.getBoundingClientRect().top - notice.getBoundingClientRect().bottom - GAP) < 1,
+      'the notice back above the hint only',
+    );
+  });
+
+  test('it follows the hint card: down when it hides, up when the tour bar lifts it', async () => {
+    phone();
+    build([]);
+    const notice = shownNotice();
+    const hint = shell.roots.byName('hint-card');
+    await until(() => clear(notice, [hint]), 'the notice above the hint');
+    const viewport = shell.container.getBoundingClientRect();
+    hint.hidden = true;
+    await until(() => Math.abs(viewport.bottom - notice.getBoundingClientRect().bottom - 18) < 1, 'the notice back at its own inset');
+    hint.hidden = false;
+    await until(() => clear(notice, [hint]), 'the notice above the hint again');
+    const tourBar = shell.roots.byName('tour-bar');
+    const resting = hint.getBoundingClientRect().top;
+    tourBar.dataset['visible'] = 'true';
+    await until(
+      () => hint.getBoundingClientRect().top < resting - 10 && clear(notice, [hint, tourBar]),
+      'the notice above the lifted hint',
+    );
+  });
+
+  test('the observer ends with the viewer', async () => {
+    phone();
+    build([]);
+    const notice = shownNotice();
+    const hint = shell.roots.byName('hint-card');
+    await until(() => clear(notice, [hint]), 'the notice above the hint');
+    lifetime.abort();
+    const lifted = shell.roots.root.style.getPropertyValue('--jeex-notice-lift');
+    hint.hidden = true;
+    await nextFrame();
+    await nextFrame();
+    expect(shell.roots.root.style.getPropertyValue('--jeex-notice-lift')).toBe(lifted);
   });
 });

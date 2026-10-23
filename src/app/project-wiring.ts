@@ -22,6 +22,7 @@ import { parseProjectManifest } from '../assets/project-manifest.schema.js';
 import { projectLibraryOf, type BakedProjectManifest } from '../assets/project-manifest.js';
 import { projectBank } from '../assets/project-catalogue.js';
 import type { VariantBank } from '../assets/asset-variants.js';
+import { projectAssetFacts, type AssetFactsSource } from '../assets/asset-facts.js';
 import { registriesFromLibrary, type SceneRegistries } from '../scene/registries.js';
 import { ProjectRepository } from '../scene/project-repository.js';
 import { SceneModel } from '../scene/scene-model.js';
@@ -50,6 +51,8 @@ export type LoadedProjectContext = {
    * for the pictures the manifest names.
    */
   readonly variants: VariantBank;
+  /** The project's library over the shipped bank, for every floor question (`assets/asset-facts.ts`). */
+  readonly facts: AssetFactsSource;
   /**
    * The library this document is drawn with, as one comparable value: the
    * folder and the validated manifest. Two loads with the same key draw with
@@ -128,6 +131,7 @@ export function projectContext(info: ProjectInfo, log: Logger): LoadedProjectCon
     key: JSON.stringify([info.baseUrl, manifest]),
     registries: registriesFromLibrary(projectLibraryOf(manifest), CATALOGUE_REGISTRIES),
     variants: bank.variants,
+    facts: projectAssetFacts(manifest.library),
     builderOptions: {
       modelUrl: (asset) => bank.modelUrl(asset),
       catalogue: bank.catalogue,

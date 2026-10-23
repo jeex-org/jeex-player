@@ -7,6 +7,7 @@
  * materials; the network is a stub that counts what is asked for.
  */
 
+import { shippedAssetFacts } from '../assets/asset-facts.js';
 import { afterAll, beforeAll, describe, expect, test } from 'bun:test';
 import * as THREE from 'three';
 import { draftOf } from '../shared/committed.js';
@@ -100,6 +101,7 @@ function loaded(key = 'project-under-test'): LoadedDocument {
     project: {
       key,
       info: { manifest: {}, baseUrl: BASE } as never,
+      facts: shippedAssetFacts,
       registries: LIBRARY_REGISTRIES,
       variants: undefined as never,
       builderOptions: {

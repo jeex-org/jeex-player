@@ -26,7 +26,7 @@
  */
 
 import * as THREE from 'three';
-import type { LayoutCatalogue } from '../layout/layout-lint.js';
+import { shippedFacts, type LayoutCatalogue } from '../layout/layout-lint.js';
 import { roomOf } from '../plan/plan-rooms.js';
 import { dragCatalogue, type BodyFacts } from './asset-move-catalogue.js';
 import {
@@ -81,8 +81,10 @@ export type AssetMoveHost = {
   /** The ray through a pixel and the camera the mode draws with. */
   ray(clientX: number, clientY: number): THREE.Ray | null;
   document(): { scene: SceneData; plan: SolvedPlan; rev: number } | null;
-  /** What the built body knows of an object the shipped bank does not (a baked project's own library). */
+  /** What the built body knows of an object the document's bank does not. */
   bodyFacts(assetId: string): BodyFacts | null;
+  /** The document's own bank (a baked project's library over the shipped one); absent is the shipped bank. */
+  layoutCatalogue?(): LayoutCatalogue;
   /** Puts the object's body at `pose` on screen, reflected as `mirror` when one is given (the document is unchanged). */
   show(assetId: string, pose: DragPose, mirror?: Mirror): void;
   tint(state: 'ok' | 'bad' | null): void;
@@ -156,7 +158,10 @@ export class AssetMoveTool {
 
   constructor(host: AssetMoveHost, schedule?: Scheduler) {
     this.host = host;
-    this.catalogue = dragCatalogue((assetId) => host.bodyFacts(assetId));
+    this.catalogue = dragCatalogue(
+      (assetId) => host.bodyFacts(assetId),
+      (placement) => (host.layoutCatalogue?.() ?? shippedFacts)(placement),
+    );
     this.burst = new IdleCommit(() => this.finishNudge(), schedule);
   }
 

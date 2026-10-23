@@ -1,6 +1,7 @@
 /**
- * The object bank a drag is judged against: the shipped one, else what the
- * built body says of an object a baked project's own library brought.
+ * The object bank a drag is judged against: the document's own (a baked
+ * project's library over the shipped bank), else what the built body says of
+ * an object neither declares.
  *
  * Pure module: no `three`, no DOM.
  */
@@ -24,15 +25,18 @@ export type BodyFacts = {
 };
 
 /**
- * The bank a drag is judged against: the shipped one, else the facts the
- * built body carries, so an object of a baked project's own library moves
- * too — judged without its archetype's layout facts (mount heights, case
- * goods), which only its manifest has.
+ * The bank a drag is judged against: `catalogue`, the document's own — so a
+ * drag reads a baked project's object with its layout facts and its floor
+ * footprint exactly as the linter does — else the facts the built body
+ * carries, judged without layout facts, which only a manifest has.
  */
-export function dragCatalogue(bodyFacts: (assetId: string) => BodyFacts | null): LayoutCatalogue {
+export function dragCatalogue(
+  bodyFacts: (assetId: string) => BodyFacts | null,
+  catalogue: LayoutCatalogue = shippedFacts,
+): LayoutCatalogue {
   return (placement) => {
-    const shipped = shippedFacts(placement);
-    if (shipped) return shipped;
+    const known = catalogue(placement);
+    if (known) return known;
     const body = bodyFacts(placement.id);
     if (!body) return null;
     const scale = Math.abs(placement.scale ?? 1);

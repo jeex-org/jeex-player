@@ -25,6 +25,8 @@ import type { UsageSink } from '../shared/usage.js';
 import type * as THREE from 'three';
 import { SceneBuilder, type BuildResult, type SceneBuilderOptions, type UpgradeResult } from '../geometry/scene-builder.js';
 import type { VariantBank } from '../assets/asset-variants.js';
+import { shippedAssetFacts, type AssetFactsSource } from '../assets/asset-facts.js';
+import { layoutCatalogueOf, shippedFacts, type LayoutCatalogue } from '../layout/layout-lint.js';
 import { isTouchedAsset, isTouchedOpening, type TouchedEntity } from '../scene/scene-ops.js';
 import { touchedText } from '../geometry/touched-kind.js';
 import { ViewerEditor } from './viewer-editor.js';
@@ -106,6 +108,7 @@ type MountArgs = {
   readonly options: SceneBuilderOptions;
   readonly variants: VariantBank | undefined;
   readonly sourceKey: string;
+  readonly facts: AssetFactsSource;
 };
 
 export class SceneMount {
@@ -138,6 +141,14 @@ export class SceneMount {
   private textures: { readonly key: string; readonly textures: LibraryTextures } | null = null;
   /** The arguments of the last `mount`, for `remount`. */
   private last: MountArgs | null = null;
+  /**
+   * The bank the mounted document's floor questions are answered from
+   * (`assets/asset-facts.ts`): its project's library over the shipped bank,
+   * or the shipped bank alone. Set by every `mount`, so a remount keeps it.
+   */
+  private facts: AssetFactsSource = shippedAssetFacts;
+  /** `facts` as the layout linter, the free-space probe and the drag tool read it. */
+  private layoutFacts: LayoutCatalogue = shippedFacts;
 
   constructor(deps: SceneMountDeps) {
     this.deps = deps;
@@ -184,14 +195,39 @@ export class SceneMount {
    * the mount, which is why it arrives with the model instead of living in
    * `SceneMountDeps`: `loadScene` may swap a bare scene for a project and back.
    */
-  mount(model: SceneModel, options: SceneBuilderOptions = {}, variants?: VariantBank, sourceKey = ''): BuildResult {
+  /**
+   * The mounted document's bank (`facts`): read late by the walk, the plan
+   * modes, checkpoints, the drag tool and the debug surface.
+   */
+  assetFacts(): AssetFactsSource {
+    return this.facts;
+  }
+
+  /** The mounted document's bank as a layout catalogue (`layoutCatalogueOf`). */
+  layoutCatalogue(): LayoutCatalogue {
+    return this.layoutFacts;
+  }
+
+  mount(
+    model: SceneModel,
+    options: SceneBuilderOptions = {},
+    variants?: VariantBank,
+    sourceKey = '',
+    facts: AssetFactsSource = shippedAssetFacts,
+  ): BuildResult {
     // A remount of the same document keeps its texture source, and with it
     // the bytes a restored context rebuilds its maps from.
     const keepTextures = options.textures !== undefined && this.textures?.textures === options.textures;
     this.release(keepTextures);
     if (options.textures !== undefined) this.textures = { key: sourceKey, textures: options.textures };
-    this.last = { model, options, variants, sourceKey };
+    this.last = { model, options, variants, sourceKey, facts };
     this.sourceKey = sourceKey;
+    // Before anything below reads it: the editor, `onDocument` and the
+    // consumers it re-seeds all ask the mount which bank is on screen.
+    if (facts !== this.facts) {
+      this.facts = facts;
+      this.layoutFacts = facts === shippedAssetFacts ? shippedFacts : layoutCatalogueOf(facts);
+    }
     this.currentModel = model;
     // The viewer's KTX2 transcoder (one per viewer: started by the first KTX2 asset, kept across a
     // context restore and a retry, ended with the viewer), so a `KHR_texture_basisu` GLB can load.
@@ -262,7 +298,7 @@ export class SceneMount {
   remount(): BuildResult | null {
     const last = this.last;
     if (last === null) return null;
-    return this.mount(last.model, last.options, last.variants, last.sourceKey);
+    return this.mount(last.model, last.options, last.variants, last.sourceKey, last.facts);
   }
 
   /** `mount` for a loaded document: the project's builder options, variant bank, library key and texture source. */
@@ -271,7 +307,7 @@ export class SceneMount {
     this.deps.ui.setProjectMark(project?.info.manifest.mark);
     const textures = project === null ? null : this.texturesFor(project);
     const options = project === null ? undefined : textures === null ? project.builderOptions : { ...project.builderOptions, textures };
-    return this.mount(loaded.model, options, project?.variants, project?.key ?? '');
+    return this.mount(loaded.model, options, project?.variants, project?.key ?? '', project?.facts);
   }
 
   /** The project's texture source: the mounted one when the library is the same, else a new one; `null` without a context. */

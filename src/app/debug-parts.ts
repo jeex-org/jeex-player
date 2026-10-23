@@ -60,6 +60,7 @@ export function debugHostFor(model: SceneModel, deps: DebugPartsDeps): ViewerDeb
     furnitureVisible: () => deps.furnitureVisible(),
     messages: () => deps.messages(),
     projectLibrary: () => deps.projectLibrary(),
+    assetFacts: () => deps.mount.assetFacts(),
 
     // ---- CameraDebug
     camera: () => stage()?.camera,

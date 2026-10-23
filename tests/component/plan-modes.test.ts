@@ -13,6 +13,8 @@ import { PlanModes, type PlanModeOptions } from '../../src/ui/plan-modes.js';
 import { RenderRuntime } from '../../src/render/render-runtime.js';
 import { fieldOfViewFor } from '../../src/camera/camera-tuning.js';
 import { OVERLAY_NAMES } from '../../src/ui/viewer-shell.js';
+import { projectAssetFacts, type AssetFactsSource } from '../../src/assets/asset-facts.js';
+import { STORE_IDS } from '../fixtures/store-ids/store-ids.js';
 import { canvasHasInk, closeContainers, demoPlan, demoScene, nextFrame, openShell, until, type Shell } from './support.js';
 
 type Harness = { shell: Shell; runtime: RenderRuntime; modes: PlanModes; perspective: THREE.PerspectiveCamera };
@@ -67,6 +69,7 @@ function frameScheduler(): {
 function build(
   options?: () => PlanModeOptions,
   scheduler?: { scheduleFrame?: (callback: () => void) => number; cancelFrame?: (handle: number) => void },
+  assetFacts?: () => AssetFactsSource,
 ): Harness {
   const shell = openShell();
   const perspective = new THREE.PerspectiveCamera(60, 1.5, 0.1, 100);
@@ -83,6 +86,7 @@ function build(
     options,
     scheduleFrame: scheduler?.scheduleFrame,
     cancelFrame: scheduler?.cancelFrame,
+    assetFacts,
   });
   return { shell, runtime, modes, perspective };
 }
@@ -353,6 +357,22 @@ describe('plan.labels, plan.dimensions and plan.camera', () => {
     local.modes.setMode('plan2d');
     await until(() => local.modes.element.width > 0, 'the overlay to get a backing store');
     expect(hasAccentPixel(local.modes.element)).toBe(false);
+    local.modes.dispose();
+    local.runtime.dispose();
+  });
+});
+
+describe('fixtures come from the document’s own bank', () => {
+  test('the store-id flat drawn with its library outlines its nine bath and kitchen fixtures', () => {
+    const scene = { ...demoScene(), assets: STORE_IDS.assets };
+    const facts = projectAssetFacts(STORE_IDS.library);
+    const local = build(undefined, undefined, () => facts);
+    local.modes.setDocument(demoPlan(), scene);
+    const fixtures = local.modes.planDrawing!.primitives.filter((primitive) => primitive.kind === 'fixture');
+    expect(fixtures).toHaveLength(9);
+    // The same document through the shipped bank alone: nothing it knows.
+    harness.modes.setDocument(demoPlan(), scene);
+    expect(harness.modes.planDrawing!.primitives.filter((primitive) => primitive.kind === 'fixture')).toHaveLength(0);
     local.modes.dispose();
     local.runtime.dispose();
   });

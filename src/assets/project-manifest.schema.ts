@@ -181,8 +181,11 @@ const pricingSchema = z.strictObject({
 const layoutSchema = z.strictObject({
   caseGood: z.optional(z.boolean()),
   kitchenBase: z.optional(z.boolean()),
-  blockingHeight: z.optional(z.number()),
-  footprint: z.optional(z.number()),
+  // Metres; the walk, the plan and the linter read it, so a negative height is refused.
+  blockingHeight: z.optional(z.number().check(z.gte(0))),
+  // A FRACTION of the plan size, in (0, 1]: 0 would make the object vanish from
+  // the floor, a negative value invert its box and more than 1 grow it.
+  footprint: z.optional(z.number().check(z.gt(0), z.lte(1))),
   mount: z.optional(z.strictObject({ centre: z.optional(z.number()), bottom: z.optional(z.number()) })),
 });
 

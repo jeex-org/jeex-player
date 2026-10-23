@@ -28,6 +28,7 @@ import * as THREE from 'three';
 import { CameraController } from './camera-controller.js';
 import { buildRoomGraph, routeToRoom as planRouteToRoom, type RoomGraph, type RouteWaypoint } from '../navigation/room-graph.js';
 import { obstaclesFor } from '../assets/asset-footprint.js';
+import type { AssetFactsSource } from '../assets/asset-facts.js';
 import { pointInPolygon } from '../plan/plan-geometry.js';
 import { TourPlayer } from './tour-player.js';
 import { WalkStepper, type StepTarget, type WalkCamera } from './walk-stepper.js';
@@ -136,6 +137,8 @@ export type CameraStackDeps = {
    * push at the leaf); `true` when the door will now open by itself.
    */
   rearmDoor?: ((openingId: string) => boolean) | undefined;
+  /** The document's bank, for the walk obstacles (`CameraController.assetFacts`); absent is the shipped bank. */
+  assetFacts?: (() => AssetFactsSource) | undefined;
   pauseOnInput?: boolean;
   /**
    * `options.interaction`, passed straight to `CameraController` —
@@ -183,6 +186,7 @@ export function mountCameraDirector(deps: CameraStackDeps): CameraDirector {
     closedDoors: deps.closedDoors,
     lockedDoors: deps.lockedDoors,
     rearmDoor: deps.rearmDoor,
+    assetFacts: deps.assetFacts,
     interaction: deps.interaction,
     signal: deps.signal,
   });
@@ -525,11 +529,11 @@ export class CameraDirector {
     const plan = this.deps.plan();
     if (!scene.rooms.some((room) => room.id === roomId)) return null;
     if (!this.graph || this.graph.plan !== plan || this.graph.scene !== scene) {
-      this.graph = { plan, scene, value: buildRoomGraph(plan, scene, obstaclesFor(scene)) };
+      this.graph = { plan, scene, value: buildRoomGraph(plan, scene, obstaclesFor(scene, this.deps.controller.assetFacts())) };
     }
     const from = this.deps.controller.getPose().position;
     // Hidden furniture is not collided with, so it must not route around either.
-    const obstacles = this.deps.controller.hasFurnitureCollision() ? obstaclesFor(scene) : [];
+    const obstacles = this.deps.controller.hasFurnitureCollision() ? obstaclesFor(scene, this.deps.controller.assetFacts()) : [];
     return planRouteToRoom(this.graph.value, plan, { x: from.x, z: from.z }, roomId, obstacles);
   }
 
