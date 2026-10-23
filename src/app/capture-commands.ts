@@ -125,6 +125,29 @@ export type CaptureDeps = {
   postChain?: (() => Promise<PostProcessor | null>) | undefined;
 };
 
+/** What `stageCaptureDeps` reads of the stage (`viewer-stage.ts`), named structurally: the stage reaches this module through its own imports. */
+type CaptureStage = {
+  readonly runtime: RenderRuntime;
+  readonly director:
+    | { readonly controller: { getPose(): { position: THREE.Vector3; target: THREE.Vector3 } }; readonly tour: TourPlayer }
+    | undefined;
+  captureChain(): Promise<PostProcessor | null>;
+};
+
+/**
+ * The deps the stage answers: its renderer, the live camera pose, the tour and
+ * the walk chain. Read through `stage` at every call, because a Retry
+ * replaces the stage under the commands.
+ */
+export function stageCaptureDeps(stage: () => CaptureStage | undefined): Pick<CaptureDeps, 'runtime' | 'livePose' | 'tour' | 'postChain'> {
+  return {
+    runtime: () => stage()?.runtime,
+    livePose: () => poseOf(stage()?.director?.controller.getPose()),
+    tour: () => stage()?.director?.tour,
+    postChain: () => stage()?.captureChain() ?? Promise.resolve(null),
+  };
+}
+
 /** The three-command surface `ViewerHandle.capture` is. */
 export function captureCommands(deps: CaptureDeps): CaptureCommands {
   /** The runtime and the document, or a coded refusal: a capture needs both. */
