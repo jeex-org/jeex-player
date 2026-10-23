@@ -11,6 +11,7 @@ import { DEMO } from '../demo/demo-ids.js';
 import { apartmentScene } from '../demo/scene-data.js';
 import { isResolved, resolveAsset } from '../assets/asset-resolver.js';
 import { dragCatalogue, type BodyFacts } from './asset-move-catalogue.js';
+import { projectLayoutCatalogue } from '../layout/layout-lint.js';
 import type { DemoAsset } from '../scene/types.js';
 
 function placement(id: string): DemoAsset {
@@ -44,5 +45,36 @@ describe('surface facts reach the drag of a body the shipped bank does not know'
     const facts = dragCatalogue(() => body)(baked);
     expect(facts?.surfaces).toEqual({ top: { y: 0.75 } });
     expect(dragCatalogue(() => ({ ...body, surfaces: undefined }))(baked)?.surfaces).toBeUndefined();
+  });
+});
+
+describe('a drag reads the document’s own bank first', () => {
+  test('a baked object is judged by its manifest facts, not by what its body carries', () => {
+    const archetype = '01a16a50-3000-7000-8000-000000000001';
+    const variant = '01a16a50-3000-7000-8000-000000000002';
+    const catalogue = projectLayoutCatalogue({
+      objects: [
+        {
+          id: archetype,
+          anchor: 'floor',
+          dims: [1, 0.9, 0.5],
+          layout: { caseGood: true },
+          defaultVariant: variant,
+          variants: [{ id: variant }],
+        },
+      ],
+    });
+    const body: BodyFacts = { archetype: 'from-the-body', anchor: 'floor', dims: [2, 2, 2], clearance: 0.1, yaw: 0 };
+    const baked: DemoAsset = {
+      id: '01a16a50-3000-7000-8000-000000000003',
+      type: archetype,
+      asset: archetype,
+      position: { x: 0, y: 0, z: 0 },
+    };
+    const facts = dragCatalogue(() => body, catalogue)(baked);
+    expect(facts?.archetype).toBe(archetype);
+    expect(facts?.layout).toEqual({ caseGood: true });
+    expect(facts?.footprint).toEqual({ hx: 0.5, hz: 0.25 });
+    expect(dragCatalogue(() => body)(baked)?.archetype).toBe('from-the-body');
   });
 });

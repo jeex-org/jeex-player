@@ -484,9 +484,9 @@
   /* A host box claimed at `bottom-right` (for example a 56px assistant button)
      sits at layer 8 in the bar's own corner and would cover the top of the speed
      button (seen at 1440x900). The bar reserves that corner in
-     its end padding: the slot's inset plus the same 64px (button plus an 8px
-     gap) `.degraded-notice` and `.camera-preview` step by, so the speed button
-     ends 8px left of the box at every width; the track gives up the room. */
+     its end padding: the slot's inset plus 64px (button plus an 8px gap, the
+     same step `.camera-preview` takes), so the speed button ends 8px left of
+     the box at every width; the track gives up the room. */
   .jeex-viewer[data-jeex-slot-bottom-right='true'] .tour-bar {
     padding-inline-end: calc(max(var(--jeex-slot-inset), env(safe-area-inset-right)) + 64px);
   }
@@ -654,41 +654,18 @@
      which must not happen (host content must never cover a viewer notice or
      error card). `host-slots.ts` marks the two flags below once, at
      construction, so the notice steps to the free `bottom-left` corner
-     instead. 64px below is the 56px button plus an 8px gap — the one concrete
-     size this bug was found with; a host whose own bottom-corner content is
-     taller keeps `--jeex-slot-inset` clear of its OWN box, but may still
-     brush a much taller notice stepping out of ITS way, same as `hint-card`
-     above the tour bar a few rules up. */
+     instead; how high it then stands is measured (the next rule). */
   .jeex-viewer[data-jeex-slot-bottom-right='true'] .degraded-notice {
     inset-inline-end: auto;
     inset-inline-start: max(18px, env(safe-area-inset-left));
   }
-  /* The corner it steps into is not empty: `.hint-card` lives there and is shown
-     from boot (`chrome.hint` defaults to true), so the notice would land ON its
-     text — the same chrome-over-chrome overlap this rule set out to end, only
-     between two pieces of the viewer's own chrome.
-
-     TWO properties summed in one `calc`, not one property enumerating the
-     combinations: the reasons to rise are independent, and an enumeration would
-     have rested on which selector happens to out-specify which. Each rule
-     sets only its own term and the sum is arithmetic.
-
-     The hint term is 62px, not the ~35px a one-line card measures: the card is
-     `max-inline-size: min(380px, …)` at `font-size: 11px` and its text is
-     translated, so German and French wrap it to two lines — a clearance
-     calibrated on English would have been correct only in English. 62px is a
-     two-line card (2 x 15px line + 20px padding + 2px border) plus the 10px gap
-     the chrome keeps between stacked cards. */
+  /* Lifted above whatever lies under it: `host-slots.ts` measures every filled
+     bottom box (left, center, right) and the hint card that overlap the notice
+     horizontally and publishes the lift that keeps it 8px above the tallest of
+     them as `--jeex-notice-lift` on the root, live (a host box that grows, the
+     hint hidden, the tour bar lifting the hint). Absent, the lift is zero. */
   .jeex-viewer .degraded-notice {
-    --jeex-notice-lift-slot: 0px;
-    --jeex-notice-lift-hint: 0px;
-    inset-block-end: calc(max(18px, env(safe-area-inset-bottom)) + var(--jeex-notice-lift-slot) + var(--jeex-notice-lift-hint));
-  }
-  .jeex-viewer[data-jeex-slot-bottom-right='true'][data-jeex-slot-bottom-left='true'] .degraded-notice {
-    --jeex-notice-lift-slot: 64px;
-  }
-  .jeex-viewer[data-jeex-slot-bottom-right='true']:has(.hint-card:not([hidden])) .degraded-notice {
-    --jeex-notice-lift-hint: 62px;
+    inset-block-end: calc(max(18px, env(safe-area-inset-bottom)) + var(--jeex-notice-lift, 0px));
   }
   .jeex-viewer .notice-dot {
     background: var(--jeex-alert);
@@ -1171,8 +1148,8 @@
      sits at layer 8, over this card's lower-right corner: the card rises 64px,
      the button plus an 8px gap at desktop width, 4px in viewers 600px and
      narrower (edge 14px, slot inset 18px); the same 64px `.camera-preview` (which
-     takes this corner while a checkpoint is focused), `.degraded-notice` and
-     the tour bar's end padding step by. Like theirs, the 64px is calibrated
+     takes this corner while a checkpoint is focused) and the tour bar's end
+     padding step by (`.degraded-notice` measures its lift instead). Like theirs, the 64px is calibrated
      on a 56px box at the default `--jeex-slot-inset`; a taller box or a larger
      inset still reaches the card. It only moves up its own column and leaves
      every other control where it was. */
@@ -1264,7 +1241,7 @@
   }
   /* A host box claimed at `bottom-right` (for example a 56px assistant button)
      sits at layer 8, over this card: the card rises above it by the button
-     plus an 8px gap — the same 64px `.degraded-notice` steps by, for the same
+     plus an 8px gap, 64px, the same step the mini-map takes, for the same
      reason (host content never covers viewer chrome). */
   .jeex-viewer[data-jeex-slot-bottom-right='true'] .camera-preview {
     --jeex-preview-lift-slot: 64px;

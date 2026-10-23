@@ -88,10 +88,15 @@ export function createViewerContext(container: HTMLElement, locale: Locale, slot
   const roots = createViewerShell(container, messages);
   // AFTER the shell tree: `HostSlots` appends, and being last is what makes a
   // slot win a `z-index` tie against the viewer's own chrome (its header).
-  const hostSlots = new HostSlots(roots.root, slots);
+  const listeners = new AbortController();
+  const hostSlots = new HostSlots(roots.root, slots, {
+    notice: roots.byName('degraded-notice'),
+    hint: roots.byName('hint-card'),
+    triggers: [roots.byName('tour-bar')],
+    signal: listeners.signal,
+  });
   const anchor = new SlotAnchor((point) => hostSlots.setAnchor(point));
   const styleRoot = styleRootOf(container);
-  const listeners = new AbortController();
   let released = false;
   return {
     roots,

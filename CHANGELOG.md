@@ -324,6 +324,21 @@ as described under [Versioning](#versioning).
 
 ### Fixed
 
+- **A baked project's own furniture collides and is drawn on the plan.**
+  Walk obstacles, the 2D plan's fixture outlines, the tour's room routes and
+  checkpoints read only the built-in objects, so a project whose library
+  carries its own ids was walked through and its bath and kitchen were missing
+  from the plan. Every floor question (walk, plan, layout rules, free-space
+  suggestions, dragging) now reads the project's library first and the
+  built-in objects behind it, by one rule: a placement's `collision`, else a
+  floor object at least 0.15 m tall (`layout.blockingHeight` when declared)
+  with `dims` times `layout.footprint` (a fraction). `projectLayoutCatalogue`
+  follows the same rule, so a project rug no longer reports wall, overlap or
+  door-zone issues and a plant is judged by its pot.
+- **The degraded-asset notice stays clear of host boxes and the hint card.**
+  It is lifted, measured live, 8 px above every filled `bottom-left`,
+  `bottom-center` or `bottom-right` box and the hint card it would overlap; a
+  bottom-center host bar covered it, and at phone width it lay on the hint.
 - **The IIFE build reads its own folder only from a real script element.**
   The folder the Basis transcoder is fetched from comes from
   `document.currentScript` in the IIFE build; a page could shadow that

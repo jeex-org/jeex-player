@@ -16,27 +16,24 @@
  * Pure module: no `three`, no DOM.
  */
 
-import { findCatalogueEntry } from './asset-catalogue.js';
+import { shippedAssetFacts, type AssetFactsSource } from './asset-facts.js';
 import { footprintOf } from './asset-footprint.js';
 import { openingFrameWidth } from './opening-frame.js';
 import { obbQuad } from '../plan/plan-geometry.js';
 import { isPlanFixtureCategory, type PlanDrawingOptions, type PlanFixture } from '../plan/plan-drawing.js';
-import { effectiveAsset, type DemoAsset, type SceneData } from '../scene/types.js';
+import { effectiveAsset, type SceneData } from '../scene/types.js';
 
-/** Category of a placement, or `null` when the object bank does not know it. */
-function categoryOf(asset: DemoAsset): { category: string; onFloor: boolean } | null {
-  const entry = findCatalogueEntry(asset.asset ?? asset.type);
-  if (!entry) return null;
-  return { category: entry.object.category, onFloor: entry.object.anchor === 'floor' };
-}
-
-/** Every bath and kitchen fixture of the scene, as a plan footprint quad. */
-export function planFixtures(scene: SceneData): PlanFixture[] {
+/**
+ * Every bath and kitchen fixture of the scene, as a plan footprint quad, read
+ * against `source` — the bank the document was loaded with — so a baked
+ * project's own bath is drawn as surely as the shipped one.
+ */
+export function planFixtures(scene: SceneData, source: AssetFactsSource = shippedAssetFacts): PlanFixture[] {
   const fixtures: PlanFixture[] = [];
   for (const placement of scene.assets) {
-    const facts = categoryOf(placement);
-    if (!facts || !facts.onFloor || !isPlanFixtureCategory(facts.category)) continue;
-    const footprint = footprintOf(placement);
+    const facts = source(placement);
+    if (!facts || facts.anchor !== 'floor' || !isPlanFixtureCategory(facts.category)) continue;
+    const footprint = footprintOf(placement, source);
     if (!footprint) continue;
     const asset = effectiveAsset(placement);
     const polygon = obbQuad({
@@ -58,6 +55,6 @@ export function planFixtures(scene: SceneData): PlanFixture[] {
  * the debug surface) says `buildPlanDrawing(plan, scene, planDrawingInputs(scene))`
  * and never has to know which of the inputs came from where.
  */
-export function planDrawingInputs(scene: SceneData): PlanDrawingOptions {
-  return { frameWidthOf: openingFrameWidth, fixtures: planFixtures(scene) };
+export function planDrawingInputs(scene: SceneData, source: AssetFactsSource = shippedAssetFacts): PlanDrawingOptions {
+  return { frameWidthOf: openingFrameWidth, fixtures: planFixtures(scene, source) };
 }

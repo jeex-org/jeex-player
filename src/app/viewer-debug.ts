@@ -28,6 +28,7 @@ import { facadeFinishOf, faceFinishOf, floorFinishOf, roomWallFinishOf } from '.
 import { polylineMidpoint } from '../plan/plan-geometry.js';
 import { buildPlanDrawing } from '../plan/plan-drawing.js';
 import { planDrawingInputs } from '../assets/plan-fixtures.js';
+import type { AssetFactsSource } from '../assets/asset-facts.js';
 // Type-only: `layout-lint.ts` itself is loaded lazily, only for a page that
 // has the debug capability on, so a production bundle never pays for it.
 import type { LayoutCatalogue, LayoutIssue } from '../layout/layout-lint.js';
@@ -433,6 +434,8 @@ type AuthoringDebug = {
    * because not one of its archetypes is in it.
    */
   projectLibrary: () => ProjectLibraryManifest | undefined;
+  /** The mounted document's bank, which the plan drawing's fixtures are read from (`SceneMount.assetFacts`). */
+  assetFacts: () => AssetFactsSource;
 };
 
 export type ViewerDebugHost = SceneDebug & CameraDebug & DoorDebug & MinimapDebug & TourDebug & AuthoringDebug;
@@ -602,7 +605,8 @@ export function installViewerDebug(host: ViewerDebugHost): ViewerDebugApi {
     },
     planDrawing: () => {
       const counts: Record<string, number> = {};
-      for (const primitive of buildPlanDrawing(model().plan, model().scene, planDrawingInputs(model().scene)).primitives) {
+      for (const primitive of buildPlanDrawing(model().plan, model().scene, planDrawingInputs(model().scene, host.assetFacts()))
+        .primitives) {
         counts[primitive.kind] = (counts[primitive.kind] ?? 0) + 1;
       }
       return counts;

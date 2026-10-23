@@ -69,6 +69,7 @@ export function stageWiring(deps: StageWiringDeps): ViewerStageDeps {
     // walk's camera buttons with it.
     walkCamerasEnabled: () => deps.options.chrome.controls || deps.viewport.isFullscreen(),
     planOptions: () => deps.options.plan,
+    assetFacts: () => deps.mount.assetFacts(),
     onRoomPicked: (roomId) => {
       if (deps.stage()?.director?.travelToRoom(roomId) === true) deps.usage?.('minimap');
     },

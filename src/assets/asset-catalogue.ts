@@ -5,7 +5,8 @@
  * Pure data - no `three`, no DOM. The manifest itself lives in
  * `asset-library.ts` and the shape both of them agree on lives in
  * `asset-types.ts`; this module owns everything the rest of the app asks of
- * the bank — the indexes, the legacy type bridge and the walk footprints.
+ * the bank — the indexes and the legacy type bridge (the walk footprints are
+ * `asset-footprint.ts`, over `asset-facts.ts`).
  *
  * The catalogue types are re-exported here because that is where every caller
  * already asks for them; the definitions themselves stay in `asset-types.ts`
@@ -159,31 +160,3 @@ export function assetCard(object: CatalogueObject): {
 
 /** Shortest floor object that still blocks a walk, metres (a rug is 2 cm). */
 export const MIN_COLLIDABLE_HEIGHT = 0.15;
-
-/**
- * Default walk-collision footprint of an asset, as half-extents in metres
- * before rotation, derived from the catalogue `dims`.
- *
- * Accepts an archetype UUID, a variant UUID or a legacy `DemoAsset.type`. Returns
- * `null` for anything the bank does not know, and for objects that are not on
- * the floor (wall and ceiling pieces are walked under, not around).
- *
- * Objects lower than `MIN_COLLIDABLE_HEIGHT` (rugs, door mats) are walked over
- * rather than around and get no footprint either, and an archetype that
- * declares `layout.footprint` reports that share of its plan size instead of
- * all of it - a plant's pot rather than the canopy overhanging it.
- *
- * `navigation.ts` derives every walk obstacle from here, so a footprint is
- * always the rendered variant's own size instead of a second copy of it.
- */
-export function footprintFor(idOrType: string): { hx: number; hz: number } | null {
-  const entry = findCatalogueEntry(idOrType);
-  if (!entry) return null;
-  const { object, variantId } = entry;
-  if (object.anchor !== 'floor') return null;
-  const variant = variantId ? object.variants.find((candidate) => candidate.id === variantId) : undefined;
-  const dims = variant?.dims ?? object.dims;
-  if (dims[1] < MIN_COLLIDABLE_HEIGHT) return null;
-  const standing = object.layout?.footprint ?? 1;
-  return { hx: (dims[0] / 2) * standing, hz: (dims[2] / 2) * standing };
-}

@@ -24,6 +24,7 @@
  * the orbit pose survives the round trip untouched.
  */
 
+import type { AssetFactsSource } from '../assets/asset-facts.js';
 import * as THREE from 'three';
 import { buildPlanDrawing, fitTransform, type PlanBounds, type PlanDrawing } from '../plan/plan-drawing.js';
 import { planDrawingInputs } from '../assets/plan-fixtures.js';
@@ -58,6 +59,8 @@ export type PlanModesDeps = {
   perspective: () => THREE.PerspectiveCamera | undefined;
   /** Read fresh on every paint; absent means every one of `PlanModeOptions` is on. */
   options?: (() => PlanModeOptions) | undefined;
+  /** The document's bank, for which placements are drawn as fixtures; absent is the shipped bank. */
+  assetFacts?: (() => AssetFactsSource) | undefined;
   /**
    * Coalesces a resize burst into the next frame (`render-runtime.ts`'s
    * `onObserve` pattern); injectable so a unit test can drive the queue by
@@ -145,7 +148,11 @@ export class PlanModes {
    */
   setDocument(plan: SolvedPlan, scene: SceneData): void {
     const options = this.planOptions();
-    this.drawing = buildPlanDrawing(plan, scene, { ...planDrawingInputs(scene), labels: options.labels, dimensions: options.dimensions });
+    this.drawing = buildPlanDrawing(plan, scene, {
+      ...planDrawingInputs(scene, this.deps.assetFacts?.()),
+      labels: options.labels,
+      dimensions: options.dimensions,
+    });
     this.bounds = this.drawing.bounds;
     if (this.mode === 'plan2d') this.paint();
     if (this.mode === 'plan3d') this.fitTopView();

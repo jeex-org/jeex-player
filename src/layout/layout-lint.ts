@@ -24,10 +24,9 @@ import { polylineSlabs } from './layout-geometry.js';
 import { obbQuad, polylineSlice, type Obb } from '../plan/plan-geometry.js';
 import { resolveDoorSwing } from '../plan/door-swing.js';
 import { openingFrameWidth } from '../assets/opening-frame.js';
-import { findCatalogueEntry } from '../assets/asset-catalogue.js';
+import { projectAssetFacts, shippedAssetFacts, type AssetFactsSource } from '../assets/asset-facts.js';
 import {
   scaleSurfaces,
-  surfacesAt,
   type AssetLayout,
   type KneeSpace,
   type SurfaceFacts,
@@ -56,8 +55,6 @@ export { LAYOUT_RULE_IDS } from './rules/context.js';
 
 /** A slab shorter than this along the wall is a numerical artefact, not a run. */
 const RUN_EPS_M = 1e-4;
-/** Comfort gap a project object that declares none asks for, metres. */
-const DEFAULT_CLEARANCE_M = 0.6;
 
 /* ------------------------------------------------------ context building --- */
 
@@ -97,57 +94,62 @@ export type LayoutFacts = {
 export type LayoutCatalogue = (placement: DemoAsset) => LayoutFacts | null;
 
 /**
- * The catalogue facts one placement needs, read straight from the object bank.
+ * `LayoutFacts` over one bank (`assets/asset-facts.ts`): the adapter every
+ * layout catalogue is, so the linter, the free-space probe and the drag tool
+ * read a placement exactly as the walk and the plan do — the same archetype,
+ * the same size variant, the same floor footprint (`layout.footprint` as a
+ * fraction, the 0.15 m blocking-height rule, the placement scale).
  *
- * `asset-resolver` would answer the same question, but it reaches `three`
- * through the finish registry, and this module must stay pure — so the layers
- * that matter here (archetype, size variant, legacy facing yaw, and the
- * archetype's own layout facts) are resolved against `asset-catalogue`
- * directly.
+ * `dims` stay the archetype's own (the overall box for a baked project): the
+ * height and mount rules measure the whole body, only the FOOTPRINT is the
+ * floor share.
+ */
+export function layoutCatalogueOf(source: AssetFactsSource): LayoutCatalogue {
+  return (placement) => {
+    const facts = source(placement);
+    if (!facts) return null;
+    return {
+      archetype: facts.archetype,
+      anchor: facts.anchor,
+      wallSnap: facts.wallSnap,
+      clearance: facts.clearance,
+      dims: facts.dims,
+      yaw: facts.yaw,
+      layout: facts.layout,
+      footprint: facts.anchor === 'floor' ? footprintOf(placement, source) : null,
+      mirror: facts.mirror,
+      surfaces: facts.surfaces,
+    };
+  };
+}
+
+/**
+ * The catalogue facts one placement needs, read from the shipped object bank.
  *
  * Exported because it is the DEFAULT bank, and a caller that asks the bank a
  * question of its own (`free-space.ts`, which needs the facts of an asset that
  * is not in the scene yet) must be able to name the same default the linter
  * uses instead of reaching into `assets/` from the `layout` layer.
  */
-export function shippedFacts(placement: DemoAsset): LayoutFacts | null {
-  const entry = findCatalogueEntry(placement.asset ?? placement.type);
-  if (!entry) return null;
-  const wanted = placement.variant ?? entry.variantId;
-  const variant = entry.object.variants.find((candidate) => candidate.id === wanted);
-  return {
-    archetype: entry.object.id,
-    anchor: entry.object.anchor,
-    wallSnap: entry.object.wallSnap,
-    clearance: entry.object.clearance,
-    dims: variant?.dims ?? entry.object.dims,
-    yaw: entry.yaw ?? 0,
-    layout: entry.object.layout,
-    footprint: entry.object.anchor === 'floor' ? footprintOf(placement) : null,
-    mirror: entry.object.mirror,
-    surfaces: surfacesAt(entry.object, entry.object.dims, variant?.dims ?? entry.object.dims),
-  };
-}
+export const shippedFacts: LayoutCatalogue = layoutCatalogueOf(shippedAssetFacts);
 
 /**
- * The same facts read from a BAKED PROJECT's library.
+ * The same facts read from a BAKED PROJECT's library, the shipped bank behind
+ * it (`projectAssetFacts`).
  *
- * Three differences from the shipped bank, all of them consequences of the
- * format rather than choices: a project object has no legacy alias of its own
- * (so no `yaw`), it is addressed by archetype id or by variant id and by
- * nothing else, and it declares no per-variant collision box — so the
- * footprint is the variant's own `dims`, which is what `asset-footprint.ts`
- * falls back to for the shipped bank as well.
- *
- * A placement the manifest does not carry is read against the SHIPPED bank,
- * the same fallback the render path and the validator have: a
- * project document still holds `type`-only placements no exporter rewrote, and
- * a linter that skipped them reported half a room clear.
+ * A project object has no legacy alias of its own (so no `yaw`), it is
+ * addressed by archetype id or by variant id, and its `dims` are its overall
+ * bounding box: the floor footprint is that box times `layout.footprint` when
+ * the archetype declares one, and a floor object lower than 0.15 m
+ * (`layout.blockingHeight` when declared) has none, exactly as in the shipped
+ * bank. A placement the manifest does not carry is read against the SHIPPED
+ * bank, the same fallback the render path and the validator have.
  */
 export function projectLayoutCatalogue(library: {
   readonly objects: readonly {
     readonly id: string;
     readonly anchor: 'floor' | 'wall' | 'ceiling';
+    readonly category?: string;
     readonly wallSnap?: boolean;
     readonly clearance?: number;
     readonly dims: readonly [number, number, number];
@@ -161,32 +163,7 @@ export function projectLayoutCatalogue(library: {
     readonly variants: readonly { readonly id: string; readonly dims?: readonly [number, number, number] | undefined }[];
   }[];
 }): LayoutCatalogue {
-  const byId = new Map<string, (typeof library.objects)[number]>();
-  for (const object of library.objects) {
-    byId.set(object.id, object);
-    for (const variant of object.variants) byId.set(variant.id, object);
-  }
-  return (placement) => {
-    const object = byId.get(placement.asset ?? placement.type);
-    if (!object) return shippedFacts(placement);
-    const wanted = placement.variant ?? object.defaultVariant;
-    const variant = object.variants.find((candidate) => candidate.id === wanted);
-    const dims = variant?.dims ?? object.dims;
-    const scale = footprintScaleOf(placement);
-    const half = placement.collision ?? { hx: dims[0] / 2, hz: dims[2] / 2 };
-    return {
-      archetype: object.id,
-      anchor: object.anchor,
-      wallSnap: object.wallSnap ?? false,
-      clearance: object.clearance ?? DEFAULT_CLEARANCE_M,
-      dims,
-      yaw: 0,
-      layout: object.layout,
-      footprint: object.anchor === 'floor' ? { hx: half.hx * scale, hz: half.hz * scale } : null,
-      mirror: object.mirror,
-      surfaces: surfacesAt(object, object.dims, dims),
-    };
-  };
+  return layoutCatalogueOf(projectAssetFacts(library));
 }
 
 /**
