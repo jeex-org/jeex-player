@@ -16,7 +16,7 @@ import { apartmentEnvironmentIntensity, LIGHTING_STANDARD } from '../lighting/li
 /** A runtime built on the shared stub renderer, with the frame pump in hand. */
 function harness(
   options: {
-    viewport?: { clientWidth: number; clientHeight: number };
+    viewport?: { clientWidth: number; clientHeight: number; element?: HTMLElement };
     canvas?: HTMLCanvasElement;
     onContextLost?: () => void;
     onContextRestored?: () => void;
@@ -667,5 +667,213 @@ describe('WebGL context loss', () => {
     controller.abort();
     fire('webglcontextlost');
     expect(lost).toEqual([]);
+  });
+});
+
+describe('a canvas taken off the page without dispose', () => {
+  /**
+   * A runtime whose canvas a test can take off the page and put back, the way
+   * a host removing and re-adding the viewer's container does: `isConnected`
+   * flips and the box empties, and the box observer — a `ResizeObserver`
+   * fired by hand, installed as the global the runtime builds its observer
+   * from — reports both. The frame queue keeps EVERY scheduled callback, so a
+   * coalesced resize and a frame queued in the same turn both run, in order.
+   */
+  function detachable(options: { observed?: boolean } = {}) {
+    const original = (globalThis as { ResizeObserver?: unknown }).ResizeObserver;
+    const live = new Set<ResizeObserverCallback>();
+    const created: ResizeObserverCallback[] = [];
+    (globalThis as { ResizeObserver?: unknown }).ResizeObserver = class {
+      readonly callback: ResizeObserverCallback;
+      constructor(callback: ResizeObserverCallback) {
+        this.callback = callback;
+        live.add(callback);
+        created.push(callback);
+      }
+      observe(): void {}
+      disconnect(): void {
+        live.delete(this.callback);
+      }
+    };
+    const { canvas, fire } = fakeCanvas();
+    const surface = canvas as unknown as { isConnected: boolean; checkVisibility?: () => boolean };
+    surface.isConnected = true;
+    const { renderer, calls: stub } = stubRuntime();
+    const order: string[] = [];
+    const setSize = renderer.setSize.bind(renderer);
+    renderer.setSize = (...args: Parameters<typeof renderer.setSize>) => {
+      order.push('size');
+      setSize(...args);
+    };
+    const render = renderer.render.bind(renderer);
+    renderer.render = (...args: Parameters<typeof renderer.render>) => {
+      order.push('render');
+      render(...args);
+    };
+    const viewport: { clientWidth: number; clientHeight: number; element?: HTMLElement } = { clientWidth: 800, clientHeight: 600 };
+    if (options.observed !== false) viewport.element = {} as HTMLElement;
+    const queue = new Map<number, () => void>();
+    let handles = 0;
+    let clock = 1_000;
+    const runtime = createRenderRuntime({
+      canvas,
+      viewport,
+      createRenderer: () => renderer,
+      createLighting: stubLighting,
+      scheduleFrame: (callback) => {
+        handles += 1;
+        queue.set(handles, callback);
+        return handles;
+      },
+      cancelFrame: (handle) => {
+        queue.delete(handle);
+      },
+      now: () => clock,
+    });
+    (globalThis as { ResizeObserver?: unknown }).ResizeObserver = original;
+    const deltas: number[] = [];
+    runtime.addFrameHook((delta) => deltas.push(delta));
+    runtime.setCamera(new THREE.PerspectiveCamera());
+
+    /** One animation frame: every callback queued before it runs, in order. */
+    const tick = (advanceMs: number): void => {
+      clock += advanceMs;
+      const due = [...queue.values()];
+      queue.clear();
+      for (const callback of due) callback();
+    };
+    /** One observer delivery of the viewport box as it is now. */
+    const observe = (callbacks: Iterable<ResizeObserverCallback> = live): void => {
+      const entry = { contentRect: { width: viewport.clientWidth, height: viewport.clientHeight } } as unknown as ResizeObserverEntry;
+      for (const callback of [...callbacks]) callback([entry], {} as ResizeObserver);
+    };
+    const detach = (): void => {
+      surface.isConnected = false;
+      viewport.clientWidth = 0;
+      viewport.clientHeight = 0;
+    };
+    const attach = (): void => {
+      surface.isConnected = true;
+      viewport.clientWidth = 800;
+      viewport.clientHeight = 600;
+    };
+    return { runtime, stub, order, deltas, queue, tick, observe, detach, attach, fire, surface, created };
+  }
+
+  test('the loop parks at the next frame and an empty-box observation does not wake it', () => {
+    const { runtime, stub, deltas, queue, tick, observe, detach } = detachable();
+    runtime.start();
+    tick(16);
+    expect(stub.renders).toBe(1);
+    detach();
+    tick(16); // the frame that finds the canvas gone
+    expect(queue.size).toBe(0);
+    // The observer reports the removed element's empty box.
+    observe();
+    tick(16); // only the coalesced resize was queued
+    tick(16);
+    expect(queue.size).toBe(0);
+    expect(stub.renders).toBe(1);
+    expect(deltas.length).toBe(1);
+    runtime.dispose();
+  });
+
+  test('reattaching resumes after the resize, with a fresh clock', () => {
+    const { runtime, order, deltas, queue, tick, observe, detach, attach } = detachable();
+    runtime.start();
+    tick(16);
+    detach();
+    tick(16);
+    observe();
+    tick(16);
+    expect(queue.size).toBe(0);
+    // A minute off the page, then the host puts the element back.
+    tick(60_000);
+    attach();
+    observe();
+    order.length = 0;
+    tick(16);
+    // The drawing buffer is back to full size before the first resumed frame.
+    expect(order).toEqual(['size', 'render']);
+    // The first step is the time since the resume, not the time spent away.
+    expect(deltas.at(-1)).toBeCloseTo(0.016, 5);
+    expect(queue.size).toBe(1);
+    runtime.dispose();
+  });
+
+  test('a viewer started before its container is on the page starts when it is attached', () => {
+    const { runtime, stub, queue, tick, observe, detach, attach } = detachable();
+    detach();
+    runtime.start();
+    expect(queue.size).toBe(0);
+    attach();
+    observe();
+    tick(16);
+    expect(stub.renders).toBe(1);
+    runtime.dispose();
+  });
+
+  test('a context restored while detached stays parked until the canvas is back', () => {
+    const { runtime, stub, queue, tick, observe, detach, attach, fire } = detachable();
+    runtime.start();
+    tick(16);
+    detach();
+    tick(16);
+    fire('webglcontextlost');
+    fire('webglcontextrestored');
+    expect(queue.size).toBe(0);
+    attach();
+    observe();
+    tick(16);
+    expect(stub.renders).toBe(2);
+    runtime.dispose();
+  });
+
+  test('without a box observer nothing can wake a parked loop, so it never parks', () => {
+    const { runtime, stub, queue, tick, detach } = detachable({ observed: false });
+    runtime.start();
+    tick(16);
+    detach();
+    tick(16);
+    expect(stub.renders).toBe(2);
+    expect(queue.size).toBe(1);
+    runtime.dispose();
+  });
+
+  test('a loop started while its canvas was not visible starts when an observation finds it visible', () => {
+    const { runtime, stub, queue, tick, observe, surface } = detachable();
+    let visible = false;
+    surface.checkVisibility = () => visible;
+    runtime.start();
+    expect(queue.size).toBe(0);
+    visible = true;
+    observe();
+    tick(16);
+    expect(stub.renders).toBe(1);
+    runtime.dispose();
+  });
+
+  test('putting the canvas back does not start a loop the owner stopped, nor a disposed one', () => {
+    const { runtime, stub, queue, tick, observe, detach, attach, created } = detachable();
+    runtime.start();
+    tick(16);
+    detach();
+    tick(16);
+    runtime.stop();
+    attach();
+    observe();
+    tick(16);
+    expect(queue.size).toBe(0);
+    expect(stub.renders).toBe(1);
+    runtime.start();
+    tick(16);
+    runtime.dispose();
+    const drawn = stub.renders;
+    // Even a delivery that raced the observer's disconnect wakes nothing.
+    observe(created);
+    tick(16);
+    tick(16);
+    expect(stub.renders).toBe(drawn);
+    expect(queue.size).toBe(0);
   });
 });
