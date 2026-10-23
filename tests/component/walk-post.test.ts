@@ -566,6 +566,13 @@ describe('a mounted viewer in walk and tour', { timeout: MOUNT_TIMEOUT_MS }, () 
     expect(await clip()).toEqual(await clip());
     expect(renderTo).toHaveBeenCalledTimes(6);
 
+    const beforeHide = draws();
+    handle.setFurnitureVisible(false);
+    const hidden = await settle();
+    expect(hidden).toBeGreaterThan(beforeHide);
+    handle.setFurnitureVisible(true);
+    await settle();
+
     const beforeEdit = draws();
     const moved = debug().applyOps([{ op: 'move_object', assetId: L_SHAPE.asset.table, position: { x: 8, y: 0, z: 2 } }]);
     expect(moved.error).toBeUndefined();
