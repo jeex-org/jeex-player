@@ -10,7 +10,7 @@ The viewer SHALL hold one light temperature: «Original» (the default) or a who
 
 #### Scenario: Out of range or off step
 - **WHEN** the viewer is at 5000 K and a host sets 2000, 7000, 3050, NaN or a non-number by any path
-- **THEN** the temperature stays 5000 K, `setLightTemperature` throws a viewer error with code `bad-option` naming `lightTemperature`, an invalid attribute or query value logs one warning and is ignored, and no change event fires
+- **THEN** the temperature stays 5000 K, `setLightTemperature` throws a viewer error with code `bad-params` and path `lightTemperature`, an invalid attribute or query value logs one warning and is ignored, and no change event fires
 
 ### Requirement: What the temperature tints
 
