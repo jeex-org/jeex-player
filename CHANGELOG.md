@@ -193,6 +193,14 @@ as described under [Versioning](#versioning).
 
 ### Fixed
 
+- **A viewer taken off the page without `dispose()` stops drawing.** Its
+  render loop kept drawing into the detached canvas on every frame, which on
+  a software rasteriser could stall the next page load in the same browser
+  for about a minute. The loop now pauses while the canvas is not in a
+  document and resumes by itself when the host puts it back; nothing is
+  disposed, and `dispose()` remains the way to tear a viewer down. A viewer
+  started while its canvas was hidden by `display: none` now also starts
+  drawing once its box appears.
 - **A restored rendering context keeps the project.** Recovery remounted the
   committed document without its project options, so a restored bake lost
   its model resolver, materials and catalogue; it now remounts with
