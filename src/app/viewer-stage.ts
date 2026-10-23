@@ -233,6 +233,8 @@ export class ViewerStage {
       },
       signal: deps.signal,
       onError: deps.onFrameError,
+      // Walk and tour draw on demand (`render/render-demand.ts`).
+      mode: () => this.mode,
     });
     this.camera = new THREE.PerspectiveCamera(
       CAMERA_TUNING.fov.wide,
@@ -248,6 +250,8 @@ export class ViewerStage {
       build: () => loadWalkPost(this.runtime.renderer, this.runtime.scene, this.camera),
       attach: (chain) => this.runtime.setPostProcessor(chain),
       report: (error) => deps.onFrameError?.(error),
+      // The scene's programs for the chain's own target, linked before the first frame through it.
+      prepare: (chain) => chain.compile(this.runtime.scene, this.camera),
     });
     this.walkLighting = new WalkLightingController({
       build: () => loadWalkLighting(this.runtime.renderer, this.runtime.scene),
@@ -476,8 +480,9 @@ export class ViewerStage {
       this.overlay.frame();
       // Walk and tour render through the chain, once it has loaded.
       this.walkPost.update(mode);
-      // The room lighting bakes after the chain is attached and shows once baked.
-      this.walkLighting.update(mode);
+      // The room lighting bakes after the chain is attached and shows once baked;
+      // a change of its look is a new picture in walk and tour.
+      if (this.walkLighting.update(mode)) this.runtime.demand.invalidate();
     };
     for (const hook of orderFrameHooks(cameraHook, hooks)) this.runtime.addFrameHook(hook);
     this.runtime.start();

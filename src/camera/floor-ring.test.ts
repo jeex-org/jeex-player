@@ -79,4 +79,20 @@ describe('FloorRing', () => {
     ring.dispose();
     expect(scene.children).toHaveLength(0);
   });
+
+  test('takeChanged reports a move or a visibility change once, and the same spot never', () => {
+    const ring = new FloorRing();
+    expect(ring.takeChanged()).toBe(false);
+    ring.show(null);
+    expect(ring.takeChanged()).toBe(false);
+    ring.show(FLOOR);
+    expect(ring.takeChanged()).toBe(true);
+    expect(ring.takeChanged()).toBe(false);
+    ring.show(FLOOR.clone());
+    expect(ring.takeChanged()).toBe(false);
+    ring.show(new THREE.Vector3(2.5, 0, 3));
+    expect(ring.takeChanged()).toBe(true);
+    ring.show(null);
+    expect(ring.takeChanged()).toBe(true);
+  });
 });

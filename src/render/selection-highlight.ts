@@ -68,6 +68,10 @@ export class SelectionHighlight {
   private direction: 1 | -1 = 1;
   /** The tint now: `HIGHLIGHT_COLOR` unless a tool recoloured it (`setColour`). */
   private colour = HIGHLIGHT_COLOR;
+  /** A set, clear or recolour not yet reported by `update`. */
+  private pending = false;
+  /** The fade's eased value the last `update` wrote; `-1` before the first. */
+  private eased = -1;
 
   constructor(root: () => THREE.Object3D | undefined) {
     this.root = root;
@@ -87,6 +91,8 @@ export class SelectionHighlight {
     this.current = target;
     this.startedAt = -1;
     this.direction = 1;
+    this.pending = true;
+    this.eased = -1;
     if (!target) return;
     const root = this.root();
     if (!root) return;
@@ -106,13 +112,22 @@ export class SelectionHighlight {
     this.set(target);
   }
 
-  /** Advances the fade. `now` is the frame clock (`render-runtime.ts`'s hook). */
-  update(now: number): void {
-    if (this.tinted.length === 0) return;
+  /**
+   * Advances the fade. `now` is the frame clock (`render-runtime.ts`'s hook).
+   * Answers whether the picture changed since the last call: a set, clear or
+   * recolour, or a fade step (walk and tour redraw on it, `render-demand.ts`).
+   */
+  update(now: number): boolean {
+    const pending = this.pending;
+    this.pending = false;
+    if (this.tinted.length === 0) return pending;
     if (this.startedAt < 0) this.startedAt = now;
     const t = Math.min(1, Math.max(0, (now - this.startedAt) / HIGHLIGHT_FADE_MS));
     const eased = this.direction === 1 ? t * t * (3 - 2 * t) : 1 - t * t * (3 - 2 * t);
     for (const entry of this.tinted) entry.clone.emissiveIntensity = HIGHLIGHT_INTENSITY * eased;
+    const faded = eased !== this.eased;
+    this.eased = eased;
+    return pending || faded;
   }
 
   /**
@@ -122,6 +137,7 @@ export class SelectionHighlight {
    */
   setColour(colour: number | null): void {
     this.colour = colour ?? HIGHLIGHT_COLOR;
+    this.pending = true;
     for (const entry of this.tinted) entry.clone.emissive.setHex(this.colour);
   }
 

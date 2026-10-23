@@ -34,6 +34,7 @@ This document is the integration reference.
 - [Scene document](#scene-document)
 - [Project format](#project-format)
 - [Scene operations entry (`jeex-viewer/ops`)](#scene-operations-entry-jeex-viewerops)
+- [First picture](#first-picture)
 - [Rendering in walk and tour](#rendering-in-walk-and-tour)
 - [Lighting standard (`jeex-viewer/lighting`)](#lighting-standard-jeex-viewerlighting)
 - [Development](#development)
@@ -514,7 +515,7 @@ Handle (`viewer.on(...)`) and custom element (`addEventListener(...)`, `detail` 
 
 | Handle event | Element event | Payload |
 |---|---|---|
-| `ready` | `jeex-ready` | `{ options, sceneId }` after the first FRAME of that scene has been drawn — on the first mount and on every `loadScene`, so a host may screenshot on it |
+| `ready` | `jeex-ready` | `{ options, sceneId }` after the first FRAME of that scene has been drawn — on the first mount, on every `loadScene` and after a restored GPU context, so a host may screenshot on it. The first picture waits for the scene's shaders ([First picture](#first-picture)), so `ready` and the reveal of the viewer come after it, never on a blank canvas; a viewer mounted hidden fires `ready` once its shaders are ready and draws its first picture when it is shown |
 | `error` | `jeex-error` | A `ViewerLibError` (`{ code, message, path?, detail?, cause? }`); codes in [Errors](#errors). The iframe bridge sends `{ code, message }` only |
 | `scene` | `jeex-scene` | `{ sceneId, rev }` after every committed change |
 | `mode` | `jeex-mode` | `ViewerMode` |
@@ -1109,13 +1110,18 @@ Every operation is atomic inside its batch: `applyOp` mutates a draft and answer
 
 A name not on this list is not public, whatever module it lives in — the same façade rule every other library entry follows (`src/embed/ops.test.ts` pins the export surface, sorted, against exactly this list). Nothing above renders anything or touches a document: `src/purity.test.ts` and `.dependency-cruiser.cjs` hold `embed/ops.ts` to the same "no `three`, no DOM" invariant as the rest of the pure layer.
 
+## First picture
+
+Before its first picture, and again after a restored GPU context, the player compiles the scene's shaders asynchronously (three's `compileAsync`; the browser links them in parallel off the main thread where it offers `KHR_parallel_shader_compile`) and puts the linked programs to their first use a few at a time, then draws, or after at most 1 s. The frame loop keeps running meanwhile. This takes the shader links out of the first frame's long task, which blocked the page's main thread; a browser without parallel compilation draws as before. The walk and tour chain compiles the scene for its own target before it attaches, drawing directly until then. A capture asked for before compilation finishes links what it needs itself, as before. Models and textures that arrive later still compile when first drawn.
+
 ## Rendering in walk and tour
 
 In `walk` and `tour`, the modes where a visitor looks around and nothing is edited, the player renders through a post-processing chain: ambient occlusion (three.js `GTAOPass`, 0.3 m world radius, full resolution, denoised without blurring across depth breaks) darkens corners, skirtings and the ground under furniture, and SMAA smooths the edges. The scene is rendered in linear high dynamic range and the lighting standard's display transform (PBR Neutral, exposure, sRGB) is applied once, in the chain's last pass. Window glass, other transparent or transmissive surfaces and invisible pick shapes cast no occlusion. `plan2d`, `plan3d` and `orbit` render straight to the screen exactly as before, and pay nothing for the chain.
 
 - **Loading:** the chain is fetched on the first entry into `walk` or `tour`. The ES module build and the demo emit it as a separate chunk of about 50 KB gzip that a page which never enters those modes never downloads; until it arrives the view renders as in the other modes. The classic-script build (`jeex-viewer.iife.js`) cannot split code and carries it inline. A chunk that fails to load leaves the view rendering directly and emits one `error` event; the next entry into `walk` or `tour` tries again.
 - **Captures:** stills and video frames (`capture.still`, `capture.pair`, `capture.frames`) taken while the viewer is in `walk` or `tour` go through the same chain at the capture's size, so they match the screen; two captures of an unchanged scene are identical. Panoramas are rendered as before, without it.
-- **Mirrors** reflect the room once per frame, with or without the chain.
+- **Mirrors** reflect the room once per drawn frame, with or without the chain.
+- **Drawn on demand:** in `walk` and `tour` a new picture is drawn only when something on screen can have changed: the camera moved, turned or zoomed, the scene was edited or rebuilt, a door or the furniture is animating, a model or a texture arrived, the selection or its aura changed, the floor cursor moved, the sun's shadow or the room lighting changed, the canvas was resized, shown again or got its GPU context back. While the camera rests and nothing moves, the last picture stays on screen and the loop draws nothing, which saves battery and heat on phones and leaves the processor and the GPU to the rest of the page. `plan2d`, `plan3d` and `orbit` draw every frame as before.
 - **Resources:** the chain follows the viewer's size and pixel ratio, is kept while you switch to an editing mode and back, is rebuilt after a lost GPU context and releases all its GPU memory when the viewer is disposed.
 
 ### Room lighting in walk and tour

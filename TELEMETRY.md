@@ -98,7 +98,7 @@ The actions in `counts`:
 
 | Field | Meaning | Example |
 |---|---|---|
-| `fps` | share of drawn time per frame-rate range, in whole tenths of percent | `{"<20": 0, "20-30": 10, "30-50": 30, ">50": 60}` |
+| `fps` | share of drawn time per frame-rate range, measured between two consecutive drawn frames (a view at rest in walk or tour draws nothing and adds nothing), in whole tenths of percent | `{"<20": 0, "20-30": 10, "30-50": 30, ">50": 60}` |
 | `<20` | share below 20 frames per second | `0` |
 | `20-30` | share from 20 to 30 | `10` |
 | `30-50` | share from 30 to 50 | `30` |

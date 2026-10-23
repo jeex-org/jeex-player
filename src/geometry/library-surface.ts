@@ -18,8 +18,16 @@ import type { TextureSource } from '../materials/texture-source.js';
 import { textureSizeFor, type TextureDeviceClass } from '../materials/texture-size.js';
 import type { FinishSurface, Vec2 } from '../scene/types.js';
 
-/** The document's texture source and the device class it draws sizes by; `null` without a WebGL context. */
-export type LibraryTextures = { readonly source: TextureSource; readonly device: TextureDeviceClass };
+/**
+ * The document's texture source and the device class it draws sizes by;
+ * `null` without a WebGL context. `attached` hears every surface whose maps
+ * were just attached: the picture changed (walk and tour draw on demand).
+ */
+export type LibraryTextures = {
+  readonly source: TextureSource;
+  readonly device: TextureDeviceClass;
+  readonly attached?: (() => void) | undefined;
+};
 
 /** The listed sizes of a material's maps (every map lists the same set). */
 function listedSizes(draw: LibraryDraw): LibraryMapSize[] {
@@ -64,6 +72,7 @@ export class LibrarySurface {
     attachLibraryMaps(this.material, this.draw, views);
     const angle = libraryAngle(library.facts, this.surface, this.outline, this.draw.rotation);
     applyLibraryTransform(this.material, libraryTextureMatrix(library.facts.tileM, angle, libraryMapFormat(library) === 'ktx2'));
+    textures.attached?.();
   }
 
   /** Gives back every view this surface holds and frees its material; its maps are the source's, not freed here. */

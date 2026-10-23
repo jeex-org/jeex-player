@@ -122,4 +122,30 @@ describe('Dollhouse cutaway', () => {
     dollhouse.update(camera);
     expect(walks).toBe(0);
   });
+
+  test('takeChanged reports a shell switch and a cutaway change once, and a still camera never', () => {
+    const { group } = exteriorWall(face.wallId);
+    const dollhouse = new Dollhouse(() => [group]);
+    dollhouse.prepare(plan, group);
+    const camera = outside();
+    dollhouse.setState('dollhouse', camera);
+    expect(dollhouse.takeChanged()).toBe(true);
+    expect(dollhouse.takeChanged()).toBe(false);
+    dollhouse.update(camera);
+    expect(dollhouse.takeChanged()).toBe(false);
+    // The same switch at the same pose: the walls and ceilings were written again.
+    dollhouse.setState('full', camera);
+    expect(dollhouse.takeChanged()).toBe(true);
+    dollhouse.setState('dollhouse', camera);
+    dollhouse.takeChanged();
+    // The cutaway follows the camera inside: a wall comes back.
+    const mid = face.polyline[Math.floor(face.polyline.length / 2)]!;
+    camera.position.set(mid.x - face.normal.x * 0.5, 1.6, mid.z - face.normal.z * 0.5);
+    dollhouse.update(camera);
+    expect(dollhouse.takeChanged()).toBe(true);
+    dollhouse.setKeepExteriors(true, camera);
+    dollhouse.setKeepExteriors(true, camera);
+    dollhouse.update(camera);
+    expect(dollhouse.takeChanged()).toBe(false);
+  });
 });

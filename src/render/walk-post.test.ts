@@ -5,7 +5,7 @@
 
 import { describe, expect, test } from 'bun:test';
 import * as THREE from 'three';
-import { WALK_POST_TUNING, WalkPost } from './walk-post.js';
+import { quadMaterials, WALK_POST_TUNING, WalkPost } from './walk-post.js';
 
 describe('WALK_POST_TUNING', () => {
   test('GTAO at 0.3 m world radius on a full-resolution buffer with depth-aware denoise, half-float targets without multisampling', () => {
@@ -78,5 +78,15 @@ describe('WalkPost sizes around captures', () => {
     post.setSize(500, 300, 2);
     post.render(new THREE.Scene(), new THREE.PerspectiveCamera(), 0);
     expect(sizes.at(-1)).toEqual([1000, 600]);
+  });
+});
+
+describe('quadMaterials', () => {
+  test('the chain compiles every pass material ahead but the output pass, whose defines change at its first render', () => {
+    const blur = new THREE.ShaderMaterial();
+    const edges = new THREE.ShaderMaterial();
+    const shown = new THREE.ShaderMaterial();
+    const output = { material: shown, enabled: true };
+    expect(quadMaterials([{ blur, size: 2 }, { edges }, output], output)).toEqual([blur, edges]);
   });
 });
