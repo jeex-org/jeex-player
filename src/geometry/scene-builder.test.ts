@@ -214,7 +214,9 @@ describe('wall joints', () => {
     const joint = meshes(root).find((mesh) => mesh.name === `joint-${L_SHAPE.node.n2}`);
     expect(joint).toBeDefined();
     joint!.geometry.computeBoundingBox();
-    const box = joint!.geometry.boundingBox!;
+    // In the world: the mesh's origin sits at the core's centre (`shell-origins.ts`).
+    root.updateMatrixWorld(true);
+    const box = joint!.geometry.boundingBox!.clone().applyMatrix4(joint!.matrixWorld);
     // Geometry positions are Float32, so metres carry six digits at best.
     expect(box.min.y).toBeCloseTo(0, 5);
     expect(box.max.y).toBeCloseTo(scene.ceilingHeight, 5);
