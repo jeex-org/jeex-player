@@ -8,14 +8,14 @@
     "src/embed/host.ts",
     "src/lighting/index.ts",
     "src/app/viewer-api.ts",
-    "src/main.ts",
     "src/main-embed.ts",
     "src/**/*.test.ts",
     "scripts/*.ts",
     "scripts/browser-check/*.ts",
     "dev/**/*.ts",
     "tests/component/*.test.ts",
-    "tests/e2e/*.spec.ts"
+    "tests/e2e/*.spec.ts",
+    "vite*.config.ts"
   ],
   "project": [
     "src/**/*.ts",

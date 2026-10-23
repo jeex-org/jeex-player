@@ -9,7 +9,7 @@
  * `tests/component/project-finishes.test.ts`.
  */
 
-import { describe, expect, test } from 'bun:test';
+import { afterEach, describe, expect, test } from 'bun:test';
 import * as THREE from 'three';
 import type { ProjectMaterial } from '../materials/finish-types.js';
 import type { LogEntry } from '../shared/logger.js';
@@ -124,5 +124,22 @@ describe('FinishRegistry sources', () => {
     expect(colourOf(registry.get(FINISH.linen_sand))).toBe(finishById(FINISH.linen_sand)!.pbr.color);
     expect(registry.get(FINISH.linen_sand).name).toBe(FINISH.linen_sand);
     registry.dispose();
+  });
+});
+
+describe('the diagnostic `noTransmission` switch', () => {
+  const page = globalThis as { __JEEX_DEBUG_FLAGS__?: unknown };
+  afterEach(() => {
+    delete page.__JEEX_DEBUG_FLAGS__;
+  });
+
+  test('a bank glass keeps its transmission without the switch and loses it with the switch', () => {
+    const plain = new FinishRegistry([], []);
+    expect((plain.get(FINISH.glass_clear) as THREE.MeshPhysicalMaterial).transmission).toBeGreaterThan(0);
+    plain.dispose();
+    page.__JEEX_DEBUG_FLAGS__ = { noTransmission: true };
+    const switched = new FinishRegistry([], []);
+    expect((switched.get(FINISH.glass_clear) as THREE.MeshPhysicalMaterial).transmission).toBe(0);
+    switched.dispose();
   });
 });

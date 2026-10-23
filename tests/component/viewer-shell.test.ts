@@ -8,7 +8,7 @@
  * converted away from. That is what this file is for.
  */
 
-import { beforeEach, describe, expect, test } from 'vitest';
+import { afterEach, beforeEach, describe, expect, test } from 'vitest';
 import {
   createViewerShell,
   ensureViewerStyles,
@@ -253,5 +253,161 @@ describe('theming', () => {
     const layerStatement = [...sheet.cssRules].find((rule) => rule.cssText.startsWith('@layer'));
     expect(layerStatement?.cssText).toContain('reset');
     expect(layerStatement?.cssText).toContain('component');
+  });
+});
+
+describe('a host page with global CSS (light DOM)', () => {
+  /** The host's own unlayered sheet, as a page `<style>`; removed after each case. */
+  let hostSheet: HTMLStyleElement;
+  const hostCss = (css: string): void => {
+    hostSheet = document.createElement('style');
+    hostSheet.textContent = css;
+    document.head.appendChild(hostSheet);
+  };
+  afterEach(() => hostSheet?.remove());
+
+  const look = (element: Element): string => {
+    const style = getComputedStyle(element);
+    return [
+      style.padding,
+      style.minHeight,
+      style.backgroundColor,
+      style.borderTopWidth,
+      style.fontSize,
+      style.lineHeight,
+      style.fontFamily,
+    ].join(' | ');
+  };
+
+  test('element rules, `*` and body typography do not reach the chrome', () => {
+    const roots = createViewerShell(container, createMessages('en'));
+    const active = roots.root.querySelector('.mode-button.is-active')!;
+    const hint = roots.byName('hint-text');
+    const clean = [look(active), look(hint)];
+    hostCss(`
+      * { line-height: 1.8; font-family: serif; }
+      body { font: 14px/1.4 serif; }
+      select, button { font: inherit; padding: 8px 10px; min-height: 40px; background: rgb(25, 29, 36); border: 1px solid rgb(42, 48, 58); }
+      .site-content button, button:hover { background: rgb(255, 45, 138); }
+    `);
+    expect([look(active), look(hint)]).toEqual(clean);
+  });
+
+  test('CMS nesting of one class and two element names does not reach the chrome', () => {
+    const site = document.createElement('div');
+    site.className = 'site-content';
+    const main = document.createElement('main');
+    site.append(main);
+    document.body.append(site);
+    main.append(container);
+    const roots = createViewerShell(container, createMessages('en'));
+    const active = roots.root.querySelector('.mode-button.is-active')!;
+    const hint = roots.byName('hint-text');
+    const clean = [look(active), look(hint)];
+    hostCss(`
+      .site-content main button { padding: 14px 18px; min-height: 44px; background: rgb(255, 212, 0); }
+      .site-content main span { font-size: 20px; line-height: 3; }
+    `);
+    expect([look(active), look(hint)]).toEqual(clean);
+  });
+
+  test('a rule that names the viewer root and the element still overrides it', () => {
+    const roots = createViewerShell(container, createMessages('en'));
+    hostCss('.jeex-viewer .mode-button { padding-left: 21px; }');
+    expect(getComputedStyle(roots.root.querySelector('.mode-button')!).paddingLeft).toBe('21px');
+  });
+
+  test('theming properties on the root still reach the chrome under hostile rules', () => {
+    const roots = createViewerShell(container, createMessages('en'));
+    hostCss('button { background: rgb(1, 2, 3); } .jeex-viewer { --jeex-accent: rgb(79, 140, 255); }');
+    expect(getComputedStyle(roots.root.querySelector('.mode-button.is-active')!).backgroundColor).toBe('rgb(79, 140, 255)');
+  });
+
+  test("the host's own content in a slot box keeps the host's rules", () => {
+    const roots = createViewerShell(container, createMessages('en'));
+    const slot = document.createElement('div');
+    slot.dataset['jeexSlot'] = 'top-left';
+    const own = document.createElement('button');
+    slot.appendChild(own);
+    roots.root.appendChild(slot);
+    hostCss('button { padding: 13px 17px; } [data-jeex-slot] { line-height: 3; }');
+    expect(getComputedStyle(own).padding).toBe('13px 17px');
+    expect(getComputedStyle(slot).lineHeight).not.toBe('normal');
+  });
+
+  test("a host's own cascade layer still hides chrome with `!important` and places the floating fullscreen button", () => {
+    // The shape of a real host: a site block that renders `<jeex-viewer shadow="none">`, hides chrome it
+    // does not want with layered `!important`, and positions the floating fullscreen button with
+    // margins and `translate`, none of which the player's layers set on that button.
+    const roots = createViewerShell(container, createMessages('en'));
+    container.className = 'host-block';
+    hostCss(`
+      @layer host-base, host-blocks;
+      @layer host-blocks {
+        .host-block :is(.tour-status, .hint-card, .brand-lockup, .control-bar) { display: none !important; }
+        .host-block .fullscreen-float { margin-block-start: 136px; margin-right: 42px; translate: 50% 0; }
+      }
+    `);
+    for (const name of ['tour-status', 'hint-card', 'brand-lockup', 'control-bar'] as const) {
+      expect(getComputedStyle(roots.byName(name)).display, name).toBe('none');
+    }
+    const float = getComputedStyle(roots.byName('fullscreen-float'));
+    expect([float.marginTop, float.marginRight, float.translate]).toEqual(['136px', '42px', '50%']);
+  });
+
+  test('an `!important` host rule still reaches the chrome, as the README documents', () => {
+    const roots = createViewerShell(container, createMessages('en'));
+    hostCss('button { padding: 20px !important; }');
+    expect(getComputedStyle(roots.root.querySelector('.mode-button')!).padding).toBe('20px');
+  });
+
+  test('a `::part()` rule of the page still styles the chrome inside a shadow root', () => {
+    const host = document.createElement('div');
+    document.body.appendChild(host);
+    const shadow = host.attachShadow({ mode: 'open' });
+    const mount = document.createElement('div');
+    shadow.appendChild(mount);
+    const roots = createViewerShell(mount, createMessages('en'));
+    hostCss('div::part(control-bar) { padding-left: 33px; }');
+    expect(getComputedStyle(roots.byName('control-bar')).paddingLeft).toBe('33px');
+  });
+
+  test("the body's typography does not reach the chrome inside a shadow root either", () => {
+    const host = document.createElement('div');
+    document.body.appendChild(host);
+    const shadow = host.attachShadow({ mode: 'open' });
+    const mount = document.createElement('div');
+    shadow.appendChild(mount);
+    const roots = createViewerShell(mount, createMessages('en'));
+    const text = (): string => {
+      const style = getComputedStyle(roots.byName('hint-text'));
+      return [
+        style.fontSize,
+        style.fontWeight,
+        style.lineHeight,
+        style.letterSpacing,
+        style.textTransform,
+        style.textAlign,
+        style.wordSpacing,
+      ].join(' | ');
+    };
+    const clean = text();
+    hostCss(
+      'body { font-size: 20px; font-weight: 300; line-height: 3; letter-spacing: 0.2em; word-spacing: 0.3em; text-transform: uppercase; text-align: center; }',
+    );
+    expect(text()).toEqual(clean);
+  });
+
+  test('inside a shadow root a sheet the host adds there still wins as before', () => {
+    const host = document.createElement('div');
+    document.body.appendChild(host);
+    const shadow = host.attachShadow({ mode: 'open' });
+    const mount = document.createElement('div');
+    shadow.appendChild(mount);
+    const roots = createViewerShell(mount, createMessages('en'));
+    const own = new CSSStyleSheet();
+    own.replaceSync('button { padding: 13px 17px; }');
+    shadow.adoptedStyleSheets = [...shadow.adoptedStyleSheets, own];
+    expect(getComputedStyle(roots.root.querySelector('.mode-button')!).padding).toBe('13px 17px');
   });
 });
