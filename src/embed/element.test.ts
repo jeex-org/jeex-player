@@ -54,6 +54,8 @@ type Recorder = {
   mounted: Array<{ shadow: boolean; options: unknown }>;
   loaded: SceneSource[];
   modes: ViewerMode[];
+  /** Every `setLightTemperature` the running viewer was given, oldest first. */
+  temperatures: Array<number | null>;
   disposals: number;
   /** Custom states the element was put in, newest last. */
   states: string[];
@@ -87,6 +89,7 @@ function harness(
   const mounted: Array<{ shadow: boolean; options: unknown }> = [];
   const loaded: SceneSource[] = [];
   const modes: ViewerMode[] = [];
+  const temperatures: Array<number | null> = [];
   const states: string[] = [];
   const boxes: Array<string | null> = [];
   let disposals = 0;
@@ -115,6 +118,9 @@ function harness(
     },
     setMode: (mode: ViewerMode) => {
       modes.push(mode);
+    },
+    setLightTemperature: (temperature: number | null) => {
+      temperatures.push(temperature);
     },
     on: (event: string, callback: (payload: never) => void) => subscribe(event, callback),
     dispose: () => {
@@ -172,6 +178,7 @@ function harness(
       mounted,
       loaded,
       modes,
+      temperatures,
       states,
       boxes,
       get disposals() {
@@ -264,13 +271,13 @@ describe('optionsFromAttributes', () => {
 });
 
 describe('effectOf', () => {
-  test('only `src`, `view` and the box `ratio` do anything to a running viewer', () => {
+  test('only `src`, `view`, `light-temperature` and the box `ratio` do anything to a running viewer', () => {
     expect(effectOf('src')).toBe('scene');
     expect(effectOf('view')).toBe('mode');
+    expect(effectOf('light-temperature')).toBe('temperature');
     expect(effectOf(RATIO_ATTRIBUTE)).toBe('box');
-    for (const attribute of OBSERVED_ATTRIBUTES.filter(
-      (name) => name !== 'src' && name !== 'view' && name !== RATIO_ATTRIBUTE && name !== LOADING_ATTRIBUTE,
-    )) {
+    const live = new Set(['src', 'view', 'light-temperature', RATIO_ATTRIBUTE, LOADING_ATTRIBUTE]);
+    for (const attribute of OBSERVED_ATTRIBUTES.filter((name) => !live.has(name))) {
       expect([attribute, effectOf(attribute)]).toEqual([attribute, 'frozen']);
     }
   });
@@ -342,6 +349,7 @@ describe('the events', () => {
     record.fireTour('progress', { fraction: 0.5 });
     record.fireTour('state', 'playing');
     record.fireTour('ended', undefined);
+    record.fire('lightTemperature', { temperature: 3000, source: 'panel' });
     expect(record.emitted.map((event) => event.type)).toEqual([
       'jeex-ready',
       'jeex-error',
@@ -350,7 +358,9 @@ describe('the events', () => {
       'jeex-tour-progress',
       'jeex-tour-state',
       'jeex-tour-ended',
+      'jeex-light-temperature',
     ]);
+    expect(record.emitted.at(-1)!.detail).toEqual({ temperature: 3000, source: 'panel' });
   });
 
   test('the payloads are the documented shapes, not the internal ones', () => {
@@ -543,10 +553,10 @@ describe('disconnect', () => {
   test('disposes the viewer and drops every subscription', () => {
     const { controller, record } = harness();
     controller.connect();
-    // Five handle events (ready, error, scene, mode, select) plus `edit`, and
-    // three of the tour's, plus the handle's own wait for the first `scene`
-    // and `ready`. Every one of them has to come back on disconnect.
-    expect(record.open()).toBe(11);
+    // Five handle events (ready, error, scene, mode, select) plus `edit` and
+    // `lightTemperature`, three of the tour's, plus the handle's own wait for
+    // the first `scene` and `ready`. Every one of them has to come back on disconnect.
+    expect(record.open()).toBe(12);
     controller.disconnect();
     expect(record.disposals).toBe(1);
     expect(record.open()).toBe(0);
@@ -967,5 +977,60 @@ describe('a start that happens inside the wait', () => {
     await Promise.resolve();
     expect(imports).toBe(1);
     expect(record.mounted).toHaveLength(1);
+  });
+});
+
+describe('the light temperature', () => {
+  test('`light-temperature` and `settings` set before the start reach the mount', () => {
+    const { controller, record } = harness({ 'light-temperature': '3000', settings: '' }, { deferred: true });
+    controller.connect();
+    expect(record.mounted).toHaveLength(0);
+    record.start();
+    expect(record.mounted[0]!.options).toMatchObject({ lighting: { temperature: 3000 }, settings: { show: true } });
+  });
+
+  test('`light-temperature` is live after the start: a number, `original`, and removal for «Original»', async () => {
+    const attributes: Record<string, string> = { 'light-temperature': '3000' };
+    const { controller, record } = harness(attributes);
+    controller.connect();
+    attributes['light-temperature'] = '5000';
+    controller.attributeChanged('light-temperature');
+    await flushed();
+    attributes['light-temperature'] = 'original';
+    controller.attributeChanged('light-temperature');
+    await flushed();
+    delete attributes['light-temperature'];
+    controller.attributeChanged('light-temperature');
+    await flushed();
+    expect(record.temperatures).toEqual([5000, null, null]);
+  });
+
+  test('an invalid `light-temperature` warns once and keeps the current value', async () => {
+    const attributes: Record<string, string> = { 'light-temperature': '5000' };
+    const { controller, record } = harness(attributes);
+    const logged = collectLog();
+    controller.onLog = logged.sink;
+    controller.connect();
+    for (const bad of ['2000', '3050', 'warm', '']) {
+      attributes['light-temperature'] = bad;
+      controller.attributeChanged('light-temperature');
+      await flushed();
+    }
+    expect(record.temperatures).toEqual([]);
+    expect(logged.codes()).toEqual(['option-invalid', 'option-invalid', 'option-invalid', 'option-invalid']);
+    expect(logged.messages()[0]).toContain('light-temperature');
+  });
+
+  test('setLightTemperature before the start is queued, read back, and refused at the call when invalid', async () => {
+    const { controller, record } = harness({ src: '/a.json' }, { deferred: true });
+    controller.connect();
+    const viewer = controller.viewer!;
+    expect(viewer.getState().lightTemperature).toBeNull();
+    viewer.setLightTemperature(2700);
+    expect(viewer.getState().lightTemperature).toBe(2700);
+    expect(() => viewer.setLightTemperature(3050)).toThrow(expect.objectContaining({ code: 'bad-params', path: 'lightTemperature' }));
+    record.start();
+    record.fire('ready', { sceneId: 'flat-a', options: {} });
+    expect(record.temperatures).toEqual([2700]);
   });
 });

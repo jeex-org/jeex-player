@@ -24,6 +24,8 @@ import { NO_SCENE_SOURCE, type SceneRepository } from '../scene/scene-repository
 import type { ViewerSelectionTarget } from '../app/selection.js';
 import { resolveLocaleTag } from '../ui/messages.js';
 import { parseRatio } from './ratio.js';
+import { isLightTemperature } from '../lighting/colour-temperature.js';
+import { ORIGINAL_TEMPERATURE } from '../app/option-raw.js';
 import { PendingViewer } from './pending-viewer.js';
 import type { ElementRuntime } from './element-runtime.js';
 import {
@@ -33,6 +35,7 @@ import {
   SHADOW_ATTRIBUTE,
   SHADOW_NONE,
   SRC_ATTRIBUTE,
+  TEMPERATURE_ATTRIBUTE,
   LOADING_ATTRIBUTE,
   effectOf,
   loadingPolicy,
@@ -266,6 +269,7 @@ export class ViewerElementController {
       handle.tour.on('progress', (progress: TourProgress) => this.host.emit(`${EVENT_PREFIX}tour-progress`, progress)),
       handle.tour.on('state', (state: TourState) => this.host.emit(`${EVENT_PREFIX}tour-state`, { state })),
       handle.tour.on('ended', () => this.host.emit(`${EVENT_PREFIX}tour-ended`, {})),
+      handle.on('lightTemperature', (change) => this.host.emit(`${EVENT_PREFIX}light-temperature`, change)),
     ];
   }
 
@@ -354,8 +358,14 @@ export class ViewerElementController {
   private apply(attribute: string): void {
     const handle = this.handle;
     if (!handle) return;
+    const effect = effectOf(attribute);
+    // Judged on its own: a bad value keeps the current temperature, not the resolver's default.
+    if (effect === 'temperature') {
+      this.applyTemperature(handle);
+      return;
+    }
     const options = resolveViewerOptions(this.readOptions());
-    switch (effectOf(attribute)) {
+    switch (effect) {
       case 'scene': {
         const url = options.scene.url;
         if (url === undefined) {
@@ -387,6 +397,28 @@ export class ViewerElementController {
           { attribute },
         );
     }
+  }
+
+  /**
+   * `light-temperature` on a running viewer: a whole step of kelvin, or
+   * `original` / no attribute for «Original». Anything else warns once and
+   * keeps the temperature on screen. Before the start the mount reads it.
+   */
+  private applyTemperature(handle: ViewerHandle): void {
+    const raw = this.host.attribute(TEMPERATURE_ATTRIBUTE);
+    if (raw === null || raw === ORIGINAL_TEMPERATURE) {
+      handle.setLightTemperature(null);
+      return;
+    }
+    const value = Number(raw);
+    if (raw.trim() !== '' && isLightTemperature(value)) {
+      handle.setLightTemperature(value);
+      return;
+    }
+    this.log().warn('option-invalid', `<${DEFAULT_TAG}>: ${TEMPERATURE_ATTRIBUTE}="${raw}" is not a temperature; keeping the current one`, {
+      attribute: TEMPERATURE_ATTRIBUTE,
+      value: raw,
+    });
   }
 
   /** This element's sink: the host's `onLog` when it set one, else the console. */

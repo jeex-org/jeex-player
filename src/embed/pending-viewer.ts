@@ -45,6 +45,7 @@ import type { Locale } from '../ui/messages.js';
 import type { SceneSource } from '../scene/scene-repository.js';
 import type { ProjectInfo } from '../app/project-wiring.js';
 import { ViewerLibError } from '../shared/errors.js';
+import { requireLightTemperature } from '../app/light-temperature-check.js';
 
 /** What the stand-in needs from the element that owns it. */
 export type PendingViewerHost = {
@@ -97,6 +98,8 @@ export class PendingViewer implements ViewerHandle {
   private locale: Locale | null = null;
   private furniture: boolean | null = null;
   private overlay: boolean | null = null;
+  /** A temperature set before the start; `undefined` while none was. */
+  private temperature: number | null | undefined = undefined;
 
   constructor(host: PendingViewerHost) {
     this.host = host;
@@ -246,6 +249,7 @@ export class PendingViewer implements ViewerHandle {
       rev: 0,
       walk: { camera: { index: null, count: 0 } },
       checkpoints: { lookThrough: null, placing: false },
+      lightTemperature: this.temperature === undefined ? this.host.options().lighting.temperature : this.temperature,
     };
   }
   getScene(): SceneData | null {
@@ -279,6 +283,12 @@ export class PendingViewer implements ViewerHandle {
   setFurnitureVisible(visible: boolean): void {
     if (!this.booted) this.furniture = visible;
     this.command((handle) => handle.setFurnitureVisible(visible));
+  }
+  /** Refused at the call, before the start too; queued like every setter. */
+  setLightTemperature(temperature: number | null): void {
+    const value = requireLightTemperature(temperature);
+    if (!this.booted) this.temperature = value;
+    this.command((handle) => handle.setLightTemperature(value));
   }
   setLocale(locale: Locale): void {
     if (!this.booted) this.locale = locale;
