@@ -444,6 +444,14 @@ describe('the apartment rig sun', () => {
     expect(sun.shadow.needsUpdate).toBe(true);
   });
 
+  test('counts the draws of its shadow map', () => {
+    const { rig, sun } = attached({ shadowCache: true });
+    expect(rig.shadowDraws).toBe(0);
+    sun.shadow.updateMatrices(sun);
+    sun.shadow.updateMatrices(sun);
+    expect(rig.shadowDraws).toBe(2);
+  });
+
   test('a non-boolean cache option is refused as bad-options', () => {
     const { lighting } = context();
     expect(codeOf(() => lighting.createApartmentRig({ shadowCache: 'yes' } as never))).toBe('bad-options');

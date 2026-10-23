@@ -117,6 +117,11 @@ export class DoorController {
     this.hud?.update(now);
   }
 
+  /** Whether a leaf moved since the last call; the sun's cached shadow follows doors (`viewer-frame.ts`). */
+  takeMoved(): boolean {
+    return this.animator.takeMoved();
+  }
+
   /** Sends one door the other way; `false` for anything that is not one. */
   toggle(openingId: string): boolean {
     if (!this.states.get(openingId)) return false;

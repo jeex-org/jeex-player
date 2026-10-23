@@ -68,6 +68,8 @@ export type ApartmentRig = LightingRig & {
   setShadowFrustum(fit: ShadowFit): void;
   /** Asks for the cached shadow map to be redrawn on the next render. */
   markShadowDirty(): void;
+  /** How many times the sun's shadow map has been drawn: a probe for a caller's own cache tests. */
+  readonly shadowDraws: number;
 };
 
 /** The standard bound to one renderer. */
@@ -183,11 +185,26 @@ function refuseSun(message: string): never {
 class SunRig extends Rig implements ApartmentRig {
   readonly shadowMapSize: number;
   private readonly sun: DirectionalLight;
+  private draws = 0;
 
   constructor(group: Group, environment: Texture, intensity: number, forget: (rig: Rig) => void, sun: DirectionalLight, size: number) {
     super('apartment', group, environment, intensity, forget);
     this.sun = sun;
     this.shadowMapSize = size;
+    // three r186 calls a directional shadow's `updateMatrices` from the shadow
+    // pass alone, once per light it actually draws: counting the calls counts
+    // the draws without reaching into the renderer.
+    const shadow = sun.shadow;
+    // Every argument goes on: three passes more than the typed one.
+    const update = shadow.updateMatrices.bind(shadow) as (...args: unknown[]) => void;
+    shadow.updateMatrices = (...args: unknown[]) => {
+      this.draws += 1;
+      update(...args);
+    };
+  }
+
+  get shadowDraws(): number {
+    return this.draws;
   }
 
   setSunDirection(direction: Triple): void {

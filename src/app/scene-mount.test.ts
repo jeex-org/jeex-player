@@ -96,7 +96,7 @@ function rig(): Rig {
   };
   const dollhouse = { prepare: () => {}, isExterior: () => false, update: () => {} };
   const mount = new SceneMount({
-    scene: () => scene,
+    runtime: () => ({ scene }),
     picker: new Picker({ getBoundingClientRect: () => ({ left: 0, top: 0, width: 100, height: 100 }) }),
     dollhouse: dollhouse as unknown as Dollhouse,
     animator: new FurnitureAnimator(),

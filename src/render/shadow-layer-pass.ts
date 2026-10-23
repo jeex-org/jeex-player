@@ -22,7 +22,7 @@
 import type * as THREE from 'three';
 import { SHADOW_ONLY_LAYER } from '../shared/render-layers.js';
 
-type ShadowPass = (lights: unknown, scene: THREE.Object3D, camera: THREE.Camera) => void;
+type ShadowPass = (lights: THREE.Light[], scene: THREE.Scene, camera: THREE.Camera) => void;
 
 /** The renderer's shadow map as this module touches it. */
 type ShadowMapLike = { render: ShadowPass };
@@ -38,6 +38,8 @@ const WRAPPED = new WeakMap<ShadowPass, ShadowPass>();
 export function installShadowLayerPass(renderer: { shadowMap: ShadowMapLike }): () => void {
   const shadowMap = renderer.shadowMap;
   const current = shadowMap.render;
+  // A unit harness's renderer has no shadow pass to wrap.
+  if (typeof current !== 'function') return () => undefined;
   if (WRAPPED.has(current)) return () => uninstall(shadowMap, current);
   const original = current;
   const wrapped: ShadowPass = function shadowLayerPass(this: unknown, lights, scene, camera) {

@@ -31,6 +31,7 @@ import { roomCentre } from '../navigation/room-graph.js';
 import { documentForState, type SceneState } from '../render/offscreen-scene.js';
 import { capturePanorama } from '../render/panorama.js';
 import { captureStill, type StillResult } from '../render/still-capture.js';
+import { prepareSunShadow } from '../render/sun-shadow.js';
 import { provenanceFor, stampCaption, type Provenance } from './provenance.js';
 import { captureFrames, type FramesRequest, type FramesResult } from './video-frames.js';
 import { ViewerLibError } from '../shared/errors.js';
@@ -172,7 +173,9 @@ export function captureCommands(deps: CaptureDeps): CaptureCommands {
     const offscreen = SceneModel.load(documentForState(model.toJSON(), 'default'), CATALOGUE_REGISTRIES);
     const builder = new SceneBuilder(offscreen.scene, offscreen.plan);
     const scene = new THREE.Scene();
-    const rig = runtime.lighting.createApartmentRig({ shadowMapSize: runtime.shadowMapSize });
+    // Cached like the live rig: a panorama's six faces share one shadow map.
+    const rig = runtime.lighting.createApartmentRig({ shadowMapSize: runtime.shadowMapSize, shadowCache: true });
+    let sun: { dispose(): void } | null = null;
     try {
       scene.background = runtime.scene.background;
       scene.fog = runtime.scene.fog;
@@ -180,8 +183,12 @@ export function captureCommands(deps: CaptureDeps): CaptureCommands {
       const built = builder.build();
       shellLike(deps.shellState(), offscreen, built.root, eye);
       scene.add(built.root);
+      // The same orientation, ceiling slabs and fitting policy as the live
+      // view, over this build's own geometry.
+      sun = prepareSunShadow(built.root, offscreen.scene, offscreen.plan, rig);
       return await take(scene);
     } finally {
+      sun?.dispose();
       // The rig's sun allocates its shadow map on the first frame it is drawn
       // in; disposing the rig releases it with the lights.
       rig.dispose();

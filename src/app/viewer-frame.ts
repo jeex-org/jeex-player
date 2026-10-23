@@ -41,6 +41,13 @@ export function frameHooksFor(deps: FrameHookDeps): readonly FrameHook[] {
       // After the camera hook: the tour's auto-open and the HUD anchor both
       // read the pose of the frame that is about to be drawn.
       deps.doors.update(now);
+      // After both animations: what they moved this frame is what the cached
+      // sun shadow must redraw (`render/sun-shadow.ts`); drained every frame.
+      const doorsMoved = deps.doors.takeMoved();
+      const furnitureMoved = deps.animator.takeMoved();
+      const sun = deps.mount.sunShadow;
+      if (sun && doorsMoved) sun.markDirty();
+      for (const group of furnitureMoved) sun?.include(group);
       // The map follows whatever the mode ended up being — a button, a room
       // focus or a manual grab mid-tour all land here on the next frame.
       stage?.syncMinimap();

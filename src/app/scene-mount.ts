@@ -38,10 +38,15 @@ import type { ViewerUI } from '../ui/viewer-ui.js';
 import type { Messages } from '../ui/messages.js';
 import { toViewerError, type ViewerError } from './viewer-events.js';
 import type { LoadedDocument } from './project-wiring.js';
+import { prepareSunShadow, type SunShadow } from '../render/sun-shadow.js';
+import type { ApartmentRig } from '../lighting/lighting-context.js';
 
 type SceneMountDeps = {
-  /** The runtime scene graph the root lives in; absent before the runtime exists. */
-  scene: () => THREE.Scene | undefined;
+  /**
+   * The runtime: the scene graph the root lives in and the rig whose sun lights
+   * it (`render/sun-shadow.ts`); absent before the runtime exists.
+   */
+  runtime: () => { readonly scene: THREE.Scene; readonly sunRig?: ApartmentRig } | undefined;
   picker: Picker;
   dollhouse: Dollhouse;
   animator: FurnitureAnimator;
@@ -88,6 +93,8 @@ export class SceneMount {
   private currentBuilder?: SceneBuilder | undefined;
   private currentEditor?: ViewerEditor | undefined;
   private root?: THREE.Group | undefined;
+  /** The sun over `root`: slabs, direction, fit and the cached map's dirtiness. */
+  private sun?: SunShadow | undefined;
   /**
    * What the mounted document was drawn WITH (`LoadedProjectContext.key`):
    * a later document is a revision of this one only when it comes with the
@@ -123,6 +130,11 @@ export class SceneMount {
 
   get sceneRoot(): THREE.Group | undefined {
     return this.root;
+  }
+
+  /** The sun of the mounted root; `undefined` before a mount or without a runtime. */
+  get sunShadow(): SunShadow | undefined {
+    return this.sun;
   }
 
   /**
@@ -175,6 +187,10 @@ export class SceneMount {
         // every consumer. An incremental asset swap does not, so its own
         // consequence — the changed footprint — is published here.
         if (SceneBuilder.needsRebuild(touched)) return;
+        // A rebuild prepared a new sun in `adopt`; anything else is refitted,
+        // which redraws only when a caster or the site really changed.
+        this.sun?.orient(model.scene.site);
+        this.sun?.refit();
         if (touched.some((entry) => isTouchedAsset(entry))) {
           this.deps.onAssetsChanged(model);
           // A variant swap hands out a freshly BUILT (procedural) body, so the
@@ -258,6 +274,7 @@ export class SceneMount {
             // The editor owns furniture pick registration and the auras, so a
             // swapped body is its news, not the mount's (`viewer-editor.ts`).
             this.currentEditor?.adoptUpgradedBody(group, replaced);
+            this.sun?.refit();
           },
         );
         if (reportFor && !signal.aborted) this.deps.onModelsSettled?.(reportFor, result);
@@ -317,18 +334,24 @@ export class SceneMount {
     this.sourceKey = null;
   }
 
-  /** Puts a build into the scene graph, the picker and the dollhouse. */
+  /** Puts a build into the scene graph, the picker, the dollhouse and under the sun. */
   private adopt(built: BuildResult): void {
     this.root = built.root;
-    this.deps.scene()?.add(built.root);
+    const runtime = this.deps.runtime();
+    runtime?.scene.add(built.root);
     if (this.currentModel) this.deps.dollhouse.prepare(this.currentModel.plan, built.root);
+    if (this.currentModel && runtime?.sunRig) {
+      this.sun = prepareSunShadow(built.root, this.currentModel.scene, this.currentModel.plan, runtime.sunRig);
+    }
     this.deps.picker.register(built.root, (wallId) => this.deps.dollhouse.isExterior(wallId));
   }
 
   /** Takes the current root out of the picker and the scene graph. */
   private detach(): void {
+    this.sun?.dispose();
+    this.sun = undefined;
     if (!this.root) return;
     this.deps.picker.unregister(this.root);
-    this.deps.scene()?.remove(this.root);
+    this.deps.runtime()?.scene.remove(this.root);
   }
 }

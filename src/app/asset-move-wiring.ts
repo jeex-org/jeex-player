@@ -107,6 +107,8 @@ export function assetMoveWiring(deps: AssetMoveWiringDeps): AssetMoveControl {
     body.group.rotation.y = pose.rotationY + body.yawOffset;
     if (mirror) setBodyMirror(body.group, mirror);
     body.group.updateMatrixWorld(true);
+    // The dragged body casts: redraw, growing the sun's frustum past the fit if it must.
+    deps.mount().sunShadow?.include(body.group);
   };
 
   const viewYaw = (): number => {
@@ -155,6 +157,8 @@ export function assetMoveWiring(deps: AssetMoveWiringDeps): AssetMoveControl {
             onEdit: (edit) => deps.events.emit('assetEdit', edit),
             onRefused: (refusal) => deps.events.emit('assetEditRefused', refusal),
             onMoving: (moving) => {
+              // A drag or a key burst ended (committed, cancelled or reverted): fit the apartment again.
+              if (!moving) deps.mount().sunShadow?.endPreview();
               const current = deps.stage();
               if (moving) current?.director?.hint('hint.assetMove');
               else if (current?.mode) deps.ui.setHintForMode(current.mode);

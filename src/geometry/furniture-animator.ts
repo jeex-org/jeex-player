@@ -62,6 +62,19 @@ export class FurnitureAnimator {
   private toggle: Toggle | null = null;
   private group: THREE.Group | null = null;
   private readonly swaps: SwapJob[] = [];
+  /** Groups whose pose an animation wrote since the last `takeMoved`. */
+  private readonly touched = new Set<THREE.Group>();
+
+  /**
+   * The groups an animation moved, scaled, removed or settled since the last
+   * call, final frames included; the sun's cached shadow follows them
+   * (`render/sun-shadow.ts`).
+   */
+  takeMoved(): THREE.Group[] {
+    const groups = [...this.touched];
+    this.touched.clear();
+    return groups;
+  }
 
   /** Adopts every direct child group of the furniture container at its current pose. */
   attach(container: THREE.Group | null): void {
@@ -158,6 +171,7 @@ export class FurnitureAnimator {
   dispose(): void {
     this.settleSwaps();
     this.items.clear();
+    this.touched.clear();
     this.toggle = null;
     this.group = null;
   }
@@ -175,6 +189,7 @@ export class FurnitureAnimator {
       const progress = item.from + (item.to - item.from) * (anim.hide ? clamped * clamped * clamped : eased);
       const base = this.items.get(item.group);
       if (base) base.progress = progress;
+      this.touched.add(item.group);
       const shown = Math.max(0.001, progress);
       item.group.scale.setScalar(item.baseScale * shown);
       // Pop-in: the item hops slightly above its spot and settles back down.
@@ -222,6 +237,7 @@ export class FurnitureAnimator {
     for (let index = this.swaps.length - 1; index >= 0; index -= 1) {
       const job = this.swaps[index]!;
       const t = (now - job.start) / SWAP_DURATION_MS;
+      this.touched.add(job.oldGroup).add(job.newGroup);
       if (t < SWAP_OUT_SHARE) {
         const k = Math.min(1, t / SWAP_OUT_SHARE);
         job.oldGroup.scale.setScalar(Math.max(0.001, job.oldBaseScale) * (1 - k));
@@ -260,6 +276,7 @@ export class FurnitureAnimator {
   }
 
   private settle(job: SwapJob): void {
+    this.touched.add(job.oldGroup).add(job.newGroup);
     if (!job.removed) {
       job.oldGroup.removeFromParent();
       job.removed = true;

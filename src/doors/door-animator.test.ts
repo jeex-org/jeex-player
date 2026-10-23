@@ -181,6 +181,24 @@ describe('DoorAnimator', () => {
     expect(leafAngle(builder, DOOR)).toBeCloseTo(open, 10);
   });
 
+  test('reports a moved leaf on every frame of a motion and its final pose, then nothing', () => {
+    const { states, animator } = harness();
+    animator.takeMoved();
+    states.close(DOOR, 0);
+    const frames: boolean[] = [];
+    for (const now of [
+      DOOR_ANIMATION_MS / 3,
+      (2 * DOOR_ANIMATION_MS) / 3,
+      DOOR_ANIMATION_MS,
+      2 * DOOR_ANIMATION_MS,
+      3 * DOOR_ANIMATION_MS,
+    ]) {
+      animator.update(now);
+      frames.push(animator.takeMoved());
+    }
+    expect(frames).toEqual([true, true, true, false, false]);
+  });
+
   test('applyAll re-shuts a door whose group was rebuilt behind its back', () => {
     const { builder, states, animator } = harness();
     states.close(DOOR, 0);

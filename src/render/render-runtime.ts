@@ -40,7 +40,8 @@ import { linkedAbortController } from '../shared/abort.js';
 import { SwatchPreview, type PreviewRenderer } from './swatch-preview.js';
 import { playerLighting } from './lighting-engine.js';
 import { LIGHTING_STANDARD } from '../lighting/lighting-standard.js';
-import type { LightingContext, LightingRig } from '../lighting/lighting-context.js';
+import type { ApartmentRig, LightingContext } from '../lighting/lighting-context.js';
+import { installShadowLayerPass } from './shadow-layer-pass.js';
 
 /** Device pixel ratio cap: above this the fill cost outgrows the visible gain. */
 const PIXEL_RATIO_CAP = 1.7;
@@ -152,8 +153,8 @@ export class RenderRuntime {
   readonly shadowMapSize: number;
   /** The lighting context now; replaced after a context restore. */
   private lightingContext: LightingContext;
-  /** The apartment rig on `scene`, from `lightingContext`. */
-  private rig: LightingRig;
+  /** The apartment rig on `scene`, from `lightingContext`; its sun shadow is cached (`sun-shadow.ts`). */
+  private rig: ApartmentRig;
   private readonly createLighting: (renderer: THREE.WebGLRenderer) => LightingContext;
   private camera: THREE.Camera | null = null;
   private renderEnabled = true;
@@ -221,8 +222,10 @@ export class RenderRuntime {
     this.createLighting = options.createLighting ?? playerLighting;
     this.shadowMapSize = options.shadowMapSize ?? SHADOW_MAP_SIZE;
     this.lightingContext = this.createLighting(this.renderer);
-    this.rig = this.lightingContext.createApartmentRig({ shadowMapSize: this.shadowMapSize });
+    this.rig = this.lightingContext.createApartmentRig({ shadowMapSize: this.shadowMapSize, shadowCache: true });
     this.rig.attach(this.scene);
+    // Shadow-only casters (hidden ceilings, cut-away walls) reach the shadow pass.
+    installShadowLayerPass(this.renderer);
 
     this.preview = new SwatchPreview(
       this.renderer,
@@ -368,6 +371,8 @@ export class RenderRuntime {
       'webglcontextrestored',
       () => {
         this.contextLost = false;
+        // three built a new shadow map with the context; wrap it again.
+        installShadowLayerPass(this.renderer);
         this.renewLighting();
         onRestored?.();
         this.start();
@@ -385,8 +390,13 @@ export class RenderRuntime {
   private renewLighting(): void {
     this.lightingContext.dispose();
     this.lightingContext = this.createLighting(this.renderer);
-    this.rig = this.lightingContext.createApartmentRig({ shadowMapSize: this.shadowMapSize });
+    this.rig = this.lightingContext.createApartmentRig({ shadowMapSize: this.shadowMapSize, shadowCache: true });
     this.rig.attach(this.scene);
+  }
+
+  /** The apartment rig lighting `scene` now; replaced after a context restore, so read it at the moment of use. */
+  get sunRig(): ApartmentRig {
+    return this.rig;
   }
 
   /**
