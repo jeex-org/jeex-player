@@ -131,6 +131,39 @@ describe('WalkLightingController', () => {
     expect(built[0]!.refreshes).toEqual([{ all: false, grids: ['bath'], probes: ['living'] }]);
   });
 
+  test('an edit made in orbit refreshes nothing until the next entry into walk', async () => {
+    const { controller, built, finishBuild, tick } = setup({ bakeFrames: 1 });
+    controller.update('walk');
+    await finishBuild();
+    controller.update('walk');
+    controller.update('orbit');
+    controller.edited({ all: false, grids: ['bath'], probes: [] });
+    tick(5000);
+    controller.update('orbit');
+    controller.update('plan3d');
+    expect(built[0]!.refreshes).toEqual([]);
+    controller.update('walk');
+    expect(built[0]!.refreshes).toEqual([{ all: false, grids: ['bath'], probes: [] }]);
+  });
+
+  test('a bake that throws is reported once and leaves the direct look', async () => {
+    const { controller, built, errors, finishBuild } = setup();
+    controller.update('walk');
+    await finishBuild();
+    const lighting = built[0]!;
+    const frame = lighting.frame.bind(lighting);
+    lighting.frame = (eligible: boolean) => {
+      if (eligible) throw new Error('layout');
+      frame(eligible);
+    };
+    controller.update('walk');
+    controller.update('walk');
+    controller.update('walk');
+    expect(errors).toHaveLength(1);
+    expect(controller.state()).toBe('failed');
+    expect(lighting.frames.at(-1)).toBe(false);
+  });
+
   test('a document the lighting refuses keeps the direct look and reports once', async () => {
     const { controller, built, errors, finishBuild, setDoc } = setup();
     controller.update('walk');

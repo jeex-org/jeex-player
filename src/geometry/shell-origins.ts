@@ -27,6 +27,7 @@
 
 import * as THREE from 'three';
 import type { SolvedPlan } from '../plan/plan-solver.js';
+import { searchLattice } from '../plan/search-lattice.js';
 import type { Vec2 } from '../scene/types.js';
 
 /** How far an origin sits from its surface, metres. */
@@ -82,11 +83,10 @@ function interiorPoint(polygon: readonly Vec2[]): Vec2 {
   const middle = { x: (Math.min(...xs) + Math.max(...xs)) / 2, z: (Math.min(...zs) + Math.max(...zs)) / 2 };
   if (insidePolygon(middle, polygon)) return middle;
   let best: { point: Vec2; distance: number } | null = null;
-  for (let x = Math.min(...xs) + SEARCH_STEP_M / 2; x < Math.max(...xs); x += SEARCH_STEP_M) {
-    for (let z = Math.min(...zs) + SEARCH_STEP_M / 2; z < Math.max(...zs); z += SEARCH_STEP_M) {
-      const distance = Math.hypot(x - middle.x, z - middle.z);
-      if (insidePolygon({ x, z }, polygon) && (!best || distance < best.distance)) best = { point: { x, z }, distance };
-    }
+  // A bounded lattice: the step widens with the room, so any room and any finite coordinates end.
+  for (const point of searchLattice(Math.min(...xs), Math.max(...xs), Math.min(...zs), Math.max(...zs), SEARCH_STEP_M)) {
+    const distance = Math.hypot(point.x - middle.x, point.z - middle.z);
+    if (insidePolygon(point, polygon) && (!best || distance < best.distance)) best = { point, distance };
   }
   return best?.point ?? middle;
 }

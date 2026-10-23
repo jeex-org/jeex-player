@@ -53,9 +53,10 @@ import type { WalkPostState } from './walk-post-controller.js';
 import type { WalkLightingState } from './walk-lighting-controller.js';
 import type { WalkLightingStats } from '../render/walk-lighting/walk-lighting.js';
 
+import { freeSpaceModule, layoutLintModule, loadLayoutModules } from './debug-layout-modules.js';
+
 /** The room lighting as the debug surface reads it. */
 type WalkLightingDebug = { state: WalkLightingState; stats: WalkLightingStats | null };
-import { freeSpaceModule, layoutLintModule, loadLayoutModules } from './debug-layout-modules.js';
 
 /** What `__viewerDebug.minimap()` answers (`minimap.ts`). */
 type MinimapState = {

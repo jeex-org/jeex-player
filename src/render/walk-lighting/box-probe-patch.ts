@@ -101,6 +101,24 @@ export function createWalkUniforms(): WalkUniforms {
   };
 }
 
+const SCENE_UNIFORMS = new WeakMap<object, WalkUniforms>();
+
+/**
+ * The uniforms of one scene, the same object for every room lighting built on
+ * it. A patched material keeps the uniforms it was compiled with, and a
+ * material may outlive a lighting (a context restore builds a new lighting
+ * over materials a host's model source kept), so the uniforms must outlive it
+ * too.
+ */
+export function walkUniformsFor(scene: object): WalkUniforms {
+  let uniforms = SCENE_UNIFORMS.get(scene);
+  if (!uniforms) {
+    uniforms = createWalkUniforms();
+    SCENE_UNIFORMS.set(scene, uniforms);
+  }
+  return uniforms;
+}
+
 /** Puts the uniforms in one of the rig's states. */
 export function setUniformState(uniforms: WalkUniforms, state: UniformState): void {
   uniforms.jeexDiffuse.value = state === 'editing' ? 1 : 0;

@@ -28,7 +28,7 @@ import { roomVolumes, type RoomVolumes, type VolumeInput } from './room-volumes.
 import { createExteriorGrid, RoomGrid } from './room-grid.js';
 import { GridBake } from './grid-bake.js';
 import { ProbeAtlas, RoomProbes } from './room-probes.js';
-import { atlasLayout, createWalkUniforms, installWalkPatch, setRoomBoxes, type WalkUniforms } from './box-probe-patch.js';
+import { atlasLayout, installWalkPatch, walkUniformsFor, setRoomBoxes, type WalkUniforms } from './box-probe-patch.js';
 import { WalkRig } from './walk-rig.js';
 import { WALK_LIGHTING_TUNING as T } from './walk-lighting-tuning.js';
 import type { LightProbeGridWebGL } from 'three/addons/lighting/LightProbeGridWebGL.js';
@@ -41,7 +41,8 @@ import type { LightProbeGridWebGL } from 'three/addons/lighting/LightProbeGridWe
 export type WalkDocument = { volumes: VolumeInput; furniture: THREE.Object3D | null };
 /** What an edit asks to refresh: everything, or the grids and probes of some rooms. */
 export type RefreshScope = { all: boolean; grids: readonly string[]; probes: readonly string[] };
-export type WalkLightingPhase = 'baking' | 'probes' | 'live';
+/** `empty`: the plan has no closed room, nothing is baked and the view keeps the direct look. */
+export type WalkLightingPhase = 'baking' | 'probes' | 'live' | 'empty';
 
 /** Measured cost of the last full bake, and the GPU memory the lighting holds. */
 export type WalkLightingStats = {
@@ -85,10 +86,11 @@ function mirrorsOf(scene: THREE.Object3D): THREE.Object3D[] {
 const gridBytes = (grid: RoomGrid): number => grid.resolution.x * grid.resolution.y * 7 * (grid.resolution.z + 2) * 16 * 2;
 
 export class WalkLighting {
-  readonly uniforms: WalkUniforms = createWalkUniforms();
+  /** The scene's shared uniforms (`walkUniformsFor`): they outlive this lighting, as the patched materials do. */
+  readonly uniforms: WalkUniforms;
   readonly rig: WalkRig;
   /** The atlas sampler's texture while there is no atlas. */
-  private readonly placeholder = this.uniforms.jeexAtlas.value;
+  private readonly placeholder: THREE.Texture;
   private readonly renderer: THREE.WebGLRenderer;
   private readonly scene: THREE.Scene;
   /** The grids' parent: room grids in grid order, the exterior grid last (three takes the first that contains an origin). */
@@ -106,6 +108,8 @@ export class WalkLighting {
   constructor(renderer: THREE.WebGLRenderer, scene: THREE.Scene) {
     this.renderer = renderer;
     this.scene = scene;
+    this.uniforms = walkUniformsFor(scene);
+    this.placeholder = this.uniforms.jeexAtlas.value;
     this.rig = new WalkRig({ scene, renderer, uniforms: this.uniforms });
     this.parent.name = 'walk-lighting-grids';
     scene.add(this.parent);
@@ -124,6 +128,10 @@ export class WalkLighting {
     if (!result.ok) throw new ViewerLibError('internal', result.error);
     this.release();
     const volumes = result.volumes;
+    if (volumes.boxes.length === 0) {
+      this.current = 'empty';
+      return;
+    }
     this.volumes = volumes;
     this.furniture = doc.furniture;
     this.grids = volumes.boxes.map((box) => new RoomGrid(box));
@@ -187,7 +195,6 @@ export class WalkLighting {
     this.release();
     this.parent.removeFromParent();
     this.rig.dispose();
-    this.placeholder.dispose();
   }
 
   private restart(): void {

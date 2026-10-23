@@ -63,6 +63,11 @@ export class FloorRing {
     this.object.visible = false;
     this.object.layers.set(FLOOR_RING_LAYER);
     this.object.raycast = () => undefined;
+    // The same white under any exposure: walk and tour raise the renderer's
+    // exposure for the room lighting, and the cursor must not glare with it.
+    this.object.onBeforeRender = (renderer) => {
+      material.color.setScalar(1 / renderer.toneMappingExposure);
+    };
   }
 
   /** Puts the ring at `point` on the floor, or hides it for `null`. */

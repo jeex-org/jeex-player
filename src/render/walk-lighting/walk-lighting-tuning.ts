@@ -35,6 +35,8 @@ export const WALK_LIGHTING_TUNING = Object.freeze({
   probeSize: 128,
   /** Room boxes the apartment may have; more keeps the direct look and reports an error. */
   maxBoxes: 16,
+  /** Grid probes along x or z of one room box (64 m at the spacing); more keeps the direct look and reports an error. */
+  maxProbesPerAxis: 64,
   /** Width of the blend between two rooms' reflections at a shared box face, metres. */
   blendM: 0.4,
   /** How far a fragment's room lookup point is pushed along its normal, metres. */

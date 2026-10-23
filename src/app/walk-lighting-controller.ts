@@ -30,7 +30,7 @@ import { WALK_LIGHTING_TUNING } from '../render/walk-lighting/walk-lighting-tuni
 
 /** What the controller drives: `render/walk-lighting/walk-lighting.ts`'s `WalkLighting`. */
 export type WalkLightingHandle<Doc = WalkDocument> = {
-  readonly phase: 'baking' | 'probes' | 'live';
+  readonly phase: 'baking' | 'probes' | 'live' | 'empty';
   readonly stats: WalkLightingStats | null;
   load(doc: Doc): void;
   frame(eligible: boolean): void;
@@ -55,7 +55,7 @@ export type WalkLightingDeps<Doc> = {
 };
 
 /** What the lighting is doing, for the debug surface. */
-export type WalkLightingState = 'off' | 'loading' | 'baking' | 'probes' | 'live' | 'failed';
+export type WalkLightingState = 'off' | 'loading' | 'baking' | 'probes' | 'live' | 'empty' | 'failed';
 
 export class WalkLightingController<Doc = WalkDocument> {
   private readonly deps: WalkLightingDeps<Doc>;
@@ -84,12 +84,21 @@ export class WalkLightingController<Doc = WalkDocument> {
       return;
     }
     if (this.stale) this.adopt(lighting);
-    if (this.scope && !this.failed && this.deps.now() - this.lastEdit >= WALK_LIGHTING_TUNING.refreshDebounceMs) {
-      const scope = this.scope;
-      this.scope = null;
-      lighting.refresh(scope);
+    try {
+      // Only on a frame drawn with the room lighting: an edit made in an editing
+      // mode waits, pending, for the next entry into walk or tour.
+      if (eligible && this.scope && !this.failed && this.deps.now() - this.lastEdit >= WALK_LIGHTING_TUNING.refreshDebounceMs) {
+        const scope = this.scope;
+        this.scope = null;
+        lighting.refresh(scope);
+      }
+      lighting.frame(eligible && !this.failed);
+    } catch (error) {
+      // A bake or a capture that throws would throw again on every frame: one report, the direct look.
+      this.failed = true;
+      this.deps.report(error);
+      lighting.frame(false);
     }
-    lighting.frame(eligible && !this.failed);
   }
 
   /** A new or rebuilt document is on screen. */

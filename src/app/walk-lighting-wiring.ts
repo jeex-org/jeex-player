@@ -16,7 +16,17 @@ import { openingFrameWidth } from '../assets/opening-frame.js';
 import { FURNITURE_GROUP_NAME } from '../geometry/scene-builder.js';
 import type { WalkLightingController } from './walk-lighting-controller.js';
 import { refreshScope, type ScopeLookups } from './walk-lighting-scope.js';
-import { pointInPolygon } from '../plan/plan-geometry.js';
+import { closestOnSegment, dist, pointInPolygon } from '../plan/plan-geometry.js';
+
+/** How close a point must lie to a face polyline to be on it, metres. */
+const ON_FACE_M = 1e-3;
+
+function onPolyline(p: { x: number; z: number }, polyline: readonly { x: number; z: number }[]): boolean {
+  for (let i = 0; i + 1 < polyline.length; i += 1) {
+    if (dist(p, closestOnSegment(p, polyline[i]!, polyline[i + 1]!).point) <= ON_FACE_M) return true;
+  }
+  return false;
+}
 
 /** The document reads a refresh scope needs, over the committed model. */
 function lookupsOf(model: SceneModel): ScopeLookups {
@@ -39,14 +49,20 @@ function lookupsOf(model: SceneModel): ScopeLookups {
 }
 
 /** The rooms, the doors and the furniture footprints of `model` built under `root`, as the volumes read them. */
-function volumeInput(model: SceneModel, root: THREE.Object3D): VolumeInput {
+export function volumeInput(model: SceneModel, root: THREE.Object3D): VolumeInput {
   const { plan, scene } = model;
   const thickness = new Map(plan.centrelines.map((line) => [line.wallId, line.thickness]));
-  const rooms = plan.rooms.map((room) => ({
-    roomId: room.roomId,
-    polygon: room.polygon,
-    halfWall: Math.max(0, ...room.loop.map((face) => (thickness.get(face.wallId) ?? 0) / 2)),
-  }));
+  const rooms = plan.rooms.map((room) => {
+    const halfWall = Math.max(0, ...room.loop.map((face) => (thickness.get(face.wallId) ?? 0) / 2));
+    // Each polygon edge takes the wall of the loop face it lies on.
+    const edgeHalfWalls = room.polygon.map((a, i) => {
+      const b = room.polygon[(i + 1) % room.polygon.length]!;
+      const middle = { x: (a.x + b.x) / 2, z: (a.z + b.z) / 2 };
+      const face = room.loop.find((candidate) => onPolyline(middle, candidate.polyline));
+      return face ? (thickness.get(face.wallId) ?? 0) / 2 : halfWall;
+    });
+    return { roomId: room.roomId, polygon: room.polygon, halfWall, edgeHalfWalls };
+  });
   const roomsOfWall = new Map<string, string[]>();
   for (const face of plan.faces.values()) {
     if (face.roomId !== null) roomsOfWall.set(face.wallId, [...(roomsOfWall.get(face.wallId) ?? []), face.roomId]);

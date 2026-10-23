@@ -142,6 +142,36 @@ describe('rebaseShellOrigins', () => {
   });
 });
 
+describe('interior points of rooms the search must not stall on', () => {
+  /** A one-floor shell of a single L-shaped room, rebased; answers the floor's origin. */
+  function floorOrigin(offset: number, scale: number): THREE.Vector3 {
+    const polygon = [
+      { x: 0, z: 0 },
+      { x: 6, z: 0 },
+      { x: 6, z: 3 },
+      { x: 3, z: 3 },
+      { x: 3, z: 6 },
+      { x: 0, z: 6 },
+    ].map((p) => ({ x: offset + p.x * scale, z: offset + p.z * scale }));
+    const floor = new THREE.Mesh(new THREE.BoxGeometry(), new THREE.MeshBasicMaterial());
+    floor.userData['surface'] = 'floor';
+    floor.userData['roomId'] = 'l';
+    const shell = new THREE.Group();
+    shell.add(floor);
+    rebaseShellOrigins(shell, { rooms: [{ roomId: 'l', polygon }] } as never, 2.6);
+    return floor.position;
+  }
+
+  test('an L-shaped room around 1e16 and a very large one end and answer a point inside', () => {
+    const huge = floorOrigin(1e16, 1000);
+    expect(huge.x - 1e16 <= 3000 || huge.z - 1e16 <= 3000).toBe(true);
+    const started = performance.now();
+    const large = floorOrigin(0, 1000);
+    expect(performance.now() - started).toBeLessThan(2000);
+    expect(large.x <= 3000 || large.z <= 3000).toBe(true);
+  });
+});
+
 describe('rebaseOpeningFrames', () => {
   test('moves the frames of one rebuilt door group and keeps their vertices', () => {
     const ctx = createBuilderContext(scene, plan);

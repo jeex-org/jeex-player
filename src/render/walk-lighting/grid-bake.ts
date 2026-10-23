@@ -63,7 +63,7 @@ export class GridBake {
   }
 
   get done(): boolean {
-    return this.pass >= PASSES;
+    return this.pass >= PASSES || (this.deps.targets ?? this.deps.grids).length === 0;
   }
 
   /** Bakes this frame's slice; answers whether the bake is done. */

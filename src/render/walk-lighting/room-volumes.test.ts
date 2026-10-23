@@ -58,8 +58,9 @@ describe('probePoint', () => {
   test('lies at the probe height, inside the room, farthest from its edges', () => {
     const point = probePoint(square(0, 0, 4, 2), []);
     expect(point.y).toBe(T.probeHeightM);
-    expect(point.x).toBeCloseTo(2, 1);
-    expect(point.z).toBeCloseTo(1, 1);
+    // To half a lattice step (0.05 m) of the true centre.
+    expect(Math.abs(point.x - 2)).toBeLessThanOrEqual(0.05 + 1e-9);
+    expect(Math.abs(point.z - 1)).toBeLessThanOrEqual(0.05 + 1e-9);
   });
 
   test('stays inside an L-shaped room, in its widest part', () => {
@@ -76,6 +77,27 @@ describe('probePoint', () => {
     const point = probePoint(square(0, 0, 4, 2), [table]);
     const inside = point.x > table.minX && point.x < table.maxX && point.z > table.minZ && point.z < table.maxZ;
     expect(inside).toBe(false);
+  });
+});
+
+describe('probePoint on rooms the search must not stall on', () => {
+  const L = (o: number, k: number) => L_ROOM.map((p) => ({ x: o + p.x * k, z: o + p.z * k }));
+
+  test('an L-shaped room around 1e16 ends and answers a point inside it', () => {
+    const polygon = L(1e16, 1000);
+    const point = probePoint(polygon, []);
+    expect(point.x).toBeGreaterThanOrEqual(1e16);
+    expect(point.x).toBeLessThanOrEqual(1e16 + 6000);
+    expect(point.z).toBeLessThanOrEqual(1e16 + 6000);
+    // Inside the L: not in its missing upper-right quarter.
+    expect(point.x - 1e16 <= 3000 || point.z - 1e16 <= 3000).toBe(true);
+  });
+
+  test('a very large room ends quickly and answers a point inside it', () => {
+    const started = performance.now();
+    const point = probePoint(L(0, 1000), []);
+    expect(performance.now() - started).toBeLessThan(2000);
+    expect(point.x <= 3000 || point.z <= 3000).toBe(true);
   });
 });
 
@@ -133,11 +155,39 @@ describe('roomVolumes', () => {
     expect(T.gridLayers).toBe(3);
   });
 
+  test('grows each selection side to its own wall: a thick facade and thin partitions', () => {
+    // A 3 x 3 room: the facade on z = 0 is 0.3 m thick, the three partitions 0.1 m.
+    const result = roomVolumes({
+      ...input,
+      rooms: [{ roomId: 'bath', polygon: square(0, 0, 3, 3), halfWall: 0.15, edgeHalfWalls: [0.15, 0.05, 0.05, 0.05] }],
+      doors: [],
+    });
+    if (!result.ok) throw new Error(result.error);
+    const { min, max } = result.volumes.boxes[0]!.selection;
+    expect(min.z).toBeCloseTo(-0.15, 9);
+    expect(min.x).toBeCloseTo(-0.05, 9);
+    expect(max.x).toBeCloseTo(3.05, 9);
+    expect(max.z).toBeCloseTo(3.05, 9);
+  });
+
   test('gives every room one probe point and the apartment its bounds', () => {
     const result = roomVolumes(input);
     if (!result.ok) throw new Error(result.error);
     expect(result.volumes.probes.map((probe) => probe.roomId)).toEqual(['bath', 'hall']);
     expect(result.volumes.bounds).toEqual({ min: { x: 0, y: 0, z: 0 }, max: { x: 6, y: 2.6, z: 5 } });
+  });
+
+  test('a plan without a closed room has no boxes and finite bounds', () => {
+    const result = roomVolumes({ ...input, rooms: [], doors: [] });
+    if (!result.ok) throw new Error(result.error);
+    expect(result.volumes.boxes).toEqual([]);
+    expect(Number.isFinite(result.volumes.bounds.max.x)).toBe(true);
+  });
+
+  test('refuses a room box whose grid would exceed the probes per axis, before any grid exists', () => {
+    const result = roomVolumes({ ...input, rooms: [{ roomId: 'hangar', polygon: square(0, 0, 3000, 3000), halfWall: 0.1 }], doors: [] });
+    expect(result.ok).toBe(false);
+    if (!result.ok) expect(result.error).toContain(String(T.maxProbesPerAxis));
   });
 
   test(`refuses more than ${T.maxBoxes} room boxes`, () => {

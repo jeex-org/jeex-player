@@ -104,6 +104,15 @@ describe('GridBake', () => {
   });
 });
 
+describe('GridBake of no grids', () => {
+  test('is done at once and bakes nothing', () => {
+    const { bake, calls } = setup({ probesPerFrame: 5, only: 'none' });
+    expect(bake.done).toBe(true);
+    expect(bake.step()).toBe(true);
+    expect(calls).toEqual([]);
+  });
+});
+
 describe('GridBake of some grids', () => {
   test('bakes only the targets, with every room grid visible in pass 1', () => {
     const { bake, calls } = setup({ probesPerFrame: 100, only: 'b' });

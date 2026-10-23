@@ -18,7 +18,7 @@ import type { ViewerHandle } from '../../src/app/viewer-handle.js';
 import { WalkLighting, WalkPost } from '../../src/render/walk-post.js';
 import { createExteriorGrid, RoomGrid } from '../../src/render/walk-lighting/room-grid.js';
 import { packAtlas, type Rgb } from '../../src/render/walk-lighting/exterior-sh.js';
-import { createWalkUniforms, installWalkPatch } from '../../src/render/walk-lighting/box-probe-patch.js';
+import { atlasLayout, createWalkUniforms, installWalkPatch, setRoomBoxes } from '../../src/render/walk-lighting/box-probe-patch.js';
 import { WALK_LIGHTING_TUNING as T } from '../../src/render/walk-lighting/walk-lighting-tuning.js';
 import { createLightingContext } from '../../src/lighting/lighting-context.js';
 import { LIGHTING_STANDARD } from '../../src/lighting/lighting-standard.js';
@@ -176,7 +176,11 @@ describe('engine pins (three r186)', () => {
       return pixels;
     };
     const before = read();
-    expect(installWalkPatch(scene, createWalkUniforms())).toBe(3);
+    const uniforms = createWalkUniforms();
+    expect(installWalkPatch(scene, uniforms)).toBe(3);
+    // Every sphere inside a room box, so the in-room branch (diffuse scale, grid hand-over, box probes) is the one compared.
+    setRoomBoxes(uniforms, [box(-3, 3, 0.05)], [{ roomId: 'box--3', position: { x: 0, y: 1.5, z: 0 } }], atlasLayout(1));
+    expect(uniforms.jeexBoxCount.value).toBe(1);
     const after = read();
     let differing = 0;
     for (let i = 0; i < before.length; i += 1) if (before[i] !== after[i]) differing += 1;

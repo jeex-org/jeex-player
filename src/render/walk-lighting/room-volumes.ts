@@ -22,14 +22,19 @@
  */
 
 import { WALK_LIGHTING_TUNING as T } from './walk-lighting-tuning.js';
+import { searchLattice } from '../../plan/search-lattice.js';
 
 type Vec2 = { readonly x: number; readonly z: number };
 export type Vec3 = { x: number; y: number; z: number };
 export type Box = { min: Vec3; max: Vec3 };
 export type Rect = { minX: number; maxX: number; minZ: number; maxZ: number };
 
-/** One room as the volumes see it: its polygon and half the thickness of its walls. */
-export type VolumeRoom = { roomId: string; polygon: readonly Vec2[]; halfWall: number };
+/**
+ * One room as the volumes see it: its polygon, half the thickness of its
+ * thickest wall, and, per polygon edge (from vertex `i` to `i + 1`), half the
+ * thickness of the wall on that edge when known.
+ */
+export type VolumeRoom = { roomId: string; polygon: readonly Vec2[]; halfWall: number; edgeHalfWalls?: readonly number[] };
 /** A door: the room its leaf swings into, and the room on the other side (`null` outside). */
 export type VolumeDoor = { into: string; other: string | null };
 
@@ -199,15 +204,14 @@ export function probePoint(polygon: readonly Vec2[], furniture: readonly Rect[])
   const minZ = Math.min(...polygon.map((p) => p.z));
   const maxZ = Math.max(...polygon.map((p) => p.z));
   let best: { point: Vec2; score: number; free: boolean } | null = null;
-  for (let x = minX + PROBE_SEARCH_STEP_M / 2; x < maxX; x += PROBE_SEARCH_STEP_M) {
-    for (let z = minZ + PROBE_SEARCH_STEP_M / 2; z < maxZ; z += PROBE_SEARCH_STEP_M) {
-      const point = { x, z };
-      if (!inside(point, polygon)) continue;
-      const free = !furniture.some((r) => x > r.minX && x < r.maxX && z > r.minZ && z < r.maxZ);
-      // Ties (a long room's centre line) go to the point nearest the middle of the room.
-      const score = edgeDistance(point, polygon) - 1e-3 * Math.hypot(x - (minX + maxX) / 2, z - (minZ + maxZ) / 2);
-      if (!best || (free && !best.free) || (free === best.free && score > best.score)) best = { point, score, free };
-    }
+  // A bounded lattice: the step widens with the room, so any room and any finite coordinates end.
+  for (const point of searchLattice(minX, maxX, minZ, maxZ, PROBE_SEARCH_STEP_M)) {
+    const { x, z } = point;
+    if (!inside(point, polygon)) continue;
+    const free = !furniture.some((r) => x > r.minX && x < r.maxX && z > r.minZ && z < r.maxZ);
+    // Ties (a long room's centre line) go to the point nearest the middle of the room.
+    const score = edgeDistance(point, polygon) - 1e-3 * Math.hypot(x - (minX + maxX) / 2, z - (minZ + maxZ) / 2);
+    if (!best || (free && !best.free) || (free === best.free && score > best.score)) best = { point, score, free };
   }
   const point = best?.point ?? polygon[0] ?? { x: 0, z: 0 };
   return { x: point.x, y: T.probeHeightM, z: point.z };
@@ -238,6 +242,36 @@ const box = (rect: Rect, y0: number, y1: number, grow: number): Box => ({
   max: { x: rect.maxX + grow, y: y1, z: rect.maxZ + grow },
 });
 
+/**
+ * How far each side of `rect` reaches to its wall's centreline: half the
+ * thickness of the thinnest wall along that side, so a side next to a thin
+ * partition stops at the partition's centreline and never reaches into the
+ * room beyond. A side with no wall of its own (a split inside the room, the
+ * rectangle around a bay) takes the room's thickest half wall.
+ */
+function sideGrowth(rect: Rect, room: VolumeRoom): { minX: number; maxX: number; minZ: number; maxZ: number } {
+  const halves = room.edgeHalfWalls;
+  const along = (axis: 'x' | 'z', at: number, from: number, to: number): number => {
+    let thinnest = Number.POSITIVE_INFINITY;
+    room.polygon.forEach((a, i) => {
+      const b = room.polygon[(i + 1) % room.polygon.length]!;
+      const other = axis === 'x' ? 'z' : 'x';
+      if (Math.abs(a[axis] - at) > SNAP_M || Math.abs(b[axis] - at) > SNAP_M) return;
+      const lo = Math.min(a[other], b[other]);
+      const hi = Math.max(a[other], b[other]);
+      if (Math.min(hi, to) - Math.max(lo, from) <= SNAP_M) return;
+      thinnest = Math.min(thinnest, halves?.[i] ?? room.halfWall);
+    });
+    return Number.isFinite(thinnest) ? thinnest : room.halfWall;
+  };
+  return {
+    minX: along('x', rect.minX, rect.minZ, rect.maxZ),
+    maxX: along('x', rect.maxX, rect.minZ, rect.maxZ),
+    minZ: along('z', rect.minZ, rect.minX, rect.maxX),
+    maxZ: along('z', rect.maxZ, rect.minX, rect.maxX),
+  };
+}
+
 /** Probes along a sampling extent: about one per `gridSpacingM`, at least two. */
 const probesAlong = (extent: number): number => Math.max(2, Math.round(extent / T.gridSpacingM) + 1);
 
@@ -265,16 +299,33 @@ export function roomVolumes(input: VolumeInput): VolumesResult {
         roomId,
         projection: box(rect, 0, height, 0),
         sampling,
-        selection: box(rect, -T.selectionPadM, height + T.selectionPadM, room.halfWall),
+        selection: (() => {
+          const grow = sideGrowth(rect, room);
+          return {
+            min: { x: rect.minX - grow.minX, y: -T.selectionPadM, z: rect.minZ - grow.minZ },
+            max: { x: rect.maxX + grow.maxX, y: height + T.selectionPadM, z: rect.maxZ + grow.maxZ },
+          };
+        })(),
         resolution: { x: probesAlong(sampling.max.x - sampling.min.x), y: T.gridLayers, z: probesAlong(sampling.max.z - sampling.min.z) },
       });
     }
     probes.push({ roomId, position: probePoint(room.polygon, input.furniture) });
   }
+  const oversized = boxes.find((b) => b.resolution.x > T.maxProbesPerAxis || b.resolution.z > T.maxProbesPerAxis);
+  if (oversized) {
+    return {
+      ok: false,
+      error: `a box of room ${oversized.roomId} needs ${oversized.resolution.x} x ${oversized.resolution.z} probes; room lighting takes at most ${T.maxProbesPerAxis} per axis`,
+    };
+  }
   if (boxes.length > T.maxBoxes) {
     return { ok: false, error: `the plan has ${boxes.length} room boxes; room lighting takes at most ${T.maxBoxes}` };
   }
   const all = input.rooms.flatMap((room) => room.polygon);
+  if (all.length === 0) {
+    const none = { x: 0, y: 0, z: 0 };
+    return { ok: true, volumes: { boxes, probes, bounds: { min: none, max: { ...none } } } };
+  }
   const bounds: Box = {
     min: { x: Math.min(...all.map((p) => p.x)), y: 0, z: Math.min(...all.map((p) => p.z)) },
     max: { x: Math.max(...all.map((p) => p.x)), y: height, z: Math.max(...all.map((p) => p.z)) },
