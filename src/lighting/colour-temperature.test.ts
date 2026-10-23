@@ -7,6 +7,7 @@
 import { describe, expect, test } from 'bun:test';
 import { colourTemperatureRgb, isLightTemperature } from './colour-temperature.js';
 import { LIGHTING_STANDARD } from './lighting-standard.js';
+import { LightingError } from './lighting-error.js';
 
 const luminance = ([r, g, b]: readonly [number, number, number]): number => 0.2126 * r + 0.7152 * g + 0.0722 * b;
 
@@ -45,8 +46,8 @@ describe('colourTemperatureRgb', () => {
   });
 
   test('refuses a value that is not a finite number', () => {
-    expect(() => colourTemperatureRgb(Number.NaN)).toThrow(RangeError);
-    expect(() => colourTemperatureRgb(Number.POSITIVE_INFINITY)).toThrow(RangeError);
+    expect(() => colourTemperatureRgb(Number.NaN)).toThrow(expect.objectContaining({ code: 'bad-options' }));
+    expect(() => colourTemperatureRgb(Number.POSITIVE_INFINITY)).toThrow(LightingError);
   });
 });
 

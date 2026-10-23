@@ -15,6 +15,7 @@
 
 import type { Triple } from './lighting-standard.js';
 import { TEMPERATURE_RANGE } from './temperature-range.js';
+import { LightingError } from './lighting-error.js';
 
 /** Linear value of one sRGB-encoded channel in 0–1. */
 function srgbToLinear(value: number): number {
@@ -28,10 +29,11 @@ function channel(value: number): number {
 /**
  * The linear RGB colour of `kelvin`, normalised to unit luminance. A
  * temperature outside the standard's range is clamped to its nearest end;
- * a value that is not a finite number throws a `RangeError`.
+ * a value that is not a finite number throws a `LightingError` with code `bad-options`.
  */
 export function colourTemperatureRgb(kelvin: number): Triple {
-  if (!Number.isFinite(kelvin)) throw new RangeError(`colour temperature must be a finite number of kelvin, got ${String(kelvin)}`);
+  if (!Number.isFinite(kelvin))
+    throw new LightingError('bad-options', `colour temperature must be a finite number of kelvin, got ${String(kelvin)}`);
   const { min, max } = TEMPERATURE_RANGE;
   const t = Math.min(max, Math.max(min, kelvin)) / 100;
   const r = channel(255);
