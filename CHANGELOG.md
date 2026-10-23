@@ -9,6 +9,16 @@ as described under [Versioning](#versioning).
 
 ### Changed
 
+- **Breaking for light-DOM hosts: the chrome holds its look against the
+  page's global CSS.** With `mountViewer` or `<jeex-viewer shadow="none">`,
+  unlayered page rules no heavier than one class, attribute or pseudo-class
+  plus three element names (`button {}`, `* {}`, `.entry-content p a {}`) no
+  longer restyle the chrome's buttons, text and icons. Weak overrides such as
+  a bare `.mode-button {}` stop winning as well. On both paths the root's (and
+  the page `body`'s) font family, size, weight, line height and spacing, and
+  its colour, no longer reach the chrome's text. The documented overrides
+  still work: `.jeex-viewer …` rules, the theme custom properties, `::part()`
+  and slots.
 - **`<jeex-viewer>` starts its viewer only when it is about to be seen.** The
   element holds its box from `connectedCallback` and starts the viewer when it
   comes within 100 px of the viewport, or on a pointer press or a focus inside

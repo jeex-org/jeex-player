@@ -14,6 +14,7 @@
 import * as THREE from 'three';
 import type { LibraryMapRole, LibraryMaterial, LibraryPbr, LibraryTint } from './finish-types.js';
 import type { LibraryDraw } from './room-finish.js';
+import { debugFlags } from '../shared/debug-flags.js';
 
 /** A library material's THREE material: standard, or physical when a field needs it. */
 export type LibraryThreeMaterial = THREE.MeshStandardMaterial | THREE.MeshPhysicalMaterial;
@@ -102,7 +103,7 @@ function applyPhysical(material: THREE.MeshPhysicalMaterial, pbr: LibraryPbr): v
   if (pbr.sheenColour !== undefined) material.sheenColor.set(pbr.sheenColour);
   if (pbr.clearcoat !== undefined) material.clearcoat = pbr.clearcoat;
   if (pbr.clearcoatRoughness !== undefined) material.clearcoatRoughness = pbr.clearcoatRoughness;
-  if (pbr.transmission !== undefined) material.transmission = pbr.transmission;
+  if (pbr.transmission !== undefined) material.transmission = debugFlags().noTransmission ? 0 : pbr.transmission;
   if (pbr.ior !== undefined) material.ior = pbr.ior;
   if (pbr.thicknessM !== undefined) material.thickness = pbr.thicknessM;
   if (pbr.attenuationDistanceM !== undefined) material.attenuationDistance = pbr.attenuationDistanceM;
@@ -144,7 +145,8 @@ export function attachLibraryMaps(material: LibraryThreeMaterial, draw: LibraryD
     material.color.set(tint ?? '#ffffff').multiplyScalar(tint === undefined ? 1 : tintGainOf(draw));
     if (facts.pbr.baseColour !== undefined) material.color.multiply(new THREE.Color(facts.pbr.baseColour));
   }
-  if (views.arm !== undefined) {
+  // A diagnostic switch can leave the ARM view off; the roughness and occlusion scalars stay as they are.
+  if (views.arm !== undefined && !debugFlags().noArm) {
     views.arm.channel = 0;
     material.aoMap = views.arm;
     material.roughnessMap = views.arm;

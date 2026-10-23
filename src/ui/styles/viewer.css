@@ -2,7 +2,9 @@
   The component stylesheet.
 
   Invariant: every rule is scoped to the `.jeex-viewer` root. There is no
-  `:root`, no `html`/`body`, no bare `*` or element selector and no `#id` —
+  `:root` (except as the zero-weight `:where(:root)` gate of the host-CSS
+  guard, see the end of the file), no `html`/`body`, no bare `*` or element
+  selector and no `#id` —
   a host page that embeds the viewer must get its own document back unchanged,
   and two viewers on one page must not fight over an id.
 
@@ -15,9 +17,11 @@
   (`?inline`) and adopted once per document or shadow root.
 
   Cascade layers: every rule below is in `reset` or `component`, declared in
-  that order. Both lose to UNLAYERED rules, which is the point — a host styling
+  that order, except the one unlayered guard at the end. Both layers lose to
+  UNLAYERED rules, which is the point — a host styling
   `jeex-viewer::part(control-bar)` from its own sheet wins without an
-  `!important` and without counting selectors.
+  `!important` and without counting selectors. In the light DOM the guard at
+  the end keeps a page's GENERIC rules (`button {}`, `* {}`) off the chrome.
 
   Theming: the custom properties on `.jeex-viewer` are the supported way to
   restyle the chrome. Their defaults are exactly the literals they replaced, so
@@ -38,6 +42,30 @@
   }
   .jeex-viewer button {
     font: inherit;
+  }
+  /*
+    The typography boundary. The root inherits the host's `body` (its size,
+    weight, line height, spacing, transform, alignment), across a shadow
+    boundary too, and the guard at the end cannot clean an INHERITED value, so
+    the root's direct children start the chrome's text from fixed values: the
+    ones a clean page passes down. Below the root, not on it, so the root and
+    the slot boxes (and the host's content in them) keep inheriting from the
+    host as before. The first selector is the light DOM, the second the
+    custom element's shadow root (and any shadow root a host mounts into).
+  */
+  :where(:root) .jeex-viewer > :not([data-jeex-slot]),
+  :host .jeex-viewer > :not([data-jeex-slot]) {
+    font: 400 medium/normal var(--jeex-font);
+    font-synthesis: none;
+    text-rendering: optimizeLegibility;
+    color: var(--jeex-surface-text);
+    letter-spacing: normal;
+    word-spacing: normal;
+    text-transform: none;
+    text-indent: 0;
+    text-shadow: none;
+    text-align: start;
+    white-space: normal;
   }
 }
 
@@ -1602,4 +1630,37 @@
       --jeex-walk-cameras-lift: 64px;
     }
   }
+}
+
+/*
+  The guard against the host page's own CSS, the sheet's ONLY unlayered rule.
+
+  On the light-DOM path (`mountViewer`, `<jeex-viewer shadow="none">`) the
+  page's stylesheets reach the chrome's elements, and an
+  unlayered `button { padding: 8px 10px }` or `* { line-height: 1.8 }` beats
+  every layered rule above. This rule outranks those by specificity and then
+  decides nothing: `revert-layer` hands each property back to the `reset` and
+  `component` layers (and, below them, to the browser's own defaults and to
+  inheritance), so the chrome computes on a hostile page what it computes on
+  a clean one. `all` leaves custom properties alone, so the theming
+  properties and the `--jeex-*` the chrome writes inline pass through.
+
+  Weight (0,1,3): `.jeex-viewer` is one class, and `:not(html)`, `:not(head)`
+  and `:not(body)` each weigh one element name while matching every element
+  in the viewer; `:where()` adds nothing. It beats every rule of one class,
+  attribute or pseudo-class with up to two element names, the nesting CMS
+  themes write (`.entry-content p a`, `.site-content main button`), wins a tie
+  with three element names by sheet order (an adopted sheet comes after the
+  document's own), and stays below (0,2,0), so `.jeex-viewer .mode-button`
+  still wins: how a host overrides on purpose (README, «Theming»).
+
+  Not guarded: the root itself (a host sizes and themes it), the slot boxes and
+  everything a host puts in them. `:where(:root)` adds no weight and cannot
+  match inside a shadow root: there the page's rules do not reach the chrome
+  at all, and a sheet a host adds to the shadow root keeps winning as before.
+*/
+:where(:root) .jeex-viewer :not(html):not(head):not(body):where(:not([data-jeex-slot], [data-jeex-slot] *)),
+:where(:root) .jeex-viewer :not(html):not(head):not(body):where(:not([data-jeex-slot], [data-jeex-slot] *))::before,
+:where(:root) .jeex-viewer :not(html):not(head):not(body):where(:not([data-jeex-slot], [data-jeex-slot] *))::after {
+  all: revert-layer;
 }
