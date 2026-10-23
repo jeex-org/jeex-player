@@ -16,7 +16,7 @@
 
 - [x] 3.1 Add `site` to `SceneData`, the zod schema, the shape validator and the compile-time agreement check; join or add version 2.3 (keep 2.2 readable); reject `site` in a 2.2 document in both the runtime validator and the generated JSON Schema (version-conditional); verify the validator tests for every scenario of `scene-site-orientation`, with field paths in the messages.
 - [x] 3.2 Regenerate the published JSON Schema and extend its test with the valid and invalid examples; verify `scripts/schema-gen.test.ts` and the schema gate.
-- [ ] 3.3 Document `site` in the README's scene format section and the CHANGELOG; verify the docs tests and spelling check pass.
+- [x] 3.3 Document `site` in the README's scene format section and the CHANGELOG; verify the docs tests and spelling check pass.
 
 ## 4. Shadow-only casters
 
@@ -30,7 +30,7 @@
 
 - [x] 5.1 Write `src/render/sun-shadow.ts` (`prepareSunShadow` returning cleanup; bounds by tag; `refit`, `markDirty`, `include`, `endPreview`) test-first with stub objects; verify its unit test (ground excluded, door sweeps included, include grows only past the fit, endPreview refits).
 - [x] 5.2 Wire it: render runtime installs the adapter and creates the rig with `shadowCache: true`; scene mount calls `prepareSunShadow` on load, rebuild, revision and model swap; context recovery reinstalls; every offscreen build in `capture-commands.ts` calls `prepareSunShadow` and its cleanup; exports skip shadow-only meshes; verify the affected unit tests, a default-state still from an overview whose ceilings block the sun, through the heavy queue, a cache-isolation test (dirty both the live and a capture rig, render the capture first and check the live rig still redraws, then the reverse), and that `render-runtime.ts` and `viewer-app.ts` stay under their line limits.
-- [x] 5.3 Wire every row of the mutation matrix below; expose the sun shadow redraw count on the debug surface (two-file change with its test); verify a browser test per row, through the heavy queue.
+- [ ] 5.3 Wire every row of the mutation matrix below; expose the sun shadow redraw count on the debug surface (two-file change with its test); verify a browser test per row, through the heavy queue.
 - [ ] 5.4 Browser test for «Casters that are not seen»: overview patches only under openings, no caster in still, panorama or mirror, none in GLB/USDZ export, picking through a cut-away wall, glass passes light; verify through the heavy queue.
 
 ### Mutation matrix (task 5.3)

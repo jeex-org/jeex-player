@@ -9,6 +9,21 @@ as described under [Versioning](#versioning).
 
 ### Added
 
+- **Scene schema 2.3: `site`, the plan's orientation and a sun preset.**
+  `site: { northDeg?, sun? }` says where true north lies (degrees clockwise
+  from `+Z` towards `+X`) and which sun preset lights the scene: `morning`,
+  `noon` or `evening` (artistic, not astronomical). An empty `site` is north
+  along `+Z` at `noon`; a document without `site` keeps the sun of earlier
+  versions. 2.2 documents stay readable and may not carry `site`; the
+  published JSON Schema says the same.
+- **`jeex-viewer/lighting`: a controllable apartment sun.**
+  `createApartmentRig` returns an `ApartmentRig` with `shadowMapSize`,
+  `setSunDirection`, `setShadowFrustum`, `markShadowDirty` and `shadowDraws`,
+  and takes a new option `shadowCache` (default `false`). The entry also
+  exports `sunDirection`, `LEGACY_SUN_DIRECTION` and `fitShadowFrustum`; the
+  standard publishes the sun presets and the shadow fit tuning.
+  `LIGHTING_STANDARD_VERSION` is 2. Existing rigs keep working unchanged.
+
 - **`jeex-viewer/lighting`: the lighting standard as a public entry.**
   `createLightingContext(three, renderer)` binds it to your own three.js
   (revision 186) and renderer; `createReferenceRig()` and
@@ -35,6 +50,15 @@ as described under [Versioning](#versioning).
   itself; the frame answers it before `ready` too.
 
 ### Changed
+
+- **The sun respects the apartment.** Its shadow is fitted to the walls,
+  ceilings, floors, furniture and door swings of the scene on screen (no more
+  fixed square that clipped large plans and wasted the map on small ones),
+  and drawn only when something that casts or receives changed. Ceilings
+  block the sun in every view and walls cut away by the overview keep their
+  shadow, so in an overview sunlight reaches the floors only through windows
+  and doors. Scenes look different where light used to fall through the
+  missing ceilings: that is intended.
 
 - **The player lights with the new standard: PBR Neutral instead of ACES
   Filmic.** Neutral keeps a material's hue and saturation where ACES washed
