@@ -18,8 +18,13 @@ export const WALK_LIGHTING_TUNING = Object.freeze({
   selectionPadM: 0.2,
   /** Probe spacing of a room grid along x and z, metres. */
   gridSpacingM: 1,
-  /** Probe layers of a room grid in height. */
-  gridLayers: 2,
+  /**
+   * Probe layers of a room grid in height. Three, not two: with two layers the
+   * probes sit just above the floor and just below the ceiling, under the sill
+   * and over the head of every window, and a wall facing a window was lit from
+   * a quarter of the light it gets (measured on the demo living room).
+   */
+  gridLayers: 3,
   /** Edge of a grid probe's capture cube, texels. */
   gridCubemapSize: 8,
   /** Grid probes (one cube render each) baked per frame. */

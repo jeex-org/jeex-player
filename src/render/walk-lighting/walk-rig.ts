@@ -7,7 +7,8 @@
  * In `capture` and `walk` the hemisphere and the fill, which reach through
  * walls, are dimmed to zero rather than removed, so no program changes; the
  * environment's diffuse goes off inside the rooms through the patch's
- * uniforms. `walk` adds a small ambient floor and the walk exposure.
+ * uniforms. `walk` adds a small ambient floor and the walk exposure, and
+ * divides the sky background's intensity by that exposure.
  *
  * Invariant: `editing` puts back exactly the values it found, the light
  * intensities and the renderer's exposure. The lights are looked up by name
@@ -36,6 +37,7 @@ export class WalkRig {
   /** What `editing` puts back, per light: read when the light first leaves the editing look. */
   private readonly saved = new WeakMap<THREE.Light, number>();
   private savedExposure: number | null = null;
+  private savedBackground: number | null = null;
 
   constructor(deps: WalkRigDeps) {
     this.deps = deps;
@@ -70,10 +72,15 @@ export class WalkRig {
     }
     if (this.current === 'walk') {
       this.savedExposure ??= renderer.toneMappingExposure;
+      this.savedBackground ??= scene.backgroundIntensity;
       renderer.toneMappingExposure = T.walkExposure;
+      // The sky through a window keeps the editing look under the walk exposure, as the facades do.
+      scene.backgroundIntensity = this.savedBackground / T.walkExposure;
     } else if (this.savedExposure !== null) {
       renderer.toneMappingExposure = this.savedExposure;
+      scene.backgroundIntensity = this.savedBackground ?? scene.backgroundIntensity;
       this.savedExposure = null;
+      this.savedBackground = null;
     }
     this.ambient.intensity = this.current === 'walk' ? T.ambientFloor : 0;
     setUniformState(uniforms, this.current);

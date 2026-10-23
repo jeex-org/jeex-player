@@ -34,7 +34,7 @@ function record(name: string, value: unknown): void {
 }
 
 afterAll(async () => {
-  await commands.writeFile('../../test-results/walk-lighting.json', JSON.stringify(results, null, 2));
+  await commands.writeFile('test-results/walk-lighting.json', JSON.stringify(results, null, 2));
 });
 
 /** A method as the prototype defines it, before a spy wraps it; called with `.call(this, ...)`. */
@@ -216,8 +216,17 @@ const ROOM = {
 
 /** Grey 0.18 matte cards facing +x: one in the windowless WC, one in the living room. */
 const PATCHES = {
-  wc: { at: new THREE.Vector3(6.95, 1.3, 1.8), camera: { position: { x: 7.95, y: 1.3, z: 1.8 }, target: { x: 6.95, y: 1.3, z: 1.8 } } },
-  living: { at: new THREE.Vector3(1.0, 1.3, 6.4), camera: { position: { x: 2.0, y: 1.3, z: 6.4 }, target: { x: 1.0, y: 1.3, z: 6.4 } } },
+  wc: {
+    at: new THREE.Vector3(6.95, 1.3, 1.8),
+    camera: { position: { x: 7.95, y: 1.3, z: 1.8 }, target: { x: 6.95, y: 1.3, z: 1.8 } },
+    yaw: Math.PI / 2,
+  },
+  // Facing the living room's west window (x = 0, z = 8).
+  living: {
+    at: new THREE.Vector3(1.6, 1.3, 7.6),
+    camera: { position: { x: 0.6, y: 1.3, z: 7.6 }, target: { x: 1.6, y: 1.3, z: 7.6 } },
+    yaw: -Math.PI / 2,
+  },
 };
 
 function addPatches(scene: THREE.Scene): void {
@@ -230,7 +239,7 @@ function addPatches(scene: THREE.Scene): void {
     const card = new THREE.Mesh(new THREE.PlaneGeometry(0.5, 0.5), material);
     card.name = `test-patch-${name}`;
     card.position.copy(patch.at);
-    card.rotation.y = Math.PI / 2;
+    card.rotation.y = patch.yaw;
     scene.add(card);
   }
 }
@@ -260,14 +269,11 @@ describe('room lighting on the demo apartment', { timeout: MOUNT_TIMEOUT_MS }, (
     });
     // The live scene, caught on its first draw, gets the grey cards before anything is measured.
     let live: THREE.Scene | null = null;
-    const render = original(THREE.WebGLRenderer.prototype, 'render');
-    const caught = vi.spyOn(THREE.WebGLRenderer.prototype, 'render').mockImplementation(function (
-      this: THREE.WebGLRenderer,
-      scene,
-      camera,
-    ) {
-      if ((scene as THREE.Scene).isScene && scene.getObjectByName('jeex-lighting-apartment-rig')) live ??= scene as THREE.Scene;
-      render.call(this, scene, camera);
+    const add = original(THREE.Object3D.prototype, 'add');
+    const caught = vi.spyOn(THREE.Object3D.prototype, 'add').mockImplementation(function (this: THREE.Object3D, ...objects) {
+      if ((this as THREE.Scene).isScene && objects.some((object) => object.name === 'jeex-lighting-apartment-rig'))
+        live ??= this as THREE.Scene;
+      return add.apply(this, objects);
     });
     handle = mountViewer(openContainer(480, 320), {
       scene: { repository: new InlineSceneRepository(demoScene()) },
@@ -279,6 +285,10 @@ describe('room lighting on the demo apartment', { timeout: MOUNT_TIMEOUT_MS }, (
     await until(() => live !== null, 'the first frame', 60_000);
     caught.mockRestore();
     addPatches(live!);
+    // The bank's lamps reach through walls until the lamp step: off, so the rooms are compared by daylight alone.
+    live!.traverse((object) => {
+      if ((object as THREE.PointLight).isPointLight) (object as THREE.PointLight).intensity = 0;
+    });
   }, MOUNT_TIMEOUT_MS);
 
   afterAll(() => {
@@ -396,6 +406,7 @@ describe('room lighting on the demo apartment', { timeout: MOUNT_TIMEOUT_MS }, (
       16,
     );
     record('facade', { walk, editing });
+    record('editing', { wc: await patch('wc'), living: await patch('living') });
     expect(Math.abs(walk - editing) / editing).toBeLessThan(0.05);
   });
 
@@ -425,9 +436,13 @@ describe('room lighting on the demo apartment', { timeout: MOUNT_TIMEOUT_MS }, (
   test('a still of the live view in walk is as dark as the screen, within 2 %', async () => {
     const draw = original(WalkPost.prototype, 'render');
     let screen: number | null = null;
+    let pose: { position: THREE.Vector3; target: THREE.Vector3; fov: number } | null = null;
     const spy = vi.spyOn(WalkPost.prototype, 'render').mockImplementation(function (this: WalkPost, ...args) {
       draw.apply(this, args);
       if (screen !== null) return;
+      const camera = args[1] as THREE.PerspectiveCamera;
+      const position = camera.getWorldPosition(new THREE.Vector3());
+      pose = { position, target: position.clone().add(camera.getWorldDirection(new THREE.Vector3())), fov: camera.fov };
       const gl = lighting.renderer.getContext();
       const width = gl.drawingBufferWidth;
       const height = gl.drawingBufferHeight;
@@ -441,7 +456,9 @@ describe('room lighting on the demo apartment', { timeout: MOUNT_TIMEOUT_MS }, (
     await until(() => screen !== null, 'a frame on screen', 10_000);
     spy.mockRestore();
     const size = lighting.renderer.getDrawingBufferSize(new THREE.Vector2());
-    const { blob } = await handle.capture.still({ width: size.x, height: size.y, camera: 'live', caption: false });
+    const shot = pose!;
+    const camera = { position: shot.position, target: shot.target };
+    const { blob } = await handle.capture.still({ width: size.x, height: size.y, camera, fov: shot.fov, caption: false });
     const still = await centreLuminance(blob, 16);
     record('stillVsScreen', { still, screen });
     expect(Math.abs(still - screen!) / screen!).toBeLessThan(0.02);
@@ -581,14 +598,31 @@ describe('reflections from the room probes', { timeout: MOUNT_TIMEOUT_MS }, () =
     });
     // Pitch 0 and off the probe's point (the room centre): a vertical stripe and its reflection share a column.
     const { pixels } = world.shoot({ x: 1.3, y: 1.3, z: 3.6 }, { x: 1.3, y: 1.3, z: 0 });
+    /** The centroid column of the pixels above half the row's maximum: the stripe's centre, to a fraction of a pixel. */
     const brightest = (row: number): number => {
-      let best = 0;
-      for (let x = 1; x < world.size.w; x += 1) if (world.lum(pixels, x, row) > world.lum(pixels, best, row)) best = x;
-      return best;
+      let peak = 0;
+      for (let x = 0; x < world.size.w; x += 1) peak = Math.max(peak, world.lum(pixels, x, row));
+      let sum = 0;
+      let weight = 0;
+      for (let x = 0; x < world.size.w; x += 1) {
+        const value = world.lum(pixels, x, row);
+        if (value < peak / 2) continue;
+        sum += x * value;
+        weight += value;
+      }
+      return Math.round((sum / weight) * 10) / 10;
     };
-    const stripe = brightest(Math.round(world.size.h * 0.6));
-    const reflection = brightest(Math.round(world.size.h * 0.2));
-    record('reflectionColumns', { stripe, reflection });
+    // Rows count from the bottom: 0.6 crosses the stripe, 0.1 the floor about 2.8 m ahead.
+    const stripeRow = Math.round(world.size.h * 0.6);
+    const floorRow = Math.round(world.size.h * 0.1);
+    const stripe = brightest(stripeRow);
+    const reflection = brightest(floorRow);
+    record('reflectionColumns', {
+      stripe,
+      reflection,
+      floorRowMean:
+        Array.from({ length: world.size.w }, (_, x) => world.lum(pixels, x, floorRow)).reduce((sum, v) => sum + v, 0) / world.size.w,
+    });
     expect(Math.abs(reflection - stripe)).toBeLessThanOrEqual(2);
     // Re-captured twice, a probe is the same: no probe sees an earlier one.
     const atlas = (world.lighting as unknown as { atlas: { target: THREE.WebGLRenderTarget } }).atlas.target;

@@ -38,20 +38,22 @@ describe('WalkRig', () => {
   });
 
   test('walk: the ambient floor and the walk exposure on, box probes on', () => {
-    const { sky, renderer, uniforms, rig } = setup();
+    const { scene, sky, renderer, uniforms, rig } = setup();
     rig.setState('walk');
     expect(sky.intensity).toBe(0);
     expect(rig.ambient.intensity).toBe(T.ambientFloor);
     expect(renderer.toneMappingExposure).toBe(T.walkExposure);
     expect(uniforms.jeexBoxProbes.value).toBe(1);
+    expect(scene.backgroundIntensity).toBeCloseTo(1 / T.walkExposure, 9);
   });
 
   test('back to editing restores every value exactly, also through capture and walk', () => {
-    const { sky, fill, renderer, uniforms, rig } = setup();
+    const { scene, sky, fill, renderer, uniforms, rig } = setup();
     rig.setState('capture');
     rig.setState('walk');
     rig.setState('capture');
     rig.setState('editing');
+    expect(scene.backgroundIntensity).toBe(1);
     expect([sky.intensity, fill.intensity, renderer.toneMappingExposure, rig.ambient.intensity]).toEqual([0.9, 0.4, 1, 0]);
     expect([uniforms.jeexDiffuse.value, uniforms.jeexBoxProbes.value]).toEqual([1, 0]);
   });

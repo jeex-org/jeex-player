@@ -130,6 +130,7 @@ describe('roomVolumes', () => {
     expect(bath!.selection.max.y).toBeCloseTo(2.6 + T.selectionPadM, 9);
     // About one probe per metre in plan, two layers in height.
     expect(bath!.resolution).toEqual({ x: 4, y: T.gridLayers, z: 4 });
+    expect(T.gridLayers).toBe(3);
   });
 
   test('gives every room one probe point and the apartment its bounds', () => {
