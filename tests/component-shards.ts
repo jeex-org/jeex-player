@@ -58,6 +58,7 @@ export const COMPONENT_FILE_COST_S: Readonly<Record<string, number>> = {
   'library-panel.test.ts': 4,
   'lighting-calibration.test.ts': 1,
   'minimap.test.ts': 1,
+  'no-webgl.test.ts': 1,
   'panorama.test.ts': 1,
   'plan-modes.test.ts': 1,
   'plan-raster.test.ts': 1,
@@ -75,6 +76,7 @@ export const COMPONENT_FILE_COST_S: Readonly<Record<string, number>> = {
   'sun-shadow.test.ts': 36,
   'swatch-preview.test.ts': 20,
   'target-sizes.test.ts': 1,
+  'texture-prewarm.test.ts': 3,
   'tour-bar.test.ts': 1,
   'tour-cameras.test.ts': 232,
   'video-frames.test.ts': 53,
@@ -86,6 +88,7 @@ export const COMPONENT_FILE_COST_S: Readonly<Record<string, number>> = {
   'walk-keys.test.ts': 22,
   'walk-lighting.test.ts': 198,
   'walk-post.test.ts': 24,
+  'webgl-probe.test.ts': 1,
   'wheel-ownership.test.ts': 1,
 };
 

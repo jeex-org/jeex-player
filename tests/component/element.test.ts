@@ -610,3 +610,259 @@ describe('the unbranded overlay flag', () => {
     expect(element.viewer!.options.interaction).toBe('none');
   });
 });
+
+/**
+ * Every distinct WebGL context the page creates from now on, for the start
+ * tests: the probe and three each call `getContext`, and both calls answer the
+ * same context, so the CONTEXTS are counted, not the calls.
+ */
+function watchContexts(): { contexts: Set<unknown>; restore: () => void } {
+  const contexts = new Set<unknown>();
+  const prototype = HTMLCanvasElement.prototype;
+  const descriptor = Object.getOwnPropertyDescriptor(prototype, 'getContext')!;
+  const original = descriptor.value as (this: HTMLCanvasElement, ...args: unknown[]) => unknown;
+  Object.defineProperty(prototype, 'getContext', {
+    ...descriptor,
+    value(this: HTMLCanvasElement, ...args: unknown[]) {
+      const context = original.apply(this, args);
+      if (context !== null && (args[0] === 'webgl2' || args[0] === 'webgl')) contexts.add(context);
+      return context;
+    },
+  });
+  return { contexts, restore: () => Object.defineProperty(prototype, 'getContext', descriptor) };
+}
+
+/** A container far below the viewport, out of reach of the start margin. */
+function belowTheFold(): HTMLElement {
+  const container = openContainer();
+  container.style.setProperty('margin-block-start', `${window.innerHeight + 2000}px`);
+  return container;
+}
+
+function placeIn(container: HTMLElement, attributes: Record<string, string>): JeexViewerElement {
+  const element = document.createElement(DEFAULT_TAG);
+  for (const [name, value] of Object.entries(attributes)) element.setAttribute(name, value);
+  container.appendChild(element);
+  elements.push(element);
+  return element;
+}
+
+/** Two rendered frames: an observer that was going to report has reported by then. */
+async function twoFrames(): Promise<void> {
+  for (let frame = 0; frame < 2; frame += 1) {
+    await new Promise((resolve) => {
+      requestAnimationFrame(resolve);
+    });
+  }
+}
+
+describe('the deferred start', () => {
+  test('a below-the-fold element keeps its box, builds nothing and makes no context until it is scrolled near', async () => {
+    const watched = watchContexts();
+    try {
+      const container = belowTheFold();
+      const element = placeIn(container, base());
+      await twoFrames();
+      expect(element.shadowRoot).not.toBeNull();
+      expect(element.shadowRoot!.querySelector(VIEWER_ROOT_SELECTOR)).toBeNull();
+      expect(element.getBoundingClientRect().height).toBeCloseTo((element.getBoundingClientRect().width * 9) / 16, 0);
+      expect(element.matches(':state(loading)')).toBe(true);
+      expect(watched.contexts.size).toBe(0);
+      // The handle is there from the connect on.
+      expect(element.viewer).not.toBeNull();
+
+      const box = element.getBoundingClientRect();
+      container.scrollIntoView();
+      await element.viewer!.ready;
+      expect(element.shadowRoot!.querySelector(VIEWER_ROOT_SELECTOR)).not.toBeNull();
+      // The box did not move under the viewer: same size before and after the start.
+      expect(element.getBoundingClientRect().width).toBe(box.width);
+      expect(element.getBoundingClientRect().height).toBe(box.height);
+      // One context for the viewer: the probe's, taken over by the renderer.
+      expect(watched.contexts.size).toBe(1);
+    } finally {
+      watched.restore();
+      window.scrollTo(0, 0);
+    }
+  });
+
+  test('a press on a below-the-fold element starts it without a scroll', async () => {
+    const element = placeIn(belowTheFold(), base());
+    await twoFrames();
+    expect(element.shadowRoot!.querySelector(VIEWER_ROOT_SELECTOR)).toBeNull();
+    element.dispatchEvent(new PointerEvent('pointerdown', { bubbles: true }));
+    await element.viewer!.ready;
+    expect(element.shadowRoot!.querySelector(VIEWER_ROOT_SELECTOR)).not.toBeNull();
+  });
+
+  test('commands given before the start are applied once it runs', async () => {
+    const container = belowTheFold();
+    const element = placeIn(container, base());
+    const atReady: Array<{ mode: string; scene: boolean }> = [];
+    const atScene: boolean[] = [];
+    element.addEventListener('jeex-scene', () => atScene.push(element.viewer!.getScene() !== null), { once: true });
+    element.addEventListener(
+      'jeex-ready',
+      () => atReady.push({ mode: element.viewer!.getMode(), scene: element.viewer!.getScene() !== null }),
+      { once: true },
+    );
+    element.viewer!.setMode('plan2d');
+    expect(element.viewer!.getMode()).toBe('plan2d');
+    expect(element.viewer!.getScene()).toBeNull();
+    container.scrollIntoView();
+    await element.viewer!.ready;
+    expect(element.viewer!.getMode()).toBe('plan2d');
+    expect(element.viewer!.getScene()).not.toBeNull();
+    // Inside the boot's own events the handle answers from the running viewer,
+    // and the queued mode is already applied when `jeex-ready` fires.
+    expect(atScene).toEqual([true]);
+    expect(atReady).toEqual([{ mode: 'plan2d', scene: true }]);
+    window.scrollTo(0, 0);
+  });
+
+  test(
+    'two viewers on a page make one context each',
+    async () => {
+      const watched = watchContexts();
+      try {
+        const first = placeIn(openContainer(), base());
+        const second = placeIn(openContainer(), base());
+        first.scrollIntoView();
+        await first.viewer!.ready;
+        second.scrollIntoView();
+        await second.viewer!.ready;
+        expect(watched.contexts.size).toBe(2);
+      } finally {
+        watched.restore();
+        window.scrollTo(0, 0);
+      }
+    },
+    MOUNT_PLUS_RELOAD_TIMEOUT_MS,
+  );
+});
+
+describe('the handle before and after the start', () => {
+  test(
+    'answers every member as a viewer before its first scene, then forwards each to the running viewer',
+    async () => {
+      const container = belowTheFold();
+      const element = placeIn(container, base());
+      const viewer = element.viewer!;
+      const id = '0192a8f0-0000-7000-8000-000000000001';
+      const selection = { kind: 'room', id, mode: 'orbit' } as const;
+
+      // Before the start: the answers of a viewer whose first scene is still loading.
+      expect(viewer.element).toBe(element.shadowRoot!.firstElementChild);
+      expect(viewer.options.readonly).toBe(true);
+      expect(viewer.getLocale()).toBe('en');
+      expect(viewer.getFurnitureVisible()).toBe(true);
+      expect(viewer.isCheckpointOverlayVisible()).toBe(false);
+      expect(viewer.getState()).toMatchObject({ sceneId: null, rev: 0, tour: null, walk: { camera: { index: null, count: 0 } } });
+      expect([viewer.project(), viewer.describeSelection(selection), viewer.slots.anchorPoint(), viewer.tour.progress()]).toEqual([
+        null,
+        null,
+        null,
+        null,
+      ]);
+      const answers = [
+        viewer.focusRoom(id),
+        viewer.stepCamera('next'),
+        viewer.addCheckpoint({ id }),
+        viewer.startCheckpointPlacement({ id }),
+        viewer.setCheckpointFromView(id),
+        viewer.frameCheckpoint(id),
+        viewer.lookThroughCheckpoint(id),
+        viewer.endLookThrough(false),
+        viewer.focusCheckpoint(null),
+        viewer.mirrorAsset(id, 'x'),
+        viewer.turnAsset(id, 1),
+      ];
+      expect(answers).toEqual(answers.map(() => false));
+      await expect(viewer.exportUsdz()).rejects.toMatchObject({ code: 'not-ready' });
+      await expect(viewer.capture.panorama({ width: 64, roomId: id })).rejects.toMatchObject({ code: 'not-ready' });
+      await expect(viewer.capture.pair({ width: 64, height: 64 })).rejects.toMatchObject({ code: 'not-ready' });
+      // Every command is queued, none throws, none starts the viewer.
+      viewer.setFurnitureVisible(false);
+      viewer.setLocale('de');
+      viewer.setCheckpointOverlay(true);
+      viewer.setSelection(null);
+      viewer.cancelCheckpointPlacement();
+      viewer.revertCheckpointEdit();
+      viewer.setAssetMoveTool(false);
+      viewer.armAssetMove();
+      viewer.revertAssetEdit();
+      viewer.resize();
+      viewer.slots.anchorTo(null);
+      viewer.tour.play();
+      viewer.tour.toggle();
+      viewer.tour.stop();
+      viewer.tour.seekDistance(0);
+      viewer.tour.seekTime(0);
+      viewer.tour.setSpeed(1);
+      viewer.tour.pause();
+      viewer.tour.seek(0);
+      const heard: string[] = [];
+      const offScene = viewer.on('scene', () => heard.push('scene'));
+      const offEarly = viewer.on('mode', () => heard.push('dropped'));
+      offEarly();
+      const offState = viewer.tour.on('state', () => heard.push('state'));
+      const offTourEarly = viewer.tour.on('ended', () => heard.push('dropped'));
+      offTourEarly();
+      const swapped = viewer.loadScene({ url: sceneUrl() });
+      expect([viewer.getFurnitureVisible(), viewer.getLocale(), viewer.isCheckpointOverlayVisible()]).toEqual([false, 'de', true]);
+      await twoFrames();
+      expect(element.shadowRoot!.querySelector(VIEWER_ROOT_SELECTOR)).toBeNull();
+
+      container.scrollIntoView();
+      await viewer.ready;
+      // After the boot the same object answers from the running viewer, with the queued setters applied.
+      expect(viewer.getFurnitureVisible()).toBe(false);
+      expect(viewer.getLocale()).toBe('de');
+      expect(viewer.isCheckpointOverlayVisible()).toBe(true);
+      expect(viewer.getState().sceneId).not.toBeNull();
+      expect(viewer.getScene()).not.toBeNull();
+      expect(viewer.element.matches(VIEWER_ROOT_SELECTOR)).toBe(true);
+      expect(viewer.options.readonly).toBe(true);
+      expect(viewer.tour.progress()).not.toBeNull();
+      expect(viewer.focusRoom('not-a-uuid')).toBe(false);
+      expect(viewer.slots.anchorPoint()).toBeNull();
+      expect(() => viewer.slots.get('selection-anchor')).toThrow(expect.objectContaining({ code: 'bad-params' }));
+      await swapped;
+      await until(() => heard.includes('scene'), 'the scene event of the queued load', SECOND_BUILD_WAIT_MS);
+      expect(heard).not.toContain('dropped');
+      offScene();
+      offState();
+      const still = await viewer.capture.still({ width: 32, height: 32 });
+      expect(still).toBeDefined();
+      window.scrollTo(0, 0);
+    },
+    MOUNT_PLUS_RELOAD_TIMEOUT_MS,
+  );
+});
+
+describe('the `loading` attribute on a real element', () => {
+  test('the property reflects the attribute and reads the normalised value', () => {
+    const element = placeIn(belowTheFold(), base());
+    expect(element.loading).toBe('lazy');
+    element.setAttribute('loading', 'soon');
+    expect(element.loading).toBe('lazy');
+    element.loading = 'eager';
+    expect(element.getAttribute('loading')).toBe('eager');
+    expect(element.loading).toBe('eager');
+  });
+
+  test('an eager element below the fold starts at the connect', async () => {
+    const element = placeIn(belowTheFold(), { ...base(), loading: 'eager' });
+    await element.viewer!.ready;
+    expect(element.shadowRoot!.querySelector(VIEWER_ROOT_SELECTOR)).not.toBeNull();
+  });
+
+  test('setting loading to eager on a waiting element starts it', async () => {
+    const element = placeIn(belowTheFold(), base());
+    await twoFrames();
+    expect(element.shadowRoot!.querySelector(VIEWER_ROOT_SELECTOR)).toBeNull();
+    element.loading = 'eager';
+    await element.viewer!.ready;
+    expect(element.shadowRoot!.querySelector(VIEWER_ROOT_SELECTOR)).not.toBeNull();
+  });
+});

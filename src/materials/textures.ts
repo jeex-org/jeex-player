@@ -25,18 +25,8 @@ import {
   overlayNoise,
   type Ctx,
 } from './texture-canvas.js';
-import {
-  adjustHsl,
-  hash2,
-  makeRandom,
-  periodicFbm,
-  periodicNoise2D,
-  periodicRidge,
-  rgba,
-  shadeHex,
-  terrazzoPalette,
-  tileGrid,
-} from './texture-noise.js';
+import { PAPER, PLASTER_TOOTH, SKY_VEIL, TERRAZZO_SHEEN, plasterBroadSpec, tileSheenSpec, weaveSlubSpec } from './noise-tiles.js';
+import { adjustHsl, hash2, makeRandom, rgba, shadeHex, terrazzoPalette, tileGrid } from './texture-noise.js';
 
 export { getTextureAnisotropy, resetTextureCache, setTextureAnisotropy } from './texture-canvas.js';
 export { chevronTexture, planksBumpTexture, planksTexture, woodGrainBumpTexture, woodGrainTexture } from './textures-wood.js';
@@ -98,12 +88,7 @@ export function terrazzoTexture(base = '#a7b5a6', seed = 7): THREE.Texture | nul
         }
       }
       // Polished sheen: broad, very low contrast, periodic.
-      overlayNoise(
-        ctx,
-        size,
-        noiseTile('terrazzo-sheen', 512, (x, y) => 0.5 + (periodicFbm(x, y, { octaves: 2, freq: 2, gain: 0.5, seed: 707 }) - 0.5) * 0.3),
-        0.35,
-      );
+      overlayNoise(ctx, size, noiseTile(TERRAZZO_SHEEN), 0.35);
     },
     { size: 1024 },
   );
@@ -304,12 +289,7 @@ export function tilesTexture(base: string, grout: string, seed = 11, options: Ti
       ctx.restore();
       // High enough frequency that the sheen reads as surface, not as a blotch
       // sitting on individual tiles.
-      overlayNoise(
-        ctx,
-        size,
-        noiseTile('tile-sheen', size, (x, y) => 0.5 + (periodicFbm(x, y, { octaves: 3, freq: 12, gain: 0.5, seed: 133 }) - 0.5) * 0.18),
-        0.3,
-      );
+      overlayNoise(ctx, size, noiseTile(tileSheenSpec(size)), 0.3);
     },
     { size: settings.size },
   );
@@ -357,21 +337,8 @@ export function plasterTexture(base: string, seed = 5): THREE.Texture | null {
       ctx.fillStyle = base;
       ctx.fillRect(0, 0, size, size);
       // Trowel-scale undulation, then a fine tooth: both periodic, both subtle.
-      overlayNoise(
-        ctx,
-        size,
-        noiseTile('plaster-broad', size, (x, y) => 0.5 + (periodicFbm(x, y, { octaves: 4, freq: 3, gain: 0.55, seed: 21 }) - 0.5) * 0.34),
-        0.5,
-      );
-      overlayNoise(
-        ctx,
-        size,
-        noiseTile('plaster-tooth', 256, (x, y) => {
-          const fine = periodicFbm(x, y, { octaves: 3, freq: 32, gain: 0.5, seed: 55 });
-          return 0.5 + (fine - 0.5) * 0.5;
-        }),
-        0.28,
-      );
+      overlayNoise(ctx, size, noiseTile(plasterBroadSpec(size)), 0.5);
+      overlayNoise(ctx, size, noiseTile(PLASTER_TOOTH), 0.28);
     },
     { size: 512 },
   );
@@ -397,15 +364,7 @@ export function stripesTexture(base: string, stripe: string, options: StripeOpti
       ctx.fillStyle = base;
       ctx.fillRect(0, 0, canvasSize, canvasSize);
       // Paper ground: a fine linen tooth with a slight vertical bias.
-      overlayNoise(
-        ctx,
-        canvasSize,
-        noiseTile('paper', 256, (x, y) => {
-          const weave = periodicNoise2D(x, y, 96, 12) * 0.6 + periodicNoise2D(x, y, 24, 34) * 0.4;
-          return 0.5 + (weave - 0.5) * 0.42;
-        }),
-        0.45,
-      );
+      overlayNoise(ctx, canvasSize, noiseTile(PAPER), 0.45);
 
       for (let index = 0; index < periods; index += 1) {
         const x = index * period;
@@ -493,15 +452,7 @@ export function fabricTexture(base: string, options: WeaveOptions = {}): THREE.T
       }
 
       // Slubs and nap: periodic fields, so the cloth never shows a repeat grid.
-      overlayNoise(
-        ctx,
-        size,
-        noiseTile(`weave-slub:${seed}`, 256, (x, y) => {
-          const slub = periodicFbm(x, y, { octaves: 3, freq: 6, gain: 0.55, seed: seed * 7 + 3 });
-          return 0.5 + (slub - 0.5) * 0.55;
-        }),
-        0.4,
-      );
+      overlayNoise(ctx, size, noiseTile(weaveSlubSpec(seed)), 0.4);
       overlayNoise(ctx, size, grainTile(GRAIN_FABRIC, 0.55, 256), 0.42);
     },
     { size: settings.size },
@@ -547,12 +498,7 @@ export function skyTexture(top: string, horizon: string): THREE.Texture | null {
       ctx.fillStyle = gradient;
       ctx.fillRect(0, 0, size, size);
       // A whisper of cloud keeps the large flat gradient from banding.
-      overlayNoise(
-        ctx,
-        size,
-        noiseTile('sky-veil', 128, (x, y) => 0.5 + (periodicRidge(x, y, { octaves: 3, freq: 2, gain: 0.5, seed: 3 }) - 0.5) * 0.25),
-        0.3,
-      );
+      overlayNoise(ctx, size, noiseTile(SKY_VEIL), 0.3);
     },
     { size: 256, repeatWrap: false },
   );

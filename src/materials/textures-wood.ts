@@ -10,12 +10,12 @@
 
 import * as THREE from 'three';
 import { GRAIN_WOOD, cached, drawWrapped, grainTile, noiseTile, overlayNoise, type Ctx } from './texture-canvas.js';
+import { PLANK_WEAR, WOOD_DRIFT, WOOD_PORES } from './noise-tiles.js';
 import {
   adjustHsl,
   chevronRowCount,
   hash2,
   makeRandom,
-  periodicFbm,
   periodicNoise2D,
   plankRowSpans,
   rgba,
@@ -166,12 +166,7 @@ export function planksTexture(base: string, seed = 1, options: PlankOptions = {}
 
       // Whole-floor wear: very low contrast, periodic, so it never shows a grid.
       overlayNoise(ctx, size, grainTile(GRAIN_WOOD, 0.5, 256), 0.5);
-      overlayNoise(
-        ctx,
-        size,
-        noiseTile('plank-wear', 512, (x, y) => 0.5 + (periodicFbm(x, y, { octaves: 3, freq: 2, gain: 0.6, seed: 401 }) - 0.5) * 0.42),
-        0.35,
-      );
+      overlayNoise(ctx, size, noiseTile(PLANK_WEAR), 0.35);
     },
     { size: settings.size },
   );
@@ -347,12 +342,7 @@ export function woodGrainTexture(base: string, seed = 1, options: WoodGrainOptio
       ctx.fillRect(0, 0, size, size);
 
       // Broad tone drift across the board; periodic, so the ends still match.
-      overlayNoise(
-        ctx,
-        size,
-        noiseTile('wood-drift', 256, (x, y) => 0.5 + (periodicFbm(x, y, { octaves: 3, freq: 2, gain: 0.55, seed: 811 }) - 0.5) * 0.3),
-        0.45,
-      );
+      overlayNoise(ctx, size, noiseTile(WOOD_DRIFT), 0.45);
 
       const step = size / lines;
       for (let line = 0; line < lines; line += 1) {
@@ -414,17 +404,7 @@ export function woodGrainBumpTexture(seed = 1, options: WoodGrainOptions = {}): 
     (ctx, size) => {
       ctx.fillStyle = '#808080';
       ctx.fillRect(0, 0, size, size);
-      overlayNoise(
-        ctx,
-        size,
-        noiseTile('wood-pores', 256, (x, y) => {
-          // Six times the lattice frequency across the grain: reads as pores, not as noise.
-          const along = periodicFbm(x, y * 6, { octaves: 3, freq: 4, gain: 0.5, seed: 613 });
-          return 0.5 + (along - 0.5) * 0.9;
-        }),
-        0.85,
-        'overlay',
-      );
+      overlayNoise(ctx, size, noiseTile(WOOD_PORES), 0.85, 'overlay');
       overlayNoise(ctx, size, grainTile(GRAIN_WOOD, 0.5, 256), 0.5, 'overlay');
     },
     { size: 256, kind: 'data' },
