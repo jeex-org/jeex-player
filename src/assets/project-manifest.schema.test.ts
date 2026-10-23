@@ -184,6 +184,19 @@ describe('projectManifestIssues — what a bake must look like', () => {
     expect(projectManifestIssues(manifest)).toEqual([]);
   });
 
+  test('layout.footprint is a fraction in (0, 1] and layout.blockingHeight is not negative', () => {
+    const withLayout = (layout: Record<string, unknown>): unknown => broken((manifest) => void (firstObject(manifest)['layout'] = layout));
+    for (const footprint of [0, -0.5, 1.5]) {
+      const issues = projectManifestIssues(withLayout({ footprint }));
+      expect(issues.map((issue) => issue.path.join('.'))).toEqual(['library.objects.0.layout.footprint']);
+    }
+    expect(projectManifestIssues(withLayout({ blockingHeight: -0.1 })).map((issue) => issue.path.join('.'))).toEqual([
+      'library.objects.0.layout.blockingHeight',
+    ]);
+    expect(projectManifestIssues(withLayout({ footprint: 1, blockingHeight: 0 }))).toEqual([]);
+    expect(projectManifestIssues(withLayout({ footprint: 0.42, blockingHeight: 0.92 }))).toEqual([]);
+  });
+
   test('the producer mark is an http(s) link and nothing else', () => {
     expect(projectManifestIssues(broken((manifest) => void delete manifest['mark']))).toEqual([]);
     expect(projectManifestIssues(broken((manifest) => void (manifest['mark'] = { href: 'http://localhost:8080/owners' })))).toEqual([]);

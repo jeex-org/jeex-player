@@ -925,6 +925,14 @@ type ProjectRights = {
 // version (a v4 included) is refused.
 ```
 
+Sizes. A project object's `dims` (and a variant's) is the OVERALL bounding box of its model, taps, backsplashes and canopies included (the player warns with `asset-defect` when a GLB is off it by more than 2 %). Two `layout` facts say what of that box stands on the floor: `layout.footprint`, a FRACTION of the plan size (`0.5` is half the width and half the depth: a plant's pot rather than its canopy), and `layout.blockingHeight`, in metres (a vanity's basin rim rather than its tap). The objects built into the player declare carcass dimensions and the same two facts where a part overhangs. Walk collision, the 2D plan's fixture outlines, the layout rules, free-space suggestions and dragging all read an object from one place, the project's library first and the built-in objects behind it, by one rule:
+
+1. a placement's own `collision` box, when it has one;
+2. else a floor-anchored object whose blocking height (`layout.blockingHeight`, else the height in `dims`) is at least 0.15 m stands on the floor with `dims` times `layout.footprint` (all of `dims` when absent); a rug or a mat lower than that is walked over, and wall and ceiling objects are walked under;
+3. a placement no library knows is left out rather than given a guessed size.
+
+The placement's `scale` multiplies the result; the 0.15 m test reads the unscaled height.
+
 Pricing and access are metadata supplied by whoever produced the bake. The player checks their shape (an unknown key or value is a `project-invalid` refusal like any other), copies a variant's `pricing.model` onto its placed object's `userData.pricing`, carries `access` and `allowed` into [`describeSelection`](#viewer-handle-api) and hands the whole manifest, `rights` included, to the host through `project()`. It shows no price, badge or lock and refuses no variant because of them.
 
 A material is either `pbr` (KTX2 maps inside the folder) or `generator` — a named parametric texture the viewer draws itself: `planks`, `chevron`, `terrazzo`, `tiles`, `plaster`, `stripes`, `wood_grain`, `fabric_weave`, `painted_plaster`, `plank_floor`, `tile_grid`. A generator this build does not know gives a flat material in the entry's own `tone` and a warning, never a refusal.

@@ -29,6 +29,7 @@ import { isPlanMode } from '../scene/types.js';
 import type { SolvedPlan } from '../plan/plan-solver.js';
 import { isNavigable, type Obstacle } from '../navigation/navigation.js';
 import { obstaclesFor } from '../assets/asset-footprint.js';
+import { shippedAssetFacts, type AssetFactsSource } from '../assets/asset-facts.js';
 import { CAMERA_TUNING, fieldOfViewFor } from './camera-tuning.js';
 import { CameraInput, type CameraGesture } from './camera-input.js';
 import { OrbitRig } from './orbit-rig.js';
@@ -54,6 +55,12 @@ const STEP_KEYS: ReadonlyMap<string, 'next' | 'previous' | 'first' | 'last'> = n
 type CameraPose = { position: THREE.Vector3; target: THREE.Vector3 };
 
 type InputCallbacks = WalkCallbacks & {
+  /**
+   * The bank the document's furniture is sized from (`assets/asset-facts.ts`),
+   * read late: a baked project's own library over the shipped bank. Absent
+   * is the shipped bank alone.
+   */
+  assetFacts?: (() => AssetFactsSource) | undefined;
   /**
    * Where keystrokes are listened for, passed straight to `CameraInput`.
    * Resolved by the caller (`app/viewer-stage.ts`, which owns `ViewerRoots`) —
@@ -139,8 +146,8 @@ export class CameraController {
     this.sceneData = sceneData;
     this.plan = plan;
     this.picker = picker;
-    this.obstacles = obstaclesFor(sceneData);
     this.callbacks = callbacks;
+    this.obstacles = obstaclesFor(sceneData, this.assetFacts());
     this.orbit = new OrbitRig({ camera, picker, callbacks, fieldOfView: (heightM) => fieldOfViewFor(camera.aspect, heightM) });
     this.walk = new WalkRig({
       camera,
@@ -166,6 +173,11 @@ export class CameraController {
             },
             this.onGesture,
           );
+  }
+
+  /** The document's bank (`InputCallbacks.assetFacts`), for every obstacle list derived from it. */
+  assetFacts(): AssetFactsSource {
+    return this.callbacks.assetFacts?.() ?? shippedAssetFacts;
   }
 
   getMode(): ViewerMode {
@@ -197,7 +209,7 @@ export class CameraController {
    */
   refreshObstacles(scene: SceneData): void {
     this.sceneData = scene;
-    this.obstacles = obstaclesFor(scene);
+    this.obstacles = obstaclesFor(scene, this.assetFacts());
     this.walk.cancelTravel();
   }
 

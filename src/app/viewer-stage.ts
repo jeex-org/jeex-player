@@ -12,6 +12,7 @@
  * module for anything.
  */
 
+import type { AssetFactsSource } from '../assets/asset-facts.js';
 import type { UsageSink } from '../shared/usage.js';
 import * as THREE from 'three';
 import { createRenderRuntime, type FrameHook, type RenderRuntime } from '../render/render-runtime.js';
@@ -75,6 +76,8 @@ export type ViewerStageDeps = {
    * anyway (found from an embedding editor host).
    */
   planOptions: () => PlanModeOptions;
+  /** The mounted document's bank, for the plan's fixtures (`SceneMount.assetFacts`). */
+  assetFacts: () => AssetFactsSource;
   /** A click on a room of the map: the application decides how to get there. */
   onRoomPicked: (roomId: string) => void;
   /** The GL context was taken away; the loop is already stopped. */
@@ -266,6 +269,7 @@ export class ViewerStage {
       runtime: this.runtime,
       perspective: () => this.camera,
       options: deps.planOptions,
+      assetFacts: deps.assetFacts,
     });
     this.minimap = new Minimap({
       container: deps.roots.viewport,

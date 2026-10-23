@@ -7,6 +7,7 @@
  * getters project the model rather than the stubs.
  */
 
+import { shippedAssetFacts } from '../assets/asset-facts.js';
 import type { SunShadow } from '../render/sun-shadow.js';
 import { CATALOGUE_REGISTRIES } from '../assets/catalogue-registries.js';
 import { afterEach, beforeEach, describe, expect, test } from 'bun:test';
@@ -141,6 +142,7 @@ function host(overrides: Partial<ViewerDebugHost> = {}): ViewerDebugHost {
     loadScene: () => true,
     // `undefined` is a bare scene, which lints against the shipped object bank.
     projectLibrary: () => undefined,
+    assetFacts: () => shippedAssetFacts,
     // `undefined` leaves `api.tour` unset, which is what a viewer with no camera
     // stack yet answers.
     tour: () => undefined,

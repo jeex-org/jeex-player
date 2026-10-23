@@ -30,7 +30,6 @@ import {
   type Obstacle,
 } from '../navigation/navigation.js';
 import { walkSpawn } from '../navigation/room-graph.js';
-import { obstaclesFor } from '../assets/asset-footprint.js';
 import { DoorNegotiator, type DoorCallbacks } from './walk-doors.js';
 import { TravelRig } from './travel-rig.js';
 import { MOVE_KEYS, keyDirection } from './camera-input.js';
@@ -231,7 +230,7 @@ export class WalkRig {
    */
   spawn(): void {
     const scene = this.deps.scene();
-    const spawn = walkSpawn(this.deps.plan(), scene, obstaclesFor(scene));
+    const spawn = walkSpawn(this.deps.plan(), scene, this.deps.obstacles());
     if ((spawn === null || spawn.derived) && this.warnedSpawnFor !== scene.id) {
       this.warnedSpawnFor = scene.id;
       (this.deps.log ?? defaultLogger).warn(

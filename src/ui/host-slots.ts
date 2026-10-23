@@ -25,7 +25,9 @@
  * `viewer-context.release()` takes them away with everything else. There is
  * deliberately no `dispose` here and not one `addEventListener`: a box the
  * viewer listened on would be a box whose content the viewer had an opinion
- * about.
+ * about. The one observer it keeps (`NoticeLift`) MEASURES the bottom boxes
+ * and reads nothing inside them, and it ends with the viewer's lifetime
+ * signal.
  */
 
 import { ViewerLibError } from '../shared/errors.js';
@@ -67,6 +69,85 @@ export const SLOT_ATTRIBUTE = 'data-jeex-slot';
  */
 export const BOTTOM_RIGHT_CLAIMED_ATTRIBUTE = 'data-jeex-slot-bottom-right';
 export const BOTTOM_LEFT_CLAIMED_ATTRIBUTE = 'data-jeex-slot-bottom-left';
+
+/**
+ * The custom property the degraded notice's lift is published as on the root,
+ * in pixels; `styles/viewer.css` adds it to the notice's bottom inset.
+ */
+const NOTICE_LIFT_PROPERTY = '--jeex-notice-lift';
+
+/** Clear space between the notice and whatever it was lifted above, pixels. */
+const NOTICE_GAP_PX = 8;
+
+/** The three boxes along the bottom edge a notice can collide with. */
+const BOTTOM_SLOTS: readonly SlotName[] = ['bottom-left', 'bottom-center', 'bottom-right'];
+
+/**
+ * What the notice is measured against: the notice itself, the viewer's own
+ * hint card beside it, the elements whose appearance moves that card without
+ * resizing it (the tour bar lifts the hint 24 px), and the mount's lifetime.
+ */
+export type NoticeLiftTargets = {
+  readonly notice: HTMLElement;
+  readonly hint: HTMLElement;
+  readonly triggers: readonly HTMLElement[];
+  readonly signal: AbortSignal;
+};
+
+/** Whether a rect is rendered at all: a hidden card and an empty host box both measure zero. */
+function rendered(rect: DOMRect): boolean {
+  return rect.width > 0 && rect.height > 0;
+}
+
+/**
+ * Lifts the degraded-asset notice above every filled bottom box and the hint
+ * card that it would otherwise overlap, plus `NOTICE_GAP_PX`.
+ *
+ * Only what overlaps the notice HORIZONTALLY counts: the lift moves the notice
+ * up and never sideways, so its horizontal span is the same before and after,
+ * and a desktop notice with nothing under it keeps its default inset.
+ * Measured on every size change of the root, the boxes, the notice, the hint
+ * and the triggers; all rects are read first and the property is written only
+ * when it changed, and that write moves the notice without resizing anything
+ * observed, so the observer cannot feed itself.
+ */
+function observeNoticeLift(root: HTMLElement, boxes: ReadonlyMap<SlotName, HTMLElement>, targets: NoticeLiftTargets): void {
+  if (typeof ResizeObserver === 'undefined' || targets.signal.aborted) return;
+  const candidates = [...BOTTOM_SLOTS.flatMap((name) => boxes.get(name) ?? []), targets.hint];
+  let lift = 0;
+  const measure = (): void => {
+    const own = targets.notice.getBoundingClientRect();
+    if (!rendered(own)) return;
+    const bottom = root.getBoundingClientRect().bottom;
+    // The notice's own inset without the lift: its distance from the root's
+    // bottom edge now, minus what this function already added.
+    const base = bottom - own.bottom - lift;
+    let clearance = 0;
+    for (const candidate of candidates) {
+      const rect = candidate.getBoundingClientRect();
+      if (!rendered(rect) || rect.left >= own.right || rect.right <= own.left) continue;
+      clearance = Math.max(clearance, bottom - rect.top + NOTICE_GAP_PX);
+    }
+    const next = Math.max(0, Math.ceil(clearance - base));
+    if (next === lift) return;
+    lift = next;
+    root.style.setProperty(NOTICE_LIFT_PROPERTY, `${next}px`);
+  };
+  const observer = new ResizeObserver(measure);
+  for (const element of [root, targets.notice, ...candidates, ...targets.triggers]) observer.observe(element);
+  // The listener is bound to its OWN controller, the `linkedAbortController`
+  // pattern (`shared/abort.ts`): bound to the mount's signal itself it would be
+  // removed by that very abort before it could run.
+  const own = new AbortController();
+  targets.signal.addEventListener(
+    'abort',
+    () => {
+      observer.disconnect();
+      own.abort();
+    },
+    { once: true, signal: own.signal },
+  );
+}
 
 /**
  * The one box the viewer writes a POSITION into, and the only reason this
@@ -117,7 +198,11 @@ export class HostSlots {
 
   private anchorY: number | null = null;
 
-  constructor(root: HTMLElement, names: readonly SlotName[]) {
+  /**
+   * `lift`, when given, keeps the degraded notice clear of the bottom boxes
+   * and the hint card (`observeNoticeLift`) for the mount's lifetime.
+   */
+  constructor(root: HTMLElement, names: readonly SlotName[], lift?: NoticeLiftTargets) {
     const boxes = new Map<SlotName, HTMLElement>();
     for (const name of names) {
       // A host that names one slot twice gets one box, not two: the second
@@ -133,6 +218,7 @@ export class HostSlots {
     this.boxes = boxes;
     root.setAttribute(BOTTOM_RIGHT_CLAIMED_ATTRIBUTE, String(boxes.has('bottom-right')));
     root.setAttribute(BOTTOM_LEFT_CLAIMED_ATTRIBUTE, String(boxes.has('bottom-left')));
+    if (lift) observeNoticeLift(root, boxes, lift);
   }
 
   /** The box for `name`; throws `MissingSlotError` when it was not asked for. */

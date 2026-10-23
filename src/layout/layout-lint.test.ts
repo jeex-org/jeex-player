@@ -30,6 +30,8 @@ const ITEM = {
   aNightstand: '01a12ff7-92d6-7ae0-80cc-6913d1d78acb',
   aDesk: '01a12ff7-92d7-7d06-9853-fe127d63dd34',
   aChair: '01a12ff7-92d8-7682-8861-c2b8e7ff4b5f',
+  plant: '01a16a50-2000-7000-8000-000000000001',
+  plantVariant: '01a16a50-2000-7000-8000-000000000002',
 } as const;
 
 /** The L-shape fixture re-furnished: the plan is fixed, the contents are the test input. */
@@ -239,6 +241,52 @@ describe('the bank of a baked project', () => {
     const issues = lintLayout(scene, solvePlan(scene), projectLayoutCatalogue(library));
 
     expect(ofRule(issues, 'no-interpenetration').map((issue) => [...issue.ids].sort())).toEqual([[ITEM.aTable, ITEM.pSofa].sort()]);
+  });
+
+  /** A rug and a plant of a baked library: overall boxes, with the floor share declared. */
+  const floorShare = {
+    objects: [
+      {
+        id: ITEM.boxSofa,
+        anchor: 'floor' as const,
+        category: 'decor/rugs',
+        dims: [2, 0.4, 1.4] as [number, number, number],
+        layout: { blockingHeight: 0.02 },
+        defaultVariant: ITEM.boxSofaVariant,
+        variants: [{ id: ITEM.boxSofaVariant }],
+      },
+      {
+        id: ITEM.plant,
+        anchor: 'floor' as const,
+        category: 'decor/plants',
+        dims: [0.8, 1.6, 0.6] as [number, number, number],
+        layout: { footprint: 0.25 },
+        defaultVariant: ITEM.plantVariant,
+        variants: [{ id: ITEM.plantVariant }],
+      },
+    ],
+  };
+
+  test('reads the same floor footprint as the walk: none for a rug, the fraction for a plant, an explicit box when declared', () => {
+    const catalogue = projectLayoutCatalogue(floorShare);
+    const at = { x: 3, y: 0, z: 4 };
+    expect(catalogue({ id: ITEM.pSofa, type: ITEM.boxSofa, asset: ITEM.boxSofa, position: at })?.footprint).toBeNull();
+    expect(catalogue({ id: ITEM.pSofa, type: ITEM.plant, asset: ITEM.plant, position: at })?.footprint).toEqual({ hx: 0.1, hz: 0.075 });
+    expect(
+      catalogue({ id: ITEM.pSofa, type: ITEM.plant, asset: ITEM.plant, position: at, collision: { hx: 0.5, hz: 0.5 } })?.footprint,
+    ).toEqual({
+      hx: 0.5,
+      hz: 0.5,
+    });
+  });
+
+  test('a project rug under a table raises nothing', () => {
+    const scene = sceneWith([
+      { id: ITEM.pSofa, type: ITEM.boxSofa, asset: ITEM.boxSofa, position: { x: 3, y: 0, z: 4 } },
+      { id: ITEM.aTable, type: 'table', position: { x: 3.2, y: 0, z: 4 } },
+    ]);
+    const issues = lintLayout(scene, solvePlan(scene), projectLayoutCatalogue(floorShare));
+    expect(issues.filter((issue) => issue.ids.includes(ITEM.pSofa))).toEqual([]);
   });
 });
 

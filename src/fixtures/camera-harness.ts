@@ -25,6 +25,7 @@ import { collectLog, fakeCanvas, type FakeCanvas } from './stubs.js';
 import { createLogger, type LogEntry } from '../shared/logger.js';
 import type { MessageKey } from '../ui/messages.js';
 import type { SceneData } from '../scene/types.js';
+import type { AssetFactsSource } from '../assets/asset-facts.js';
 
 /**
  * Eye height the controller snaps to in walk mode.
@@ -60,6 +61,8 @@ export type CameraHarnessOptions = {
   lockedDoors?: (() => ReadonlySet<string>) | undefined;
   rearmDoor?: ((openingId: string) => boolean) | undefined;
   scene?: SceneData;
+  /** The document's bank for the walk obstacles; absent is the shipped bank. */
+  assetFacts?: (() => AssetFactsSource) | undefined;
   /** Where the controller reports manual input; the director's business, so a no-op by default. */
   onManualInput?: (() => void) | undefined;
   /** `options.interaction`; default `'full'`, as the resolver's is. */
@@ -91,6 +94,7 @@ export function cameraHarness(options: CameraHarnessOptions = {}): CameraHarness
     closedDoors: options.closedDoors,
     lockedDoors: options.lockedDoors,
     rearmDoor: options.rearmDoor,
+    assetFacts: options.assetFacts,
     interaction: options.interaction,
     log: createLogger(logged.sink),
   });

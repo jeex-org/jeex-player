@@ -49,6 +49,7 @@ export function directorWiring(deps: DirectorWiringDeps): ViewerStageDeps['direc
     ui: deps.ui,
     scene: () => deps.model().scene,
     plan: () => deps.model().plan,
+    assetFacts: () => mount.assetFacts(),
     onSurfacePicked: (pick, x, y) => {
       // A click on a door still opens the variant panel; the HUD it also raises
       // is what a touch device gets instead of a hover. `doors.showFor` is

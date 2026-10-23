@@ -151,6 +151,7 @@ export function assetMoveWiring(deps: AssetMoveWiringDeps): AssetMoveControl {
               return model ? { scene: model.scene, plan: model.plan, rev: model.rev } : null;
             },
             bodyFacts,
+            layoutCatalogue: () => deps.mount().layoutCatalogue(),
             show,
             tint: (state) => deps.stage()?.selection.tint(state === null ? null : TINTS[state]),
             viewYaw,

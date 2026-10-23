@@ -9,6 +9,7 @@
  * object identity).
  */
 
+import { projectAssetFacts, shippedAssetFacts, type AssetFactsSource } from '../assets/asset-facts.js';
 import { afterAll, beforeAll, describe, expect, spyOn, test } from 'bun:test';
 import * as THREE from 'three';
 import { CATALOGUE_REGISTRIES } from '../assets/catalogue-registries.js';
@@ -26,6 +27,7 @@ import { createMessages } from '../ui/messages.js';
 import { editsWiring } from './edits-wiring.js';
 import type { LoadedDocument } from './project-wiring.js';
 import { SceneMount } from './scene-mount.js';
+import { shippedFacts } from '../layout/layout-lint.js';
 import { resolveViewerOptions } from './viewer-options.js';
 import type { Dollhouse } from '../geometry/dollhouse.js';
 import type { ViewerUI } from '../ui/viewer-ui.js';
@@ -79,6 +81,7 @@ type Rig = {
   /** How many times the whole document was built. */
   builds: () => number;
   load: (document: SceneData, key?: string) => LoadedDocument;
+  seededFacts: AssetFactsSource[];
   /** Redraws the mount asked the runtime for (`RenderDemand.invalidate`). */
   invalidations: () => number;
 };
@@ -87,6 +90,8 @@ function rig(sunRig?: ApartmentRig): Rig {
   const scene = new THREE.Scene();
   const downloads: string[] = [];
   const seeded: SceneModel[] = [];
+  /** `mount.assetFacts()` as `onDocument` read it, one per seed. */
+  const seededFacts: AssetFactsSource[] = [];
   const settled: Rig['settled'] = [];
   const buildsBefore = builds.mock.calls.length;
   let invalidations = 0;
@@ -109,7 +114,10 @@ function rig(sunRig?: ApartmentRig): Rig {
     messages: createMessages('en'),
     renderPreview: () => null,
     edits: editsWiring(resolveViewerOptions({}), () => {}),
-    onDocument: (model) => seeded.push(model),
+    onDocument: (model) => {
+      seeded.push(model);
+      seededFacts.push(mount.assetFacts());
+    },
     onAssetsChanged: () => {},
     onModelsSettled: (model, result) => settled.push({ model, upgraded: result.upgraded, failed: result.failed }),
     onError: (error) => {
@@ -130,6 +138,7 @@ function rig(sunRig?: ApartmentRig): Rig {
         key,
         // A manifest with no `mark`: the mount hands it to the UI.
         info: { manifest: {}, baseUrl: '' } as never,
+        facts: shippedAssetFacts,
         registries: CATALOGUE_REGISTRIES,
         variants: undefined as never,
         builderOptions: { modelUrl: (asset) => `https://models.test/${asset.variantId}.glb`, modelSource, log: QUIET },
@@ -141,6 +150,7 @@ function rig(sunRig?: ApartmentRig): Rig {
     scene,
     downloads,
     seeded,
+    seededFacts,
     settled,
     builds: () => builds.mock.calls.length - buildsBefore,
     load,
@@ -419,5 +429,21 @@ describe('a sun redraw asks for a redraw too', () => {
     const before = subject.invalidations();
     subject.mount.sunShadow!.markDirty();
     expect(subject.invalidations()).toBe(before + 1);
+  });
+});
+
+describe('the bank the document is drawn with answers its floor questions', () => {
+  test('the project bank is current inside onDocument, survives a remount, and a bare scene resets it', () => {
+    const r = rig();
+    const facts = projectAssetFacts({ objects: [] });
+    const loaded = r.load(lShapePlan);
+    r.mount.mountDocument({ ...loaded, project: { ...loaded.project!, facts } });
+    expect(r.seededFacts.at(-1)).toBe(facts);
+    expect(r.mount.assetFacts()).toBe(facts);
+    r.mount.remount();
+    expect(r.seededFacts.at(-1)).toBe(facts);
+    r.mount.mountDocument({ model: new SceneModel(lShapePlan, CATALOGUE_REGISTRIES), project: null });
+    expect(r.seededFacts.at(-1)).toBe(shippedAssetFacts);
+    expect(r.mount.layoutCatalogue()).toBe(shippedFacts);
   });
 });

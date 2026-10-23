@@ -1,10 +1,8 @@
 import { describe, expect, test } from 'bun:test';
 import {
   LEGACY_TYPE_ALIASES,
-  MIN_COLLIDABLE_HEIGHT,
   assetCard,
   findCatalogueEntry,
-  footprintFor,
   interiorLibrary,
   legacyAlias,
   listCatalogueObjects,
@@ -188,37 +186,5 @@ describe('legacy type aliases', () => {
       if (alias.yaw === undefined) continue;
       expect({ type, yaw: alias.yaw }).toEqual({ type, yaw: Math.PI });
     }
-  });
-});
-
-describe('footprints', () => {
-  test('floor objects report half-extents derived from their dimensions', () => {
-    expect(footprintFor('sofa')).toEqual({ hx: 1.12, hz: 0.475 });
-    expect(footprintFor(ARCHETYPE.sofa_3s)).toEqual({ hx: 1.12, hz: 0.475 });
-    expect(footprintFor(VARIANT.sofa_2s_linen)).toEqual({ hx: 0.83, hz: 0.475 });
-  });
-
-  test('wall and ceiling objects have no walk footprint', () => {
-    expect(footprintFor('art')).toBeNull();
-    expect(footprintFor(ARCHETYPE.pendant)).toBeNull();
-    expect(footprintFor('ceiling-light')).toBeNull();
-  });
-
-  test('an unknown id has no footprint', () => {
-    expect(footprintFor('not-a-thing')).toBeNull();
-  });
-
-  test('every floor archetype tall enough to walk into has a positive footprint', () => {
-    for (const object of objects) {
-      if (object.anchor !== 'floor' || object.dims[1] < MIN_COLLIDABLE_HEIGHT) continue;
-      const footprint = footprintFor(object.id)!;
-      expect(footprint.hx).toBeGreaterThan(0);
-      expect(footprint.hz).toBeGreaterThan(0);
-    }
-  });
-
-  test('a rug is walked over, not around', () => {
-    expect(footprintFor(ARCHETYPE.rug_rect)).toBeNull();
-    expect(footprintFor(ARCHETYPE.door_mat)).toBeNull();
   });
 });

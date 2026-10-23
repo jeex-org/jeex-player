@@ -16,6 +16,7 @@
  * is not covered here: it lives in `picker.ts` and has its own tests.
  */
 
+import { STORE_IDS } from '../../tests/fixtures/store-ids/store-ids.js';
 import { CATALOGUE_REGISTRIES } from '../assets/catalogue-registries.js';
 import { afterEach, beforeEach, describe, expect, test } from 'bun:test';
 import { draftOf } from '../shared/committed.js';
@@ -33,6 +34,8 @@ import { SceneModel, isApplyOk } from '../scene/scene-model.js';
 import { cameraHarness, doorwayCentre, EYE_HEIGHT, expectPosition, FRAME } from '../fixtures/camera-harness.js';
 import { fakeCanvas, fakeWindowHooks } from '../fixtures/stubs.js';
 import type { SceneData } from '../scene/types.js';
+import { projectAssetFacts, type AssetFactsSource } from '../assets/asset-facts.js';
+import { apartmentScene } from '../demo/scene-data.js';
 
 /**
  * Bun has no `window`; some collaborators the controller drives (rig capability
@@ -490,5 +493,41 @@ describe('refreshObstacles: an asset swap changes what the camera collides with'
     const stopped = camera.position.clone();
     for (let i = 0; i < 60; i += 1) controller.update(FRAME);
     expect(camera.position.distanceTo(stopped)).toBeLessThan(1e-6);
+  });
+});
+
+describe('the walk collides with a baked project’s own furniture', () => {
+  /** The demo flat exported with store-minted archetype and variant ids (`tests/fixtures/store-ids/`). */
+  const scene: SceneData = { ...apartmentScene, assets: STORE_IDS.assets };
+  const sofaObject = STORE_IDS.library.objects.find((object) => object.category === 'furniture/sofas')!;
+  const sofa = STORE_IDS.assets.find((asset) => asset.asset === sofaObject.id)!;
+
+  /** A walker standing 1.4 m from the sofa on the floor, on the first side the plan lets it stand. */
+  function walkerBeside(assetFacts?: () => AssetFactsSource): CameraController {
+    const { controller } = cameraHarness({ scene, assetFacts });
+    controller.setMode('walk');
+    const target = new THREE.Vector3(sofa.position.x, EYE_HEIGHT, sofa.position.z);
+    for (const [dx, dz] of [
+      [0, -1.4],
+      [0, 1.4],
+      [-1.4, 0],
+      [1.4, 0],
+    ] as const) {
+      const x = sofa.position.x + dx;
+      const z = sofa.position.z + dz;
+      if (!controller.isNavigableAt(x, z)) continue;
+      controller.setPose(new THREE.Vector3(x, EYE_HEIGHT, z), target);
+      return controller;
+    }
+    throw new Error('no floor beside the sofa');
+  }
+
+  test('a store-id sofa is not reachable on foot', () => {
+    const facts = projectAssetFacts(STORE_IDS.library);
+    expect(walkerBeside(() => facts).canWalkTo(sofa.position.x, sofa.position.z)).toBe(false);
+  });
+
+  test('read against the shipped bank alone, the same sofa was walked into', () => {
+    expect(walkerBeside().canWalkTo(sofa.position.x, sofa.position.z)).toBe(true);
   });
 });
