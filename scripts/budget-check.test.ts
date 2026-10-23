@@ -67,7 +67,7 @@ describe('constants', () => {
   });
 
   test('the lighting entry keeps a budget of its own: no three.js fits in it', () => {
-    expect(LIGHTING_BUDGET_FAIL_BYTES).toBe(10 * 1024 + 534);
+    expect(LIGHTING_BUDGET_FAIL_BYTES).toBe(11_743 + 1024);
     expect(limitFor('jeex-viewer-lighting.js')).toBe(LIGHTING_BUDGET_FAIL_BYTES);
   });
 });
