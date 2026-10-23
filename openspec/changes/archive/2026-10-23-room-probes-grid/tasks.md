@@ -26,4 +26,4 @@
 
 - [x] 4.1 README (what walk and tour add) and CHANGELOG.
 - [x] 4.2 Before/after shots from identical, logged poses: living room, bathroom, kitchen, a glossy floor, a doorway between a lit and a dark room.
-- [ ] 4.3 Fast tier green, then the full gate once through the machine's gate queue on the final tree.
+- [x] 4.3 Fast tier green, then the full gate once through the machine's gate queue on the final tree.

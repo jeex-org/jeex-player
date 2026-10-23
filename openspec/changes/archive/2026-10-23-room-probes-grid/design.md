@@ -2,7 +2,7 @@
 
 ## Context
 
-See proposal.md and brainstorm.md (engine facts verified in three r186: grid choice by mesh origin with no binding API and a recompile when an object is in no grid; probes on the grid box surface; private bake camera; ranged bakes write into the live atlas; environment diffuse adds on top of the grid; grid and hemisphere counts in the program key; linear captures into targets).
+See proposal.md. Engine facts verified in three r186: grid choice by mesh origin with no binding API and a recompile when an object is in no grid; probes on the grid box surface; private bake camera; ranged bakes write into the live atlas; environment diffuse adds on top of the grid; grid and hemisphere counts in the program key; linear captures into targets.
 
 ## Goals / Non-Goals
 
