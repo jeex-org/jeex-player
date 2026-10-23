@@ -28,20 +28,44 @@ async function capture(context: BrowserContext): Promise<Captured[]> {
   return seen;
 }
 
+/**
+ * Navigates to the telemetry page without waiting for its `load` event.
+ *
+ * The page's own ready flag is the signal every test waits on; `load` is not.
+ * It waits for every subresource, the iframe form's whole frame document
+ * included, and the viewer is already drawing by then: on SwiftShader on a
+ * loaded machine each of those steps queues behind a frame of several
+ * seconds, and `page.goto` alone ran past the 60 s test budget.
+ */
+async function visit(page: Page, path: string): Promise<void> {
+  await page.goto(path, { waitUntil: 'domcontentloaded' });
+}
+
 /** Opens the telemetry page in one form and waits until its viewer is on screen. */
 async function open(page: Page, form: 'element' | 'script' | 'iframe', analytics?: string): Promise<void> {
   const query = new URLSearchParams({ form });
   if (analytics !== undefined) query.set('analytics', analytics);
-  await page.goto(`/dev/telemetry.html?${query.toString()}`);
+  await visit(page, `/dev/telemetry.html?${query.toString()}`);
   await waitForBoot(page, form === 'element' ? 'window.__appReady === true' : 'window.jeexTelemetryReady === true');
 }
 
-/** Everything a visit can trigger after boot: a page leave, then the viewer removed. */
+/**
+ * Everything a visit can trigger after boot: a page leave, then the viewer
+ * torn down the way each form's host does it — the element and the iframe by
+ * removal, the script form by `dispose()` and then removal.
+ *
+ * The script form is disposed, not only removed: a `mountViewer` viewer whose
+ * container is emptied without `dispose()` keeps its render loop and WebGL
+ * context, and on SwiftShader the NEXT page in the same browser then waited
+ * 69 s for DOMContentLoaded (0.3 s after a disposed one), which failed
+ * whichever test the worker ran after a script-form one.
+ */
 async function finishVisit(page: Page): Promise<void> {
   for (const frame of page.frames()) {
     await frame.evaluate(() => window.dispatchEvent(new PageTransitionEvent('pagehide'))).catch(() => undefined);
   }
   await page.evaluate(() => {
+    window.jeexTelemetryHandle?.dispose();
     document.querySelector('#viewer')?.remove();
     document.querySelector('#stage')?.replaceChildren();
   });
@@ -50,7 +74,7 @@ async function finishVisit(page: Page): Promise<void> {
 
 test('the element sends view and ready, with closed keys, no referrer and no cookie', async ({ page, context }) => {
   const seen = await capture(context);
-  await page.goto('/dev/telemetry.html?utm_source=mail#x');
+  await visit(page, '/dev/telemetry.html?utm_source=mail#x');
   await waitForBoot(page, 'window.__appReady === true');
   await expect.poll(() => seen.map((entry) => entry.body['event'])).toEqual(['view', 'ready']);
   const [view, ready] = seen.map((entry) => entry.body);
@@ -65,6 +89,18 @@ test('the element sends view and ready, with closed keys, no referrer and no coo
     expect(headers['cookie']).toBeUndefined();
   }
   // Leaving the page sends what was gathered, each group as its own request.
+  // `device` carries frame times, and a frame interval over a second is a
+  // pause, not a frame (`MAX_FRAME_INTERVAL_MS`): on SwiftShader on a loaded
+  // machine every real interval is longer than that (1.6 to 2.7 s measured),
+  // so nothing is gathered and nothing is sent, however long the test waits.
+  // The page's clock is therefore paused and stepped over two frames, which
+  // makes the measured intervals 16 ms whatever a frame costs to draw. It is
+  // paused a minute ahead of the page's own time, because each protocol call
+  // waits behind a frame and a nearer target was already in the past when
+  // the call arrived; the jump fires a timer due in that minute at most once.
+  await page.clock.install();
+  await page.clock.pauseAt((await page.evaluate(() => Date.now())) + 60_000);
+  await page.clock.runFor(40);
   await page.evaluate(() => window.dispatchEvent(new PageTransitionEvent('pagehide')));
   await expect.poll(() => seen.some((entry) => entry.body['group'] === 'device')).toBe(true);
   expect(JSON.stringify(seen.map((entry) => entry.body))).not.toContain('utm_source');

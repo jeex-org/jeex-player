@@ -47,6 +47,7 @@ if (form === 'element') {
 } else if (form === 'script') {
   element.remove();
   const handle = mountViewer(stage, { scene: { url: sceneUrl }, analytics: analyticsValue() as 'off' });
+  window.jeexTelemetryHandle = handle;
   void handle.ready.then(() => {
     window.jeexTelemetryReady = true;
   });
@@ -63,5 +64,7 @@ declare global {
   interface Window {
     /** Set once the script or iframe form is on screen. */
     jeexTelemetryReady?: boolean;
+    /** The script form's handle, so a check can end the visit the way a host does. */
+    jeexTelemetryHandle?: { dispose(): void };
   }
 }

@@ -301,6 +301,27 @@ function allowOneScreenshot(): void {
 }
 
 /**
+ * Stops the page drawing, so a screenshot that follows costs one composite
+ * instead of a race with the render loop.
+ *
+ * The viewer draws on every animation frame even when nothing moves, and on
+ * SwiftShader every capture `toHaveScreenshot` takes queues behind those
+ * frames in the GPU process: on a loaded machine a frame of a full-window
+ * canvas took 2.7 s and a single capture of a resting canvas 40-50 s, past
+ * `SCREENSHOT_TIMEOUT_MS` before any comparison. The page's
+ * `requestAnimationFrame` is replaced by one that never calls back, so the
+ * render loop stops after the frame in flight and the canvas keeps showing
+ * the last frame it drew, which is what the baseline is of. Playwright's own
+ * frame waits run in its utility world and are untouched. Only for a test
+ * whose LAST step is the screenshot.
+ */
+export async function holdFrames(page: Page): Promise<void> {
+  await page.evaluate(() => {
+    window.requestAnimationFrame = () => 0;
+  });
+}
+
+/**
  * A baseline of the page's CHROME with the scene masked out.
  *
  * The canvas is masked rather than cropped around: the chrome is positioned
@@ -372,7 +393,7 @@ export async function waitForChromeIdle(root: Page | FrameLocator): Promise<void
  * an easing that lasts longer than its budget just times out — so the pose is
  * settled first, on a predicate rather than a sleep.
  */
-export async function waitForCameraStill(page: Page, tolerance = 1e-3): Promise<void> {
+export async function waitForCameraStill(page: Page, tolerance = 1e-3, timeout = scaled(30_000)): Promise<void> {
   await expect
     .poll(
       async () =>
@@ -386,7 +407,7 @@ export async function waitForCameraStill(page: Page, tolerance = 1e-3): Promise<
           if (!before || !after) return false;
           return Math.hypot(after.x - before.x, after.y - before.y, after.z - before.z) < limit;
         }, tolerance),
-      { timeout: scaled(30_000) },
+      { timeout },
     )
     .toBe(true);
 }

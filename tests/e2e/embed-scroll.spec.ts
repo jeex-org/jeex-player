@@ -88,7 +88,22 @@ test('Ctrl + wheel zooms the unfocused viewer and leaves the page where it was',
   expect(await page.evaluate(() => window.__plateShown)).toBe(false);
 });
 
+/** How long the camera may take to settle after a wheel, on a frame-bound budget (see the test). */
+const SETTLE_AFTER_WHEEL_MS = scaled(90_000);
+
 test('once clicked, the viewer owns the wheel and Space: the page stays put', async ({ page }) => {
+  // Frame-bound, not stuck: every protocol call below (the hover, the press,
+  // the release, Escape, each camera read and wheel) waits behind the frame in
+  // flight, and this test makes about fifteen of them after the boot. On
+  // SwiftShader on a loaded machine a frame of this page took about 3 s, and
+  // the steps up to the second camera wait alone took 56 s of the 60 s budget
+  // with every one of them answering. Nothing here waits on a clock of its
+  // own, so the budget is what has to fit the frame cost: tripled, as the
+  // mount/dispose canary in `leaks.spec.ts` is. The settle after the wheel
+  // is frame-bound the same way: a drawn frame advances the camera by at most
+  // `MAX_FRAME_DELTA` (50 ms), so a one-second zoom ease takes twenty frames,
+  // a minute at 3 s a frame, past the 30 s default of `waitForCameraStill`.
+  test.slow();
   await hoverScene(page);
   await page.mouse.down();
   await page.mouse.up();
@@ -105,7 +120,7 @@ test('once clicked, the viewer owns the wheel and Space: the page stays put', as
   await expectCameraMoved(page, before, 0.1);
   await page.keyboard.press('Space');
   await page.mouse.wheel(0, 120);
-  await waitForCameraStill(page);
+  await waitForCameraStill(page, undefined, SETTLE_AFTER_WHEEL_MS);
   expect(await scrollY(page)).toBe(top);
   expect(await page.evaluate(() => window.__plateShown)).toBe(false);
 });
