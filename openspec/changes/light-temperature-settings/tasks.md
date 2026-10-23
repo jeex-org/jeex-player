@@ -19,10 +19,10 @@
 ## 4. Panel
 
 - [x] 4.1 `settings-panel.ts` and CSS (plain CSS over `--jeex-*`), strings in all seven catalogues; unit tests for state, «Original» thumb and first adjustment, keyboard handling, mutual exclusion.
-- [ ] 4.2 Browser/e2e (heavy queue; new files in `COMPONENT_FILE_COST_S`): button hidden by default with the bar pixel-identical; shown without moving any existing control on both sides of the narrow breakpoint (600 px: button under the bar's end; 430 px: panel as a bottom sheet) and in a narrow viewer inside a wide page; open/first adjustment/reset/reopen; keyboard, Escape, focus return, outside press inside and outside the viewer; mutual exclusion with «Interior style»; edits off, «Interior style» unavailable, chrome hidden; live locale change; chrome awake while open; axe clean in the shadow DOM; two viewers independent.
+- [x] 4.2 Browser/e2e (heavy queue; new files in `COMPONENT_FILE_COST_S`): button hidden by default with the bar pixel-identical; shown without moving any existing control on both sides of the narrow breakpoint (600 px: button under the bar's end; 430 px: panel as a bottom sheet) and in a narrow viewer inside a wide page; open/first adjustment/reset/reopen; keyboard, Escape, focus return, outside press inside and outside the viewer; mutual exclusion with «Interior style»; edits off, «Interior style» unavailable, chrome hidden; live locale change; chrome awake while open; axe clean in the shadow DOM; two viewers independent.
 
 ## 5. Acceptance and integration (heavy queue)
 
-- [ ] 5.1 Browser checks: «Original» keeps editing-mode frames pixel-identical to main; swatches unchanged; warm/cold chromaticity and luminance within 5 % on a lamp-lit grey card; context restore keeps the value; live and default-state stills and a panorama show the temperature.
-- [ ] 5.2 Before/after shots from identical, logged poses (living room with lamps at Original, 2700 K, 6500 K; the sunlit floor in walk before and after the sun factor; the bar with and without the settings button, wide and narrow), saved outside the repository.
+- [x] 5.1 Browser checks: «Original» keeps editing-mode frames pixel-identical to main; swatches unchanged; warm/cold chromaticity and luminance within 5 % on a lamp-lit grey card; context restore keeps the value; live and default-state stills and a panorama show the temperature.
+- [x] 5.2 Before/after shots from identical, logged poses (living room with lamps at Original, 2700 K, 6500 K; the sunlit floor in walk before and after the sun factor; the bar with and without the settings button, wide and narrow), saved outside the repository.
 - [ ] 5.3 Fast tier green, then the full gate once through the machine's gate queue.
