@@ -22,9 +22,10 @@ export type PostProcessor = {
   render(scene: THREE.Scene, camera: THREE.Camera, delta: number): void;
   /**
    * Draws one display-referred picture of `scene` into the caller's 8-bit
-   * `target` at `width` x `height` device pixels, then puts the chain's own
-   * size and the renderer's bound target back, so the next live frame draws
-   * as it would have.
+   * `target` at `width` x `height` device pixels and puts the renderer's
+   * bound target back. The chain keeps the capture's size until the next
+   * `render`, which takes the live size back, so a clip of many frames
+   * resizes once and the next live frame draws as it would have.
    */
   renderTo(target: THREE.WebGLRenderTarget, scene: THREE.Scene, camera: THREE.Camera, width: number, height: number): void;
   /** Follows the renderer: logical size in CSS pixels and the effective pixel ratio. */

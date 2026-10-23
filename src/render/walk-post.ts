@@ -115,9 +115,12 @@ export class WalkPost implements PostProcessor {
   readonly smaa: SMAAPass;
   readonly output: OutputPass;
   private readonly renderer: THREE.WebGLRenderer;
-  /** The composer's size in device pixels. */
+  /** The composer's size in device pixels now: the live size, or the last capture's until the next live frame. */
   private width: number;
   private height: number;
+  /** The live drawing buffer's size in device pixels, which the next live frame restores. */
+  private liveWidth: number;
+  private liveHeight: number;
   private disposed = false;
 
   constructor(renderer: THREE.WebGLRenderer, scene: THREE.Scene, camera: THREE.Camera) {
@@ -125,6 +128,8 @@ export class WalkPost implements PostProcessor {
     const size = renderer.getDrawingBufferSize(new THREE.Vector2());
     this.width = Math.max(1, size.x);
     this.height = Math.max(1, size.y);
+    this.liveWidth = this.width;
+    this.liveHeight = this.height;
     const target = new THREE.WebGLRenderTarget(this.width, this.height, {
       type: WALK_POST_TUNING.colourType,
       samples: WALK_POST_TUNING.samples,
@@ -155,11 +160,13 @@ export class WalkPost implements PostProcessor {
 
   render(scene: THREE.Scene, camera: THREE.Camera, delta: number): void {
     this.view(scene, camera);
+    // A capture leaves its own size behind (a clip of N frames resizes once); the live frame takes its size back.
+    this.resize(this.liveWidth, this.liveHeight);
     this.composer.render(delta);
   }
 
   renderTo(target: THREE.WebGLRenderTarget, scene: THREE.Scene, camera: THREE.Camera, width: number, height: number): void {
-    const live = { scene: this.beauty.scene, camera: this.beauty.camera, width: this.width, height: this.height };
+    const live = { scene: this.beauty.scene, camera: this.beauty.camera };
     const previous = this.renderer.getRenderTarget();
     try {
       this.view(scene, camera);
@@ -175,14 +182,15 @@ export class WalkPost implements PostProcessor {
       this.output.enabled = true;
       this.composer.renderToScreen = true;
       this.view(live.scene, live.camera);
-      this.resize(live.width, live.height);
       this.renderer.setRenderTarget(previous);
     }
   }
 
   setSize(width: number, height: number, pixelRatio: number): void {
     // `WebGLRenderer.setSize` floors the same product for the drawing buffer.
-    this.resize(Math.floor(width * pixelRatio), Math.floor(height * pixelRatio));
+    this.liveWidth = Math.max(1, Math.floor(width * pixelRatio));
+    this.liveHeight = Math.max(1, Math.floor(height * pixelRatio));
+    this.resize(this.liveWidth, this.liveHeight);
   }
 
   dispose(): void {

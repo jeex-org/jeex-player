@@ -8,9 +8,9 @@
  * what the beauty pass draws as a solid surface, so an object occludes when it
  * is a visible mesh on layer 0 (an object only on custom layers is an overlay
  * or a shadow-only caster, `shared/render-layers.ts`) whose every material is
- * opaque: not transparent, fully opaque, visible, writing colour and not
- * transmissive. Pick proxies are caught by their invisible material, not by
- * any metadata.
+ * opaque: not transparent, fully opaque, visible, writing colour, not
+ * transmissive and not a cut-out (alpha test or alpha hash). Pick proxies
+ * are caught by their invisible material, not by any metadata.
  *
  * Invariant: `withOccludersOnly` restores every visibility it changed, in
  * `finally`, also when the draw throws.
@@ -23,7 +23,9 @@ type Renderable = THREE.Object3D & { isMesh?: boolean; isLine?: boolean; isPoint
 /** Whether one material draws a solid surface. */
 function opaque(material: THREE.Material): boolean {
   const transmission = (material as Partial<THREE.MeshPhysicalMaterial>).transmission ?? 0;
-  return material.visible && !material.transparent && material.opacity >= 1 && material.colorWrite && transmission <= 0;
+  // A cut-out (alpha test or alpha hash) has holes the normal pass would draw solid.
+  const cutOut = material.alphaTest > 0 || material.alphaHash;
+  return material.visible && !material.transparent && material.opacity >= 1 && material.colorWrite && transmission <= 0 && !cutOut;
 }
 
 /** Whether `object` takes part in the occlusion input. */

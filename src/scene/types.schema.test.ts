@@ -1223,3 +1223,18 @@ describe('set_site in the op schema', () => {
     expect(issues({ op: 'set_site', north_deg: 90 })).toContain('set_site carries an unknown key: north_deg');
   });
 });
+
+describe('set_site inside an interior preset', () => {
+  test('is refused once, as interior-preset-op-site, before any dry run could refuse it again on a 2.2 document', () => {
+    const scene = brokenScene((draft) => put(draft, 'interiors', [{ ...soundPreset(), ops: [{ op: 'set_site', sun: 'evening' }] }]));
+    const refusals: unknown[] = [];
+    try {
+      validateScene(scene, CATALOGUE_REGISTRIES);
+    } catch (error) {
+      refusals.push(error);
+    }
+    expect(refusals).toHaveLength(1);
+    expect(refusals[0]).toBeInstanceOf(SceneValidationError);
+    expect((refusals[0] as SceneValidationError).rule).toBe('interior-preset-op-site');
+  });
+});

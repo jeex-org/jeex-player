@@ -39,6 +39,12 @@ describe('occludes', () => {
     expect(occludes(box(new THREE.MeshPhysicalMaterial({ transmission: 0 })))).toBe(true);
   });
 
+  test('cut-out materials (alpha test, alpha hash) do not occlude: the normal pass would draw their holes solid', () => {
+    expect(occludes(box(new THREE.MeshStandardMaterial({ alphaTest: 0.5 })))).toBe(false);
+    expect(occludes(box(new THREE.MeshStandardMaterial({ alphaHash: true })))).toBe(false);
+    expect(occludes(box(new THREE.MeshStandardMaterial({ alphaTest: 0 })))).toBe(true);
+  });
+
   test('a material array occludes only when every material is opaque', () => {
     expect(occludes(box([new THREE.MeshStandardMaterial(), new THREE.MeshStandardMaterial()]))).toBe(true);
     expect(occludes(box([new THREE.MeshStandardMaterial(), new THREE.MeshStandardMaterial({ transparent: true })]))).toBe(false);
