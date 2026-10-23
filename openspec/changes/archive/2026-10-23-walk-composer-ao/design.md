@@ -35,7 +35,7 @@ See proposal.md. Engine and build facts that shape the design (three r186 and Vi
 
 1. [GTAO cost on phones] → full-resolution AO now (half resolution measured 2 ms cheaper on the desktop GPU, but left halos); the quality-tier step sets the resolution per tier and measures GTAO against N8AO on two phones.
 2. [Overlays keep the floor's AO factor] → the floor ring sits on open floor; accepted.
-3. [IIFE carries the chain] → decided by the project lead; sidecar only if the measurement shows it matters.
+3. [IIFE carries the chain] → a separate lazy file for the IIFE only if a later phone measurement shows the first-load cost matters.
 4. [Memory: about 63 MiB of colour targets at 1920×1080 before AO] → editing modes detach the chain; tiers later lower resolution.
 5. [Mirror brightness] → checked by eye and by a pixel test against the direct path.
 
