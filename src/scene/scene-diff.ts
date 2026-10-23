@@ -22,7 +22,7 @@
  * Pure module: no `three`, no DOM.
  */
 
-import type { DemoAsset, SceneData } from './types.js';
+import type { DemoAsset, Room, SceneData } from './types.js';
 import {
   TOUCHED_AUTOTOUR,
   TOUCHED_NAVIGATION,
@@ -62,11 +62,21 @@ export function sameBody(a: DemoAsset, b: DemoAsset): boolean {
   return BODY_FIELDS.every((field) => sameData(a[field], b[field]));
 }
 
+/** A room without its `purpose`: what the `rooms` key is compared by, so a purpose change draws nothing. */
+function withoutPurpose(room: Room): Omit<Room, 'purpose'> {
+  const { purpose: _purpose, ...rest } = room;
+  return rest;
+}
+
 /** Document keys whose change touches an entity of its own (or nothing at all), never the plan. */
 const OWN_ENTITY: Partial<Record<keyof SceneData, (prev: SceneData, next: SceneData) => TouchedEntity[]>> = {
   assets: (prev, next) => diffAssets(prev.assets, next.assets),
   name: () => [],
   interiors: () => [],
+  // A version raise is a sentence about the document, not a fact about the plan: the first
+  // purpose pick on an older project (which the studio raises to 2.4) rebuilds nothing, and
+  // its undo rebuilds nothing either.
+  schemaVersion: () => [],
   navigation: () => [TOUCHED_NAVIGATION],
   autotour: () => [TOUCHED_AUTOTOUR],
   tourCheckpoints: () => [TOUCHED_TOUR_CHECKPOINTS],
@@ -103,6 +113,13 @@ export function diffScenes(prev: SceneData, next: SceneData): TouchedEntity[] {
   const touched: TouchedEntity[] = [];
   let shell = false;
   for (const key of keys) {
+    // The rooms are compared with every room's purpose stripped: equal means
+    // the two documents differ in purposes only, and a purpose draws nothing.
+    if (key === 'rooms') {
+      if (sameData(prev.rooms.map(withoutPurpose), next.rooms.map(withoutPurpose))) continue;
+      shell = true;
+      continue;
+    }
     if (sameData(prev[key], next[key])) continue;
     const own = OWN_ENTITY[key];
     if (own) touched.push(...own(prev, next));

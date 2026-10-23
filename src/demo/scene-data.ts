@@ -64,7 +64,7 @@ import { DEMO } from './demo-ids.js';
 const { node: NODE, wall: WALL, opening: OPENING, room: ROOM } = DEMO;
 
 const baseApartment: SceneData = {
-  schemaVersion: '2.2',
+  schemaVersion: '2.4',
   units: 'm',
   id: DEMO.scene,
   name: 'Two-bedroom demo apartment',
@@ -305,20 +305,35 @@ const baseApartment: SceneData = {
   ],
 
   rooms: [
-    { id: ROOM.kitchen, name: 'Kitchen', anchor: { x: 2.2, z: 2.9 }, floorMaterial: FINISH.oak, accent: '#8fae9d' },
-    { id: ROOM.bathroom, name: 'Bathroom', anchor: { x: 5.6, z: 1.8 }, floorMaterial: FINISH.stone, accent: '#a5c0be' },
-    { id: ROOM.wc, name: 'WC', anchor: { x: 7.3, z: 1.6 }, floorMaterial: FINISH.stone, accent: '#b5c4c9' },
-    { id: ROOM.guestRoom, name: 'Guest bedroom', anchor: { x: 9.8, z: 1.8 }, floorMaterial: FINISH.oak, accent: '#93a896' },
-    { id: ROOM.hall, name: 'Entrance hall', anchor: { x: 8.6, z: 4.4 }, floorMaterial: FINISH.oak, accent: '#d2b28f' },
+    { id: ROOM.kitchen, name: 'Kitchen', anchor: { x: 2.2, z: 2.9 }, floorMaterial: FINISH.oak, accent: '#8fae9d', purpose: 'kitchen' },
+    {
+      id: ROOM.bathroom,
+      name: 'Bathroom',
+      anchor: { x: 5.6, z: 1.8 },
+      floorMaterial: FINISH.stone,
+      accent: '#a5c0be',
+      purpose: 'bathroom',
+    },
+    { id: ROOM.wc, name: 'WC', anchor: { x: 7.3, z: 1.6 }, floorMaterial: FINISH.stone, accent: '#b5c4c9', purpose: 'wc' },
+    {
+      id: ROOM.guestRoom,
+      name: 'Guest bedroom',
+      anchor: { x: 9.8, z: 1.8 },
+      floorMaterial: FINISH.oak,
+      accent: '#93a896',
+      purpose: 'bedroom',
+    },
+    { id: ROOM.hall, name: 'Entrance hall', anchor: { x: 8.6, z: 4.4 }, floorMaterial: FINISH.oak, accent: '#d2b28f', purpose: 'hall' },
     {
       id: ROOM.living,
       name: 'Living and dining room',
       anchor: { x: 3.0, z: 7.0 },
       floorMaterial: FINISH.oak,
       accent: '#d9a66d',
+      purpose: 'living',
     },
-    { id: ROOM.bedroom, name: 'Bedroom', anchor: { x: 8.4, z: 7.2 }, floorMaterial: FINISH.oak, accent: '#cfae8e' },
-    { id: ROOM.study, name: 'Study', anchor: { x: 12.0, z: 7.0 }, floorMaterial: FINISH.oak, accent: '#c8beb0' },
+    { id: ROOM.bedroom, name: 'Bedroom', anchor: { x: 8.4, z: 7.2 }, floorMaterial: FINISH.oak, accent: '#cfae8e', purpose: 'bedroom' },
+    { id: ROOM.study, name: 'Study', anchor: { x: 12.0, z: 7.0 }, floorMaterial: FINISH.oak, accent: '#c8beb0', purpose: 'study' },
     {
       id: ROOM.loggia,
       name: 'Loggia',
@@ -326,6 +341,7 @@ const baseApartment: SceneData = {
       floorMaterial: FINISH.ceramic_light,
       accent: '#bd765c',
       kind: 'loggia',
+      purpose: 'balcony',
     },
   ],
 

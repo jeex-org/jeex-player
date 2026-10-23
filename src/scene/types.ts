@@ -6,8 +6,8 @@
  * (`shared/committed.ts`), which is the exact inverse and can only be obtained
  * from `draftOf` — a private deep copy nothing else holds.
  *
- * This module imports only `types.finishes.ts` and `types.site.ts`, which it
- * re-exports and which import nothing (code-ranker ADP): every other module in the data/geometry
+ * This module imports only `types.plan.ts`, `types.finishes.ts` and
+ * `types.site.ts`, which it re-exports and which import nothing (code-ranker ADP): every other module in the data/geometry
  * layer imports FROM here, so an import back into any of them closes a cycle. `SceneOp` (the op
  * vocabulary) and `InteriorPreset` (built from it) live here for exactly
  * that reason: both are scene DATA shapes, and `SceneData.interiors` needs
@@ -28,52 +28,43 @@
 
 import type { FaceKey, FinishSurface, SceneFinishes, WallSide } from './types.finishes.js';
 import type { SceneSite, SiteSun } from './types.site.js';
+import type {
+  Opening,
+  OpeningShape,
+  OpeningType,
+  PlanNode,
+  Room,
+  RoomKind,
+  RoomPurpose,
+  Vec2,
+  Vec3,
+  Wall,
+  WallArc,
+  WallRole,
+} from './types.plan.js';
 
 export type { SceneSite, SiteSun } from './types.site.js';
 
 export { HEX_COLOUR_PATTERN, isHexColour } from './types.finishes.js';
 export type { FaceFinish, FaceKey, FinishRef, FinishSurface, RoomFinishes, SceneFinishes, WallSide } from './types.finishes.js';
 
-export type Vec2 = { readonly x: number; readonly z: number };
-export type Vec3 = { readonly x: number; readonly y: number; readonly z: number };
-
-/** Node of the wall centreline graph. Walls reference nodes by id. */
-export type PlanNode = { readonly id: string; readonly p: Vec2 };
-
-/**
- * Circular wall segment. The centreline runs `a -> b` on a circle of `radius`
- * (the minor arc). `ccw` selects the side of the bulge: `true` bulges to the
- * LEFT of `a -> b`, `false` to the right. See `plan-geometry.arcFromChord`.
- */
-export type WallArc = { readonly radius: number; readonly ccw: boolean };
-
-/**
- * Kind of a wall opening. `passage` is a doorway without a leaf: it is cut and
- * validated exactly like a door (floor to head, skirting broken, walkable) but
- * the builder fills it with a frame only, so no width heuristic (such as
- * "a door wider than 1.7 m has no leaf") decides whether a door has a leaf.
- */
-export type OpeningType = 'door' | 'window' | 'passage';
-
-/** Head shape of an opening. Omitted on the document means `'flat'`. */
-export type OpeningShape = 'flat' | 'arch';
-
-/** Jamb a door leaf hangs on, named by the wall node it is nearer to. */
-export type OpeningHinge = 'a' | 'b';
-
-/** Side a door leaf swings towards: `'in'` is the wall's interior side. */
-export type OpeningSwing = 'in' | 'out';
-
-/** Structural hint on a wall. Omitted on the document means `'partition'`. */
-export type WallRole = 'bearing' | 'partition' | 'facade';
-
-/** Kind of a room. Omitted on the document means `'room'`; a loggia has no ceiling. */
-export type RoomKind = 'room' | 'loggia';
-
-/** True for the opening kinds that reach the floor and can be walked through. */
-export function isDoorLike(type: OpeningType): boolean {
-  return type === 'door' || type === 'passage';
-}
+export { isDoorLike, WALL_LIMITS } from './types.plan.js';
+export type {
+  Opening,
+  OpeningHinge,
+  OpeningShape,
+  OpeningSwing,
+  OpeningType,
+  PlanNode,
+  Room,
+  RoomKind,
+  RoomPurpose,
+  Vec2,
+  Vec3,
+  Wall,
+  WallArc,
+  WallRole,
+} from './types.plan.js';
 
 // ------------------------------------------------------------ identifiers --
 //
@@ -169,91 +160,6 @@ export class FaceMap<V> {
     return this.entries();
   }
 }
-
-export type Opening = {
-  readonly id: string;
-  readonly type: OpeningType;
-  /** Distance along the centreline from node `a` (arc length for arcs). */
-  readonly center: number;
-  readonly width: number;
-  readonly sill?: number | undefined;
-  readonly head?: number | undefined;
-  /** Head shape; defaults to 'flat'. 'arch' is a semicircular lintel. */
-  readonly shape?: OpeningShape;
-  /** `OpeningVariant.id` from `opening-variants.ts`; omitted means the type's default look. */
-  readonly variant?: string;
-  /**
-   * Jamb the door leaf is hinged on, named by the wall node it is nearer to:
-   * `'a'` is the jamb at `center - width / 2`, `'b'` the one at
-   * `center + width / 2`. Omitted means "let `door-swing.ts` pick the jamb
-   * farther from the wall end", which is the jamb farther from the
-   * perpendicular wall that meets it there.
-   */
-  readonly hinge?: OpeningHinge;
-  /**
-   * Side the leaf swings towards. `'in'` is the wall's INTERIOR side — the
-   * side the solved plan gives a room to, and the left of `a -> b` when both
-   * sides are rooms (`door-swing.interiorSideOf`). `'out'` is the other side.
-   * Omitted means "into the room with the free run" (`door-swing.ts`).
-   */
-  readonly swing?: OpeningSwing | undefined;
-  /**
-   * Marks the front door of the apartment. Drives the entrance variant set and
-   * the UI label; the entrance is authored, never guessed from opening ids.
-   */
-  readonly entrance?: boolean;
-};
-
-/**
- * Numeric limits of the wall schema, in metres. They were private to
- * `validate/walls.ts`; an importer has to CLAMP to them before it builds a
- * document, so they belong to the schema rather than to the gate that checks
- * it. `minCentrelineLength` is measured along the true centreline — arc length
- * for a curved wall, not the chord.
- */
-export const WALL_LIMITS = {
-  minThickness: 0.05,
-  maxThickness: 0.6,
-  minCentrelineLength: 0.5,
-} as const satisfies { readonly minThickness: number; readonly maxThickness: number; readonly minCentrelineLength: number };
-
-export type Wall = {
-  readonly id: string;
-  /** PlanNode.id of the start node. */
-  readonly a: string;
-  /** PlanNode.id of the end node. */
-  readonly b: string;
-  /** Full thickness, symmetric about the centreline. */
-  readonly thickness: number;
-  readonly arc?: WallArc;
-  /** Hint for UI and validation; does not affect geometry. */
-  readonly role?: WallRole;
-  readonly openings?: readonly Opening[];
-};
-
-export type Room = {
-  readonly id: string;
-  readonly name: string;
-  /** Point strictly inside the room; picks the graph face that is this room. */
-  readonly anchor: Vec2;
-  readonly floorMaterial: string;
-  readonly accent?: string;
-  /** 'loggia' rooms get no ceiling. */
-  readonly kind?: RoomKind;
-  /**
-   * The outline the room's SOURCE supplied, for a room the wall graph does not
-   * close around (optional).
-   *
-   * A room normally has no outline of its own: it names an `anchor`, and the
-   * face of the wall graph containing that anchor IS the room. A scan or a CAD
-   * export that measured a room but left its wall ring open has no such face,
-   * and the choice is between losing the room and trusting what the source
-   * itself measured. A room carrying this field is the second case: it claims
-   * NO graph face (the solver leaves the faces to the rooms that do have one)
-   * and is solved from this polygon instead. Authored documents leave it out.
-   */
-  readonly polygon?: readonly Vec2[];
-};
 
 export type MaterialDefinition = {
   readonly id: string;
@@ -600,10 +506,10 @@ export type SetTourCheckpointsOp = {
 // ------------------------------------------------------------------ rooms --
 //
 // A room is an ANCHOR, not an outline: the face of the wall graph containing
-// the anchor is the room (`Room.anchor` above). So these three operations only
-// ever say where the anchor is and what the room is called — whether the
-// anchor actually lands inside a free face is the solver's answer, and
-// `SceneModel.apply` asks it before the batch commits.
+// the anchor is the room (`Room.anchor`). So these four operations only ever
+// say where the anchor is, what the room is called and what it is for —
+// whether the anchor actually lands inside a free face is the solver's answer,
+// and `SceneModel.apply` asks it before the batch commits.
 
 export type AddRoomOp = {
   readonly op: 'add_room';
@@ -628,6 +534,9 @@ export type SetRoomOp = {
 };
 
 export type RemoveRoomOp = { readonly op: 'remove_room'; readonly roomId: string };
+
+/** Sets or clears one room's `purpose` (schema 2.4 only; the version is never raised): `null` clears it. Draws nothing. */
+export type SetRoomPurposeOp = { readonly op: 'set_room_purpose'; readonly roomId: string; readonly purpose: RoomPurpose | null };
 
 // -------------------------------------------------------------- furniture --
 
@@ -755,6 +664,7 @@ export type SceneOp =
   | AddRoomOp
   | SetRoomOp
   | RemoveRoomOp
+  | SetRoomPurposeOp
   | PlaceObjectOp
   | MoveObjectOp
   | RotateObjectOp
@@ -799,14 +709,20 @@ export type InteriorPreset = {
  * an existing field means, so an older document is refused, never
  * reinterpreted, and its producer converts it. 2.3 adds the optional `site`
  * and the library finishes: a finish value may be an object (`FinishRef`),
- * and a room may name its `ceiling` and its `trim`. Nothing of 2.2 changed
- * meaning, so both are read; a 2.2 document that uses a field new in 2.3 is
- * refused.
+ * and a room may name its `ceiling` and its `trim`. 2.4 adds the optional
+ * `Room.purpose`, from the closed `RoomPurpose` vocabulary. Nothing of 2.2
+ * changed meaning in 2.3 or 2.4, so all three are read; a document that uses
+ * a field newer than its version is refused.
  */
-export type SchemaVersion = '2.2' | '2.3';
+export type SchemaVersion = '2.2' | '2.3' | '2.4';
 
-/** The versions a reader accepts, oldest first; the last is what a writer writes (a document is never re-versioned by an op). */
-export const SCHEMA_VERSIONS = ['2.2', '2.3'] as const satisfies readonly SchemaVersion[];
+/** The versions a reader accepts, oldest first; the last is the newest a writer may write (a document is never re-versioned by an op). */
+export const SCHEMA_VERSIONS = ['2.2', '2.3', '2.4'] as const satisfies readonly SchemaVersion[];
+
+/** True when `version` comes before `floor` in `SCHEMA_VERSIONS`; a version the list does not know is not before anything. */
+export function schemaVersionBefore(version: SchemaVersion, floor: SchemaVersion): boolean {
+  return SCHEMA_VERSIONS.includes(version) && SCHEMA_VERSIONS.indexOf(version) < SCHEMA_VERSIONS.indexOf(floor);
+}
 
 /**
  * The only length unit this schema speaks. Explicit on the document, so an

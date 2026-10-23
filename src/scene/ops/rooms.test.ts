@@ -247,6 +247,76 @@ describe('remove_room', () => {
   });
 });
 
+describe('set_room_purpose', () => {
+  /** The L-shape draft declared 2.4: only such a document may carry a purpose, and an op never raises the version. */
+  function draft24(): Draft<SceneData> {
+    const scene = opDraft();
+    (scene as { schemaVersion: string }).schemaVersion = '2.4';
+    return scene;
+  }
+
+  test('sets a purpose on a room without one, and reports old → new with nothing touched', () => {
+    const scene = draft24();
+
+    const outcome = apply(scene, { op: 'set_room_purpose', roomId: ROOM_A, purpose: 'kitchen' });
+
+    expect(scene.rooms[0]!.purpose).toBe('kitchen');
+    expect(scene.rooms[1]!.purpose).toBeUndefined();
+    expect(outcome.summary).toBe(`Room ${ROOM_A}: purpose none → kitchen`);
+    expect(outcome.touched).toEqual([]);
+  });
+
+  test('null removes the key outright, and the summary names what it was', () => {
+    const scene = draft24();
+    apply(scene, { op: 'set_room_purpose', roomId: ROOM_A, purpose: 'kitchen' });
+
+    const outcome = apply(scene, { op: 'set_room_purpose', roomId: ROOM_A, purpose: null });
+
+    expect(scene.rooms[0]!).not.toHaveProperty('purpose');
+    expect(outcome.summary).toBe(`Room ${ROOM_A}: purpose kitchen → none`);
+    expect(outcome.touched).toEqual([]);
+  });
+
+  test('the value the room already has, and a clear of an absent one, are accepted and change nothing', () => {
+    const scene = draft24();
+    apply(scene, { op: 'set_room_purpose', roomId: ROOM_A, purpose: 'kitchen' });
+
+    const same = apply(scene, { op: 'set_room_purpose', roomId: ROOM_A, purpose: 'kitchen' });
+    const cleared = apply(scene, { op: 'set_room_purpose', roomId: ROOM_B, purpose: null });
+
+    expect(scene.rooms[0]!.purpose).toBe('kitchen');
+    expect(scene.rooms[1]!).not.toHaveProperty('purpose');
+    expect(same.summary).toBe(`Room ${ROOM_A}: purpose kitchen → kitchen`);
+    expect(cleared.summary).toBe(`Room ${ROOM_B}: purpose none → none`);
+  });
+
+  test('refuses an unknown room, naming it, and the scene is unchanged', () => {
+    const scene = draft24();
+    expect(rejectsOp(scene, { op: 'set_room_purpose', roomId: NEW.ghost, purpose: 'kitchen' })).toContain(`Unknown room ${NEW.ghost}`);
+  });
+
+  test('refuses an out-of-vocabulary value from a caller that skipped the op schema, naming the value', () => {
+    const scene = draft24();
+    for (const purpose of ['dining', '', 5, undefined]) {
+      const op = { op: 'set_room_purpose', roomId: ROOM_A, purpose } as unknown as SceneOp;
+      expect(rejectsOp(scene, op)).toContain(`Unknown room purpose ${String(purpose)}`);
+    }
+    expect(scene.rooms[0]!.purpose).toBeUndefined();
+  });
+
+  test('refuses a pre-2.4 document, naming 2.4, and the version stays as it was', () => {
+    for (const version of ['2.2', '2.3'] as const) {
+      const scene = opDraft();
+      (scene as { schemaVersion: string }).schemaVersion = version;
+      expect(rejectsOp(scene, { op: 'set_room_purpose', roomId: ROOM_A, purpose: 'kitchen' })).toContain(
+        `set_room_purpose needs scene schema 2.4; this document is ${version}`,
+      );
+      expect((scene as { schemaVersion: string }).schemaVersion).toBe(version);
+      expect(scene.rooms[0]!.purpose).toBeUndefined();
+    }
+  });
+});
+
 describe('what the applier does NOT decide', () => {
   test('an anchor outside every free face of the graph applies, and the batch loses at commit', () => {
     const model = new SceneModel(lShapePlan, CATALOGUE_REGISTRIES);

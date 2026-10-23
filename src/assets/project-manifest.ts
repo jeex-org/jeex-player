@@ -184,7 +184,7 @@ export type BakedProjectManifest = {
   /** ISO-8601. */
   readonly bakedAt: string;
   readonly title?: string;
-  /** Relative path of the scene document (schema 2.2 or 2.3). */
+  /** Relative path of the scene document (schema 2.2, 2.3 or 2.4). */
   readonly scene: string;
   /** The project's asset library: library-manifest shape, `baseUrl` omitted (it IS the manifest folder). */
   readonly library: ProjectLibraryManifest;

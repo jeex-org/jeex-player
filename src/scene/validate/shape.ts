@@ -16,7 +16,7 @@ import { isUuidV7, SCHEMA_VERSIONS } from '../types.js';
 import { isMemberOf, SITE_SUNS } from '../schema-sets.js';
 import type { SceneData } from '../types.js';
 
-/** The document versions this build reads: 2.2 and 2.3 (`SCHEMA_VERSIONS`). */
+/** The document versions this build reads: 2.2, 2.3 and 2.4 (`SCHEMA_VERSIONS`). */
 const READABLE_VERSIONS: ReadonlySet<unknown> = new Set(SCHEMA_VERSIONS);
 
 /**
@@ -91,7 +91,7 @@ function checkSite(scene: Partial<SceneData>): void {
 }
 
 /**
- * Refuses anything that is not a schema 2.2 or 2.3 document with every required field
+ * Refuses anything that is not a schema 2.2, 2.3 or 2.4 document with every required field
  * present and of the right container kind, and narrows it to `SceneData`.
  */
 export function assertSceneShape(input: unknown): asserts input is SceneData {

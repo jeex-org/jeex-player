@@ -144,6 +144,7 @@ export type {
   WallArc,
   WallRole,
   RoomKind,
+  RoomPurpose,
   OpeningType,
   OpeningShape,
   OpeningHinge,
@@ -180,6 +181,7 @@ export type {
   AddRoomOp,
   SetRoomOp,
   RemoveRoomOp,
+  SetRoomPurposeOp,
   PlaceObjectOp,
   MoveObjectOp,
   RotateObjectOp,
@@ -225,7 +227,15 @@ export type { PresetModel, PresetCoverage } from '../scene/interior-presets.js';
 
 export { sceneSchema, sceneOpSchema, isSceneShape, sceneShapeIssues } from '../scene/types.schema.js';
 
-export { OPENING_TYPES, ROOM_KINDS, WALL_ROLES } from '../scene/schema-sets.js';
+export { OPENING_TYPES, ROOM_KINDS, ROOM_PURPOSES, WALL_ROLES } from '../scene/schema-sets.js';
+
+/**
+ * The schema-version vocabulary a host checks a document's version with, and
+ * the one version-order test every "this field needs that version" rule is
+ * written with — so a host raising a document for `set_room_purpose` asks the
+ * viewer instead of keeping a version list of its own.
+ */
+export { SCHEMA_VERSIONS, schemaVersionBefore } from '../scene/types.js';
 
 export { CATALOGUE_REGISTRIES } from '../assets/catalogue-registries.js';
 
