@@ -2,7 +2,7 @@
 
 ## 1. Standard (TDD)
 
-- [ ] 1.1 Temperature range in `LIGHTING_STANDARD`; `colour-temperature.ts` test-first (reference values at 2700/4000/6500 K, unit luminance, clamp, monotonic warm→cold), exported from the lighting entry with its export-surface test and the entry's consumer fixture; version stays 1; lighting entry budget re-measured by its rule if needed; verify unit tests and `build:lib`.
+- [x] 1.1 Temperature range in `LIGHTING_STANDARD`; `colour-temperature.ts` test-first (reference values at 2700/4000/6500 K, unit luminance, clamp, monotonic warm→cold), exported from the lighting entry with its export-surface test and the entry's consumer fixture; version stays 1; lighting entry budget re-measured by its rule if needed; verify unit tests and `build:lib`.
 
 ## 2. Applying the temperature
 
@@ -13,12 +13,12 @@
 ## 3. Host contract (test-first for schema and resolvers)
 
 - [x] 3.1 Before adding lines, extract wiring as needed so `render-runtime.ts` stays under 700 and `viewer-app.ts` at or under 500.
-- [ ] 3.2 Options, schema, resolvers (invalid attribute/query keeps the current value with one warning; handle throws `bad-params` with path `lightTemperature`; removal = «Original»), attributes (live), query parameters, handle method and `getState().lightTemperature`, event `lightTemperature` / `jeex-light-temperature` (no event on unchanged), iframe command and event, bridge and host; each with its unit test and the surface tests (published exports, option sets, protocol lists, debug members if any); verify those tests.
-- [ ] 3.3 Local demo enables `settings`; README options/attributes/events tables and CHANGELOG.
+- [x] 3.2 Options, schema, resolvers (invalid attribute/query keeps the current value with one warning; handle throws `bad-params` with path `lightTemperature`; removal = «Original»), attributes (live), query parameters, handle method and `getState().lightTemperature`, event `lightTemperature` / `jeex-light-temperature` (no event on unchanged), iframe command and event, bridge and host; each with its unit test and the surface tests (published exports, option sets, protocol lists, debug members if any); verify those tests.
+- [x] 3.3 Local demo enables `settings`; README options/attributes/events tables and CHANGELOG.
 
 ## 4. Panel
 
-- [ ] 4.1 `settings-panel.ts` and CSS (plain CSS over `--jeex-*`), strings in all seven catalogues; unit tests for state, «Original» thumb and first adjustment, keyboard handling, mutual exclusion.
+- [x] 4.1 `settings-panel.ts` and CSS (plain CSS over `--jeex-*`), strings in all seven catalogues; unit tests for state, «Original» thumb and first adjustment, keyboard handling, mutual exclusion.
 - [ ] 4.2 Browser/e2e (heavy queue; new files in `COMPONENT_FILE_COST_S`): button hidden by default with the bar pixel-identical; shown without moving any existing control on both sides of the narrow breakpoint (600 px: button under the bar's end; 430 px: panel as a bottom sheet) and in a narrow viewer inside a wide page; open/first adjustment/reset/reopen; keyboard, Escape, focus return, outside press inside and outside the viewer; mutual exclusion with «Interior style»; edits off, «Interior style» unavailable, chrome hidden; live locale change; chrome awake while open; axe clean in the shadow DOM; two viewers independent.
 
 ## 5. Acceptance and integration (heavy queue)
