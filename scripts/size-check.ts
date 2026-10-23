@@ -37,12 +37,13 @@ export const DATA_FILE_LIMIT = 1500;
  *
  * They are declaration tables, not modules: `scene/types.ts` is the scene
  * document plus the operation vocabulary, every entry of which is a `type`
- * with the prose that says what the field means, and its own layer in
- * `.dependency-cruiser.cjs` is that one file — so the vocabulary cannot be
- * split into a sibling without inventing a layer for it and teaching every
- * reader of the vocabulary where the other half went. Nothing in either file BRANCHES, which is what the 700-line
- * default is really measuring. Raised from the default when the scene-ops
- * vocabulary took the op block past it; the two files stand at 750 and 447 lines today.
+ * with the prose that says what the field means. Nothing in either file
+ * BRANCHES, which is what the 700-line default is really measuring. Raised
+ * from the default when the scene-ops vocabulary took the op block past it.
+ * When `scene/types.ts` grows towards the limit, a self-contained group of
+ * declarations moves into a sibling in the same dependency layer and is
+ * re-exported from it (`types.plan.ts`, `types.finishes.ts`, `types.site.ts`),
+ * so readers keep importing from `scene/types.ts`; the limit is not raised.
  */
 export const SCHEMA_FILE_LIMIT = 1000;
 /** Line limit for the public mount API. */

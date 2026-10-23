@@ -455,7 +455,7 @@ type CaptureCommands = {
 };
 
 type Provenance = {
-  generator: 'jeex-viewer'; version: string; sceneId: string; rev: number; schemaVersion: '2.2' | '2.3';
+  generator: 'jeex-viewer'; version: string; sceneId: string; rev: number; schemaVersion: '2.2' | '2.3' | '2.4';
   state: 'current' | 'default'; kind: 'still' | 'panorama' | 'plan' | 'frame';
   createdAt: string;                  // ISO 8601
   disclosure: 'rendered-3d';          // a JEEX artefact is a rendering, never a photograph
@@ -726,11 +726,11 @@ The repository ships no server, so the header is a deployment fact, not a runtim
 
 ## Scene document
 
-Schemas `2.2` and `2.3`: a `2.0` or `2.1` document is refused, never converted (2.1 added a placement's `mirror` and made `scale` positive; 2.2 split a placement's catalogue reference into the fields `asset` and `library`, so the earlier `library:asset` string means nothing to this build and its producer rewrites it). 2.3 adds the optional `site` and the library finishes (a finish object, a room's `ceiling` and `trim`, see [Scene finishes](#scene-finishes)); a 2.2 document may carry none of them (`site-invalid`, `finish-needs-schema-2-3`), and every other 2.2 document reads and draws as before. The full shape is the published JSON Schema (`dist-lib/schema/scene.schema.json`, written by `bun run build:lib`, imported as `jeex-viewer/schema/scene.json`, see below); the rules it cannot express are listed under it. Minimal shape:
+Schemas `2.2`, `2.3` and `2.4`: a `2.0` or `2.1` document is refused, never converted (2.1 added a placement's `mirror` and made `scale` positive; 2.2 split a placement's catalogue reference into the fields `asset` and `library`, so the earlier `library:asset` string means nothing to this build and its producer rewrites it). 2.3 adds the optional `site` and the library finishes (a finish object, a room's `ceiling` and `trim`, see [Scene finishes](#scene-finishes)); a 2.2 document may carry none of them (`site-invalid`, `finish-needs-schema-2-3`), and every other 2.2 document reads and draws as before. 2.4 adds the optional `Room.purpose`, from a closed vocabulary of what each room is for; a purpose in a 2.2 or 2.3 document is refused (`room-purpose-needs-schema-2-4`), and every other older document reads and draws as before. The full shape is the published JSON Schema (`dist-lib/schema/scene.schema.json`, written by `bun run build:lib`, imported as `jeex-viewer/schema/scene.json`, see below); the rules it cannot express are listed under it. Minimal shape:
 
 ```ts
 type SceneData = {
-  schemaVersion: '2.2' | '2.3';
+  schemaVersion: '2.2' | '2.3' | '2.4';
   id: string;                          // every id in the document is a UUID v7
   name: string;                        // shown as the brand context line
   ceilingHeight: number;               // metres
@@ -739,7 +739,7 @@ type SceneData = {
            arc?: { radius: number; ccw: boolean }; role?: 'facade' | 'partition';
            openings?: { id: string; type: 'door' | 'window' | 'passage'; center: number; width: number;
                         sill?: number; head?: number; entrance?: boolean; hinge?: 'a' | 'b'; swing?: 'in' | 'out' }[] }[];
-  rooms: { id: string; name: string; anchor: { x: number; z: number }; floorMaterial: string; kind?: 'loggia' }[];
+  rooms: { id: string; name: string; anchor: { x: number; z: number }; floorMaterial: string; kind?: 'loggia'; purpose?: RoomPurpose }[];
   assetLibrary?: string;               // library UUID a placement without `library` belongs to; absent = the built-in bank
   assets: DemoAsset[];                 // furniture placements: { id, type, asset?, library?, variant?, room?, position, rotationY?, scale?, mirror? }
   presentationCamera: { position: Vec3; target: Vec3 };
@@ -772,7 +772,8 @@ Rules the validator enforces:
 - `Opening.center` is measured along the wall centreline from node `a`. Omitted `sill`/`head` mean the defaults for the kind (window 0.9 / 2.2, door 0 / 2.1); `head` must stay 0.05 m under the ceiling.
 - Finish UUIDs resolve through the built-in catalogue; `materials` only adds or overrides.
 - `site` (schema 2.3 only) ties the sun to the plan. `northDeg` is the world azimuth of true north, in degrees clockwise seen from above, from `+Z` towards `+X`, read modulo 360 (absent: 0); `sun` is a preset (absent: `noon`). The presets are artistic, northern hemisphere, not astronomical: `morning` shines from 90° (east of north) at 20° elevation, `noon` from 180° at 55°, `evening` from 270° at 20°. The sun's world azimuth is `northDeg + preset azimuth`. A document without `site` keeps the sun of earlier versions. An editor writes `site` with the `set_site` operation (below), which never leaves an empty `site` behind. `site` is a strict object: any other key (`north_deg`), a `northDeg` that is not a finite number or another `sun` is refused as `site-invalid` naming the field, and so is `site` in a 2.2 document.
-- An interior preset dresses what exists: it may not carry an operation that creates an entity (`add_node`, `add_wall`, `split_wall`, `add_room`, `add_opening`, `place_object`), and it may not change the orientation (`set_site`, refused as `interior-preset-op-site`).
+- `purpose` (schema 2.4 only) says what a room is for, from a closed vocabulary of thirteen values: `living`, `kitchen`, `kitchen-living`, `bedroom`, `kids`, `study`, `bathroom`, `wc`, `hall`, `corridor`, `storage`, `utility`, `balcony` (in this order; `ROOM_PURPOSES` in `jeex-viewer/ops`). The values are vocabulary, not locale text: an editor labels them. An absent `purpose` means not declared — nothing substitutes a default — and no rule reads it against `kind`: a loggia may be a `study`, a room a `balcony`. An unknown value is refused as `room-purpose-unknown` at that room's `purpose`, and any `purpose` in a 2.2 or 2.3 document as `room-purpose-needs-schema-2-4`. An editor writes it with the `set_room_purpose` operation (below).
+- An interior preset dresses what exists: it may not carry an operation that creates an entity (`add_node`, `add_wall`, `split_wall`, `add_room`, `add_opening`, `place_object`), and it may not change the orientation (`set_site`, refused as `interior-preset-op-site`) or a room's purpose (`set_room_purpose`, refused as `interior-preset-op-purpose`).
 
 ### Scene finishes
 
@@ -1045,7 +1046,7 @@ if (!isApplyOk(result)) console.error(result.error, result.message, result.issue
 
 The full export list:
 
-- **Op vocabulary** — `applyOp`, `OpError`, `floorFinishOf`, `roomWallFinishOf`, `facadeFinishOf`, `faceFinishOf`, `TOUCHED_SHELL`, `TOUCHED_FACADE`, `isTouchedAsset` (types: `OpOutcome`, `TouchedEntity` — what an op touched, as `{ kind, … }` with faces as `FaceKey` — `SceneOp`, `InteriorPreset`, plus every member of the union by its own name — `SetRoomOp`, `PlaceObjectOp`, … — so an editor panel can be typed to one operation). The twenty-eight operations:
+- **Op vocabulary** — `applyOp`, `OpError`, `floorFinishOf`, `roomWallFinishOf`, `facadeFinishOf`, `faceFinishOf`, `TOUCHED_SHELL`, `TOUCHED_FACADE`, `isTouchedAsset` (types: `OpOutcome`, `TouchedEntity` — what an op touched, as `{ kind, … }` with faces as `FaceKey` — `SceneOp`, `InteriorPreset`, plus every member of the union by its own name — `SetRoomOp`, `PlaceObjectOp`, … — so an editor panel can be typed to one operation). The twenty-nine operations:
 
 | Operation | What it does |
 |---|---|
@@ -1064,6 +1065,7 @@ The full export list:
 | `add_room` | Adds room `id` at an anchor inside a free face of the graph; starts on `registries.defaultFloorFinish` when given no `floorMaterial`. |
 | `set_room` | Changes a room's `name`, `kind`, `anchor` or `accent`; a name is non-empty and at most `ROOM_NAME_MAX` characters. |
 | `remove_room` | Removes a room, unbinds its furniture, drops its camera and its finishes, all in `touched`. |
+| `set_room_purpose` | Schema 2.4: sets or clears what a room is for (`purpose`: one of the thirteen vocabulary values, or `null` to remove the field). The value the room already has, and a clear of an absent one, are accepted and change nothing. Refused on a pre-2.4 document (the version is never raised by an operation), on an unknown room, and on a value outside the vocabulary; inside interior presets it is refused as `interior-preset-op-purpose`. Touches nothing: a purpose change draws no entity and rebuilds no plan. |
 | `set_material` | Paints a finish. Explicit form `{ surface, room?, face?, material, colour?, rotation? }` (see below), or the legacy form `{ target, material, scope? }`: one room (its UUID, the surface inferred from the finish), one face (`{ room?, wallId, side }`), every floor, every wall or the facade (the words `floors`, `walls`, `facade`). |
 | `place_object` | Puts catalogue object `id` down — `asset` is a bare archetype or variant UUID, the optional `library` the UUID of its library (absent: the document's `assetLibrary`, then the built-in bank), written into the placement as given — with an optional variant, room, yaw and finishes; a floor-standing object's `y` is pinned to 0. |
 | `move_object` | Moves a placement (`position` or `dposition`) and binds or unbinds it from a room (`room: null`). |
@@ -1097,12 +1099,12 @@ Every operation is atomic inside its batch: `applyOp` mutates a draft and answer
 - **The revision model** — `SceneModel`, `isApplyOk` (types: `ApplyBatch`, `ApplyOk`, `ApplyFailure`, `ApplyResult`, `AppliedOp`, `LintMode`, `RevisionListener`, `SceneModelOptions`). A batch may ask for the furniture layout to be reviewed before it commits: `lint: 'report'` returns `issues` on the result, `lint: 'strict'` refuses a candidate carrying a hard issue with `error: 'layout_failed'` and leaves the revision alone. The linter is injected — `new SceneModel(document, registries, { lint: lintLayout })` — so a viewer that never lints does not carry it.
 - **Validation** — `validateScene`.
 - **The registries interface and the shipped catalogues** — types `SceneRegistries`, `CatalogueArchetype`, `CataloguePlacement`, `CatalogueVariantRef`, `LibraryCatalogue`, `LibraryFinish`, `ProjectLibrary`, `AssetRef`, `AssetRefFields`, `OpeningVariantFamily`, `OpeningVariantOption`; the function `assetRefOf(fields, defaultLibrary)`, the one rule a reference is read by (`{ library: fields.library ?? defaultLibrary, assetId: fields.asset ?? fields.type }`, nothing parsed out of a string); the value `CATALOGUE_REGISTRIES`, ready to hand a `SceneModel` without wiring the catalogues by hand, and `registriesFromLibrary(library, base?)`, which builds registries from an object-bank manifest (its objects, their variants, and its materials as finishes). Registries declare every library they can resolve, so a document whose `assetLibrary` names a project's own bank validates against it: `registriesFromLibrary(projectLibrary, CATALOGUE_REGISTRIES)` accepts both. They also answer the two questions an editor asks before it edits: `registries.openingVariantsOf(type, { entrance? })` lists what a variant `<select>` may offer (id and label, no canvas), and `registries.defaultFloorFinish` says what `add_room` writes when the user names no floor — the oak floor's UUID for the shipped bank, a project library's own first floor material otherwise.
-- **Scene document types** — `SceneData`, `Vec2`, `Vec3`, `DemoAsset`, `Wall`, `Room`, `Opening`, `PlanNode`, `WallArc`, `WallRole`, `RoomKind`, `OpeningType`, `OpeningShape`, `OpeningHinge`, `OpeningSwing`, `MaterialDefinition`, `CameraPose`, `TourGazeKey`, `TourSpeedZone`, `SchemaVersion`, `LengthUnit`.
+- **Scene document types** — `SceneData`, `Vec2`, `Vec3`, `DemoAsset`, `Wall`, `Room`, `Opening`, `PlanNode`, `WallArc`, `WallRole`, `RoomKind`, `RoomPurpose`, `OpeningType`, `OpeningShape`, `OpeningHinge`, `OpeningSwing`, `MaterialDefinition`, `CameraPose`, `TourGazeKey`, `TourSpeedZone`, `SchemaVersion`, `LengthUnit`.
 - **The plan solver** — `solvePlan` (type `SolvedPlan`).
 - **Layout linting** — `lintLayout`, `countIssues`, `describeIssues` (types `LayoutIssue`, `LayoutRule`, `LayoutIssueCounts`, `LayoutLinter`).
 - **Interior presets** — `applyPresetBatch`, `findPreset`, `standardPreset`, `presetCoverage`, `presetBatchOps` (types `PresetModel`, `PresetCoverage`).
 - **The `zod/mini` shape check** — `sceneSchema`, `sceneOpSchema`, `isSceneShape`, `sceneShapeIssues`, so a caller can shape-check a document before handing it to `validateScene`.
-- **The closed sets** — `OPENING_TYPES`, `ROOM_KINDS`, `WALL_ROLES`.
+- **The closed sets** — `OPENING_TYPES`, `ROOM_KINDS`, `ROOM_PURPOSES`, `WALL_ROLES`, and the schema-version vocabulary `SCHEMA_VERSIONS` with its order test `schemaVersionBefore` (the versions a build reads, oldest first; true when a version comes before a floor in that order, false for a version the list does not know).
 - **Identifiers** — `UUID_V7_PATTERN` and `isUuidV7` (the validator's own check; the entry exports no generator), `faceKey`, `sameFace`, `isFaceKey` (types `FaceKey`, `FaceFinish`, `FinishRef`, `SetMaterialAlias`, `SetMaterialSurfaceOp`, `TopologyRemap`, `TopologyRemapEntry`, and `NewIdRefusal`: the `OpError.detail.reason` a creating op refuses an id with, `invalid_id` or `duplicate_id`), and `CATALOGUE_ID_BY_SLUG` (types `CatalogueIdBySlug`, `CatalogueSlugTable`), the shipped catalogue's readable slug → UUID table.
 
 A name not on this list is not public, whatever module it lives in — the same façade rule every other library entry follows (`src/embed/ops.test.ts` pins the export surface, sorted, against exactly this list). Nothing above renders anything or touches a document: `src/purity.test.ts` and `.dependency-cruiser.cjs` hold `embed/ops.ts` to the same "no `three`, no DOM" invariant as the rest of the pure layer.

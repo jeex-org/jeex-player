@@ -11,7 +11,8 @@
  */
 
 import { isFiniteVec2, requireFinishFamily, type ValidationContext } from './context.js';
-import { ROOM_KINDS, isMemberOf } from '../schema-sets.js';
+import { ROOM_KINDS, ROOM_PURPOSES, isMemberOf } from '../schema-sets.js';
+import { schemaVersionBefore } from '../types.js';
 
 /** Plan nodes: the id grammar and finite coordinates. */
 export function checkNodes(ctx: ValidationContext): void {
@@ -62,6 +63,22 @@ export function checkRooms(ctx: ValidationContext): void {
     if (!isFiniteVec2(room.anchor)) ctx.fail('room-anchor-invalid', `${path}.anchor`, `Room ${id} has an invalid anchor`);
     if (room.kind !== undefined && !isMemberOf(ROOM_KINDS, room.kind)) {
       ctx.fail('room-kind-unknown', `${path}.kind`, `Room ${id} has unknown kind ${String(room.kind)}`, { kind: room.kind });
+    }
+    // A purpose is 2.4's, and the version is asked FIRST: a 2.3 document with
+    // an out-of-vocabulary value is refused for its version, not for the value
+    // it could not have carried yet.
+    if (room.purpose !== undefined) {
+      if (schemaVersionBefore(ctx.scene.schemaVersion, '2.4')) {
+        ctx.fail(
+          'room-purpose-needs-schema-2-4',
+          `${path}.purpose`,
+          `Room ${id} purpose needs scene schema 2.4; this document is ${ctx.scene.schemaVersion}`,
+        );
+      } else if (!isMemberOf(ROOM_PURPOSES, room.purpose)) {
+        ctx.fail('room-purpose-unknown', `${path}.purpose`, `Room ${id} has unknown purpose ${String(room.purpose)}`, {
+          purpose: room.purpose,
+        });
+      }
     }
     // A source-supplied outline replaces the graph face this room has none of,
     // so it must be a real ring: anything the solver would hand on as a room

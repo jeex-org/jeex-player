@@ -26,8 +26,17 @@
  */
 
 import { describe, expect, test } from 'bun:test';
-import { OPENING_HINGES, OPENING_SHAPES, OPENING_SWINGS, OPENING_TYPES, ROOM_KINDS, SITE_SUNS, WALL_ROLES } from './scene/schema-sets.js';
-import type { OpeningHinge, OpeningShape, OpeningSwing, OpeningType, RoomKind, SiteSun, WallRole } from './scene/types.js';
+import {
+  OPENING_HINGES,
+  OPENING_SHAPES,
+  OPENING_SWINGS,
+  OPENING_TYPES,
+  ROOM_KINDS,
+  ROOM_PURPOSES,
+  SITE_SUNS,
+  WALL_ROLES,
+} from './scene/schema-sets.js';
+import type { OpeningHinge, OpeningShape, OpeningSwing, OpeningType, RoomKind, RoomPurpose, SiteSun, WallRole } from './scene/types.js';
 import { FINISH_KINDS } from './materials/finish-catalogue.js';
 import type { FinishKind } from './materials/finish-catalogue.js';
 import { ASSET_ANCHORS, KNEE_SIDES, VARIANT_ACCESS } from './assets/asset-types.js';
@@ -43,6 +52,21 @@ const EVERY_OPENING_HINGE = { a: true, b: true } satisfies Record<OpeningHinge, 
 const EVERY_OPENING_SWING = { in: true, out: true } satisfies Record<OpeningSwing, true>;
 const EVERY_SITE_SUN = { morning: true, noon: true, evening: true } satisfies Record<SiteSun, true>;
 const EVERY_ROOM_KIND = { room: true, loggia: true } satisfies Record<RoomKind, true>;
+const EVERY_ROOM_PURPOSE = {
+  living: true,
+  kitchen: true,
+  'kitchen-living': true,
+  bedroom: true,
+  kids: true,
+  study: true,
+  bathroom: true,
+  wc: true,
+  hall: true,
+  corridor: true,
+  storage: true,
+  utility: true,
+  balcony: true,
+} satisfies Record<RoomPurpose, true>;
 const EVERY_WALL_ROLE = { bearing: true, partition: true, facade: true } satisfies Record<WallRole, true>;
 const EVERY_FINISH_KIND = {
   planks: true,
@@ -83,6 +107,7 @@ const SETS = [
   ['OPENING_SWINGS', EVERY_OPENING_SWING, OPENING_SWINGS],
   ['SITE_SUNS', EVERY_SITE_SUN, SITE_SUNS],
   ['ROOM_KINDS', EVERY_ROOM_KIND, ROOM_KINDS],
+  ['ROOM_PURPOSES', EVERY_ROOM_PURPOSE, ROOM_PURPOSES],
   ['WALL_ROLES', EVERY_WALL_ROLE, WALL_ROLES],
   ['FINISH_KINDS', EVERY_FINISH_KIND, FINISH_KINDS],
   ['ASSET_ANCHORS', EVERY_ASSET_ANCHOR, ASSET_ANCHORS],
@@ -104,6 +129,6 @@ describe('closed sets', () => {
     // The count is the assertion: a new closed set is a new row, and a row
     // that was deleted with its set takes the number down with it. Bump this
     // deliberately, never to make the test pass.
-    expect(SETS.length).toBe(12);
+    expect(SETS.length).toBe(13);
   });
 });

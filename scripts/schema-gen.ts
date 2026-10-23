@@ -86,7 +86,7 @@ import { mkdirSync, writeFileSync } from 'node:fs';
 import { telemetrySendSchema } from '../src/telemetry/telemetry.schema.js';
 import { TELEMETRY_SCHEMA_VERSION } from '../src/telemetry/vocabulary.js';
 import { join } from 'node:path';
-import { HEX_COLOUR_PATTERN, UUID_V7_PATTERN } from '../src/scene/types.js';
+import { HEX_COLOUR_PATTERN, SCHEMA_VERSIONS, UUID_V7_PATTERN, schemaVersionBefore } from '../src/scene/types.js';
 import { readPackageVersion } from './config-input.js';
 
 /** JSON Schema draft this repository publishes. */
@@ -162,6 +162,7 @@ export function generateSchema(target: SchemaTarget, version: string = packageVe
     forbidSiteBeforeItsVersion(schema, target.type);
     annotateFinishValues(schema);
     forbidLibraryFinishesBeforeTheirVersion(schema, target.type);
+    forbidPurposeBeforeItsVersion(schema, target.type);
     requireSetSiteField(schema);
   }
   return schema;
@@ -266,6 +267,32 @@ function forbidLibraryFinishesBeforeTheirVersion(schema: Record<string, unknown>
 }
 
 /**
+ * A FIFTH post-generation step, beside the site and finishes rules: a room
+ * `purpose` belongs to schema 2.4, and an older document must not carry one.
+ * Written on the document as an `allOf` arm beside the untouched `not` (site)
+ * and `anyOf` (finishes): either the document declares no purpose-bearing
+ * room, or its version is not one of the versions before `'2.4'` — the enum
+ * of the older versions is generated from `SCHEMA_VERSIONS`, never restated.
+ */
+function forbidPurposeBeforeItsVersion(schema: Record<string, unknown>, typeName: string): void {
+  const definitions = schema['definitions'] as Record<string, { properties?: Record<string, unknown>; [key: string]: unknown }> | undefined;
+  const definition = definitions?.[typeName];
+  if (definition?.properties?.['rooms'] === undefined) throw new Error(`schema-gen: expected definitions.${typeName}.properties.rooms`);
+  const older = SCHEMA_VERSIONS.filter((version) => schemaVersionBefore(version, '2.4'));
+  definition['allOf'] = [
+    {
+      not: {
+        required: ['schemaVersion', 'rooms'],
+        properties: {
+          schemaVersion: { enum: [...older] },
+          rooms: { type: 'array', contains: { type: 'object', properties: { purpose: {} }, required: ['purpose'] } },
+        },
+      },
+    },
+  ];
+}
+
+/**
  * A FOURTH post-generation step: `set_site` carries `northDeg` or `sun`, at
  * least one of them. Both are optional in the type, which cannot say «at
  * least one», so this writes the rule the Zod twin judges with
@@ -320,6 +347,7 @@ export const UUID_FIELDS: Readonly<
   AddRoomOp: { value: ['id'] },
   SetRoomOp: { value: ['roomId'] },
   RemoveRoomOp: { value: ['roomId'] },
+  SetRoomPurposeOp: { value: ['roomId'] },
   PlaceObjectOp: { value: ['id', 'asset', 'library', 'room'] },
   MoveObjectOp: { value: ['assetId', 'room'] },
   RotateObjectOp: { value: ['assetId'] },

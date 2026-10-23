@@ -337,19 +337,66 @@ describe('sceneSchema — site (schema 2.3)', () => {
   });
 });
 
-describe('scene schema versions 2.2 and 2.3', () => {
-  test('a 2.2 and a 2.3 document are both read, by the schema and by the shape gate', () => {
-    for (const version of ['2.2', '2.3']) {
+describe('scene schema versions 2.2, 2.3 and 2.4', () => {
+  test('a 2.2, a 2.3 and a 2.4 document are all read, by the schema and by the shape gate', () => {
+    for (const version of ['2.2', '2.3', '2.4']) {
       const document = withField(lShapePlan, 'schemaVersion', version);
       expect({ version, schema: documentPaths(document), shape: sceneShapeIssues(document) }).toEqual({ version, schema: [], shape: [] });
     }
   });
 
-  test('2.4 is refused, and the refusal names both readable versions', () => {
-    const document = withField(lShapePlan, 'schemaVersion', '2.4');
+  test('2.5 is refused, and the refusal names every readable version', () => {
+    const document = withField(lShapePlan, 'schemaVersion', '2.5');
     const result = z.safeParse(sceneSchema, document);
     expect(result.success).toBe(false);
-    expect(result.error?.issues[0]?.message).toBe("Unsupported scene schema; expected '2.2' or '2.3'");
+    expect(result.error?.issues[0]?.message).toBe("Unsupported scene schema; expected '2.2' or '2.3' or '2.4'");
+  });
+});
+
+describe('sceneSchema — room purpose (schema 2.4)', () => {
+  /** `lShapePlan` declared as `version`, with `purpose` written on its first room. */
+  const at = (purpose: unknown, version = '2.4'): unknown => {
+    const scene = draftOf(lShapePlan);
+    (scene as { schemaVersion: string }).schemaVersion = version;
+    put(scene.rooms[0]!, 'purpose', purpose);
+    return scene;
+  };
+
+  test('a 2.4 document with a known value is a whole scene document, and one without a purpose stays one', () => {
+    expect(documentPaths(at('kitchen-living'))).toEqual([]);
+    const absent = draftOf(lShapePlan);
+    (absent as { schemaVersion: string }).schemaVersion = '2.4';
+    expect(documentPaths(absent)).toEqual([]);
+    expect('purpose' in absent.rooms[0]!).toBe(false);
+  });
+
+  test.each(['dining', 'Kitchen', '', 5])('an out-of-vocabulary value %j is refused at that room purpose', (purpose) => {
+    expect(documentPaths(at(purpose))).toEqual(['rooms[0].purpose']);
+  });
+
+  test('a purpose in a 2.3 document is refused at that room purpose, with the sentence the validator refuses with', () => {
+    const issues = documentPaths(at('bedroom', '2.3'));
+    expect(issues).toEqual(['rooms[0].purpose']);
+    const result = z.safeParse(sceneSchema, at('bedroom', '2.3'));
+    expect(result.error?.issues[0]?.message).toBe(`Room ${ROOM.a} purpose needs scene schema 2.4; this document is 2.3`);
+  });
+
+  test('on the Zod path an out-of-vocabulary purpose in a 2.3 document is refused by the enum at the same place', () => {
+    // Zod reports the room-level refusal alone here (a failed enum stops the
+    // document refinement); the VERSION-first ordering is the runtime
+    // validator's, pinned in `scene-validator.test.ts`.
+    expect(documentPaths(at('dining', '2.3'))).toEqual(['rooms[0].purpose']);
+  });
+
+  test('a purpose in a 2.2 document is refused the same way', () => {
+    expect(documentPaths(at('bedroom', '2.2'))).toEqual(['rooms[0].purpose']);
+  });
+
+  test('the shape gate names no room field, so it accepts a 2.4 document with purposes', () => {
+    const document = draftOf(lShapePlan);
+    (document as { schemaVersion: string }).schemaVersion = '2.4';
+    for (const room of document.rooms) put(room, 'purpose', 'living');
+    expect(pathsOf(document)).toEqual([]);
   });
 });
 
@@ -625,6 +672,24 @@ const RULE_CASES: readonly RuleCase[] = [
   { rule: 'room-name-missing', kind: 'structural', document: () => brokenScene((scene) => put(scene.rooms[0]!, 'name', '')) },
   { rule: 'room-anchor-invalid', kind: 'structural', document: () => brokenScene((scene) => put(scene.rooms[0]!.anchor, 'x', Number.NaN)) },
   { rule: 'room-kind-unknown', kind: 'structural', document: () => brokenScene((scene) => put(scene.rooms[0]!, 'kind', 'kitchen')) },
+  {
+    rule: 'room-purpose-unknown',
+    kind: 'structural',
+    document: () =>
+      brokenScene((scene) => {
+        put(scene, 'schemaVersion', '2.4');
+        put(scene.rooms[0]!, 'purpose', 'dining');
+      }),
+  },
+  {
+    rule: 'room-purpose-needs-schema-2-4',
+    kind: 'structural',
+    document: () =>
+      brokenScene((scene) => {
+        put(scene, 'schemaVersion', '2.3');
+        put(scene.rooms[0]!, 'purpose', 'bedroom');
+      }),
+  },
   {
     rule: 'room-polygon-invalid',
     kind: 'semantic',
@@ -1030,6 +1095,15 @@ const RULE_CASES: readonly RuleCase[] = [
     document: () => brokenScene((scene) => put(scene, 'interiors', [{ ...soundPreset(), ops: [{ op: 'set_site', sun: 'evening' }] }])),
   },
   {
+    // A purpose is not decoration either: a preset dresses the flat, it never says what a room is for.
+    rule: 'interior-preset-op-purpose',
+    kind: 'semantic',
+    document: () =>
+      brokenScene((scene) =>
+        put(scene, 'interiors', [{ ...soundPreset(), ops: [{ op: 'set_room_purpose', roomId: ROOM.a, purpose: 'kitchen' }] }]),
+      ),
+  },
+  {
     rule: 'interior-preset-op-failed',
     kind: 'semantic',
     document: () =>
@@ -1224,6 +1298,26 @@ describe('set_site in the op schema', () => {
   });
 });
 
+describe('set_room_purpose in the op schema', () => {
+  test('a vocabulary value and a null parse, with the key required', () => {
+    const ops: SceneOp[] = [
+      { op: 'set_room_purpose', roomId: ROOM.a, purpose: 'kitchen-living' },
+      { op: 'set_room_purpose', roomId: ROOM.a, purpose: null },
+      { op: 'set_room_purpose', roomId: ROOM.a, purpose: 'balcony' },
+    ];
+    expect(sceneOpsIssues(ops)).toEqual([]);
+  });
+
+  test('a missing purpose is refused at the field', () => {
+    expect(sceneOpsIssues([{ op: 'set_room_purpose', roomId: ROOM.a }]).map((issue) => issuePath(issue))).toEqual(['[0].purpose']);
+  });
+
+  test.each(['dining', '', 5, true])('the out-of-vocabulary value %j is refused naming the field purpose', (purpose) => {
+    const issues = sceneOpsIssues([{ op: 'set_room_purpose', roomId: ROOM.a, purpose }]);
+    expect(issues.map((issue) => issuePath(issue))).toEqual(['[0].purpose']);
+  });
+});
+
 describe('set_site inside an interior preset', () => {
   test('is refused once, as interior-preset-op-site, before any dry run could refuse it again on a 2.2 document', () => {
     const scene = brokenScene((draft) => put(draft, 'interiors', [{ ...soundPreset(), ops: [{ op: 'set_site', sun: 'evening' }] }]));
@@ -1236,5 +1330,23 @@ describe('set_site inside an interior preset', () => {
     expect(refusals).toHaveLength(1);
     expect(refusals[0]).toBeInstanceOf(SceneValidationError);
     expect((refusals[0] as SceneValidationError).rule).toBe('interior-preset-op-site');
+  });
+});
+
+describe('set_room_purpose inside an interior preset', () => {
+  test('is refused once, as interior-preset-op-purpose, before any dry run could refuse it again on a pre-2.4 document', () => {
+    const scene = brokenScene((draft) =>
+      put(draft, 'interiors', [{ ...soundPreset(), ops: [{ op: 'set_room_purpose', roomId: ROOM.a, purpose: 'kitchen' }] }]),
+    );
+    const refusals: unknown[] = [];
+    try {
+      validateScene(scene, CATALOGUE_REGISTRIES);
+    } catch (error) {
+      refusals.push(error);
+    }
+    expect(refusals).toHaveLength(1);
+    expect(refusals[0]).toBeInstanceOf(SceneValidationError);
+    expect((refusals[0] as SceneValidationError).rule).toBe('interior-preset-op-purpose');
+    expect((refusals[0] as SceneValidationError).message).toContain("may not change a room's purpose (set_room_purpose)");
   });
 });
