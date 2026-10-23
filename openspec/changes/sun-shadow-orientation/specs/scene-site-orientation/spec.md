@@ -1,0 +1,45 @@
+## ADDED Requirements
+
+### Requirement: Site orientation field
+
+A scene document of schema version 2.3 MAY carry `site`, an object with an optional `northDeg` (finite number of degrees, the world azimuth of true north clockwise from +Z towards +X, read modulo 360) and an optional `sun` (`morning`, `noon` or `evening`). Version 2.2 documents SHALL stay readable and SHALL NOT carry `site`. Any other key inside `site`, a non-finite `northDeg` or another `sun` value SHALL make the document invalid with a message that names the field.
+
+#### Scenario: Valid site
+- **WHEN** a 2.3 document carries `site: { northDeg: 30, sun: "evening" }`
+- **THEN** it validates and the player orients the sun by it
+
+#### Scenario: Unknown key
+- **WHEN** a 2.3 document carries `site: { north_deg: 30 }`
+- **THEN** validation fails naming `site.north_deg`
+
+#### Scenario: Bad values
+- **WHEN** a 2.3 document carries `site.northDeg` as `NaN`, a string or infinity, or `site.sun` as `"night"`
+- **THEN** validation fails naming the field
+
+#### Scenario: Site in a 2.2 document
+- **WHEN** a 2.2 document carries `site`
+- **THEN** validation fails naming `site` and the version
+
+#### Scenario: Site not an object
+- **WHEN** a 2.3 document carries `site` as `null`, an array or a number
+- **THEN** validation fails naming `site`
+
+#### Scenario: 2.2 unchanged
+- **WHEN** a valid 2.2 document without `site` is loaded
+- **THEN** it validates as before and the sun keeps the legacy direction
+
+### Requirement: Orientation defaults
+
+With no `site` the sun SHALL keep the legacy direction. With a `site`, a missing `northDeg` SHALL read as 0 and a missing `sun` as `noon`.
+
+#### Scenario: Empty site
+- **WHEN** a 2.3 document carries `site: {}`
+- **THEN** the sun is the `noon` preset with north along +Z
+
+### Requirement: Published JSON Schema
+
+The JSON Schema the package publishes for scene documents SHALL describe `site` exactly as the validator judges it.
+
+#### Scenario: Generated schema agrees
+- **WHEN** the JSON Schema is generated
+- **THEN** it accepts the valid and rejects the invalid examples of this capability, including a 2.2 document with `site`
