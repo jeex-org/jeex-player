@@ -160,6 +160,9 @@ export const LIGHTING_STANDARD = deepFreeze({
        * plane may be, metres; the depth offset the bias is made of, metres
        * (`bias = -depthOffset / (far - near)`); and the normal bias in world
        * texels, clamped to `[normalBiasMin, normalBiasMax]` metres.
+       * Calibrated by eye on the demo apartment at the legacy direction and
+       * the three presets (2048 map, 7 to 10 mm texels): no acne on walls or
+       * floors and no visible gap between an object and its shadow.
        */
       fit: {
         lateralPadding: 0.25,

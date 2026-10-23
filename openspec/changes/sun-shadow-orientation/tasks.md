@@ -48,8 +48,8 @@
 
 ## 6. Calibration and shots
 
-- [ ] 6.1 Calibrate bias and normal bias by eye on the demo apartment at legacy, morning, noon and evening; record the final numbers in the standard and its test.
-- [ ] 6.2 Before/after shots (main vs branch) of the demo apartment: plan3d overview, orbit, walk in the living room, at the legacy direction and the three presets; attach to the delivery notes.
+- [x] 6.1 Calibrate bias and normal bias by eye on the demo apartment at legacy, morning, noon and evening; record the final numbers in the standard and its test.
+- [x] 6.2 Before/after shots (main vs branch) of the demo apartment: plan3d overview, orbit, walk in the living room, at the legacy direction and the three presets; attach to the delivery notes.
 
 ## 7. Integration
 

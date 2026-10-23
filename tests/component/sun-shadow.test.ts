@@ -279,6 +279,43 @@ describe('a default-state capture', () => {
   });
 });
 
+describe('a default-state panorama', () => {
+  test('never shows a ceiling caster: the sky above a room without its cap is the sky, not the slab', async () => {
+    const container = openContainer(320, 240);
+    const canvas = document.createElement('canvas');
+    container.appendChild(canvas);
+    const runtime: RenderRuntime = createRenderRuntime({
+      canvas,
+      viewport: { clientWidth: 320, clientHeight: 240, element: container },
+      scheduleFrame: () => 0,
+      cancelFrame: () => undefined,
+    });
+    disposers.push(() => runtime.dispose());
+    const model = SceneModel.load(structuredClone(lShapePlan), CATALOGUE_REGISTRIES);
+    const capture = captureCommands({
+      runtime: () => runtime,
+      model: () => model,
+      livePose: () => null,
+      options: () => DEFAULT_VIEWER_OPTIONS,
+      messages: () => createMessages('en'),
+      shellState: () => 'dollhouse',
+      ready: () => true,
+    });
+    const { blob } = await capture.panorama({ width: 256, roomId: L_SHAPE.room.a, state: 'default', caption: false });
+    const bitmap = await createImageBitmap(blob);
+    const offscreen = new OffscreenCanvas(bitmap.width, bitmap.height);
+    const context = offscreen.getContext('2d')!;
+    context.drawImage(bitmap, 0, 0);
+    // The top rows of an equirectangular image look straight up: the warm sky
+    // gradient there, or a neutral grey-white where a slab is drawn.
+    const top = context.getImageData(0, 0, bitmap.width, 2).data;
+    let warmth = 0;
+    for (let at = 0; at < top.length; at += 4) warmth += top[at]! - top[at + 2]!;
+    bitmap.close();
+    expect(warmth / (top.length / 4)).toBeGreaterThan(12);
+  });
+});
+
 describe('a mounted viewer redraws the sun shadow only when something changed', () => {
   async function mount(scene: SceneData = structuredClone(lShapePlan)): Promise<ViewerHandle> {
     const container = openContainer(480, 320);
