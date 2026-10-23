@@ -15,8 +15,9 @@
  * First-picture invariant: a started loop draws its first picture only once
  * the scene's programs were compiled asynchronously, or the bound passed
  * (`first-draw.ts`); the hooks run meanwhile, nothing counts as drawn, and
- * `firstDraw` resolves after that picture. Every `start()` of a stopped loop
- * (the boot, a context restore, the end of a video capture) arms both again.
+ * `firstDraw` resolves after that picture. The first `start()` arms both, and
+ * so does the one after a context restore; a stop and start that kept the
+ * context (a video capture) does not.
  *
  * Visibility invariant: the loop runs only when the canvas could actually be
  * seen. `document.hidden` and `checkVisibility()` gate it, and the frame clock
@@ -156,6 +157,8 @@ export class RenderRuntime {
   });
   /** «The first picture since `start()` is on screen»: the viewer's `ready` waits on it. */
   readonly firstDraw = new FirstDrawSignal();
+  /** Whether the next `start()` owes a first picture: the first one, and the one after a context restore. */
+  private firstOwed = true;
   private readonly canvas: HTMLCanvasElement;
   private readonly pixelRatioCap: number;
   /** Watches the viewport box; `null` where there is no `ResizeObserver`. */
@@ -371,6 +374,7 @@ export class RenderRuntime {
         this.contextLost = true;
         this.stop();
         // Owed from now: the restore's own announcement reads it before `start()`.
+        this.firstOwed = true;
         this.firstDraw.arm();
         onLost?.();
       },
@@ -501,17 +505,25 @@ export class RenderRuntime {
 
   start(): void {
     if (this.disposed) return;
-    if (!this.running) this.armFirstDraw();
+    // A stop and start that kept the context (a video capture) keeps its programs: nothing to compile.
+    if (!this.running && this.firstOwed) this.armFirstDraw();
     this.running = true;
     this.resume();
   }
 
-  /** A first picture is owed, drawn once the scene compiled asynchronously (`first-draw.ts`). */
+  /**
+   * A first picture is owed, drawn once the scene compiled asynchronously
+   * (`first-draw.ts`) for the path that draws it: through the attached chain
+   * (its own target, `PostProcessor.compile`) or straight to the screen.
+   */
   private armFirstDraw(): void {
+    this.firstOwed = false;
     this.firstDraw.arm();
     const camera = this.camera;
+    const post = this.post;
     const renderer = this.renderer as Partial<THREE.WebGLRenderer>;
-    const compile = renderer.compileAsync?.bind(renderer);
+    const direct = renderer.compileAsync?.bind(renderer);
+    const compile = post ? (scene: THREE.Scene, view: THREE.Camera) => post.compile(scene, view) : direct;
     this.gate.arm(camera && compile ? () => compile(this.scene, camera) : null);
   }
 
@@ -599,11 +611,11 @@ export class RenderRuntime {
     this.hooks.emit(delta, now);
     // Committed only after the draw returned: a throwing draw keeps the demand.
     const camera = this.camera;
-    // The first-picture gate first: while it holds, nothing commits and nothing counts as drawn.
+    // While the first-picture gate holds, the tick is counted and nothing commits or counts as drawn.
     if (
       camera &&
-      this.gate.open &&
       this.demand.shouldDraw(camera, this.mode()) &&
+      this.gate.open &&
       (this.renderEnabled || now - this.lastDrawn >= KEEP_WARM_MS)
     ) {
       this.draw(camera, delta);

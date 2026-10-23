@@ -96,11 +96,13 @@ describe('walk and tour draw on demand', { timeout: MOUNT_TIMEOUT_MS }, () => {
   let ringOf: () => FloorRing = () => {
     throw new Error('no floor ring yet');
   };
+  let hasRing = (): boolean => false;
 
   beforeAll(async () => {
     // The walk floor ring, as the camera controller made it: the receiver of its first `show`.
     const shows = vi.spyOn(FloorRing.prototype, 'show');
     ringOf = () => shows.mock.contexts[0] as FloorRing;
+    hasRing = () => shows.mock.contexts.length > 0;
     // The live camera, as the gate reads it.
     const shouldDraw = Object.getOwnPropertyDescriptor(RenderDemand.prototype, 'shouldDraw')!.value as RenderDemand['shouldDraw'];
     vi.spyOn(RenderDemand.prototype, 'shouldDraw').mockImplementation(function (this: RenderDemand, live, mode) {
@@ -211,11 +213,24 @@ describe('walk and tour draw on demand', { timeout: MOUNT_TIMEOUT_MS }, () => {
 
   test('the floor ring the walk puts on the floor draws on a move and on hiding while the camera rests', async () => {
     // The walk asks the ring to stand where a hovering pointer meets the floor
-    // (`CameraController.flushHover`); this asks it the same way, at a floor
-    // point 1.5 m ahead of the resting camera.
-    const live = camera as THREE.PerspectiveCamera;
-    const ahead = live.getWorldDirection(new THREE.Vector3()).setY(0).normalize().multiplyScalar(1.5);
-    const point = live.getWorldPosition(new THREE.Vector3()).add(ahead).setY(0);
+    // (`CameraController.flushHover`); this asks it the same way.
+    // A pointer leaving the canvas hides the ring through the controller: that call names the ring.
+    container.querySelector('[data-jeex="scene-canvas"]')!.dispatchEvent(new PointerEvent('pointerleave', { pointerType: 'mouse' }));
+    await until(() => hasRing(), 'the controller to hide the ring', 10_000);
+    // The floor point the walk's own pick finds under a spot of the canvas (`CameraController.floorPoint`).
+    const box = container.querySelector('[data-jeex="scene-canvas"]')!.getBoundingClientRect();
+    let found: { x: number; y: number; z: number } | null = null;
+    for (const [x, y] of [
+      [0.5, 0.8],
+      [0.4, 0.8],
+      [0.6, 0.8],
+      [0.5, 0.7],
+      [0.5, 0.9],
+    ] as const) {
+      found ??= debug().floorPoint(box.left + box.width * x, box.top + box.height * y);
+    }
+    expect(found).not.toBeNull();
+    const point = new THREE.Vector3(found!.x, found!.y, found!.z);
     await rest('before the ring');
     const without = await shot();
     const shown = await follow(() => ringOf().show(point));

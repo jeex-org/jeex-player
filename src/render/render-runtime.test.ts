@@ -202,7 +202,10 @@ describe('the post-processor seam', () => {
     const chain: PostProcessor = {
       render: (scene, camera) => calls.push(`render ${scene.type} ${camera.type}`),
       renderTo: () => calls.push('renderTo'),
-      compile: () => Promise.resolve(),
+      compile: () => {
+        calls.push('compile');
+        return Promise.resolve();
+      },
       setSize: (width, height, ratio) => sizes.push([width, height, ratio]),
       dispose: () => calls.push('dispose'),
     };
@@ -228,13 +231,18 @@ describe('the post-processor seam', () => {
     runtime.dispose();
   });
 
-  test('an attached chain draws the frame instead of the renderer, sized to the drawing buffer', () => {
+  test('an attached chain draws the frame instead of the renderer, sized to the drawing buffer', async () => {
     const { runtime, stub, tick, viewport } = harness();
     runtime.setCamera(new THREE.PerspectiveCamera());
     const { chain, calls, sizes } = fakeChain();
     runtime.setPostProcessor(chain);
     expect(sizes).toEqual([[800, 600, 1]]);
     runtime.start();
+    // The first picture waits for the scene compiled for the chain's own target.
+    expect(calls).toEqual(['compile']);
+    calls.length = 0;
+    await Promise.resolve();
+    await Promise.resolve();
     tick(16);
     expect(calls).toEqual(['render Scene PerspectiveCamera']);
     expect(stub.renders).toBe(0);
@@ -471,6 +479,20 @@ describe('the first picture waits for asynchronous shader compilation', () => {
     expect(stub.renders).toBe(1);
     await settle();
     expect(announced).toBe(true);
+    runtime.dispose();
+  });
+
+  test('a stop and start that kept the context (a video capture) compiles nothing and draws at once', async () => {
+    const { runtime, stub, tick, compiled, finish } = compiling();
+    runtime.start();
+    finish();
+    await settle();
+    tick(16);
+    runtime.stop();
+    runtime.start();
+    tick(16);
+    expect(compiled).toHaveLength(1);
+    expect(stub.renders).toBe(2);
     runtime.dispose();
   });
 
