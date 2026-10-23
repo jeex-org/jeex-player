@@ -18,6 +18,16 @@
  * chunks, not a second implementation of either — on the way to the 8-bit
  * target the pixels are read from.
  *
+ * In `walk` and `tour` the application hands over the live post-processing
+ * chain (`spec.post`, `walk-post.ts`): the picture then goes through the same
+ * occlusion, SMAA and output pass as the screen, the chain writes the
+ * display-referred image into the 8-bit target itself, and the display pass
+ * below is not used, so the transform is still applied once.
+ *
+ * Mirror invariant: the render of the picture is the capture's beauty pass
+ * (`shared/scene-pass.ts`), so a mirror reflects the room for the capture's
+ * camera.
+ *
  * Borrow invariant: the renderer's render target and clear colour are put back
  * in a `finally`, and a root that had a parent is returned to it, so the very
  * next frame of the live scene draws exactly as it would have.
@@ -25,7 +35,9 @@
 
 import * as THREE from 'three';
 import { ViewerLibError } from '../shared/errors.js';
+import { withScenePass } from '../shared/scene-pass.js';
 import type { CameraPose } from '../scene/types.js';
+import type { PostProcessor } from './post-processor.js';
 
 /** Vertical field of view of a capture that names none, degrees. */
 const DEFAULT_FOV_DEG = 55;
@@ -45,6 +57,8 @@ export type StillSpec = {
   fov?: number | undefined;
   /** Device pixels per CSS pixel; default 1. */
   pixelRatio?: number | undefined;
+  /** The live walk and tour chain to render through; the direct path without one. */
+  post?: PostProcessor | null | undefined;
 };
 
 /** A captured picture and the size it actually came out at, in device pixels. */
@@ -198,7 +212,7 @@ export async function captureStill(
   camera.lookAt(spec.pose.target.x, spec.pose.target.y, spec.pose.target.z);
   camera.updateProjectionMatrix();
 
-  const pixels = drawStill(renderer, root, camera, width, height, lights);
+  const pixels = drawStill(renderer, root, camera, width, height, lights, spec.post ?? null);
   return { blob: await encodePng(renderer, pixels, width, height), width, height };
 }
 
@@ -210,22 +224,51 @@ function drawStill(
   width: number,
   height: number,
   lights: THREE.Object3D | undefined,
+  post: PostProcessor | null,
 ): Uint8Array {
   const borrowed = root instanceof THREE.Scene ? null : borrow(root, lights);
   const scene = borrowed?.scene ?? (root as THREE.Scene);
+  try {
+    return post === null ? drawDirect(renderer, scene, camera, width, height) : drawThrough(renderer, post, scene, camera, width, height);
+  } finally {
+    borrowed?.restore();
+  }
+}
+
+/** The picture through the display pass of this module. */
+function drawDirect(renderer: THREE.WebGLRenderer, scene: THREE.Scene, camera: THREE.Camera, width: number, height: number): Uint8Array {
   // Half float, because tone mapping happens AFTER this pass: an 8-bit linear
   // target would clip every highlight the operator is there to roll off.
   const hdr = new THREE.WebGLRenderTarget(width, height, { type: THREE.HalfFloatType, depthBuffer: true });
   const previous = renderer.getRenderTarget();
   try {
     renderer.setRenderTarget(hdr);
-    renderer.render(scene, camera);
+    withScenePass(renderer, { target: hdr, scene, camera }, () => renderer.render(scene, camera));
     const material = displayMaterial(renderer, { map: { value: hdr.texture } }, 'uniform sampler2D map;', 'texture2D(map, vUv)');
     return drawDisplayPass(renderer, material, width, height);
   } finally {
     renderer.setRenderTarget(previous);
     hdr.dispose();
-    borrowed?.restore();
+  }
+}
+
+/** The picture through the live chain, which writes the display-referred image itself. */
+function drawThrough(
+  renderer: THREE.WebGLRenderer,
+  post: PostProcessor,
+  scene: THREE.Scene,
+  camera: THREE.Camera,
+  width: number,
+  height: number,
+): Uint8Array {
+  const target = new THREE.WebGLRenderTarget(width, height, { depthBuffer: false, stencilBuffer: false });
+  try {
+    post.renderTo(target, scene, camera, width, height);
+    const pixels = new Uint8Array(width * height * 4);
+    renderer.readRenderTargetPixels(target, 0, 0, width, height, pixels);
+    return pixels;
+  } finally {
+    target.dispose();
   }
 }
 

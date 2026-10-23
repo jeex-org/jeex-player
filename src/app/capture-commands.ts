@@ -39,6 +39,7 @@ import type { RenderRuntime } from '../render/render-runtime.js';
 import type { TourPlayer } from '../camera/tour-player.js';
 import { isUuidV7, type CameraPose, type SceneData, type Vec3 } from '../scene/types.js';
 import type { Messages } from '../ui/messages.js';
+import type { PostProcessor } from '../render/post-processor.js';
 import type { ViewerOptions } from './viewer-options.js';
 
 /** Eye height a room panorama is taken at, metres — the walk rig's own. */
@@ -114,6 +115,14 @@ export type CaptureDeps = {
    * supply one.
    */
   tour?: (() => TourPlayer | undefined) | undefined;
+  /**
+   * The live walk and tour chain a still or a video frame renders through,
+   * waiting for it to load; `null` outside walk and tour or when it cannot be
+   * had, and the capture takes the direct path (`app/walk-post-controller.ts`).
+   * Optional: a mount built without one captures directly. Panoramas never
+   * ask for it.
+   */
+  postChain?: (() => Promise<PostProcessor | null>) | undefined;
 };
 
 /** The three-command surface `ViewerHandle.capture` is. */
@@ -223,8 +232,9 @@ export function captureCommands(deps: CaptureDeps): CaptureCommands {
       const { runtime, model } = engaged();
       const state = request.state ?? 'current';
       const pose = poseFor(model.scene, request.camera);
+      const post = (await deps.postChain?.()) ?? null;
       const shot = await inState(state, runtime, model, pose.position, (root) =>
-        captureStill(runtime.renderer, root, { width: request.width, height: request.height, pose, fov: request.fov }),
+        captureStill(runtime.renderer, root, { width: request.width, height: request.height, pose, fov: request.fov, post }),
       );
       return artefact(shot, model, 'still', state, request.caption, { camera: pose });
     },
@@ -252,6 +262,7 @@ export function captureCommands(deps: CaptureDeps): CaptureCommands {
       if (tour === undefined) throw new ViewerLibError('not-ready', 'capture: the tour does not exist yet');
       const state = request.state ?? 'current';
       const eye = deps.livePose()?.position ?? model.scene.presentationCamera.position;
+      const post = (await deps.postChain?.()) ?? null;
       return captureFrames(
         {
           runtime,
@@ -260,6 +271,7 @@ export function captureCommands(deps: CaptureDeps): CaptureCommands {
           livePose: deps.livePose,
           withRoot: (take) => inState(state, runtime, model, eye, take),
           captionFor,
+          post,
         },
         request,
       );

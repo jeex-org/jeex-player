@@ -49,6 +49,7 @@ import type { FaceKey, SceneData, SceneReport, Vec2 } from '../scene/types.js';
 import type { ViewerSelection, ViewerSelectionTarget } from './selection.js';
 import type { SelectionDescription } from '../ui/selection-options.js';
 import type { AssetMoveDebug } from '../edit/asset-move-session.js';
+import type { WalkPostState } from './walk-post-controller.js';
 
 /** What `__viewerDebug.minimap()` answers (`minimap.ts`). */
 type MinimapState = {
@@ -101,6 +102,8 @@ type ViewerDebugApi = {
   furnitureRendered: () => boolean | null;
   /** The sun: direction, its world angles, the fitted frustum and how often its cached map was drawn; `null` before a root. */
   sunShadow: () => SunShadowState | null;
+  /** The walk and tour post-processing chain: `off`, `loading`, `on` (drawing the frame) or `failed`. */
+  walkPost: () => WalkPostState;
   /**
    * What every furniture body on screen actually IS, right now: the placement
    * id, whether its body is procedural, a `dims` stand-in waiting for a GLB or
@@ -392,6 +395,7 @@ type SceneDebug = {
   builder: () => SceneBuilder | undefined;
   editor: () => ViewerEditor | undefined;
   sun: () => SunShadow | undefined;
+  walkPost: () => WalkPostState | undefined;
   furnitureVisible: () => boolean;
   /** This instance's catalogue; `setLocale` replaces it. */
   messages: () => Messages;
@@ -517,6 +521,7 @@ export function installViewerDebug(host: ViewerDebugHost): ViewerDebugApi {
     furniture: () => host.furnitureVisible(),
     furnitureRendered: () => host.sceneRoot()?.getObjectByName(FURNITURE_GROUP_NAME)?.visible ?? null,
     sunShadow: () => host.sun()?.state() ?? null,
+    walkPost: () => host.walkPost() ?? 'off',
     assetModels: () => {
       const furniture = host.sceneRoot()?.getObjectByName(FURNITURE_GROUP_NAME);
       if (!furniture) return [];

@@ -51,6 +51,7 @@ export function debugHostFor(model: SceneModel, deps: DebugPartsDeps): ViewerDeb
     builder: () => deps.mount.builder,
     editor: () => deps.mount.editor,
     sun: () => deps.mount.sunShadow,
+    walkPost: () => stage()?.walkPost.state(),
     furnitureVisible: () => deps.furnitureVisible(),
     messages: () => deps.messages(),
     projectLibrary: () => deps.projectLibrary(),

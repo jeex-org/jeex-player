@@ -122,6 +122,7 @@ export class ViewerApp {
     shellState: () => this.dollhouse.state,
     ready: () => this.booted,
     tour: () => this.stage?.director?.tour,
+    postChain: () => this.stage?.captureChain() ?? Promise.resolve(null),
   });
   /**
    * The `ViewerHandle` read/write methods (`handle-commands.ts`); built at the

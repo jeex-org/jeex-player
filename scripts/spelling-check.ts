@@ -81,6 +81,7 @@ export const FORCED_NAMES: readonly ForcedName[] = [
   { name: 'sheenColor', reason: 'three.js: MeshPhysicalMaterial.sheenColor' },
   { name: 'specularColor', reason: 'three.js: MeshPhysicalMaterial.specularColor' },
   { name: 'attenuationColor', reason: 'three.js: MeshPhysicalMaterial.attenuationColor' },
+  { name: 'colorWrite', reason: 'three.js: Material.colorWrite' },
   { name: '.color', reason: 'three.js: Material.color, Light.color — set by property name' },
   { name: 'color:', reason: 'three.js material options and the scene.json wire format both spell it `color`' },
   { name: 'color?', reason: 'scene.json 1.1: MaterialDefinition.color, and the manifest `pbr.color`' },

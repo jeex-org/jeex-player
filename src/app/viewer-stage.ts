@@ -42,6 +42,8 @@ import type { ViewerMode } from '../scene/types.js';
 import { ViewerSelectionController, type ViewerSelection } from './selection.js';
 import type { Picker } from '../geometry/picker.js';
 import type { AssetMoveControl } from '../edit/asset-move-session.js';
+import { loadWalkPost, WalkPostController } from './walk-post-controller.js';
+import type { PostProcessor } from '../render/post-processor.js';
 
 /**
  * What the stage needs from the application, minus the camera it builds itself.
@@ -191,6 +193,8 @@ export class ViewerStage {
   /** «Ctrl + scroll to zoom», shown when a plain wheel went to the page. */
   readonly scrollHint: ScrollHint;
   private cameraDirector?: CameraDirector;
+  /** The walk and tour post-processing chain: loaded on demand, attached in those modes (`walk-post-controller.ts`). */
+  readonly walkPost: WalkPostController;
   private disposed = false;
   /** The asset move tool's switch, once `handle.setAssetMoveTool` was first called (`asset-move-wiring.ts`). */
   assetMove: AssetMoveControl | null = null;
@@ -210,8 +214,14 @@ export class ViewerStage {
     this.runtime = createRenderRuntime({
       canvas: deps.roots.canvas,
       viewport: deps.viewport,
-      onContextLost: deps.onContextLost,
-      onContextRestored: deps.onContextRestored,
+      onContextLost: () => {
+        this.walkPost.contextLost();
+        deps.onContextLost?.();
+      },
+      onContextRestored: () => {
+        this.walkPost.contextRestored();
+        deps.onContextRestored?.();
+      },
       signal: deps.signal,
       onError: deps.onFrameError,
     });
@@ -225,6 +235,11 @@ export class ViewerStage {
     // The walk floor ring is drawn by this camera alone (`FLOOR_RING_LAYER`).
     this.camera.layers.enable(FLOOR_RING_LAYER);
     this.runtime.setCamera(this.camera);
+    this.walkPost = new WalkPostController({
+      build: () => loadWalkPost(this.runtime.renderer, this.runtime.scene, this.camera),
+      attach: (chain) => this.runtime.setPostProcessor(chain),
+      report: (error) => deps.onFrameError?.(error),
+    });
     this.planModes = new PlanModes({
       container: deps.roots.viewport,
       viewport: deps.viewport,
@@ -440,9 +455,16 @@ export class ViewerStage {
       this.authoring.visible = mode !== undefined && AUTHORING_MODES.has(mode);
       // Size floor, constant-size handles and badges, for the pose just set.
       this.overlay.frame();
+      // Walk and tour render through the chain, once it has loaded.
+      this.walkPost.update(mode);
     };
     for (const hook of orderFrameHooks(cameraHook, hooks)) this.runtime.addFrameHook(hook);
     this.runtime.start();
+  }
+
+  /** The chain a still or video frame taken now renders through (`capture-commands.ts`). */
+  captureChain(): Promise<PostProcessor | null> {
+    return this.walkPost.forCapture(this.mode);
   }
 
   /** Re-measures the container; normally the `ResizeObserver` has already. */
@@ -488,6 +510,7 @@ export class ViewerStage {
     this.overlay.dispose();
     this.selection.dispose();
     this.scrollHint.dispose();
+    this.walkPost.dispose();
     this.runtime.dispose();
   }
 }

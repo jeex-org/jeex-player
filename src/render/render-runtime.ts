@@ -44,6 +44,8 @@ import { playerLighting } from './lighting-engine.js';
 import { LIGHTING_STANDARD } from '../lighting/lighting-standard.js';
 import type { ApartmentRig, LightingContext } from '../lighting/lighting-context.js';
 import { installShadowLayerPass } from './shadow-layer-pass.js';
+import { withScenePass } from '../shared/scene-pass.js';
+import type { PostProcessor } from './post-processor.js';
 
 /** Device pixel ratio cap: above this the fill cost outgrows the visible gain. */
 const PIXEL_RATIO_CAP = 1.7;
@@ -159,6 +161,8 @@ export class RenderRuntime {
   private rig: ApartmentRig;
   private readonly createLighting: (renderer: THREE.WebGLRenderer) => LightingContext;
   private camera: THREE.Camera | null = null;
+  /** The chain the frame renders through (`walk-post.ts`), or `null` for straight to the screen. */
+  private post: PostProcessor | null = null;
   private renderEnabled = true;
   /** `now()` of the last frame actually drawn, for the keep-warm heartbeat. */
   private lastDrawn = Number.NEGATIVE_INFINITY;
@@ -466,6 +470,16 @@ export class RenderRuntime {
     return this.renderEnabled;
   }
 
+  /**
+   * Renders every frame through `post` (sized to the drawing buffer now and
+   * on every resize), or straight to the screen again with `null`. The
+   * runtime never disposes a chain: its owner does (`app/walk-post-controller.ts`).
+   */
+  setPostProcessor(post: PostProcessor | null): void {
+    this.post = post;
+    post?.setSize(this.appliedWidth, this.appliedHeight, this.appliedRatio);
+  }
+
   addFrameHook(hook: FrameHook): void {
     // `Fanout` is a `Set`, so registering the same hook twice leaves one.
     this.hooks.add(hook);
@@ -530,6 +544,7 @@ export class RenderRuntime {
     // it afterwards would leave one frame at the old resolution.
     this.renderer.setPixelRatio(ratio);
     this.renderer.setSize(width, height, false);
+    this.post?.setSize(width, height, ratio);
   }
 
   /**
@@ -588,7 +603,7 @@ export class RenderRuntime {
     // with nothing reported.
     this.hooks.emit(delta, now);
     if (this.camera && (this.renderEnabled || now - this.lastDrawn >= KEEP_WARM_MS)) {
-      this.renderer.render(this.scene, this.camera);
+      this.draw(this.camera, delta);
       this.lastDrawn = now;
     }
     // The post-render hooks run even when the render itself is OFF (plan2d):
@@ -597,6 +612,18 @@ export class RenderRuntime {
     // skipped hook produces. A drawing hook guards itself.
     this.postRenderHooks.emit(delta, now);
   };
+
+  /**
+   * The frame's picture: through the attached chain, or to the screen inside
+   * the beauty-pass scope a mirror captures in (`shared/scene-pass.ts`).
+   */
+  private draw(camera: THREE.Camera, delta: number): void {
+    if (this.post) {
+      this.post.render(this.scene, camera, delta);
+      return;
+    }
+    withScenePass(this.renderer, { target: null, scene: this.scene, camera }, () => this.renderer.render(this.scene, camera));
+  }
 }
 
 /**
