@@ -11,6 +11,7 @@
  */
 
 import * as THREE from 'three';
+import { Reflector } from 'three/addons/objects/Reflector.js';
 import { afterEach, describe, expect, test } from 'vitest';
 import { CATALOGUE_REGISTRIES } from '../../src/assets/catalogue-registries.js';
 import { captureCommands } from '../../src/app/capture-commands.js';
@@ -132,6 +133,35 @@ describe('the shadow-only adapter (three r186 behaviour)', () => {
     // The caster itself never reaches the picture: no red.
     expect(withAdapter[0] - withAdapter[1]).toBeLessThan(10);
     expect(camera.layers.isEnabled(SHADOW_ONLY_LAYER)).toBe(false);
+  });
+});
+
+describe('a mirror', () => {
+  test('never reflects a shadow-only caster; the same box on layer 0 shows in it', () => {
+    const renderer = bareRenderer(64);
+    renderer.shadowMap.enabled = true;
+    installShadowLayerPass(renderer);
+    const scene = new THREE.Scene();
+    scene.background = new THREE.Color('#000000');
+    const mirror = new Reflector(new THREE.PlaneGeometry(4, 4), { textureWidth: 64, textureHeight: 64, color: 0xffffff });
+    disposers.push(() => mirror.dispose());
+    scene.add(mirror);
+    // Behind the camera: the box can only be seen in the mirror.
+    const box = new THREE.Mesh(new THREE.BoxGeometry(6, 6, 0.5), new THREE.MeshBasicMaterial({ color: '#ff0000' }));
+    box.position.set(0, 0, 6);
+    box.castShadow = true;
+    box.layers.set(SHADOW_ONLY_LAYER);
+    scene.add(box);
+    const camera = new THREE.PerspectiveCamera(40, 1, 0.1, 50);
+    camera.position.set(0, 0, 3);
+    camera.lookAt(0, 0, 0);
+    renderer.render(scene, camera);
+    const hidden = pixelAt(renderer, 32, 32);
+    box.layers.enable(0);
+    renderer.render(scene, camera);
+    const shown = pixelAt(renderer, 32, 32);
+    expect(shown[0] - shown[2]).toBeGreaterThan(60);
+    expect(hidden[0] - hidden[2]).toBeLessThan(10);
   });
 });
 

@@ -213,6 +213,8 @@ export function assetMoveWiring(deps: AssetMoveWiringDeps): AssetMoveControl {
     },
     revert() {
       session?.tool.revert();
+      // The body is back at its start pose: fit the apartment again and redraw it there.
+      deps.mount().sunShadow?.endPreview();
     },
     mirror: (assetId, axis) => session?.tool.mirror(assetId, axis) ?? false,
     turnAsset: (assetId, steps) => session?.tool.turnAsset(assetId, steps) ?? false,
