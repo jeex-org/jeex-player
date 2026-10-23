@@ -57,6 +57,7 @@ import { withScenePass } from '../shared/scene-pass.js';
 import type { PostProcessor } from './post-processor.js';
 import { RenderDemand } from './render-demand.js';
 import { FirstDrawGate, FirstDrawSignal } from './first-draw.js';
+import { compileScene } from './scene-compile.js';
 import { devicePixelRatioOf, measureEntry, observeBox, type ObservedBox, type ViewportBox } from './viewport-box.js';
 
 /** Device pixel ratio cap: above this the fill cost outgrows the visible gain. */
@@ -514,17 +515,20 @@ export class RenderRuntime {
   /**
    * A first picture is owed, drawn once the scene compiled asynchronously
    * (`first-draw.ts`) for the path that draws it: through the attached chain
-   * (its own target, `PostProcessor.compile`) or straight to the screen.
+   * (its own target, `PostProcessor.compile`) or straight to the screen
+   * (`scene-compile.ts`).
    */
   private armFirstDraw(): void {
     this.firstOwed = false;
     this.firstDraw.arm();
     const camera = this.camera;
     const post = this.post;
-    const renderer = this.renderer as Partial<THREE.WebGLRenderer>;
-    const direct = renderer.compileAsync?.bind(renderer);
-    const compile = post ? (scene: THREE.Scene, view: THREE.Camera) => post.compile(scene, view) : direct;
-    this.gate.arm(camera && compile ? () => compile(this.scene, camera) : null);
+    if (!camera) {
+      this.gate.arm(null);
+      return;
+    }
+    const pending = post ? post.compile(this.scene, camera) : compileScene(this.renderer, this.scene, camera);
+    this.gate.arm(pending === null ? null : () => pending);
   }
 
   stop(): void {

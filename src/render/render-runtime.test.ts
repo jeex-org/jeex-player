@@ -407,7 +407,7 @@ describe('drawing on demand in walk and tour', () => {
 describe('the first picture waits for asynchronous shader compilation', () => {
   /** A runtime whose renderer compiles asynchronously, with the compilation in hand. */
   function compiling(mode?: string) {
-    let finish: () => void = () => undefined;
+    const pending: Array<() => void> = [];
     const compiled: Array<[unknown, unknown]> = [];
     const rig = harness(mode === undefined ? {} : { mode: () => mode });
     (rig.runtime.renderer as unknown as { compileAsync: (scene: unknown, camera: unknown) => Promise<unknown> }).compileAsync = (
@@ -416,12 +416,12 @@ describe('the first picture waits for asynchronous shader compilation', () => {
     ) => {
       compiled.push([scene, camera]);
       return new Promise<void>((resolve) => {
-        finish = resolve;
+        pending.push(resolve);
       });
     };
     const camera = new THREE.PerspectiveCamera();
     rig.runtime.setCamera(camera);
-    return { ...rig, camera, compiled, finish: () => finish() };
+    return { ...rig, camera, compiled, finish: () => pending.splice(0).forEach((resolve) => resolve()) };
   }
 
   const settle = async (): Promise<void> => {
@@ -437,7 +437,11 @@ describe('the first picture waits for asynchronous shader compilation', () => {
     let announced = false;
     runtime.start();
     void runtime.firstDraw.next.then(() => (announced = true));
-    expect(compiled).toEqual([[runtime.scene, camera]]);
+    // For the screen and for a linear target (`scene-compile.ts`).
+    expect(compiled).toEqual([
+      [runtime.scene, camera],
+      [runtime.scene, camera],
+    ]);
     tick(16);
     tick(16);
     expect(hooks).toBe(2);
@@ -491,7 +495,7 @@ describe('the first picture waits for asynchronous shader compilation', () => {
     runtime.stop();
     runtime.start();
     tick(16);
-    expect(compiled).toHaveLength(1);
+    expect(compiled).toHaveLength(2);
     expect(stub.renders).toBe(2);
     runtime.dispose();
   });
@@ -499,12 +503,13 @@ describe('the first picture waits for asynchronous shader compilation', () => {
   test('a lost context owes a new first picture; the restore compiles again before drawing it', async () => {
     const { canvas, fire } = fakeCanvas();
     const rig = harness({ canvas });
-    let finish: () => void = () => undefined;
+    const pending: Array<() => void> = [];
+    const finish = (): void => pending.splice(0).forEach((resolve) => resolve());
     let compiles = 0;
     (rig.runtime.renderer as unknown as { compileAsync: () => Promise<unknown> }).compileAsync = () => {
       compiles += 1;
       return new Promise<void>((resolve) => {
-        finish = resolve;
+        pending.push(resolve);
       });
     };
     rig.runtime.setCamera(new THREE.PerspectiveCamera());
@@ -517,7 +522,7 @@ describe('the first picture waits for asynchronous shader compilation', () => {
     let announced = false;
     void rig.runtime.firstDraw.next.then(() => (announced = true));
     fire('webglcontextrestored');
-    expect(compiles).toBe(2);
+    expect(compiles).toBe(4);
     rig.tick(16);
     expect(rig.stub.renders).toBe(1);
     finish();
