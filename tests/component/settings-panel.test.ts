@@ -82,6 +82,28 @@ describe('the settings button', { timeout: MOUNT_TIMEOUT_MS }, () => {
     });
   }
 
+  test('at 1280 px a long scene name leaves no room beside the bar: the button goes under its end, inside the viewer', async () => {
+    const scene = {
+      ...demoScene(),
+      name: 'A two-bedroom apartment with a very long name that a listing editor pasted in full, '.repeat(2),
+    };
+    const viewer = mountViewer(openContainer(1280, 520), {
+      scene: { repository: new InlineSceneRepository(scene) },
+      tour: { mode: 'off' },
+      settings: { show: true },
+    });
+    viewers.push(viewer);
+    await viewer.ready;
+    const extension = node(viewer, 'settings-extension')!;
+    await until(() => extension.dataset['placement'] === 'under', 'the button under the bar');
+    const bar = node(viewer, 'control-bar')!.getBoundingClientRect();
+    const plate = extension.getBoundingClientRect();
+    const box = viewer.element.getBoundingClientRect();
+    expect(plate.right).toBeLessThanOrEqual(box.right);
+    expect(plate.top).toBeGreaterThan(bar.bottom);
+    expect(Math.abs(plate.right - bar.right)).toBeLessThan(1.5);
+  });
+
   test('stays with edits off and with no Interior styles, and hides with the control bar', async () => {
     const off = await mount(900, { settings: { show: true }, edits: 'off', interiors: { selector: false } });
     expect(node(off, 'settings-button')!.checkVisibility()).toBe(true);

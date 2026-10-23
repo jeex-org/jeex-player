@@ -686,12 +686,9 @@ describe('reflections from the room probes', { timeout: MOUNT_TIMEOUT_MS }, () =
     world.dispose();
   });
 
-  // A pre-existing seam of the probe blend, measured with no sunlight on the strip (2026-10-24):
-  // the step across the boundary is 0.173 against 0.004 elsewhere, identically on `main` and with the
-  // walk sun factor on or off. With the sun on, its patches made «elsewhere» 0.141 and hid the seam
-  // (0.118); the sun factor took that cover away. Marked failing until the blend is fixed: the
-  // assertion below then passes and this marker turns the test red, as it should.
-  test.fails('across an open boundary the floor’s reflection changes smoothly, no step larger than elsewhere (no sunlight on the strip)', () => {
+  // No sunlight on the strip, so the step measured is the probe blend's alone (with the sun on, its
+  // patches made «elsewhere» large enough to hide a 0.173 seam: 2026-10-24, fixed in the projection).
+  test('across an open boundary the floor’s reflection changes smoothly, no step larger than elsewhere', () => {
     const B: Box = { x0: 4.1, x1: 8.1, z0: 0, z1: 4 };
     const world = lit(
       [
@@ -703,6 +700,21 @@ describe('reflections from the room probes', { timeout: MOUNT_TIMEOUT_MS }, () =
         (scene.getObjectByName('jeex-lighting-sun') as THREE.Light).intensity = 0;
         room(scene, A, { side: 'x1' });
         room(scene, B, { side: 'x0' });
+        // One open space: the walls and the ceiling run on across the 0.1 m between the two boxes.
+        const bridge = new THREE.MeshStandardMaterial({ color: 0x9a9a9a, roughness: 0.9 });
+        for (const [z, yaw] of [
+          [0.01, 0],
+          [3.99, Math.PI],
+        ] as const) {
+          const wall = new THREE.Mesh(new THREE.PlaneGeometry(0.1, HEIGHT_M), bridge);
+          wall.position.set(4.05, HEIGHT_M / 2, z);
+          wall.rotation.y = yaw;
+          scene.add(wall);
+        }
+        const ceiling = new THREE.Mesh(new THREE.PlaneGeometry(0.1, 4), bridge);
+        ceiling.rotation.x = Math.PI / 2;
+        ceiling.position.set(4.05, HEIGHT_M - 0.01, 2);
+        scene.add(ceiling);
         floor(scene, { x0: 0, x1: 8.1, z0: 0, z1: 4 }, 0.25);
         light(scene, [0.04, 1.6, 3], [0.06, 1.3, 2]);
       },

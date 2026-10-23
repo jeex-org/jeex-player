@@ -982,6 +982,12 @@
     cursor: default;
     opacity: 0.55;
   }
+  /* A bar a long scene name made too wide for the button beside it (`settings-panel.ts`). */
+  .jeex-viewer .settings-extension[data-placement='under'] {
+    inset-block-start: calc(100% + 6px);
+    inset-inline: auto 0;
+    translate: none;
+  }
   @container (max-width: 600px) {
     .jeex-viewer .settings-extension {
       inset-block-start: calc(100% + 6px);

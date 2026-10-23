@@ -37,6 +37,10 @@ export const SLIDER_REST_K = 4000;
 const WARM_MAX_K = 3300;
 const NEUTRAL_MAX_K = 4600;
 
+/** The gap between the bar's end and the button's plate beside it, and the least room left to the viewer's edge, CSS px. */
+const PLATE_GAP_PX = 4;
+const EDGE_MARGIN_PX = 8;
+
 /** The `data-jeex` names of the nodes this module builds. */
 export const SETTINGS_NAMES = { extension: 'settings-extension', button: 'settings-button', panel: 'settings-panel' } as const;
 
@@ -124,6 +128,8 @@ export class SettingsPanel {
   /** The document listener of an open panel; aborted on close. */
   private outside: AbortController | null = null;
   private focusTimer: number | undefined;
+  /** Watches the bar and the viewer, so a bar too wide for the button beside it puts it under the bar's end. */
+  private observer: ResizeObserver | null = null;
 
   constructor(deps: SettingsPanelDeps) {
     this.deps = deps;
@@ -196,6 +202,8 @@ export class SettingsPanel {
     this.focusTimer = undefined;
     this.outside?.abort();
     this.outside = null;
+    this.observer?.disconnect();
+    this.observer = null;
   }
 
   // ---------------------------------------------------------------- internals
@@ -236,6 +244,26 @@ export class SettingsPanel {
     this.nodes = { extension, button, panel, title, close, label, output, slider, reset };
     this.bind();
     this.render();
+    if (typeof ResizeObserver !== 'undefined') {
+      this.observer = new ResizeObserver(() => this.place());
+      this.observer.observe(bar);
+      this.observer.observe(roots.viewport);
+      this.deps.signal?.addEventListener('abort', () => this.observer?.disconnect(), { once: true });
+    }
+  }
+
+  /**
+   * Beside the bar's end where it fits, else under it: a bar that a long scene
+   * name has made nearly as wide as the viewer leaves no room beside it, and
+   * the narrow position (`styles/viewer.css`, 600 px and below) is used then too.
+   */
+  private place(): void {
+    const nodes = this.nodes;
+    if (!nodes) return;
+    const bar = this.deps.roots.byName('control-bar').getBoundingClientRect();
+    const frame = this.deps.roots.viewport.getBoundingClientRect();
+    const fits = bar.right + PLATE_GAP_PX + nodes.extension.offsetWidth + EDGE_MARGIN_PX <= frame.right;
+    nodes.extension.dataset['placement'] = fits ? 'beside' : 'under';
   }
 
   private bind(): void {

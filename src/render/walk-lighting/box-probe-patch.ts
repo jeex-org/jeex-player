@@ -18,7 +18,10 @@
  * - with `jeexBoxProbes` on (walk and tour), specular and clearcoat
  *   reflections come from the room probes in one shared atlas, box-projected
  *   onto the room box chosen per fragment (lookup point pushed along the
- *   normal), blended across `blendM` at a shared box face; a fragment outside
+ *   normal), blended across `blendM` at a shared box face; a fragment of the
+ *   band that lies beyond a box is projected through that box's other faces,
+ *   never the one it stands outside (at an open boundary that face is no
+ *   surface, and projecting onto it put a bright ridge along the boundary); a fragment outside
  *   every room reflects the studio environment. The anisotropy and
  *   retroreflection branches keep the studio environment.
  *
@@ -251,6 +254,9 @@ vec3 jeexRadiance( const in vec3 viewDir, const in vec3 normal, const in float r
 		if ( weight <= 0.0 ) continue;
 		vec3 from = clamp( jeexWorldPos, jeexBoxMin[ i ], jeexBoxMax[ i ] );
 		vec3 exits = max( ( jeexBoxMax[ i ] - from ) * reciprocal, ( jeexBoxMin[ i ] - from ) * reciprocal );
+		// A fragment in the blend band beyond this box (an open boundary) is clamped onto the box's face; the
+		// ray leaves through that face at once, so that face is no surface: it exits through the others.
+		exits += step( 1e-4, abs( jeexWorldPos - from ) ) * 1e4;
 		float travel = max( min( min( exits.x, exits.y ), exits.z ), 0.0 );
 		vec3 direction = from + reflectVec * travel - jeexProbe[ i ];
 		sum += weight * jeexProbeSample( direction, roughness, jeexTile[ i ] );

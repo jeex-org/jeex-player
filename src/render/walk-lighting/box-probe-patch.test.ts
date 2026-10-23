@@ -45,6 +45,8 @@ describe('patchFragmentShader', () => {
       'getIBLAnisotropyRadiance( geometryViewDir, geometryNormal, material.roughness, material.anisotropyB, material.anisotropy )',
     );
     expect(physical).toContain('getIBLRetroRadiance( geometryViewDir, geometryNormal, material.roughness )');
+    // A fragment beyond a box (an open boundary's blend band) does not reflect that box's open face.
+    expect(physical).toContain('exits += step( 1e-4, abs( jeexWorldPos - from ) ) * 1e4;');
   });
 
   test('scales direct sunlight inside the rooms by the walk sun factor, after the room is located, and nothing else', () => {
