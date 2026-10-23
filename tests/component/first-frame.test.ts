@@ -58,10 +58,18 @@ function gateWith(wait: (start: () => Promise<unknown>) => Promise<unknown> | nu
   return { calls: () => calls };
 }
 
+/**
+ * The control bar is pinned open (`chrome.autoHide: false`): the pictures are
+ * whole-page shots, and the bar collapses `HIDE_CONTROLS_MS` (4.2 s) after the
+ * boot's own wake. A view that takes longer than that to settle (a full
+ * parallel tier on one GPU) would otherwise be shot with the bar collapsed and
+ * compared against one shot with it open.
+ */
 function mount(): ViewerHandle {
   const handle = mountViewer(openContainer(480, 320), {
     scene: { repository: new InlineSceneRepository(demoScene()) },
     tour: { mode: 'off' },
+    chrome: { autoHide: false },
     debug: true,
   });
   handles.push(handle);
