@@ -33,6 +33,7 @@ import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
 import { GTAOPass } from 'three/addons/postprocessing/GTAOPass.js';
 import { SMAAPass } from 'three/addons/postprocessing/SMAAPass.js';
 import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
+import { warmPrograms } from './scene-compile.js';
 import { withScenePass } from '../shared/scene-pass.js';
 import { withOccludersOnly } from './ao-occluders.js';
 import type { PostProcessor } from './post-processor.js';
@@ -190,14 +191,32 @@ export class WalkPost implements PostProcessor {
   }
 
   compile(scene: THREE.Scene, camera: THREE.Camera): Promise<unknown> {
-    const previous = this.renderer.getRenderTarget();
-    // `compileAsync` creates every program synchronously, before its first
-    // await: the target bound here is the one their keys are made with.
-    this.renderer.setRenderTarget(this.composer.readBuffer);
+    const renderer = this.renderer;
+    const previous = renderer.getRenderTarget();
+    // The chain's own full-screen materials too (measured on the demo
+    // apartment: about 115 ms of links in the first frame through the chain
+    // without this), each on a throwaway quad with the target it draws into.
+    // The output pass sets its defines at its first render, so its program
+    // still links then.
+    // Position and uv only, as three's full-screen quad: a normal attribute is a different program.
+    const quad = new THREE.PlaneGeometry(2, 2).deleteAttribute('normal');
+    const view = new THREE.OrthographicCamera(-1, 1, 1, -1, 0, 1);
+    const quads = (materials: readonly THREE.Material[]): THREE.Scene => {
+      const holder = new THREE.Scene();
+      for (const material of materials) holder.add(new THREE.Mesh(quad, material));
+      return holder;
+    };
+    const intoBuffers = this.composer.passes.filter((pass) => pass !== this.output).flatMap((pass) => materialsOf(pass));
     try {
-      return this.renderer.compileAsync(scene, camera);
+      // `compileAsync` creates every program synchronously, before its first
+      // await: the target bound here is the one their keys are made with.
+      renderer.setRenderTarget(this.composer.readBuffer);
+      const pending = [renderer.compileAsync(scene, camera), renderer.compileAsync(quads(intoBuffers), view)];
+      renderer.setRenderTarget(null);
+      pending.push(renderer.compileAsync(quads(materialsOf(this.output)), view));
+      return Promise.all(pending).then(() => warmPrograms(renderer));
     } finally {
-      this.renderer.setRenderTarget(previous);
+      renderer.setRenderTarget(previous);
     }
   }
 
@@ -248,4 +267,9 @@ export async function createWalkPost(renderer: THREE.WebGLRenderer, scene: THREE
     throw error;
   }
   return chain;
+}
+
+/** The materials a pass keeps as its own fields: what its full-screen quad draws with. */
+function materialsOf(pass: object): THREE.Material[] {
+  return Object.values(pass).filter((value): value is THREE.Material => value instanceof THREE.Material);
 }
