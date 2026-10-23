@@ -202,8 +202,6 @@ export class SettingsPanel {
     this.focusTimer = undefined;
     this.outside?.abort();
     this.outside = null;
-    this.observer?.disconnect();
-    this.observer = null;
   }
 
   // ---------------------------------------------------------------- internals
@@ -245,10 +243,13 @@ export class SettingsPanel {
     this.bind();
     this.render();
     if (typeof ResizeObserver !== 'undefined') {
-      this.observer = new ResizeObserver(() => this.place());
+      // Ends with the viewer, not with a boot: a Retry keeps this panel and its nodes.
+      this.observer = new ResizeObserver(() => {
+        if (this.deps.signal?.aborted === true) this.observer?.disconnect();
+        else this.place();
+      });
       this.observer.observe(bar);
       this.observer.observe(roots.viewport);
-      this.deps.signal?.addEventListener('abort', () => this.observer?.disconnect(), { once: true });
     }
   }
 
