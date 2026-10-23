@@ -57,7 +57,7 @@ as described under [Versioning](#versioning).
   switches in one frame; edits refresh only the rooms they touch. Editing
   modes render exactly as before. Shell meshes (walls, floors, ceilings,
   skirtings, joints) now have their origins inside their rooms; their
-  world-space vertices are unchanged. The walk chunk grows by about 10 KB
+  world-space vertices are unchanged. The walk chunk grows by about 12 KB
   gzip. `__viewerDebug.walkLighting()` reports the phase and the measured
   bake.
 

@@ -473,15 +473,22 @@ describe('room lighting on the demo apartment', { timeout: MOUNT_TIMEOUT_MS }, (
   });
 
   test('an edit in walk re-captures only its room’s probe, after the debounce', async () => {
-    const refresh = vi.spyOn(WalkLighting.prototype, 'refresh');
+    const refreshed = original(WalkLighting.prototype, 'refresh');
+    let calledAt = 0;
+    const refresh = vi.spyOn(WalkLighting.prototype, 'refresh').mockImplementation(function (this: WalkLighting, scope) {
+      calledAt = performance.now();
+      refreshed.call(this, scope);
+    });
+    const editedAt = performance.now();
     const asset = demoScene().assets.find((item) => item.room === ROOM.living)!;
     const result = debug().applyOps([
       { op: 'move_object', assetId: asset.id, position: { x: asset.position.x + 0.05, y: asset.position.y, z: asset.position.z } },
     ]);
     expect(result.error).toBeUndefined();
-    for (let i = 0; i < 5; i += 1) await nextFrame();
-    expect(refresh).not.toHaveBeenCalled();
-    await until(() => refresh.mock.calls.length > 0, 'the refresh after the debounce', 10_000);
+    // On the wall clock, not the frame clock: the debounce is time, and a slow renderer draws few frames in it.
+    await until(() => refresh.mock.calls.length > 0, 'the refresh after the debounce', 60_000);
+    expect(calledAt - editedAt).toBeGreaterThanOrEqual(T.refreshDebounceMs - 50);
+    expect(refresh).toHaveBeenCalledTimes(1);
     expect(refresh.mock.calls[0]![0]).toEqual({ all: false, grids: [], probes: [ROOM.living] });
   });
 });

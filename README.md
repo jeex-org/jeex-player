@@ -1126,7 +1126,7 @@ In `walk` and `tour` each room is lit by its own light: a windowless bathroom is
 - **When:** the bake starts once the post-processing chain is ready and runs over a number of frames, a fixed number of probes per frame; until it is done the view looks as before, then switches in one frame. An edit in walk refreshes only the rooms it touched, about a second after the last change; loading a scene, a plan change, a sun change or a lost GPU context bakes everything again.
 - **Editing modes** (`plan2d`, `plan3d`, `orbit`) are unchanged, and leaving walk restores them exactly.
 - **Captures:** stills, video frames and panoramas of the live view in walk or tour show the room lighting once it is baked (before that, the direct look). Captures of other states (another camera's preview, an exported file) show the editing look.
-- **Cost:** the code travels in the walk chunk (about 10 KB gzip more). GPU memory is about 1.6 MB per room for the reflection probe plus a few kilobytes per grid.
+- **Cost:** the code travels in the walk chunk (about 12 KB gzip more). GPU memory is about 1.6 MB per room for the reflection probe plus a few kilobytes per grid.
 
 ## Lighting standard (`jeex-viewer/lighting`)
 
