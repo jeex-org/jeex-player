@@ -19,7 +19,7 @@ A room surface whose resolved finish is a library material SHALL draw it with it
 
 ### Requirement: Flat first frame
 
-The first frame after a mount or repaint SHALL draw every library surface in a flat colour without waiting for any texture: `averageColour` for a natural material, `averageColour` times the tint in linear light for a tintable scan, and the tint itself for a tintable parameters material, which has no map. Texture work SHALL start only after that frame.
+The first frame after a mount or repaint SHALL draw every library surface in a flat colour without waiting for any texture: `averageColour` for a natural material, `averageColour` times the tint times the tint recipe's gain in linear light for a tintable scan, and the tint itself for a tintable parameters material, which has no map. Texture work SHALL start only after that frame.
 
 #### Scenario: Delayed texture response
 - **WHEN** a project is mounted while its texture responses are held back
@@ -35,11 +35,15 @@ The first frame after a mount or repaint SHALL draw every library surface in a f
 
 ### Requirement: Tint
 
-A tintable material SHALL use the finish value's `colour`, or else its first suggested colour, as the tint. A tintable scan SHALL draw `albedoTint` times the tint in linear light; a tintable parameters material SHALL draw the tint as its base colour. A natural material SHALL ignore any `colour`.
+A tintable material SHALL use the finish value's `colour`, or else its first suggested colour, as the tint. A tintable scan SHALL draw `albedoTint` times the tint times the gain of its tint recipe, in linear light. The gain undoes the recipe's normalisation (for `luma-mid@1`, the inverse of mid grey in linear light); a tintable parameters material SHALL draw the tint as its base colour. A natural material SHALL ignore any `colour`.
 
 #### Scenario: Tinted scan
 - **WHEN** a tintable scan is drawn with `colour: '#ff0000'` over a mid-grey `albedoTint`
 - **THEN** the rendered surface is red with the map's variation and no green or blue beyond the light's contribution
+
+#### Scenario: Natural tint reproduces the scan
+- **WHEN** a `luma-mid@1` scan whose natural colour is `#9a8d7a` is drawn with `colour: '#9a8d7a'`, before and after its mid-grey `albedoTint` arrives
+- **THEN** the map's mean times the colour factor equals `#9a8d7a` within half an 8-bit step, and the flat first frame (from the `#808080` average) within one step
 
 #### Scenario: Paint without colour
 - **WHEN** a tintable parameters material is drawn from a bare UUID

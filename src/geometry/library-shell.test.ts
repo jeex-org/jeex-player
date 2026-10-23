@@ -108,15 +108,18 @@ describe('the shell of a dressed scene, first frame', () => {
     expect(floor.map).toBeNull();
   });
 
-  test('library walls start flat in averageColour times the first suggested tint', () => {
+  test('library walls start flat in averageColour times the first suggested tint and its recipe gain', () => {
     const walls = materialsOf(
       root,
       (mesh) => mesh.userData['surface'] === 'wall' && (mesh.userData['face'] as { room?: string }).room === ROOM.a,
     );
     expect(walls.size).toBe(1);
-    const expected = new THREE.Color('#808080').multiply(new THREE.Color('#c9d6df'));
+    // A mid-grey averageColour times the `luma-mid@1` gain gives the tint back,
+    // within one 8-bit step (`#808080` sits a hair above the map's exact mean).
     const wall = [...walls][0] as THREE.MeshStandardMaterial;
-    expect(wall.color.equals(expected)).toBe(true);
+    const drawn = wall.color.clone().convertLinearToSRGB();
+    const tint = new THREE.Color('#c9d6df').convertLinearToSRGB();
+    for (const channel of ['r', 'g', 'b'] as const) expect(Math.abs(drawn[channel] - tint[channel])).toBeLessThan(1 / 255 + 1e-9);
     expect(wall.map).toBeNull();
   });
 });

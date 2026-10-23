@@ -19,6 +19,17 @@ function withPbr(material: ProjectMaterial, pbr: LibraryPbr): LibraryDraw {
   return { id: material.id, material: { ...library, facts: { ...library.facts, pbr } }, rotation: 0 };
 }
 
+/** The linear mean a `luma-mid@1` tint map is normalised to: sRGB 0.5, as the catalogue writes it. */
+const MID_GREY_LINEAR = new THREE.Color().setRGB(0.5, 0.5, 0.5, THREE.SRGBColorSpace).r;
+
+/** True when two linear colours agree within `steps` 8-bit sRGB steps of each other. */
+function closeTo(actual: THREE.Color, expected: THREE.Color, steps = 0.5): boolean {
+  const a = actual.clone().convertLinearToSRGB();
+  const b = expected.clone().convertLinearToSRGB();
+  const within = (x: number, y: number) => Math.abs(x - y) < steps / 255 + 1e-9;
+  return within(a.r, b.r) && within(a.g, b.g) && within(a.b, b.b);
+}
+
 /** The material's colour as `#rrggbb` (sRGB). */
 const hexOf = (material: THREE.MeshStandardMaterial): string => `#${material.color.getHexString()}`;
 
@@ -28,11 +39,20 @@ describe('createLibraryMaterial: the first frame', () => {
     expect(hexOf(createLibraryMaterial(draw(NATURAL_SCAN, '#ff0000')))).toBe('#9a7b56');
   });
 
-  test('a tintable scan draws averageColour times the tint in linear light', () => {
-    const expected = new THREE.Color('#808080').multiply(new THREE.Color('#ff0000'));
-    expect(createLibraryMaterial(draw(TINTABLE_SCAN, '#ff0000')).color.equals(expected)).toBe(true);
-    const suggested = new THREE.Color('#808080').multiply(new THREE.Color('#c9d6df'));
-    expect(createLibraryMaterial(draw(TINTABLE_SCAN)).color.equals(suggested)).toBe(true);
+  test('a tintable scan draws averageColour times the tint times its recipe gain, in linear light', () => {
+    const gain = 1 / MID_GREY_LINEAR;
+    const expected = new THREE.Color('#808080').multiply(new THREE.Color('#ff0000')).multiplyScalar(gain);
+    expect(closeTo(createLibraryMaterial(draw(TINTABLE_SCAN, '#ff0000')).color, expected)).toBe(true);
+    const suggested = new THREE.Color('#808080').multiply(new THREE.Color('#c9d6df')).multiplyScalar(gain);
+    expect(closeTo(createLibraryMaterial(draw(TINTABLE_SCAN)).color, suggested)).toBe(true);
+  });
+
+  test('a tint in the scan’s own colour reproduces the scan’s mean on the first frame', () => {
+    // `luma-mid@1` normalises the tint map to a mid-grey mean, which is the
+    // averageColour of a tintable scan; the natural tint must give the scan back.
+    // `#808080` is 128/255, a hair above the map's exact mean, so the flat
+    // placeholder may be one 8-bit step bright; the map path below is exact.
+    expect(closeTo(createLibraryMaterial(draw(TINTABLE_SCAN, '#9a8d7a')).color, new THREE.Color('#9a8d7a'), 1)).toBe(true);
   });
 
   test('a tintable paint draws exactly its tint, never its base colour or a product of the two', () => {
@@ -147,10 +167,19 @@ describe('attachLibraryMaps', () => {
     expect(material.version).toBeGreaterThan(version);
   });
 
-  test('a tintable scan’s tint map is drawn times the tint', () => {
+  test('a tintable scan’s tint map is drawn times the tint and its recipe gain', () => {
     const material = createLibraryMaterial(draw(TINTABLE_SCAN, '#ff0000'));
     attachLibraryMaps(material, draw(TINTABLE_SCAN, '#ff0000'), { albedoTint: view() });
-    expect(hexOf(material)).toBe('#ff0000');
+    expect(closeTo(material.color, new THREE.Color('#ff0000').multiplyScalar(1 / MID_GREY_LINEAR))).toBe(true);
+  });
+
+  test('a tint map of mid-grey mean drawn in the scan’s own colour reproduces the scan’s mean', () => {
+    const natural = draw(TINTABLE_SCAN, '#9a8d7a');
+    const material = createLibraryMaterial(natural);
+    attachLibraryMaps(material, natural, { albedoTint: view() });
+    // The drawn mean is the map's linear mean (mid grey) times the colour factor.
+    const drawn = material.color.clone().multiplyScalar(MID_GREY_LINEAR);
+    expect(closeTo(drawn, new THREE.Color('#9a8d7a'))).toBe(true);
   });
 
   test('a scan’s baseColour multiplies its colour map by glTF rules', () => {
