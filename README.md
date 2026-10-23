@@ -1112,7 +1112,7 @@ A name not on this list is not public, whatever module it lives in — the same 
 
 ## First picture
 
-Before its first picture, and again after a restored GPU context, the player compiles the scene's shaders asynchronously (three's `compileAsync`; the browser links them in parallel off the main thread where it offers `KHR_parallel_shader_compile`) and draws once they are ready, or after at most 1 s. The frame loop keeps running meanwhile. This takes the shader links out of the first frame's long task, which blocked the page's main thread; a browser without parallel compilation draws as before. The walk and tour chain compiles the scene for its own target before it attaches, drawing directly until then. A capture asked for before compilation finishes links what it needs itself, as before. Models and textures that arrive later still compile when first drawn.
+Before its first picture, and again after a restored GPU context, the player compiles the scene's shaders asynchronously (three's `compileAsync`; the browser links them in parallel off the main thread where it offers `KHR_parallel_shader_compile`) and puts the linked programs to their first use a few at a time, then draws, or after at most 1 s. The frame loop keeps running meanwhile. This takes the shader links out of the first frame's long task, which blocked the page's main thread; a browser without parallel compilation draws as before. The walk and tour chain compiles the scene for its own target before it attaches, drawing directly until then. A capture asked for before compilation finishes links what it needs itself, as before. Models and textures that arrive later still compile when first drawn.
 
 ## Rendering in walk and tour
 
