@@ -39,10 +39,21 @@ export const WALK_LIGHTING_TUNING = Object.freeze({
   blendM: 0.4,
   /** How far a fragment's room lookup point is pushed along its normal, metres. */
   normalPushM: 0.05,
-  /** Ambient light in walk and tour, so a room without a window or a lamp is not black; intensity. */
-  ambientFloor: 0.06,
-  /** Renderer exposure in walk and tour, against the standard's 1. */
-  walkExposure: 1.35,
+  /**
+   * Ambient light in walk and tour, so a room without a window or a lamp is not
+   * black; intensity. Measured on the demo apartment by daylight (lamps off): the
+   * closed WC reads 0.17 of the living room's window wall at this floor.
+   */
+  ambientFloor: 0.05,
+  /**
+   * Renderer exposure in walk and tour, against the standard's 1. Baked
+   * daylight through windows is far weaker than the studio light of the editing
+   * look; at 3.5 a grey card facing the living room's window reads about a
+   * third of its editing value, the target (about 1.6 stops under the studio
+   * look, as a daylit room measures against an evenly lit studio). Facades and
+   * the sky are divided by it, so they keep the editing look.
+   */
+  walkExposure: 3.5,
   /** Quiet time after the last edit in walk before the affected rooms are refreshed, milliseconds. */
   refreshDebounceMs: 1000,
 });

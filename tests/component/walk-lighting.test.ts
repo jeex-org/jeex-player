@@ -240,6 +240,9 @@ function addPatches(scene: THREE.Scene): void {
     card.name = `test-patch-${name}`;
     card.position.copy(patch.at);
     card.rotation.y = patch.yaw;
+    // A receiver like every surface of the shell: without it the sun reached the windowless WC through the roof.
+    card.receiveShadow = true;
+    card.castShadow = true;
     scene.add(card);
   }
 }
@@ -406,7 +409,12 @@ describe('room lighting on the demo apartment', { timeout: MOUNT_TIMEOUT_MS }, (
       16,
     );
     record('facade', { walk, editing });
-    record('editing', { wc: await patch('wc'), living: await patch('living') });
+    const editingLiving = await patch('living');
+    record('editing', { wc: await patch('wc'), living: editingLiving });
+    // The calibration target: the window room reads about a third of the studio-lit editing look.
+    const walkLiving = (results['walk'] as { living: number }).living;
+    expect(walkLiving / editingLiving).toBeGreaterThan(0.25);
+    expect(walkLiving / editingLiving).toBeLessThan(0.45);
     expect(Math.abs(walk - editing) / editing).toBeLessThan(0.05);
   });
 
