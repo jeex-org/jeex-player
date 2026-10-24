@@ -290,6 +290,7 @@ const libraryPbrSchema = z.strictObject({
   opacity: z.optional(unitSchema),
   sheen: z.optional(unitSchema),
   sheenColour: z.optional(hexSchema),
+  sheenRoughness: z.optional(unitSchema),
   clearcoat: z.optional(unitSchema),
   clearcoatRoughness: z.optional(unitSchema),
   transmission: z.optional(unitSchema),

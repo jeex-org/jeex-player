@@ -115,6 +115,7 @@ describe('createLibraryMaterial: the first frame', () => {
     const fields: LibraryPbr[] = [
       { sheen: 0.5 },
       { sheenColour: '#ffffff' },
+      { sheenRoughness: 0.6 },
       { clearcoat: 0.5 },
       { clearcoatRoughness: 0.5 },
       { transmission: 0.5 },
@@ -172,6 +173,46 @@ describe('createLibraryMaterial: the first frame', () => {
       attenuationDistance: 3,
       attenuationColor: '#00ff00',
     });
+  });
+});
+
+describe('createLibraryMaterial: the sheen lobe of a cloth', () => {
+  /** A cotton cloth: a tintable `luma-mid@1` scan with the sheen facts of its fabric. */
+  const CLOTH: LibraryPbr = { roughness: 0.85, sheen: 0.3, sheenRoughness: 0.6 };
+
+  /** The cloth drawn with `pbr`, in `colour` when given. */
+  function cloth(pbr: LibraryPbr, colour?: string): THREE.MeshPhysicalMaterial {
+    const drawn = withPbr(TINTABLE_SCAN, pbr);
+    const material = createLibraryMaterial({ ...drawn, ...(colour !== undefined && { colour }) });
+    expect(material).toBeInstanceOf(THREE.MeshPhysicalMaterial);
+    return material as THREE.MeshPhysicalMaterial;
+  }
+
+  test('stated sheen, sheen roughness and sheen colour reach the physical material, the colour in linear light', () => {
+    const material = cloth({ ...CLOTH, sheenColour: '#d0c8b8' }, '#5a6b8c');
+    expect({ sheen: material.sheen, sheenRoughness: material.sheenRoughness }).toEqual({ sheen: 0.3, sheenRoughness: 0.6 });
+    expect(closeTo(material.sheenColor, new THREE.Color('#d0c8b8'))).toBe(true);
+  });
+
+  test('sheen roughness alone gives a physical material with that sheen roughness', () => {
+    expect(cloth({ sheenRoughness: 0.6 }).sheenRoughness).toBe(0.6);
+  });
+
+  test('a sheen without a colour takes the plain tint, never the tint times the recipe gain', () => {
+    expect(closeTo(cloth(CLOTH, '#5a6b8c').sheenColor, new THREE.Color('#5a6b8c'))).toBe(true);
+  });
+
+  test('a sheen without a colour or a finish colour takes the first suggested colour', () => {
+    expect(closeTo(cloth(CLOTH).sheenColor, new THREE.Color('#c9d6df'))).toBe(true);
+  });
+
+  test('a sheen without a colour on an untinted material is white', () => {
+    const material = createLibraryMaterial(withPbr(NATURAL_SCAN, CLOTH)) as THREE.MeshPhysicalMaterial;
+    expect(`#${material.sheenColor.getHexString()}`).toBe('#ffffff');
+  });
+
+  test('an absent sheen roughness keeps three’s default of 1', () => {
+    expect(cloth({ sheen: 0.3, sheenColour: '#ffffff' }).sheenRoughness).toBe(1);
   });
 });
 

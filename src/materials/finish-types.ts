@@ -129,6 +129,7 @@ export type LibraryPbr = {
   readonly opacity?: number;
   readonly sheen?: number;
   readonly sheenColour?: string;
+  readonly sheenRoughness?: number;
   readonly clearcoat?: number;
   readonly clearcoatRoughness?: number;
   readonly transmission?: number;

@@ -26,6 +26,7 @@ const MASK_CUTOFF = 0.5;
 const PHYSICAL_FIELDS: readonly (keyof LibraryPbr)[] = [
   'sheen',
   'sheenColour',
+  'sheenRoughness',
   'clearcoat',
   'clearcoatRoughness',
   'transmission',
@@ -93,14 +94,23 @@ export function createLibraryMaterial(draw: LibraryDraw): LibraryThreeMaterial {
   } else if (pbr.alphaMode === 'mask') {
     material.alphaTest = MASK_CUTOFF;
   }
-  if (material instanceof THREE.MeshPhysicalMaterial) applyPhysical(material, pbr);
+  if (material instanceof THREE.MeshPhysicalMaterial) applyPhysical(material, draw);
   return material;
 }
 
-/** The physical fields under their three.js names. */
-function applyPhysical(material: THREE.MeshPhysicalMaterial, pbr: LibraryPbr): void {
+/**
+ * The physical fields under their three.js names. three's sheen colour is
+ * black until set, which hides a stated sheen, so a sheen stated without a
+ * colour takes the draw's tint (the plain colour: the sheen lobe samples no
+ * map, so the tint recipe's gain does not apply), or white without a tint.
+ * An absent sheen roughness keeps three's default of 1.
+ */
+function applyPhysical(material: THREE.MeshPhysicalMaterial, draw: LibraryDraw): void {
+  const { pbr } = draw.material.facts;
   if (pbr.sheen !== undefined) material.sheen = pbr.sheen;
   if (pbr.sheenColour !== undefined) material.sheenColor.set(pbr.sheenColour);
+  else if (pbr.sheen !== undefined) material.sheenColor.set(tintOf(draw) ?? '#ffffff');
+  if (pbr.sheenRoughness !== undefined) material.sheenRoughness = pbr.sheenRoughness;
   if (pbr.clearcoat !== undefined) material.clearcoat = pbr.clearcoat;
   if (pbr.clearcoatRoughness !== undefined) material.clearcoatRoughness = pbr.clearcoatRoughness;
   if (pbr.transmission !== undefined) material.transmission = debugFlags().noTransmission ? 0 : pbr.transmission;

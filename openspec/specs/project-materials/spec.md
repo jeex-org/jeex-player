@@ -71,11 +71,15 @@ The `apply` list of every project material SHALL accept the words `floor`, `wall
 
 ### Requirement: PBR values and ranges
 
-`facts.pbr` SHALL accept only `baseColour`, `roughness`, `metalness`, `alphaMode` (`opaque`, `blend`, `mask`), `opacity`, `sheen`, `sheenColour`, `clearcoat`, `clearcoatRoughness`, `transmission`, `ior`, `thicknessM`, `attenuationDistanceM`, `attenuationColour`, `emissive` and `emissiveIntensity`. Colours SHALL be `#rrggbb`; ranges are in the scenarios.
+`facts.pbr` SHALL accept only `baseColour`, `roughness`, `metalness`, `alphaMode` (`opaque`, `blend`, `mask`), `opacity`, `sheen`, `sheenColour`, `sheenRoughness`, `clearcoat`, `clearcoatRoughness`, `transmission`, `ior`, `thicknessM`, `attenuationDistanceM`, `attenuationColour`, `emissive` and `emissiveIntensity`. Colours SHALL be `#rrggbb`; ranges are in the scenarios.
 
 #### Scenario: Unit-interval values
-- **WHEN** any of roughness, metalness, opacity, sheen, clearcoat, clearcoatRoughness or transmission is below 0 or above 1
+- **WHEN** any of roughness, metalness, opacity, sheen, sheenRoughness, clearcoat, clearcoatRoughness or transmission is below 0 or above 1
 - **THEN** the manifest is refused
+
+#### Scenario: Sheen roughness accepted
+- **WHEN** `sheenRoughness` is 0, 1 or a value between them, with or without the other sheen fields
+- **THEN** the manifest is accepted
 
 #### Scenario: Index of refraction
 - **WHEN** `ior` is below 1 or above 2.333
