@@ -412,6 +412,9 @@ describe('room lighting on the demo apartment', { timeout: MOUNT_TIMEOUT_MS }, (
     const point = new THREE.Vector3(7.5, 1.5, 1.0804411764705883);
     const rig = lighting.rig as unknown as { setState(state: string): void; state: string };
     const state = rig.state;
+    // Put back exactly what was shown: the live view keeps its grids visible between frames.
+    const shown = lighting.grids.map((grid) => grid.visible);
+    const exteriorShown = lighting.exterior.visible;
     rig.setState('capture');
     for (const grid of lighting.grids) grid.visible = true;
     lighting.exterior.visible = true;
@@ -425,8 +428,8 @@ describe('room lighting on the demo apartment', { timeout: MOUNT_TIMEOUT_MS }, (
       target.dispose();
     } finally {
       pmrem.dispose();
-      for (const grid of lighting.grids) grid.visible = false;
-      lighting.exterior.visible = false;
+      lighting.grids.forEach((grid, i) => (grid.visible = shown[i]!));
+      lighting.exterior.visible = exteriorShown;
       rig.setState(state);
     }
     record('wcProbeNaN', { renderer: debugRenderer(lighting.renderer), nan });
@@ -660,11 +663,12 @@ function floor(scene: THREE.Scene, b: Box, roughness: number): void {
 }
 
 /** A bright emissive bar: the stripe or the window of a test room. */
+/**
+ * A bright bar the probes see: unlit, so the walk's emissive cap (which keeps a lamp shade under the display
+ * knee) leaves it at full strength, as a window or a bare bulb would be.
+ */
 function light(scene: THREE.Scene, size: [number, number, number], at: [number, number, number]): void {
-  const mesh = new THREE.Mesh(
-    new THREE.BoxGeometry(...size),
-    new THREE.MeshStandardMaterial({ color: 0x000000, emissive: 0xffffff, emissiveIntensity: 6 }),
-  );
+  const mesh = new THREE.Mesh(new THREE.BoxGeometry(...size), new THREE.MeshBasicMaterial({ color: new THREE.Color().setScalar(6) }));
   mesh.position.set(...at);
   scene.add(mesh);
 }
