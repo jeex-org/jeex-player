@@ -4,6 +4,8 @@
  */
 
 import { describe, expect, test } from 'bun:test';
+import { blenderPower } from '../lighting/lamp-units.js';
+import * as schema from './bake-lights.schema.js';
 import { judgeBakeLights } from './bake-lights.schema.js';
 
 const LAMP_A = '01a15f1b-dbbd-764a-90b8-84dbe9962bfc';
@@ -75,6 +77,13 @@ describe('judgeBakeLights', () => {
 
   test('refuses a lamp whose power is not 4π times its intensity', () => {
     expect(refusal((d) => (d.lamps[0].power = 1.2))).toContain('lamps.0.power');
+  });
+
+  test('judges the power by the lighting module’s conversion and keeps no copy of it', () => {
+    expect(Object.keys(schema).filter((name) => /WATT|POWER/i.test(name))).toEqual([]);
+    const doc = valid();
+    doc.lamps[0].power = blenderPower(doc.lamps[0].intensity);
+    expect(judgeBakeLights(doc).ok).toBe(true);
   });
 
   test('refuses a non-finite lamp position', () => {

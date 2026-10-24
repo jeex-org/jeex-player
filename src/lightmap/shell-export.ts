@@ -6,7 +6,10 @@
  * builds it, origins inside the rooms included; then every mesh's world
  * matrix is applied to its vertices and normals, so each node of the file has
  * an identity transform and its origin travels in `extras.jeex.origin`. Only
- * `TEXCOORD_0` is written: the bake tool adds `TEXCOORD_1`.
+ * `TEXCOORD_0` is written: the bake tool adds `TEXCOORD_1`. A mesh with
+ * triangles no walk can see is written as two nodes, its seen part and then
+ * its unseen part (`shellParts`); each part keeps its triangles in the mesh's
+ * order and its vertices in order of first use.
  *
  * Mesh ids belong to the shell file, not to the scene (which has no id per
  * wall side, nor one for a floor apart from its ceiling), so the caller, who
@@ -32,7 +35,7 @@ import { solvePlan } from '../plan/plan-solver.js';
 import { isUuidV7, type SceneData } from '../scene/types.js';
 import { ViewerLibError } from '../shared/errors.js';
 import { writeGlb, type GlbMaterial, type GlbMesh } from './glb-write.js';
-import { shellEntries, type ShellEntry } from './shell-contract.js';
+import { shellEntries, shellParts, type ShellEntry } from './shell-contract.js';
 import { canonicalJson, shellInputsHash } from './shell-inputs.js';
 
 /** The bundled finishes, for a scene the live view paints without a project. */
@@ -98,6 +101,32 @@ export function worldAttributes(mesh: THREE.Mesh): Pick<GlbMesh, 'positions' | '
   }
 }
 
+type MeshAttributes = Pick<GlbMesh, 'positions' | 'normals' | 'uv0' | 'indices'>;
+
+/** The triangles `triangles` of `all`, their vertices renumbered in order of first use. */
+function partAttributes(all: MeshAttributes, triangles: readonly number[]): MeshAttributes {
+  const remap = new Map<number, number>();
+  const order: number[] = [];
+  const indices = new Uint32Array(triangles.length * 3);
+  triangles.forEach((t, i) => {
+    for (let k = 0; k < 3; k++) {
+      const vertex = all.indices[3 * t + k]!;
+      let at = remap.get(vertex);
+      if (at === undefined) {
+        at = order.push(vertex) - 1;
+        remap.set(vertex, at);
+      }
+      indices[3 * i + k] = at;
+    }
+  });
+  const pick = (source: Float32Array, size: number) => {
+    const out = new Float32Array(order.length * size);
+    order.forEach((vertex, i) => out.set(source.subarray(vertex * size, vertex * size + size), i * size));
+    return out;
+  };
+  return { positions: pick(all.positions, 3), normals: pick(all.normals, 3), uv0: pick(all.uv0, 2), indices };
+}
+
 function glbMaterialOf(entry: ShellEntry): GlbMaterial {
   const material = entry.mesh.material as THREE.MeshStandardMaterial;
   return {
@@ -127,7 +156,8 @@ export async function exportShellForBake(scene: SceneData, options: ShellExportO
     const materials: GlbMaterial[] = [];
     const materialIndex = new Map<string, number>();
     const names = new Set<string>();
-    const meshes: GlbMesh[] = entries.map((entry) => {
+    const world = new Map(entries.map((entry) => [entry, worldAttributes(entry.mesh)]));
+    const meshes: GlbMesh[] = shellParts(entries).map(({ entry, extras, triangles }) => {
       const name = options.mintId();
       if (!isUuidV7(name)) throw new ViewerLibError('bad-params', `shell export: minted id ${JSON.stringify(name)} is not a UUID v7`);
       if (names.has(name)) throw new ViewerLibError('bad-params', `shell export: minted id ${name} was minted twice`);
@@ -139,7 +169,7 @@ export async function exportShellForBake(scene: SceneData, options: ShellExportO
         material = materials.push(glbMaterial) - 1;
         materialIndex.set(key, material);
       }
-      return { name, ...worldAttributes(entry.mesh), material, extras: { jeex: entry.extras } };
+      return { name, ...partAttributes(world.get(entry)!, triangles), material, extras: { jeex: extras } };
     });
 
     const hash = await shellInputsHash(scene, projectMaterials);

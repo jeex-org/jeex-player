@@ -12,8 +12,9 @@
  *   irradiance of the live hemisphere light.
  * - `lamps`: point lamps of radius 0 at `position`; `intensity` in candela
  *   with inverse-square falloff and no cut-off distance, `power` the
- *   equivalent radiant power in watts, `BAKE_LAMP_WATTS_PER_CANDELA` times the
- *   intensity; `lamps[i].color` linear; `id` is the lamp's placement id and `index`
+ *   equivalent radiant power in watts, the lighting module's `blenderPower`
+ *   of the intensity (4π × cd: a radiant power `P` spread over the sphere
+ *   gives `P / (4π d²)` at distance `d`, three's light gives `I / d²`); `lamps[i].color` linear; `id` is the lamp's placement id and `index`
  *   the light's place among that placement's lights, so `(id, index)` is
  *   unique. A lamp is a light a placement declares (`render/lamp-lights.ts`);
  *   a bank builder's procedural bulb is not one and stays live.
@@ -22,7 +23,7 @@
  * file's frame (glTF, +Y up); a consumer that converts the shell to another
  * frame (Blender's +Z up: `(x, y, z) -> (x, -z, y)`) converts these the same
  * way. Tolerances: the sun direction is unit to 1e-9; `power` equals
- * `BAKE_LAMP_WATTS_PER_CANDELA × intensity` to 1e-9 relative (absolute below
+ * `blenderPower(intensity)` to 1e-9 relative (absolute below
  * 1 W).
  *
  * Into the sidecar (`light-bake.schema.ts`): its `sun` is this `sun`
@@ -39,19 +40,13 @@
  */
 
 import { z } from 'zod/mini';
+import { blenderPower } from '../lighting/lamp-units.js';
 import { UUID_V7_PATTERN } from '../scene/types.js';
 
 /** The recipe every field above belongs to; a bake records it. */
 export const BAKE_LIGHTS_RECIPE = 'jeex-bake-lights@1';
 /** The interim sky: two uniform hemispheres split at the horizon. */
 export const BAKE_SKY_HEMISPHERE_RECIPE = 'jeex-sky-hemisphere@1';
-/**
- * Watts of a radius-0 point lamp per candela of three's point light: a
- * radiant power `P` spread over the sphere gives `P / (4π d²)` at distance
- * `d`, three's light gives `I / d²`, so `P = 4π·I`.
- */
-export const BAKE_LAMP_WATTS_PER_CANDELA = 4 * Math.PI;
-
 const uuid = z.string().check(z.regex(UUID_V7_PATTERN, { error: 'not a UUID v7' }));
 const finite = z.number().check(z.refine(Number.isFinite, { error: 'must be finite' }));
 const nonNegative = finite.check(z.gte(0, { error: 'must not be negative' }));
@@ -72,7 +67,7 @@ const lampSchema = z
     color: colour,
   })
   .check(
-    z.refine((lamp) => Math.abs(lamp.power - BAKE_LAMP_WATTS_PER_CANDELA * lamp.intensity) <= 1e-9 * Math.max(1, lamp.power), {
+    z.refine((lamp) => Math.abs(lamp.power - blenderPower(lamp.intensity)) <= 1e-9 * Math.max(1, lamp.power), {
       path: ['power'],
       error: 'must be 4π times the intensity',
     }),

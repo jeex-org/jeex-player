@@ -4,8 +4,8 @@
  * change, as a real unwrap's seams make them) and gives each mesh a chart in
  * its own rect of one atlas page: triangle `t` of a mesh fills a small
  * right triangle in cell `t` of a grid inside the rect. Names, node order,
- * materials and every `extras` object are written back unchanged; the site
- * and glazing get no UV1, like the real tool does.
+ * materials and every `extras` object are written back unchanged; the site,
+ * glazing and unseen parts get no UV1, like the real tool does.
  *
  * Deterministic: the same file gives the same bytes and the same rects.
  */
@@ -32,9 +32,9 @@ export function glbJson(bytes: ArrayBuffer): ShellGltf {
   return JSON.parse(new TextDecoder().decode(new Uint8Array(bytes, 20, length))) as ShellGltf;
 }
 
-/** Whether the bake lights a mesh of this kind (it gets UV1 and a binding). */
+/** Whether the bake lights a mesh of this kind (it gets UV1 and a binding): not the site, glazing, a hidden mesh or an unseen part. */
 export function isLit(extras: ShellNodeExtras): boolean {
-  return extras.kind !== 'site' && !(extras.kind === 'opening' && extras.opening === 'glass') && extras.visible;
+  return extras.kind !== 'site' && !(extras.kind === 'opening' && extras.opening === 'glass') && extras.visible && !('unseen' in extras);
 }
 
 /**

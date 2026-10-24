@@ -15,21 +15,34 @@
  * puts the node's origin (`extras.jeex.origin`) where the file says: the
  * vertices are shifted by the opposite, so the world result is the file's.
  *
+ * A live mesh whose triangles no walk can see is two nodes in the file
+ * (`shellParts`): its seen part, which it adopts as above, and its unseen
+ * part, which becomes a CHILD mesh drawn with the live mesh's material as it
+ * stands before the binding (so the bake's material never reaches it and it
+ * keeps live lighting), a shallow copy of its `userData`, its shadow flags
+ * and its current layers (the dollhouse cuts and restores whole subtrees).
+ * The picker casts its registered meshes without their children, so the
+ * parent answers raycasts for the child's triangles as its own (face indices
+ * after its own) and the child answers none itself: picks land where they
+ * landed on the live shell. A mesh whose seen part has no `TEXCOORD_1` keeps
+ * its live geometry whole and gets no child.
+ *
  * The file is accepted only when it describes the live shell exactly: the
- * same number of meshes, and mesh for mesh, in order, the same contract
+ * same parts, and part for part, in order, the same contract
  * (`shell-contract.ts`) and finish value. The bake tool may split vertices,
  * so counts are never compared. A mismatch refuses the whole file before
  * anything changes; the caller keeps the live shell.
  *
  * The minted mesh names are not written onto the live meshes (the live
  * names are what the rest of the player knows them by): `named` maps each
- * file name to its live mesh, which is what the lightmap binding resolves.
+ * file name to its live mesh, an unseen part's name to its child, which is
+ * what the lightmap binding resolves.
  */
 
 import * as THREE from 'three';
 import { readGlbContainer } from '../geometry/glb-container.js';
 import { LightBakeError } from './light-bake-error.js';
-import type { ShellEntry } from './shell-contract.js';
+import { shellParts, type ShellEntry } from './shell-contract.js';
 import { judgeShellGltf, type ShellGltf } from './shell-extras.schema.js';
 import { canonicalJson } from './shell-inputs.js';
 
@@ -114,25 +127,32 @@ function rebasedGeometry(source: THREE.BufferGeometry, origin: readonly [number,
  */
 export function adoptShippedShell(entries: readonly ShellEntry[], shipped: ShippedShell): AdoptedShell {
   const { gltf, meshes } = shipped;
-  if (meshes.length !== entries.length)
-    throw refuse(`light bake shell has ${String(meshes.length)} meshes, the live shell ${String(entries.length)}`);
-  const plan = entries.map((entry, i) => {
+  const parts = shellParts(entries);
+  if (meshes.length !== parts.length)
+    throw refuse(`light bake shell has ${String(meshes.length)} meshes, the live shell ${String(parts.length)}`);
+  const checked = parts.map((part, i) => {
     const node = gltf.nodes[i]!;
     const material = gltf.materials[gltf.meshes[node.mesh]!.primitives[0].material]!;
-    if (canonicalJson(node.extras.jeex) !== canonicalJson(entry.extras))
-      throw refuse(`light bake shell node ${node.name} (${String(i)}) is not the live ${entry.extras.kind}`, {
+    if (canonicalJson(node.extras.jeex) !== canonicalJson(part.extras))
+      throw refuse(`light bake shell node ${node.name} (${String(i)}) is not the live ${part.extras.kind}`, {
         node: node.name,
         index: i,
-        expected: entry.extras,
+        expected: part.extras,
         actual: node.extras.jeex,
       });
-    if (canonicalJson(material.extras.jeex) !== canonicalJson(entry.material))
+    if (canonicalJson(material.extras.jeex) !== canonicalJson(part.entry.material))
       throw refuse(`light bake shell node ${node.name} (${String(i)}) wears another finish`, { node: node.name, index: i });
-    const mesh = entry.mesh;
     const source = meshes[i]!.geometry;
     checkAttributes(source, node.name);
-    if (!source.getAttribute('uv1')) return { name: node.name, mesh, swap: null };
-    const origin = node.extras.jeex.origin;
+    return { part, name: node.name, source };
+  });
+  const plan = entries.map((entry) => {
+    const own = checked.filter(({ part }) => part.entry === entry);
+    const seen = own.find(({ part }) => !part.unseen);
+    const unseen = own.find(({ part }) => part.unseen);
+    const mesh = entry.mesh;
+    if (!seen?.source.getAttribute('uv1')) return { mesh, seen, unseen, swap: null };
+    const origin = entry.extras.origin;
     const parent = mesh.parent;
     const local = new THREE.Matrix4().makeTranslation(origin[0], origin[1], origin[2]);
     if (parent) {
@@ -144,10 +164,12 @@ export function adoptShippedShell(entries: readonly ShellEntry[], shipped: Shipp
     const scale = new THREE.Vector3();
     local.decompose(position, quaternion, scale);
     return {
-      name: node.name,
       mesh,
+      seen,
+      unseen,
       swap: {
-        geometry: rebasedGeometry(source, origin),
+        geometry: rebasedGeometry(seen.source, origin),
+        child: unseen ? unseenChild(mesh, rebasedGeometry(unseen.source, origin)) : null,
         transform: { position, quaternion, scale },
         before: {
           geometry: mesh.geometry,
@@ -165,16 +187,26 @@ export function adoptShippedShell(entries: readonly ShellEntry[], shipped: Shipp
     step.mesh.position.copy(step.transform.position);
     step.mesh.quaternion.copy(step.transform.quaternion);
     step.mesh.scale.copy(step.transform.scale);
+    if (step.child) attachUnseen(step.mesh, step.child);
     step.mesh.updateMatrixWorld();
   }
 
+  const named = new Map<string, THREE.Mesh>();
+  for (const { mesh, seen, unseen, swap } of plan) {
+    if (seen) named.set(seen.name, mesh);
+    if (unseen) {
+      if (swap?.child) named.set(unseen.name, swap.child.mesh);
+      else if (!seen) named.set(unseen.name, mesh);
+    }
+  }
   let adopted = true;
   return {
-    named: new Map(plan.map((step) => [step.name, step.mesh])),
+    named,
     restore() {
       if (!adopted) return;
       adopted = false;
       for (const step of swaps) {
+        if (step.child) detachUnseen(step.mesh, step.child);
         if (step.mesh.geometry === step.geometry) {
           step.mesh.geometry = step.before.geometry;
           step.mesh.position.copy(step.before.position);
@@ -186,4 +218,41 @@ export function adoptShippedShell(entries: readonly ShellEntry[], shipped: Shipp
       }
     },
   };
+}
+
+/** An adopted mesh's unseen part, and the raycast its parent answers for both with. */
+type UnseenChild = { readonly mesh: THREE.Mesh; readonly raycast: THREE.Mesh['raycast'] };
+
+/** The child that draws `parent`'s unseen part with the parent's current (live) material. */
+function unseenChild(parent: THREE.Mesh, geometry: THREE.BufferGeometry): UnseenChild {
+  const mesh = new THREE.Mesh(geometry, parent.material);
+  mesh.userData = { ...parent.userData };
+  mesh.castShadow = parent.castShadow;
+  mesh.receiveShadow = parent.receiveShadow;
+  mesh.layers.mask = parent.layers.mask;
+  mesh.raycast = () => undefined;
+  const raycast: THREE.Mesh['raycast'] = (raycaster, intersects) => {
+    THREE.Mesh.prototype.raycast.call(parent, raycaster, intersects);
+    const from = intersects.length;
+    THREE.Mesh.prototype.raycast.call(mesh, raycaster, intersects);
+    const own = parent.geometry;
+    const offset = (own.index ? own.index.count : own.getAttribute('position').count) / 3;
+    for (let k = from; k < intersects.length; k++) {
+      const hit = intersects[k]!;
+      hit.object = parent;
+      if (hit.faceIndex !== undefined && hit.faceIndex !== null) hit.faceIndex += offset;
+    }
+  };
+  return { mesh, raycast };
+}
+
+function attachUnseen(parent: THREE.Mesh, child: UnseenChild): void {
+  parent.add(child.mesh);
+  parent.raycast = child.raycast;
+}
+
+function detachUnseen(parent: THREE.Mesh, child: UnseenChild): void {
+  child.mesh.removeFromParent();
+  child.mesh.geometry.dispose();
+  if (parent.raycast === child.raycast) Reflect.deleteProperty(parent, 'raycast');
 }
