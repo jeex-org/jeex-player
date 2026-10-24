@@ -66,7 +66,8 @@ export const LIBRARY_PROJECT_FIXTURE = {
 /**
  * `tests/fixtures/project-lamps/`: two lamp archetypes whose variants carry a
  * `lights` fact (a floor table lamp and a ceiling pendant), one room under a
- * 2.65 m ceiling, and the two lamp GLBs `scripts/make-fixture-glb.ts` writes.
+ * 2.65 m ceiling floored in the bundled oak, and the two lamp GLBs
+ * `scripts/make-fixture-glb.ts` writes.
  */
 export const LAMP_PROJECT_FIXTURE = {
   projectId: '01a16c09-ee6e-778b-9552-c778436584cb',

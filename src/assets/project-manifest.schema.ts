@@ -197,6 +197,37 @@ const surfaceFactsShape = {
   tuck: z.optional(z.strictObject({ depth: z.number(), height: z.number() })),
 };
 
+/** A `#rrggbb` colour, the scene schema's own grammar (`HEX_COLOUR_PATTERN`). */
+const hexSchema = z.string().check(z.regex(HEX_COLOUR_PATTERN, 'must be a #rrggbb colour'));
+
+/** The brightest lamp light a variant may declare, nominal lumens (`lighting/lamp-units.ts`). */
+export const LAMP_MAX_LUMENS = 10_000;
+
+/** The farthest a lamp light may reach, metres: where its light falls to zero. */
+export const LAMP_MAX_CUTOFF = 15;
+
+/** How many lights one variant may carry. */
+export const LAMP_MAX_LIGHTS = 4;
+
+/**
+ * `LampLight`: one light of a lamp variant, in the variant's model frame
+ * (metres, front -Z, origin at the centre of the floor footprint, y up from
+ * the model's lowest point). A discriminated union on `kind` so other kinds can
+ * join without a break; today only `point`. No id: a light is its placement
+ * and its index. No decay: it is always 2. `z.number()` already refuses NaN
+ * and the infinities. Exported for the formats that mirror this one.
+ */
+export const lampLightSchema = z.discriminatedUnion('kind', [
+  z.strictObject({
+    kind: z.literal('point'),
+    position: z.tuple([z.number(), z.number(), z.number()]),
+    colour: hexSchema,
+    lumens: z.number().check(z.gt(0), z.lte(LAMP_MAX_LUMENS)),
+    cutoff: z.number().check(z.gt(0), z.lte(LAMP_MAX_CUTOFF)),
+    shadow: z.optional(z.boolean()),
+  }),
+]);
+
 /** `ProjectVariant`: a catalogue variant, plus the GLB and the preview a bake gives it. */
 const variantSchema = z.strictObject({
   id: uuidSchema,
@@ -211,6 +242,7 @@ const variantSchema = z.strictObject({
   preview: z.optional(previewSchema),
   access: z.optional(z.enum(VARIANT_ACCESS)),
   allowed: z.optional(z.boolean()),
+  lights: z.optional(z.array(lampLightSchema).check(z.minLength(1), z.maxLength(LAMP_MAX_LIGHTS))),
 });
 
 /** `ProjectObject`: an archetype of the bake. `model` is required; `builder` is not a field a bake has. */
@@ -239,9 +271,6 @@ const objectSchema = z.strictObject({
 });
 
 /* ---------------------------------------------------- library materials --- */
-
-/** A `#rrggbb` colour, the scene schema's own grammar (`HEX_COLOUR_PATTERN`). */
-const hexSchema = z.string().check(z.regex(HEX_COLOUR_PATTERN, 'must be a #rrggbb colour'));
 
 /** A fraction: roughness, metalness, opacity and the physical weights. */
 const unitSchema = z.number().check(z.gte(0), z.lte(1));
