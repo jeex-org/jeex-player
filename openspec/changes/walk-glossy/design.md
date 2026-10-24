@@ -44,7 +44,7 @@ Choice, in this order: a qualifying point beats a non-qualifying one; among qual
 
 Alternatives: a 2D footprint grown by the clearance (rejected: a low sofa would push the probe away for nothing, and a tall shelf's top would not count); a point on the far side of the lamp only (rejected: special-cases one asset kind); several probes per room (rejected in the brainstorm).
 
-Cost: lattice points times furniture boxes, per room, CPU only, at load and after an edit. The demo apartment has tens of items and rooms of a few hundred to a few thousand lattice points, well under a millisecond per room by estimate; the real figure is measured once on the demo plan and recorded in the report, and no culling is added unless that measurement asks for it.
+Cost: lattice points times furniture boxes, per room, CPU only, at load and after an edit. Measured on the demo plan (9 rooms, 59 furniture boxes): 25–42 ms for the whole apartment, against 8 ms without furniture. Accepted as is; no culling.
 
 ### 2. Placement refresh after furniture edits
 
@@ -102,3 +102,7 @@ Panoramas: `displayFragment`/`displayMaterial` take an optional matrix; with one
 ### 6. Walk emissive cap (added by jeex-common after the Sol round)
 
 Measured in walk before tone mapping, the shades' brightest channel is ivory 2.30, opal 3.70, warm lamp 6.66, ink 0.789; the display knee is 0.76. One uniform factor cannot fit all four (they would need about 0.16, 0.084, 0.039 and 0.95). So the walk transform caps the emissive term instead: `E × min(1, cap / max(E))`, chroma kept, emissive below the cap untouched (ink keeps its glow). The cap is one walk value in `walk-lighting-tuning.ts`, chosen by measurement so every shade meets both bounds (total brightest channel ≤ 0.76 with the bulb's lit part included, and ≥ 1.25× the shade with emissive off). It is applied through the shader composer on the emissive term, only while the rig is in the walk state (a uniform the rig sets, 1e9 in editing and capture), so editing, orbit and `plan3d` glow stay exact; `WALK_TRANSFORM.version` is bumped once for this change. The finish catalogue is not touched. If no single cap meets both bounds for all four shades, the numbers go to jeex-common for a decision. A dimmer shade changes the ceiling and the probe blob, so the white-balance calibration is redone after the cap.
+
+### 7. A zero bump normal in captures (found by the placement)
+
+The WC's new probe point exposed a latent defect: from it, the hall shoe cabinet's natural oak (a bump map) falls on the edge column of a capture cube face, where a software rasteriser's screen derivatives vanish; three r186's bump perturbation (`perturbNormalArb`) then normalises a zero vector, the one NaN texel spreads through the prefilter over the whole probe, and the WC's surfaces render black. It is not a light inside a fixture and not the placement's own doing: any probe there would hit it. The walk transform replaces the bump chunk's final normalisation with one that keeps the surface normal when the perturbed vector vanishes (same chunk otherwise; a missing anchor fails loudly). `WALK_TRANSFORM.version` goes to 4 once, for this and the emissive cap together.

@@ -46,6 +46,10 @@ Every behaviour change lands as a failing test first, then the code. Browser tes
 - Rebase onto the orbit-on-demand landing before the gate.
 - Review of record, security review, one full gate through the machine's gate queue, owner approval, then archive the change.
 
+## 5b. Zero bump normal in captures
+
+- [x] 5b.1 Red: the WC probe captured at its new point holds no NaN (SwiftShader: 22 980 NaN values); green after the walk transform guards the bump normalisation; the WC calibration test is green again.
+
 ## 6. Walk emissive cap (added by jeex-common after the Sol round)
 
 - [ ] 6.1 Red: adapt the lamp-shade emissive test (one mount per finish, walk and editing readings) into the branch, crediting the jeex-player session; verify it fails on walk (ivory 2.30, opal 3.70, warm lamp 6.66).

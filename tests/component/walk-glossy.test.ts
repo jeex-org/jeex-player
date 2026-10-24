@@ -44,7 +44,7 @@ const POSE_GLOSS = { position: new THREE.Vector3(5.6, 1.6, 6.2), target: new THR
 /** Pose P2 of the window metering: across the living room towards the bay. */
 const POSE_WINDOW = { position: new THREE.Vector3(2.6, 1.6, 6.0), target: new THREE.Vector3(2.4, 0.4, 9.6) };
 const SIZE = { w: 480, h: 300 };
-/** Classes a mask can tell apart. */
+/** Classes a mask can tell apart; a class is coded as a fraction of 1, since the mask render clamps colour at 1. */
 const MASK_CLASSES = 64;
 /** Mask classes from here on are candidate furniture meshes. */
 const FURNITURE_CLASS0 = 10;
@@ -61,8 +61,7 @@ function rendererString(): string {
 const RENDERER = rendererString();
 const HARDWARE = !/swiftshader|llvmpipe|softpipe|none/i.test(RENDERER);
 
-const maskHistograms: Array<Record<string, number>> = [];
-const results: Record<string, unknown> = { renderer: RENDERER, maskHistograms };
+const results: Record<string, unknown> = { renderer: RENDERER };
 const record = (name: string, value: unknown): void => {
   results[name] = value;
 };
@@ -113,7 +112,7 @@ describe.skipIf(!HARDWARE)(`walk gloss and white balance in the demo living room
       { length: MASK_CLASSES },
       (_, k) =>
         new THREE.MeshBasicMaterial({
-          color: new THREE.Color().setRGB(k + 1, 0, 0),
+          color: new THREE.Color().setRGB((k + 1) / MASK_CLASSES, 0, 0, THREE.LinearSRGBColorSpace),
           toneMapped: false,
           fog: false,
           side: THREE.DoubleSide,
@@ -121,24 +120,30 @@ describe.skipIf(!HARDWARE)(`walk gloss and white balance in the demo living room
     );
     const none = new THREE.MeshBasicMaterial({ color: 0x000000, toneMapped: false, fog: false, side: THREE.DoubleSide });
     const background = scene.background;
+    const hidden: THREE.Object3D[] = [];
     scene.traverse((object) => {
       const mesh = object as THREE.Mesh;
       if (!mesh.isMesh) return;
+      // A mesh that draws nothing (a pick proxy: an invisible material) must stay undrawn, or it covers what it wraps.
+      if ([mesh.material].flat().every((material) => !material.visible || !material.colorWrite)) {
+        if (mesh.visible) hidden.push(mesh);
+        mesh.visible = false;
+        return;
+      }
       swapped.set(mesh, mesh.material);
       const index = classify(mesh);
       mesh.material = index === null ? none : palette[index]!;
     });
-    scene.background = backgroundClass === null ? null : new THREE.Color().setRGB(backgroundClass + 1, 0, 0, THREE.LinearSRGBColorSpace);
+    scene.background =
+      backgroundClass === null ? null : new THREE.Color().setRGB((backgroundClass + 1) / MASK_CLASSES, 0, 0, THREE.LinearSRGBColorSpace);
     try {
       const pixels = linearShot(view);
       const out = new Int8Array(SIZE.w * SIZE.h);
-      for (let i = 0; i < out.length; i += 1) out[i] = Math.round(pixels[i * 4]!) - 1;
-      const histogram: Record<string, number> = {};
-      for (let i = 0; i < out.length; i += 1) histogram[pixels[i * 4]!.toFixed(2)] = (histogram[pixels[i * 4]!.toFixed(2)] ?? 0) + 1;
-      maskHistograms.push(histogram);
+      for (let i = 0; i < out.length; i += 1) out[i] = Math.round(pixels[i * 4]! * MASK_CLASSES) - 1;
       return out;
     } finally {
       for (const [mesh, material] of swapped) mesh.material = material;
+      for (const object of hidden) object.visible = true;
       scene.background = background;
       for (const material of [...palette, none]) material.dispose();
     }
@@ -230,29 +235,15 @@ describe.skipIf(!HARDWARE)(`walk gloss and white balance in the demo living room
   function windowBand(view: THREE.Camera): { columns: [number, number]; inside: number; beside: number; counts: [number, number] } {
     const restore = blackFloor(0.07);
     try {
-      const classes = mask(view, (mesh) => (LIVING_FLOOR.test(mesh.name) ? 0 : null));
+      const classes = mask(view, (mesh) => (isGlass(mesh) ? 1 : LIVING_FLOOR.test(mesh.name) ? 0 : null));
       const pixels = linearShot(view);
-      // The panes' screen columns, from their projected bounds (glazing draws nothing into a mask).
-      const frustum = new THREE.Frustum().setFromProjectionMatrix(
-        new THREE.Matrix4().multiplyMatrices(view.projectionMatrix, view.matrixWorldInverse),
-      );
       let x0 = SIZE.w;
       let x1 = -1;
-      lighting.scene.traverse((object) => {
-        const mesh = object as THREE.Mesh;
-        if (!mesh.isMesh || !isGlass(mesh) || !frustum.intersectsObject(mesh)) return;
-        const box = new THREE.Box3().setFromObject(mesh);
-        for (const corner of [0, 1, 2, 3, 4, 5, 6, 7]) {
-          const p = new THREE.Vector3(
-            corner & 1 ? box.max.x : box.min.x,
-            corner & 2 ? box.max.y : box.min.y,
-            corner & 4 ? box.max.z : box.min.z,
-          ).project(view);
-          const x = Math.round(((Math.max(-1, Math.min(1, p.x)) + 1) / 2) * (SIZE.w - 1));
-          x0 = Math.min(x0, x);
-          x1 = Math.max(x1, x);
-        }
-      });
+      for (let i = 0; i < classes.length; i += 1) {
+        if (classes[i] !== 1) continue;
+        x0 = Math.min(x0, i % SIZE.w);
+        x1 = Math.max(x1, i % SIZE.w);
+      }
       const inside: number[] = [];
       const beside: number[] = [];
       for (let i = 0; i < classes.length; i += 1) {
@@ -302,32 +293,6 @@ describe.skipIf(!HARDWARE)(`walk gloss and white balance in the demo living room
     handle.dispose();
     vi.restoreAllMocks();
     closeContainers();
-  });
-
-  test('mask diagnosis: how glazing and furniture meshes are drawn', () => {
-    const how = (mesh: THREE.Mesh) => {
-      const chain: Array<{ name: string; visible: boolean; layers: number }> = [];
-      for (let o: THREE.Object3D | null = mesh; o; o = o.parent)
-        chain.push({ name: `${o.type}:${o.name}`, visible: o.visible, layers: o.layers.mask });
-      return {
-        chain,
-        frustumCulled: mesh.frustumCulled,
-        renderOrder: mesh.renderOrder,
-        hooks: mesh.onBeforeRender.toString().slice(0, 120),
-        material: [mesh.material].flat().map((m) => m.type),
-      };
-    };
-    let glass: THREE.Mesh | null = null;
-    let item: THREE.Mesh | null = null;
-    lighting.scene.traverse((o) => {
-      const mesh = o as THREE.Mesh;
-      if (!mesh.isMesh) return;
-      if (!glass && isGlass(mesh)) glass = mesh;
-      let p: THREE.Object3D | null = mesh;
-      while (p && p.userData['assetId'] === undefined) p = p.parent;
-      if (!item && p) item = mesh;
-    });
-    record('maskDiagnosis', { glass: glass && how(glass), item: item && how(item) });
   });
 
   test('the living probe is clear of the floor lamp', () => {
