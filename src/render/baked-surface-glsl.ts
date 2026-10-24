@@ -19,9 +19,13 @@
  *   (0 for the fill, 1 for the sun);
  * - after the maps chunk `irradiance` (the lightmap alone by then) is scaled
  *   by `jeexBakedGain`, the baked-interior gain of the scene's mode
- *   (`render/baked-surface.ts`), never by redefining `lightMapIntensity`,
- *   which a lightmap decode owns. The lightmap is indirect light, like the
- *   room grid: the walk's interior sun factor never touches it.
+ *   (`render/baked-surface.ts`), inside the walk's room boxes; outside every
+ *   box (where the walk patch located the fragment, `JEEX_MAX_BOXES`) it
+ *   takes `jeexBakedEditingGain`, so under the walk's outside compensation
+ *   it keeps the editing look like a facade. Never by redefining
+ *   `lightMapIntensity`, which a lightmap decode owns. The lightmap is
+ *   indirect light, like the room grid: the walk's interior sun factor never
+ *   touches it.
  *
  * The anchors are pinned by `BAKED_CHUNK_ANCHORS` against the installed
  * three (r186.1).
@@ -54,6 +58,7 @@ uniform float jeexSpotDiffuse[ NUM_SPOT_LIGHTS ];
 uniform float jeexDirDirect[ NUM_DIR_LIGHTS ];
 #endif
 uniform float jeexBakedGain;
+uniform float jeexBakedEditingGain;
 `;
 
 /** The `RE_Direct` call with its diffuse kept only as far as the light's mask says. */
@@ -77,7 +82,9 @@ const CLEAR = /* glsl */ `
 #endif`;
 
 const GAIN = /* glsl */ `
-#if defined( RE_IndirectDiffuse )
+#if defined( RE_IndirectDiffuse ) && defined( JEEX_MAX_BOXES )
+	irradiance *= mix( jeexBakedEditingGain, jeexBakedGain, jeexInRoom );
+#elif defined( RE_IndirectDiffuse )
 	irradiance *= jeexBakedGain;
 #endif`;
 

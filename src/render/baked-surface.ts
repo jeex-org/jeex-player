@@ -10,7 +10,8 @@
  * says what changes in the shader). A lamp left unmarked counts as live.
  *
  * Gain: the lightmap is multiplied by the baked-interior gain of the drawn
- * scene's mode (`LIGHTING_STANDARD.baked.exposure`), recorded per scene by
+ * scene's mode (`LIGHTING_STANDARD.baked.exposure`) inside the walk's room
+ * boxes, and by the editing gain outside every box, recorded per scene by
  * `setBakedLightMode` (the walk rig sets `walk`; a scene nobody set is
  * `editing`) and put into a shared uniform by the same draw hook as the
  * masks, so two viewers in different modes keep their own gains and no
@@ -42,12 +43,14 @@ const SURFACE_KEY = 'jeexBakedSurface';
 /** The baked transform's version: changes with its shader text. */
 const BAKED_VERSION = 2;
 
-/** The uniforms every baked material shares: the light masks, resized to three's light counts per render, and the gain. */
+/** The uniforms every baked material shares: the light masks, resized to three's light counts per render, and the gains. */
 const SHARED = {
   jeexPointDiffuse: { value: [] as number[] },
   jeexSpotDiffuse: { value: [] as number[] },
   jeexDirDirect: { value: [] as number[] },
   jeexBakedGain: { value: LIGHTING_STANDARD.baked.exposure.editing },
+  /** Outside every room box, in every mode: such a surface keeps the editing look, like a facade. */
+  jeexBakedEditingGain: { value: LIGHTING_STANDARD.baked.exposure.editing },
 };
 
 /** The mode that picks the baked-interior gain: the editing modes, or walk and tour with their captures. */

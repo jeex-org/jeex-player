@@ -218,7 +218,7 @@ describe('the lightmap of a baked surface in walk', () => {
     expect(near(luminance(centre(gl, scene, camera())), luminance(asEditing))).toBe(true);
   });
 
-  test('outside every room: the outside compensation times the gain ratio, no grid light', () => {
+  test('outside every room: the editing gain under the outside compensation, no grid light', () => {
     const gl = renderer();
     const box = room(-3, 3);
     const { scene, uniforms } = walkScene(gl, box);
@@ -229,11 +229,31 @@ describe('the lightmap of a baked surface in walk', () => {
     const editing = centre(gl, scene, view);
     enter(scene, uniforms, 'walk');
     const walk = centre(gl, scene, view);
-    expect(near(ratio(walk, editing), (uniforms.jeexOutside.value * GAIN.walk) / GAIN.editing)).toBe(true);
+    enter(scene, uniforms, 'capture');
+    const capture = centre(gl, scene, view);
+    // Like a facade: the walk gain never reaches a surface outside the boxes.
+    expect(near(ratio(walk, editing), 1 / T.walkExposure)).toBe(true);
+    expect(near(luminance(capture), luminance(editing))).toBe(true);
     // What the editing reading holds is the lightmap alone, times the editing gain: the grid and the environment add nothing.
     const alone = new THREE.Scene();
     alone.add(plane(grey({ lightMap: lightmap(0.05), lightMapIntensity: GAIN.editing }), 10));
     expect(near(luminance(editing), luminance(centre(gl, alone, view)))).toBe(true);
+  });
+
+  test('a baked surface outside every room reads in walk as in orbit once the walk exposure is applied', () => {
+    const gl = renderer();
+    const box = room(-3, 3);
+    const { scene, uniforms } = walkScene(gl, box);
+    scene.add(plane(baked(0.05), 10));
+    installWalkPatch(scene, uniforms);
+    const view = camera(10);
+    enter(scene, uniforms, 'editing');
+    const orbit = luminance(centre(gl, scene, view));
+    enter(scene, uniforms, 'walk');
+    // The renderer shows walk at the walk exposure and the editing modes at 1.
+    const shown = luminance(centre(gl, scene, view)) * T.walkExposure;
+    expect(orbit).toBeGreaterThan(0.03);
+    expect(near(shown, orbit, 0.02)).toBe(true);
   });
 
   test('doubling the room grid leaves a baked floor unchanged and changes an unbaked card', () => {

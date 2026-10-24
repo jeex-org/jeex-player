@@ -85,7 +85,9 @@ describe('bakeFragmentShader', () => {
     // The walk's own sun scale stays the only use of the factor.
     expect(both.split('jeexSunScale;')).toHaveLength(2);
     expect(both).not.toContain('irradiance *= jeexSunScale;');
-    expect(both.split('irradiance *= jeexBakedGain;')).toHaveLength(2);
+    // Inside the room boxes the gain of the mode, outside every box the editing gain (a facade keeps the editing look).
+    expect(both.split('irradiance *= mix( jeexBakedEditingGain, jeexBakedGain, jeexInRoom );')).toHaveLength(2);
+    expect(both.indexOf('irradiance *= mix( jeexBakedEditingGain')).toBeGreaterThan(both.indexOf('jeexLocate( - vViewPosition, normal );'));
   });
 });
 

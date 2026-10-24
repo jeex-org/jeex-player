@@ -201,15 +201,19 @@ export const LIGHTING_STANDARD = deepFreeze({
    * Baked interiors: `exposure` is a gain on the lightmap of a baked surface
    * and on nothing else (live furniture, the direct sun and reflections keep
    * their light), per mode: `editing` in the editing modes, `walk` in walk
-   * and tour, on top of the walk exposure. A closed room sees the sky only
-   * through its windows (a daylight factor of a few percent), while the live
-   * look lights every face as if in the open; the gains bring a baked room
-   * to the live look of the same mode. Metered on the demo flat's bake at a
-   * living-room pose: the mean wall reading within 5 % of the live one in
-   * orbit and in walk, the floor warm, nothing clipped. Both shrink once
-   * furniture takes baked light (per-room probes for dynamic objects).
-   * Adding them changed no existing rig value and no shipped look (no baked
-   * project is published), so the version stays 1.
+   * and tour inside the room boxes, on top of the walk exposure; outside
+   * every box a baked surface keeps `editing` in every mode, so it keeps the
+   * editing look like a facade. A closed room sees the sky only through its
+   * windows (a daylight factor of a few percent), while the live look lights
+   * every face as if in the open; the gains bring a baked room to the live
+   * look of the same mode. Target: within ±20 % of the live look. Metered on
+   * the demo flat's bake at a living-room pose: the mean wall reading within
+   * 1 % of the live one in orbit and in walk, the floor within 8 % and warm,
+   * nothing clipped. Both shrink once furniture takes baked light (per-room
+   * probes for dynamic objects). Adding them changed no existing rig value
+   * and no shipped look (no baked project is published), so the version
+   * stays 1; from now on a change of either gain changes how every baked
+   * surface looks and raises `LIGHTING_STANDARD_VERSION`.
    */
   baked: { exposure: { editing: 80, walk: 6.4 } },
 });

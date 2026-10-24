@@ -7,7 +7,7 @@ A baked surface (`render/baked-surface.ts`) takes its diffuse indirect light onl
 ## Goals / Non-Goals
 
 **Goals:**
-- In a baked room, the mean wall reading within 20 % of the live look of the same mode, in orbit and in walk at the same pose, with the floor keeping a warm cast and nothing clipping.
+- In a baked room, the mean wall reading within ±20 % of the live look of the same mode, in orbit and in walk at the same pose, with the floor keeping a warm cast and nothing clipping.
 - The lightmap treated as indirect light in every mode: no walk sun factor on it.
 
 **Non-Goals:**
@@ -16,9 +16,9 @@ A baked surface (`render/baked-surface.ts`) takes its diffuse indirect light onl
 
 ## Decisions
 
-1. **Walk factor removed.** `baked-surface-glsl.ts` no longer multiplies `irradiance` by `jeexSunScale` after the maps chunk. The walk patch still declares `jeexSunScale` and defines `JEEX_WALK_LIGHTING` (its own direct-sun scale uses them), so its program and version do not change.
+1. **Walk factor removed.** `baked-surface-glsl.ts` no longer multiplies `irradiance` by `jeexSunScale` after the maps chunk. The walk patch declares `jeexSunScale` again only beside the directional light, where its own direct-sun scale uses it, and drops `JEEX_WALK_LIGHTING`, which nothing read any more; its transform version goes from 2 to 3.
 2. **Gain data.** `LIGHTING_STANDARD.baked.exposure = { editing, walk }`, plain data in the frozen standard, published through `jeex-viewer/lighting` with no three.js at run time. Each is a gain on the lightmap of a baked surface only.
-3. **Gain in the shader.** One shared uniform `jeexBakedGain` beside the light masks; after the maps chunk, where `irradiance` holds the lightmap alone, `irradiance *= jeexBakedGain`. The baked transform's version goes from 1 to 2.
+3. **Gain in the shader.** Shared uniforms `jeexBakedGain` (the mode's gain) and `jeexBakedEditingGain` beside the light masks; after the maps chunk, where `irradiance` holds the lightmap alone, `irradiance *= mix( jeexBakedEditingGain, jeexBakedGain, jeexInRoom )` where the walk patch located the fragment (`JEEX_MAX_BOXES` defined), `irradiance *= jeexBakedGain` elsewhere. Outside every room box a baked surface thus keeps the editing gain, and the walk's outside compensation gives it the editing look, as on a facade. The baked transform's version goes from 1 to 2.
 4. **Gain per scene, chosen by the mode.** `setBakedLightMode(scene, 'editing' | 'walk')` records the mode of a scene; the draw hook that already resolves the light masks per render also sets the uniform from the rendered scene's mode (`editing` when none was recorded). Per scene, not per page, so two viewers on one page in different modes keep their own gains; per render, so a capture nested in a render uses the same scene's value. No program changes with the mode.
 5. **Who sets the mode.** The walk rig (`walk-lighting/walk-rig.ts`) in `reapply`: `walk` in the `walk` and `capture` states (a capture records what walk shows: the grid and the probes feed walk's furniture light and reflections), `editing` otherwise, and `editing` on dispose.
 6. **Calibration.** Both gains metered on the demo flat with its first full bake through the debug light-bake hook, on the GPU, at the living-room pose `4.8, 1.6, 8.6 → 1.2, 1.2, 6.2` in walk and in orbit: mean sRGB luma of two wall patches and one floor patch, the floor's R/B ratio and the share of clipped pixels, against the live look of the same mode. Result: `editing` 80, `walk` 6.4 (numbers in the delivery report). The code comment says they shrink once furniture takes baked light.

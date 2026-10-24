@@ -10,11 +10,15 @@
 
 ### Requirement: Baked light per mode
 
-The lightmap's contribution on a baked surface SHALL be scaled by the baked-interior gain of the mode (`LIGHTING_STANDARD.baked.exposure`): the editing gain in the editing modes, the walk gain in walk and tour and in their grid and probe captures. It SHALL NOT be scaled by the walk sun factor: it is indirect light, like the room grid, shown at the walk exposure in walk and tour. The gain SHALL touch the lightmap alone, never live objects, the direct sun or reflections.
+The lightmap's contribution on a baked surface SHALL be scaled by the baked-interior gain of the mode (`LIGHTING_STANDARD.baked.exposure`): the editing gain in the editing modes, the walk gain in walk and tour and in their captures inside the room boxes, the editing gain outside every box. It SHALL NOT be scaled by the walk sun factor (it is indirect light). The gain SHALL touch the lightmap alone.
 
 #### Scenario: Walk does not divide the lightmap by the walk exposure
 - **WHEN** a baked floor inside a room is read in walk and in an editing mode with the same camera, before the post chain
 - **THEN** its lightmap contribution in walk is the editing contribution times the walk gain over the editing gain, within the tolerance, and not times the walk sun factor
+
+#### Scenario: Outside the room boxes
+- **WHEN** a baked surface outside every room box is drawn in walk, in a capture or in an editing mode
+- **THEN** its lightmap carries the editing gain in each
 
 #### Scenario: The gain follows the mode
 - **WHEN** a scene leaves the editing modes for walk and comes back

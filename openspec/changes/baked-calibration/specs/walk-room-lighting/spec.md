@@ -10,7 +10,7 @@
 
 ### Requirement: Baked surfaces under the walk lighting
 
-In walk and tour a baked surface SHALL show its lightmap times the walk gain (`LIGHTING_STANDARD.baked.exposure.walk`) at the walk exposure, never scaled by the walk sun factor; its sun SHALL be scaled as on any surface, its reflections inside a room box SHALL come from the room probes. Outside every box the outside exposure compensation SHALL apply. Grid and probe captures SHALL see the lightmap times the walk gain.
+In walk and tour a baked surface SHALL show its lightmap times the walk gain (`LIGHTING_STANDARD.baked.exposure.walk`) at the walk exposure, never scaled by the walk sun factor; its sun SHALL be scaled as on any surface, its reflections inside a room box SHALL come from the room probes. Outside every box it SHALL read as in the editing modes, like a facade. Captures SHALL see what walk shows.
 
 #### Scenario: Baked room in walk
 - **WHEN** a baked room is viewed in walk after the bake of grids and probes
@@ -18,7 +18,7 @@ In walk and tour a baked surface SHALL show its lightmap times the walk gain (`L
 
 #### Scenario: Baked surface outside the rooms
 - **WHEN** a baked surface outside every room box is read in walk and in an editing mode
-- **THEN** its walk reading is its editing reading times the outside exposure compensation times the walk gain over the editing gain, and the exterior grid adds no diffuse light to it
+- **THEN** its walk reading is its editing reading times the outside exposure compensation, so under the walk exposure it reads as in the editing modes within the tolerance, its capture reading equals its editing reading, and the exterior grid adds no diffuse light to it
 
 #### Scenario: Lightmap with the walk gain in a grid capture
 - **WHEN** a room grid is baked in walk with a baked surface in view of a grid probe
