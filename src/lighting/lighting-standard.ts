@@ -187,6 +187,15 @@ export const LIGHTING_STANDARD = deepFreeze({
    * appearance version does not depend on it.
    */
   temperature: TEMPERATURE_RANGE,
+  /**
+   * The lamps of a project (`lamp-units.ts`): `exposure` turns nominal lumens
+   * into candela, `cd = lm / 4π × exposure`. Calibrated at one point, 400 lm =
+   * 1.2 cd (the bank table lamp), so a baked lamp reads as bright as the bank
+   * lamp it reproduces; it moves with any exposure or tone-mapping change of
+   * the display. It changes no rig value, so the appearance version does not
+   * depend on it.
+   */
+  lamp: { exposure: (1.2 * 4 * Math.PI) / 400 },
 });
 
 export type LightingStandard = typeof LIGHTING_STANDARD;
