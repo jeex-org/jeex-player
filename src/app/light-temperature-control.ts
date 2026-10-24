@@ -24,7 +24,7 @@ export type LightTemperatureControlDeps = {
   initial: LightTemperatureValue;
   /** The live scene, `undefined` before the stage exists. */
   scene: () => THREE.Object3D | undefined;
-  /** Walk and tour draw the next tick. */
+  /** The next tick draws (`render/render-demand.ts`). */
   invalidate: () => void;
   /** The walk's probes are re-captured once the value rests. */
   relit: () => void;

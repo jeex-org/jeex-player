@@ -9,8 +9,9 @@
  * resources and the frame clock; every scene-specific update runs as a frame
  * hook registered by the composition root, in registration order, before the
  * single draw of that frame: straight to the screen, or through the post-
- * processing chain attached with `setPostProcessor` (walk and tour). In walk
- * and tour the draw happens only on demand (`render-demand.ts`, `demand`).
+ * processing chain attached with `setPostProcessor` (walk and tour). In every
+ * mode but `plan2d` the draw happens only on demand (`render-demand.ts`,
+ * `demand`); `plan2d` draws its keep-warm heartbeat.
  *
  * First-picture invariant: a started loop draws its first picture only once
  * the scene's programs were compiled asynchronously, or the bound passed
@@ -117,7 +118,7 @@ type RenderRuntimeOptions = {
   signal?: AbortSignal | undefined;
   /** A frame hook threw. The frame goes on; the composition root reports it. */
   onError?: ((error: unknown) => void) | undefined;
-  /** The camera mode now: walk and tour draw on demand (`render-demand.ts`). */
+  /** The camera mode now: every mode but `plan2d` draws on demand (`render-demand.ts`). */
   mode?: (() => string | undefined) | undefined;
 };
 
@@ -631,9 +632,9 @@ export class RenderRuntime {
       this.releaseCompile?.(); // the real background drew with the stand-in's program
       this.releaseCompile = null;
     }
-    // The post-render hooks run on skipped ticks too (plan2d, a resting walk):
-    // the camera-preview card's visibility sync lives there. A drawing hook
-    // guards itself, and none may draw on a skipped tick in walk or tour.
+    // The post-render hooks run on skipped ticks too (plan2d, a resting view):
+    // a drawing hook guards itself, and none may draw on a skipped tick (the
+    // camera-preview inset draws only after a main draw).
     this.postRenderHooks.emit(delta, now);
   };
 

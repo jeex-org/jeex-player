@@ -238,7 +238,7 @@ export class ViewerStage {
       },
       signal: deps.signal,
       onError: deps.onFrameError,
-      // Walk and tour draw on demand (`render/render-demand.ts`).
+      // Every mode but `plan2d` draws on demand (`render/render-demand.ts`).
       mode: () => this.mode,
     });
     this.camera = new THREE.PerspectiveCamera(
