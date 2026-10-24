@@ -41,6 +41,8 @@ export class LibrarySurface {
   private readonly surface: FinishSurface;
   private readonly outline: readonly Vec2[];
   private released = false;
+  /** The source the maps were asked of, which is the one they are given back to. */
+  private textures: LibraryTextures | null = null;
 
   constructor(draw: LibraryDraw, surface: FinishSurface, outline: readonly Vec2[] = []) {
     this.draw = draw;
@@ -55,6 +57,7 @@ export class LibrarySurface {
    * the surface flat; nothing here throws.
    */
   async load(textures: LibraryTextures): Promise<void> {
+    this.textures = textures;
     const { material: library } = this.draw;
     const size = textureSizeFor(textures.device, listedSizes(this.draw));
     if (size === null || library.facts.tileM === null) return;
@@ -75,10 +78,13 @@ export class LibrarySurface {
     textures.attached?.();
   }
 
-  /** Gives back every view this surface holds and frees its material; its maps are the source's, not freed here. */
-  release(textures: LibraryTextures | null): void {
+  /**
+   * Gives back every view this surface holds to the source it asked, and
+   * frees its material; its maps are the source's, not freed here.
+   */
+  release(): void {
     this.released = true;
-    textures?.source.release(this);
+    this.textures?.source.release(this);
     this.material.dispose();
   }
 }

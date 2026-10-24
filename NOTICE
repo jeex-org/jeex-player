@@ -6,6 +6,13 @@ This product is licensed under the Apache License, Version 2.0 (see
 
     http://www.apache.org/licenses/LICENSE-2.0
 
+## Bundled finish maps
+
+The texture maps in `finish-maps/` are scans released under CC0 1.0 (public
+domain dedication) by their providers; `finish-maps/SOURCES.md` lists each
+one with its source page. They carry no attribution requirement and are not
+covered by the Apache License of the player code.
+
 ## Third-party software
 
 This product bundles the following third-party software. Each notice below

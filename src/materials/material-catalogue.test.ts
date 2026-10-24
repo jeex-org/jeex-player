@@ -21,7 +21,7 @@ describe('resolveFinish', () => {
   test('surface finishes resolve first and carry their catalogue entry', () => {
     const oak = resolveFinish(FINISH.oak);
     expect(oak?.source).toBe('surface');
-    expect(oak?.color).toBe('#b5855a');
+    expect(oak?.color).toBe('#83654c');
     expect(oak?.source === 'surface' && oak.finish.kind).toBe('planks');
   });
 
@@ -50,7 +50,7 @@ describe('resolveFinish', () => {
   });
 
   test('finishColorOf gives a chip colour for every source', () => {
-    expect(finishColorOf(FINISH.sage)).toBe('#a8b5a4');
+    expect(finishColorOf(FINISH.sage)).toBe('#a9b6a5');
     expect(finishColorOf(FINISH.brass_soft)).toBeTruthy();
     expect(finishColorOf(UNOBTANIUM, LOCAL)).toBe('#ff00ff');
     expect(finishColorOf(NOPE)).toBeNull();

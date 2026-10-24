@@ -1,0 +1,654 @@
+{
+  "format": 1,
+  "finishes": [
+    {
+      "finish": "01a12fdf-158e-7748-adfe-d397dde469ba",
+      "slug": "oak",
+      "variant": "01a16d1f-9f8e-70d4-9a46-57fd0246c272",
+      "version": "01a16d1f-9f8e-70d4-9a46-57febe3c2191"
+    },
+    {
+      "finish": "01a12fdf-158f-702d-8070-693ed21d3b05",
+      "slug": "walnut",
+      "variant": "01a16d21-6413-763c-b044-4682247bf7f9",
+      "version": "01a16d21-6413-763c-b044-46831700a81f"
+    },
+    {
+      "finish": "01a12fdf-1590-7754-92f4-5912a4ff24a2",
+      "slug": "ash",
+      "variant": "01a16d1f-f16c-700b-b7eb-7872b27daabf",
+      "version": "01a16d21-a2ce-728e-8f8f-1d365801542f"
+    },
+    {
+      "finish": "01a12fdf-1591-7e42-b45b-22367fa2faec",
+      "slug": "teak",
+      "variant": "01a16d20-20f0-7061-a81e-014b7ba857d3",
+      "version": "01a16d20-20f0-7061-a81e-014c1f488682"
+    },
+    {
+      "finish": "01a12fdf-1592-7088-8910-32f02da0d875",
+      "slug": "chevron",
+      "variant": "01a16d20-3f1d-7759-9aa0-48f87c67f18b",
+      "version": "01a16d21-a2d8-7401-9191-e2c7ef2e6834"
+    },
+    {
+      "finish": "01a12fdf-1593-72d2-a5f9-a56d9c522980",
+      "slug": "terrazzo",
+      "kept": true,
+      "why": "pending"
+    },
+    {
+      "finish": "01a12fdf-1594-715c-a2ec-7257f0ac0434",
+      "slug": "limestone",
+      "kept": true,
+      "why": "pending"
+    },
+    {
+      "finish": "01a12fdf-1595-71e8-be84-9227216ac42d",
+      "slug": "ceramic_light",
+      "kept": true,
+      "why": "pending"
+    },
+    {
+      "finish": "01a12fdf-1596-7992-9061-a9a730fd7840",
+      "slug": "ceramic_graphite",
+      "kept": true,
+      "why": "pending"
+    },
+    {
+      "finish": "01a12fdf-1597-7e0c-8b3e-f091fb6af634",
+      "slug": "sand",
+      "variant": "01a1689e-3512-757a-8276-36198fb4d666",
+      "version": "01a1689e-c2d9-7246-a313-fcd4f0df5a93",
+      "colour": "#b0a294"
+    },
+    {
+      "finish": "01a12fdf-1598-7b82-807b-83d8a5effde3",
+      "slug": "white",
+      "variant": "01a1689e-3512-757a-8276-36198fb4d666",
+      "version": "01a1689e-c2d9-7246-a313-fcd4f0df5a93",
+      "colour": "#eae4d6"
+    },
+    {
+      "finish": "01a12fdf-1599-7b1d-99dd-48f13cb98f0a",
+      "slug": "sage",
+      "variant": "01a1689e-3512-757a-8276-36198fb4d666",
+      "version": "01a1689e-c2d9-7246-a313-fcd4f0df5a93",
+      "colour": "#a8b5a4"
+    },
+    {
+      "finish": "01a12fdf-159a-7c53-a64b-b1a9506f20b7",
+      "slug": "terracotta",
+      "variant": "01a1689e-3512-757a-8276-36198fb4d666",
+      "version": "01a1689e-c2d9-7246-a313-fcd4f0df5a93",
+      "colour": "#c08a70"
+    },
+    {
+      "finish": "01a12fdf-159b-71b5-8b10-01d372c4c14b",
+      "slug": "graphite",
+      "variant": "01a1689e-3512-757a-8276-36198fb4d666",
+      "version": "01a1689e-c2d9-7246-a313-fcd4f0df5a93",
+      "colour": "#6a6862"
+    },
+    {
+      "finish": "01a12fdf-159c-78e6-97c2-8b635635ce85",
+      "slug": "stripes_cream",
+      "kept": true,
+      "why": "keep"
+    },
+    {
+      "finish": "01a12fdf-159d-770d-b5ab-64b41de36f30",
+      "slug": "stripes_sage",
+      "kept": true,
+      "why": "keep"
+    },
+    {
+      "finish": "01a12fdf-159e-7413-8248-0060d7df7693",
+      "slug": "tiles_white",
+      "kept": true,
+      "why": "pending"
+    }
+  ],
+  "defaults": {
+    "ceiling": {
+      "finish": "01a12fdf-15aa-7d0e-97e3-bb2102d2e0bb",
+      "slug": "plaster_white",
+      "variant": "01a1689e-3512-757a-8276-36198fb4d666",
+      "version": "01a1689e-c2d9-7246-a313-fcd4f0df5a93",
+      "colour": "#eee9df"
+    }
+  },
+  "versions": [
+    {
+      "version": "01a16d1f-9f8e-70d4-9a46-57febe3c2191",
+      "variant": "01a16d1f-9f8e-70d4-9a46-57fd0246c272",
+      "name": "Wood Floor 056",
+      "kind": "scan",
+      "facts": {
+        "tileM": [
+          3.2,
+          3.2
+        ],
+        "grain": "along_u",
+        "suitability": "plank_floor",
+        "normalStrength": 1,
+        "colourMode": "natural",
+        "averageColour": "#83654c",
+        "pbr": {}
+      },
+      "maps": {
+        "albedo": {
+          "colourSpace": "srgb",
+          "files": {
+            "256": {
+              "path": "tex/01a16d1f-9f8e-70d4-9a46-57febe3c2191/albedo.256.webp",
+              "bytes": 8628,
+              "sha256": "74a1c9c2a69e902b34e75eb37d83ea075893a882133b7e190dac68cea87299f7"
+            },
+            "512": {
+              "path": "tex/01a16d1f-9f8e-70d4-9a46-57febe3c2191/albedo.512.webp",
+              "bytes": 32572,
+              "sha256": "4ca267df8f0cc7e49ce2897880adec3e01c96b540bfa72d42b04666792784a0d"
+            },
+            "768": {
+              "path": "tex/01a16d1f-9f8e-70d4-9a46-57febe3c2191/albedo.768.webp",
+              "bytes": 76562,
+              "sha256": "2f5f205097fe8d9a20becedbefe9b62ad52eb6d8973dfc29646611326510171c"
+            }
+          }
+        },
+        "normal": {
+          "colourSpace": "linear",
+          "convention": "opengl",
+          "files": {
+            "256": {
+              "path": "tex/01a16d1f-9f8e-70d4-9a46-57febe3c2191/normal.256.webp",
+              "bytes": 19914,
+              "sha256": "039802c5201a148b38ac592e8524464e4175c73d68100259dbeaadc815ec7b12"
+            },
+            "512": {
+              "path": "tex/01a16d1f-9f8e-70d4-9a46-57febe3c2191/normal.512.webp",
+              "bytes": 80268,
+              "sha256": "9eb174861ec70b8833122cc4a8f44219a3ecc7927c26dac58e77f8360da325ff"
+            },
+            "768": {
+              "path": "tex/01a16d1f-9f8e-70d4-9a46-57febe3c2191/normal.768.webp",
+              "bytes": 225870,
+              "sha256": "96e36a2742f9d57c56c224a37d96573db7f5ca784643d7c6629402b76b422335"
+            }
+          }
+        },
+        "arm": {
+          "colourSpace": "linear",
+          "files": {
+            "256": {
+              "path": "tex/01a16d1f-9f8e-70d4-9a46-57febe3c2191/arm.256.webp",
+              "bytes": 24314,
+              "sha256": "8dff299e9edf65bc2645b8cfe6f80a821095f599424b5abe5972ad1ad487c0ee"
+            },
+            "512": {
+              "path": "tex/01a16d1f-9f8e-70d4-9a46-57febe3c2191/arm.512.webp",
+              "bytes": 90796,
+              "sha256": "e359fbd338db1d89c254d64e2c33235091b0ae29f62c851c3f18e79f40b655a3"
+            },
+            "768": {
+              "path": "tex/01a16d1f-9f8e-70d4-9a46-57febe3c2191/arm.768.webp",
+              "bytes": 196754,
+              "sha256": "023d0b3eab1b22e2077866892cfab409d64cd6e52178b26d90b63ad011ebca8e"
+            }
+          }
+        }
+      },
+      "source": {
+        "provider": "ambientcg",
+        "sourceName": "WoodFloor056",
+        "sourcePage": "https://ambientcg.com/a/WoodFloor056",
+        "licence": "CC0-1.0"
+      }
+    },
+    {
+      "version": "01a16d21-6413-763c-b044-46831700a81f",
+      "variant": "01a16d21-6413-763c-b044-4682247bf7f9",
+      "name": "Wood Floor 046",
+      "kind": "scan",
+      "facts": {
+        "tileM": [
+          1.3,
+          1.3
+        ],
+        "grain": "along_u",
+        "suitability": "continuous",
+        "normalStrength": 1,
+        "colourMode": "natural",
+        "averageColour": "#745224",
+        "pbr": {}
+      },
+      "maps": {
+        "albedo": {
+          "colourSpace": "srgb",
+          "files": {
+            "256": {
+              "path": "tex/01a16d21-6413-763c-b044-46831700a81f/albedo.256.webp",
+              "bytes": 8494,
+              "sha256": "b622ae2960e0a8609b6bcee9750dbeb7220eb83cac26708d41d7324d064bc3a0"
+            },
+            "512": {
+              "path": "tex/01a16d21-6413-763c-b044-46831700a81f/albedo.512.webp",
+              "bytes": 36356,
+              "sha256": "bcbf65c36a1d6d6a0b58360898b3371fbb55bfc3d7f300c7cef44d663b12d61e"
+            },
+            "768": {
+              "path": "tex/01a16d21-6413-763c-b044-46831700a81f/albedo.768.webp",
+              "bytes": 98738,
+              "sha256": "cdaef0391f856b5b3eb69298f7902cbaad8c8f4160aaad8e40fe3f837f59f4b4"
+            }
+          }
+        },
+        "normal": {
+          "colourSpace": "linear",
+          "convention": "opengl",
+          "files": {
+            "256": {
+              "path": "tex/01a16d21-6413-763c-b044-46831700a81f/normal.256.webp",
+              "bytes": 12070,
+              "sha256": "e8e5a960a27edfe13bb5498aa7641b1c7afcdb7cd0d335e72722094e693586d6"
+            },
+            "512": {
+              "path": "tex/01a16d21-6413-763c-b044-46831700a81f/normal.512.webp",
+              "bytes": 54130,
+              "sha256": "96ec36ecf4968486b0595bcc69bcb2d6329544bb768ed44f4c7bf60f3d4eafc9"
+            },
+            "768": {
+              "path": "tex/01a16d21-6413-763c-b044-46831700a81f/normal.768.webp",
+              "bytes": 178394,
+              "sha256": "a739b18363ab36a705f0af87879ebb68db2ed07ab6ce4eda5e6113a69c4cd171"
+            }
+          }
+        },
+        "arm": {
+          "colourSpace": "linear",
+          "files": {
+            "256": {
+              "path": "tex/01a16d21-6413-763c-b044-46831700a81f/arm.256.webp",
+              "bytes": 18478,
+              "sha256": "23d669075ed6faa3eb4d9848ead017dd769e05d7bc3091b0f12c0e0b347da790"
+            },
+            "512": {
+              "path": "tex/01a16d21-6413-763c-b044-46831700a81f/arm.512.webp",
+              "bytes": 72056,
+              "sha256": "3dbd625cfce82c0286d955e3ef90c314369b9858b725790d6ef487db023cef11"
+            },
+            "768": {
+              "path": "tex/01a16d21-6413-763c-b044-46831700a81f/arm.768.webp",
+              "bytes": 161162,
+              "sha256": "31b432d85a04e3545164eb71542d3c94d62da6b708907e4e5894b55d2bd5e0e9"
+            }
+          }
+        }
+      },
+      "source": {
+        "provider": "ambientcg",
+        "sourceName": "WoodFloor046",
+        "sourcePage": "https://ambientcg.com/a/WoodFloor046",
+        "licence": "CC0-1.0"
+      }
+    },
+    {
+      "version": "01a16d21-a2ce-728e-8f8f-1d365801542f",
+      "variant": "01a16d1f-f16c-700b-b7eb-7872b27daabf",
+      "name": "Wood Floor 039",
+      "kind": "scan",
+      "facts": {
+        "tileM": [
+          1.9,
+          1.9
+        ],
+        "grain": "along_v",
+        "suitability": "plank_floor",
+        "normalStrength": 1,
+        "colourMode": "natural",
+        "averageColour": "#e1c59c",
+        "pbr": {}
+      },
+      "maps": {
+        "albedo": {
+          "colourSpace": "srgb",
+          "files": {
+            "256": {
+              "path": "tex/01a16d21-a2ce-728e-8f8f-1d365801542f/albedo.256.webp",
+              "bytes": 4888,
+              "sha256": "5393067c9a1bccca9e819bf233abc2b357ee66420d96050fd7a4e51a9caa7a5b"
+            },
+            "512": {
+              "path": "tex/01a16d21-a2ce-728e-8f8f-1d365801542f/albedo.512.webp",
+              "bytes": 22856,
+              "sha256": "01a46b139e602dfedf083dd598d60d3f4d0213e9803b6c8895c4b48fbf885631"
+            },
+            "768": {
+              "path": "tex/01a16d21-a2ce-728e-8f8f-1d365801542f/albedo.768.webp",
+              "bytes": 54330,
+              "sha256": "dd27095904d580acd8695f85646356ecab22be6078981fe57fc89d7f3bcd7036"
+            }
+          }
+        },
+        "normal": {
+          "colourSpace": "linear",
+          "convention": "opengl",
+          "files": {
+            "256": {
+              "path": "tex/01a16d21-a2ce-728e-8f8f-1d365801542f/normal.256.webp",
+              "bytes": 27794,
+              "sha256": "9db972f63d33fd776c3b0c4907d1f57aca71aa8169d18cc0974d817bc2c1a966"
+            },
+            "512": {
+              "path": "tex/01a16d21-a2ce-728e-8f8f-1d365801542f/normal.512.webp",
+              "bytes": 149656,
+              "sha256": "bd08865fc2507c6c1c580772b98d409fe86de3718441a5669b94e0187a01c5e9"
+            },
+            "768": {
+              "path": "tex/01a16d21-a2ce-728e-8f8f-1d365801542f/normal.768.webp",
+              "bytes": 418620,
+              "sha256": "ea468475a000fc5a593f5769a83b046c9c3c980e4a9b1a63ff51afede8c965b8"
+            }
+          }
+        },
+        "arm": {
+          "colourSpace": "linear",
+          "files": {
+            "256": {
+              "path": "tex/01a16d21-a2ce-728e-8f8f-1d365801542f/arm.256.webp",
+              "bytes": 16318,
+              "sha256": "5f6dc55cc826bedb4af9a72b9cadb0b6862957d99a8f65a03082d100e95e22fc"
+            },
+            "512": {
+              "path": "tex/01a16d21-a2ce-728e-8f8f-1d365801542f/arm.512.webp",
+              "bytes": 59320,
+              "sha256": "9f430d991eab82fe5c0d0dfa222ec41e1796bfea7066e6cc59366173d195e4f6"
+            },
+            "768": {
+              "path": "tex/01a16d21-a2ce-728e-8f8f-1d365801542f/arm.768.webp",
+              "bytes": 130634,
+              "sha256": "0ac87a612467dea74c1104cc0e544e180e37bfc546b123cad5a5e6065e1a3a84"
+            }
+          }
+        }
+      },
+      "source": {
+        "provider": "ambientcg",
+        "sourceName": "WoodFloor039",
+        "sourcePage": "https://ambientcg.com/a/WoodFloor039",
+        "licence": "CC0-1.0"
+      }
+    },
+    {
+      "version": "01a16d20-20f0-7061-a81e-014c1f488682",
+      "variant": "01a16d20-20f0-7061-a81e-014b7ba857d3",
+      "name": "Wooden Floor 01",
+      "kind": "scan",
+      "facts": {
+        "tileM": [
+          1.988,
+          1.988
+        ],
+        "grain": "along_u",
+        "suitability": "plank_floor",
+        "normalStrength": 1,
+        "colourMode": "natural",
+        "averageColour": "#ab8256",
+        "pbr": {}
+      },
+      "maps": {
+        "albedo": {
+          "colourSpace": "srgb",
+          "files": {
+            "256": {
+              "path": "tex/01a16d20-20f0-7061-a81e-014c1f488682/albedo.256.webp",
+              "bytes": 13262,
+              "sha256": "acbe7bde4787924a815877064386132429597a214827cb55b92b085cc7044e4e"
+            },
+            "512": {
+              "path": "tex/01a16d20-20f0-7061-a81e-014c1f488682/albedo.512.webp",
+              "bytes": 55212,
+              "sha256": "2ab174ab5c922613632e4ec627f6ec19e356160dafc6d8b627ba03eb0b7cb20c"
+            },
+            "768": {
+              "path": "tex/01a16d20-20f0-7061-a81e-014c1f488682/albedo.768.webp",
+              "bytes": 133376,
+              "sha256": "a37e76488cb0995c949655d8acc3e2072e06651dd4e6e4bb69e0477ed43af3c8"
+            }
+          }
+        },
+        "normal": {
+          "colourSpace": "linear",
+          "convention": "opengl",
+          "files": {
+            "256": {
+              "path": "tex/01a16d20-20f0-7061-a81e-014c1f488682/normal.256.webp",
+              "bytes": 18486,
+              "sha256": "de2b6584069dfebb4ac96d571a1bd50e5f53f49a2d494e84311252d5a954ba94"
+            },
+            "512": {
+              "path": "tex/01a16d20-20f0-7061-a81e-014c1f488682/normal.512.webp",
+              "bytes": 93050,
+              "sha256": "a65540a2c9ebffbf465900f0eddffa7960e72abf25d59a5118a3925f2db6b2e1"
+            },
+            "768": {
+              "path": "tex/01a16d20-20f0-7061-a81e-014c1f488682/normal.768.webp",
+              "bytes": 229548,
+              "sha256": "7dd76ae5b91d40993a0351276a1ea1b42ebaaa00eee2f51941c26d0668d48487"
+            }
+          }
+        },
+        "arm": {
+          "colourSpace": "linear",
+          "files": {
+            "256": {
+              "path": "tex/01a16d20-20f0-7061-a81e-014c1f488682/arm.256.webp",
+              "bytes": 28420,
+              "sha256": "8372f3087f1a7fca7a39589982e086d8c65269ba5d7a88032f18ebf2fd15fa3f"
+            },
+            "512": {
+              "path": "tex/01a16d20-20f0-7061-a81e-014c1f488682/arm.512.webp",
+              "bytes": 135946,
+              "sha256": "5f89e0eade8ab88c85892fd43019906351130d41c9ff250f54b72d48624632e5"
+            },
+            "768": {
+              "path": "tex/01a16d20-20f0-7061-a81e-014c1f488682/arm.768.webp",
+              "bytes": 344560,
+              "sha256": "f3f65504fae9b6571a723fe242c0d8489bc063769ee0486c63e9d7ea54994370"
+            }
+          }
+        }
+      },
+      "source": {
+        "provider": "polyhaven",
+        "sourceName": "wooden_floor_01",
+        "sourcePage": "https://polyhaven.com/a/wooden_floor_01",
+        "licence": "CC0-1.0"
+      }
+    },
+    {
+      "version": "01a16d21-a2d8-7401-9191-e2c7ef2e6834",
+      "variant": "01a16d20-3f1d-7759-9aa0-48f87c67f18b",
+      "name": "Wood Floor 057",
+      "kind": "scan",
+      "facts": {
+        "tileM": [
+          3.2,
+          3.2
+        ],
+        "grain": "along_v",
+        "suitability": "plank_floor",
+        "normalStrength": 1,
+        "colourMode": "natural",
+        "averageColour": "#917258",
+        "pbr": {}
+      },
+      "maps": {
+        "albedo": {
+          "colourSpace": "srgb",
+          "files": {
+            "256": {
+              "path": "tex/01a16d21-a2d8-7401-9191-e2c7ef2e6834/albedo.256.webp",
+              "bytes": 12272,
+              "sha256": "8eda41c5b2a6a337d9acaf80af458b4e602d6c73a8b2c2a77e49dc37019bf4f3"
+            },
+            "512": {
+              "path": "tex/01a16d21-a2d8-7401-9191-e2c7ef2e6834/albedo.512.webp",
+              "bytes": 46156,
+              "sha256": "69e07ca25b0394912b0ac5f6cd580d32a5674d4227c0f06c6626f9f0031de6e2"
+            },
+            "768": {
+              "path": "tex/01a16d21-a2d8-7401-9191-e2c7ef2e6834/albedo.768.webp",
+              "bytes": 115172,
+              "sha256": "0dadc0ddaeda972456cfd2cc762f597f778bf33c1f9ddf75cbe3edad5a8ba7b3"
+            }
+          }
+        },
+        "normal": {
+          "colourSpace": "linear",
+          "convention": "opengl",
+          "files": {
+            "256": {
+              "path": "tex/01a16d21-a2d8-7401-9191-e2c7ef2e6834/normal.256.webp",
+              "bytes": 21150,
+              "sha256": "022a31ae97fd6b8129683b9af1cf1ce579ae6efaf67850dd4eb9cbbf8d5c5132"
+            },
+            "512": {
+              "path": "tex/01a16d21-a2d8-7401-9191-e2c7ef2e6834/normal.512.webp",
+              "bytes": 113490,
+              "sha256": "6c18b62f814590050f7014acfda214a3829d8528fdab372c5acb85439aa351a2"
+            },
+            "768": {
+              "path": "tex/01a16d21-a2d8-7401-9191-e2c7ef2e6834/normal.768.webp",
+              "bytes": 304014,
+              "sha256": "07b9d41fd61a50dcc85f080b5f6519e3b1326e1002b9aebb77407a3e02a12cd0"
+            }
+          }
+        },
+        "arm": {
+          "colourSpace": "linear",
+          "files": {
+            "256": {
+              "path": "tex/01a16d21-a2d8-7401-9191-e2c7ef2e6834/arm.256.webp",
+              "bytes": 34794,
+              "sha256": "77a502b5d36b9a198357a48da473bf371f6eabb05791b376f68c5fb2b9f228f8"
+            },
+            "512": {
+              "path": "tex/01a16d21-a2d8-7401-9191-e2c7ef2e6834/arm.512.webp",
+              "bytes": 133568,
+              "sha256": "39b89830c2a3691502a50149d662a4d5338dcb6e8bf8a7317b9d912eb17b32db"
+            },
+            "768": {
+              "path": "tex/01a16d21-a2d8-7401-9191-e2c7ef2e6834/arm.768.webp",
+              "bytes": 275680,
+              "sha256": "bc112b6d70dad5ee3344f2497de605821f0b9335a04c40392b4e50d9a7a3c393"
+            }
+          }
+        }
+      },
+      "source": {
+        "provider": "ambientcg",
+        "sourceName": "WoodFloor057",
+        "sourcePage": "https://ambientcg.com/a/WoodFloor057",
+        "licence": "CC0-1.0"
+      }
+    },
+    {
+      "version": "01a1689e-c2d9-7246-a313-fcd4f0df5a93",
+      "variant": "01a1689e-3512-757a-8276-36198fb4d666",
+      "name": "Beige Wall 001",
+      "kind": "scan",
+      "facts": {
+        "tileM": [
+          3,
+          3
+        ],
+        "grain": "none",
+        "suitability": "continuous",
+        "normalStrength": 1,
+        "colourMode": "tintable",
+        "tint": {
+          "recipe": "luma-mid@1",
+          "suggestedColours": [
+            {
+              "name": "natural",
+              "hex": "#9a8d7a"
+            }
+          ]
+        },
+        "averageColour": "#808080",
+        "pbr": {}
+      },
+      "maps": {
+        "albedoTint": {
+          "colourSpace": "srgb",
+          "files": {
+            "256": {
+              "path": "tex/01a1689e-c2d9-7246-a313-fcd4f0df5a93/albedoTint.256.webp",
+              "bytes": 282,
+              "sha256": "027755fbbe1c5a5d31e845f071a2fd809c63c173465dd51a18cb01f0a24252df"
+            },
+            "512": {
+              "path": "tex/01a1689e-c2d9-7246-a313-fcd4f0df5a93/albedoTint.512.webp",
+              "bytes": 940,
+              "sha256": "4491c788d38b65d4e62d46d8791ebd80231b7ebc69a590803a1110d0db00cfc1"
+            },
+            "768": {
+              "path": "tex/01a1689e-c2d9-7246-a313-fcd4f0df5a93/albedoTint.768.webp",
+              "bytes": 2510,
+              "sha256": "6174349349301682962142f4cafb443f81f0e2b04da6eea4a70533ff81eaea6e"
+            }
+          }
+        },
+        "normal": {
+          "colourSpace": "linear",
+          "convention": "opengl",
+          "files": {
+            "256": {
+              "path": "tex/01a1689e-c2d9-7246-a313-fcd4f0df5a93/normal.256.webp",
+              "bytes": 37716,
+              "sha256": "05f7144430c82283fd517314357d33ad55c00843491ca78daaaeaeabaa407d73"
+            },
+            "512": {
+              "path": "tex/01a1689e-c2d9-7246-a313-fcd4f0df5a93/normal.512.webp",
+              "bytes": 215700,
+              "sha256": "7610440e4b1aa21ec35a484423055395fe04c0aefac4d36efc487f733f12642e"
+            },
+            "768": {
+              "path": "tex/01a1689e-c2d9-7246-a313-fcd4f0df5a93/normal.768.webp",
+              "bytes": 587798,
+              "sha256": "ef921c7dbdaebefd1f35e6215d956a67f5783c9e4bd3d20923eb96977b332234"
+            }
+          }
+        },
+        "arm": {
+          "colourSpace": "linear",
+          "files": {
+            "256": {
+              "path": "tex/01a1689e-c2d9-7246-a313-fcd4f0df5a93/arm.256.webp",
+              "bytes": 34530,
+              "sha256": "d193bd658ebd6ec142d3eff3720a45a8a1cd2bb5cefc4c704ee1703fc0f99b1e"
+            },
+            "512": {
+              "path": "tex/01a1689e-c2d9-7246-a313-fcd4f0df5a93/arm.512.webp",
+              "bytes": 158196,
+              "sha256": "e6c98d7297171ab3a832c93f650091ba0050303abc7098586813a79032b39a92"
+            },
+            "768": {
+              "path": "tex/01a1689e-c2d9-7246-a313-fcd4f0df5a93/arm.768.webp",
+              "bytes": 395504,
+              "sha256": "d2fb61eba19e0ab2045e1a97a97142af33337290c5ce92101917413c2a220f2e"
+            }
+          }
+        }
+      },
+      "source": {
+        "provider": "polyhaven",
+        "sourceName": "beige_wall_001",
+        "sourcePage": "https://polyhaven.com/a/beige_wall_001",
+        "licence": "CC0-1.0"
+      }
+    }
+  ]
+}

@@ -192,7 +192,7 @@ describe('material lifecycle', () => {
     expect(disposed).toHaveBeenCalled();
   });
 
-  test('clearing a face override disposes the override and restores the room material', () => {
+  test('clearing a face override disposes the override and puts the room material back on the face', () => {
     const { builder, root } = build(lShapePlan);
     const mesh = faceMeshOf(root, A_WEST);
     const roomMaterial = mesh.material as THREE.MeshStandardMaterial;
@@ -202,16 +202,22 @@ describe('material lifecycle', () => {
     const disposed = spyOn(override, 'dispose');
     builder.setRoomWall(ROOM.a, FINISH.sage);
     expect(disposed).toHaveBeenCalled();
-    expect(mesh.material).toBe(roomMaterial);
+    const other = builder.facesOfRoom(ROOM.a).find((key) => key !== A_WEST)!;
+    expect(mesh.material).toBe(faceMeshOf(root, other).material);
   });
 
-  test('room repaint keeps the shared material instance of every face of that room', () => {
+  test('a room repaint puts one material on every face of that room, leaves the other room alone and releases the old one', () => {
     const { builder, root } = build(lShapePlan);
     const faces = builder.facesOfRoom(ROOM.a).map((key) => faceMeshOf(root, key));
-    const before = faces.map((mesh) => mesh.material);
+    const others = builder.facesOfRoom(ROOM.b).map((key) => faceMeshOf(root, key).material);
+    const before = faces[0]!.material as THREE.Material;
+    const disposed = spyOn(before, 'dispose');
     builder.setRoomWall(ROOM.a, FINISH.sage);
-    expect(faces.map((mesh) => mesh.material)).toEqual(before);
-    expect(new Set(before).size).toBe(1);
+    const after = new Set(faces.map((mesh) => mesh.material));
+    expect(after.size).toBe(1);
+    expect(after.has(before)).toBe(false);
+    expect(disposed).toHaveBeenCalled();
+    expect(builder.facesOfRoom(ROOM.b).map((key) => faceMeshOf(root, key).material)).toEqual(others);
   });
 });
 

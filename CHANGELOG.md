@@ -7,6 +7,23 @@ as described under [Versioning](#versioning).
 
 ## [Unreleased]
 
+### Changed
+
+- **Bundled room finishes draw scanned materials.** Natural oak, dark walnut,
+  bleached ash, honey teak and the chevron parquet are CC0 wood scans; the
+  five plaster paints (warm sand, cotton white, sage green, terracotta,
+  graphite) and the default ceiling are a tintable plaster scan in their own
+  colours. Ids, names and picker order are unchanged, so documents and light
+  bake hashes are too. The maps ship in `finish-maps/` next to the player file
+  (WebP at 256, 512 and 768 px, about 5.8 MB in all, fetched only for the
+  finishes on screen at the device's size); the npm package leaves the folder
+  out, and a host that serves the player from the package copies it next to
+  the player file, else those surfaces stay flat in their library colour with
+  one warning. Still generated until a scan is chosen: the terrazzo,
+  limestone, the two ceramic floors, white wall tiles and the two striped
+  wallpapers. GLB and USDZ export write the scanned bundled surfaces flat in
+  their library colour (they wrote the generated texture before).
+
 ### Added
 
 - **Baked rooms read like live rooms.** `LIGHTING_STANDARD.baked.exposure`

@@ -9,6 +9,7 @@
  */
 
 import { describe, expect, test } from 'bun:test';
+import { builtinFolder } from '../materials/builtin-folder.js';
 import {
   assetLabel,
   describeSelection,
@@ -432,7 +433,10 @@ describe('describeSelection', () => {
     for (const description of every()) {
       expect(description.options.length).toBeGreaterThan(0);
       for (const option of description.options) {
-        expect(option.preview.startsWith('data:image/')).toBe(true);
+        // A generated or palette picture, or the shipped albedo of a bundled scan.
+        expect(
+          option.preview.startsWith('data:image/') || (option.preview.startsWith(builtinFolder()) && option.preview.endsWith('.webp')),
+        ).toBe(true);
         expect(option.label.length).toBeGreaterThan(0);
         expect(option.preview).not.toContain(option.label);
       }

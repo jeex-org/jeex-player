@@ -6,6 +6,7 @@
  * The load-bearing one: a preview is an image, never text.
  */
 
+import { builtinFolder } from '../materials/builtin-folder.js';
 import { describe, expect, test } from 'bun:test';
 import { finishPanelRequest, furniturePanelRequest, interiorPanelRequest, openingPanelRequest } from './panel-requests.js';
 import { lShapePlan } from '../fixtures/plan-l-shape.js';
@@ -177,8 +178,11 @@ describe('previews carry no text', () => {
         expect(typeof item.label).toBe('string');
         expect(item.label.length).toBeGreaterThan(0);
         // Without a `document` the generators return null, so the fallback chip
-        // has to carry the colour; either way nothing renders text.
-        expect(item.thumbnail === null || item.thumbnail.startsWith('data:image/')).toBe(true);
+        // has to carry the colour; a bundled scan shows its shipped albedo.
+        // Either way nothing renders text.
+        expect(item.thumbnail === null || item.thumbnail.startsWith('data:image/') || item.thumbnail.startsWith(builtinFolder())).toBe(
+          true,
+        );
         expect(typeof item.background).toBe('string');
       }
     }

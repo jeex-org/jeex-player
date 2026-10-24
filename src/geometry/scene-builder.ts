@@ -89,6 +89,12 @@ export type SceneBuilderOptions = {
   findFinish?: ((id: string) => Finish | null) | undefined;
   /** Where library materials on room surfaces take their maps from; flat colours only when absent. */
   textures?: LibraryTextures | undefined;
+  /**
+   * Where the bundled finishes take their maps from: the player's own
+   * `finish-maps/` folder, one source per viewer; absent without a WebGL
+   * context, and then they stay flat.
+   */
+  builtinTextures?: LibraryTextures | undefined;
   /** `'omit'` for the files of a baked project. */
   credentials?: RequestCredentials | undefined;
   /** The viewer's KTX2 transcoder, for GLBs that use `KHR_texture_basisu`; such GLBs are refused without it. */
@@ -172,7 +178,14 @@ export class SceneBuilder {
     this.plan = plan;
     this.options = options;
     this.log = options.log ?? defaultLogger;
-    this.ctx = createBuilderContext(scene, plan, options.findFinish, options.projectMaterials, options.textures ?? null);
+    this.ctx = createBuilderContext(
+      scene,
+      plan,
+      options.findFinish,
+      options.projectMaterials,
+      options.textures ?? null,
+      options.builtinTextures ?? null,
+    );
     this.shell = new ShellBuilder(this.ctx);
     this.openings = new OpeningBuilder(this.ctx);
     // One loader for the whole scene: geometry and finishes are shared between
@@ -595,6 +608,7 @@ export class SceneBuilder {
       this.options.findFinish,
       this.options.projectMaterials,
       this.options.textures ?? null,
+      this.options.builtinTextures ?? null,
     );
     this.shell = new ShellBuilder(this.ctx);
     if (model) this.shell.paint.bindScene(() => model.scene);
