@@ -44,6 +44,7 @@ import { resolveFinish } from '../materials/material-catalogue.js';
 import { FINISH } from '../materials/finish-ids.js';
 import { effectiveRoom, isDoorLike, type Vec2 } from '../scene/types.js';
 import { boardUV, placeFaceLocal, quadPrism, type BoardFrame } from './builder-uv.js';
+import { SKIRTING_BOX_FLAGS, capCovered, concatFlags, faceEndsCovered, flagsOf, prismFlags, recordUnseen } from './shell-unseen.js';
 
 /** Face slab depth as a fraction of the wall thickness (1 % overlap on the centreline). */
 const FACE_DEPTH_RATIO = 0.51;
@@ -217,7 +218,8 @@ export class ShellBuilder {
       // Notched through the doorways (`floor-outline.ts`), so no strip of site
       // slab shows under a door and the two floors meet on the centreline.
       const outline = floorOutline(this.ctx.plan, this.ctx.scene, room.id);
-      const geometry = this.slabGeometry(outline, 0, FLOOR_SLAB);
+      // The slab sits in the site slab: only its top can be seen (`shell-unseen.ts`).
+      const geometry = this.slabGeometry(outline, 0, FLOOR_SLAB, { bottom: true, sides: true });
       const material = geometry ? this.paint.floorMaterialForRoom(room.id, outline) : null;
       if (!geometry || !material) {
         geometry?.dispose();
@@ -283,16 +285,31 @@ export class ShellBuilder {
     return geometry;
   }
 
-  /** Solid slab: top cap at `yTop`, bottom cap below it, and the side quads. */
-  private slabGeometry(polygon: readonly Vec2[], yTop: number, thickness: number): THREE.BufferGeometry | null {
+  /** Solid slab: top cap at `yTop`, bottom cap below it, and the side quads; `unseen` names the parts no walk sees. */
+  private slabGeometry(
+    polygon: readonly Vec2[],
+    yTop: number,
+    thickness: number,
+    unseen: { bottom: boolean; sides: boolean },
+  ): THREE.BufferGeometry | null {
     const parts: THREE.BufferGeometry[] = [];
+    const flags: Uint8Array[] = [];
     const top = this.polygonCap(polygon, yTop, true);
     const bottom = this.polygonCap(polygon, yTop - thickness, false);
     const sides = this.slabSides(polygon, yTop, thickness);
-    for (const part of [top, bottom, sides]) if (part) parts.push(part);
+    for (const [part, hidden] of [
+      [top, false],
+      [bottom, unseen.bottom],
+      [sides, unseen.sides],
+    ] as const) {
+      if (!part) continue;
+      parts.push(part);
+      flags.push(flagsOf(part.getAttribute('position').count / 3, hidden ? 1 : 0));
+    }
     if (parts.length === 0) return null;
     const merged = mergeGeometries(parts, false);
     for (const part of parts) part.dispose();
+    if (merged) recordUnseen(merged, concatFlags(flags));
     return merged;
   }
 
@@ -333,6 +350,8 @@ export class ShellBuilder {
     const segments = faceSegments(face);
     const normals = segmentNormals(segments);
     const parts: THREE.BufferGeometry[] = [];
+    const flags: Uint8Array[] = [];
+    const ends = faceEndsCovered(face, this.ctx.scene, this.ctx.plan);
     segments.forEach((segment, index) => {
       for (const quad of face.quads) {
         const from = Math.max(quad.t0, segment.t0);
@@ -340,17 +359,27 @@ export class ShellBuilder {
         if (to - from <= EPS) continue;
         const local: FaceQuad = { ...quad, t0: from - segment.t0, t1: to - segment.t0 };
         parts.push(this.prismGeometry(local, face.t0 + segment.t0, depth, segment, normals[index]!, face));
+        // A cap where a chord boundary cuts the quad is covered by the same quad's next prism.
+        flags.push(
+          prismFlags(quad, {
+            start: from > quad.t0 + EPS || capCovered(face, quad, 'start', ends.start),
+            end: to < quad.t1 - EPS || capCovered(face, quad, 'end', ends.end),
+          }),
+        );
       }
     });
     for (const opening of face.openings) {
       if (opening.shape !== 'arch') continue;
       const spandrel = this.archSpandrel(face, opening, segments);
-      if (spandrel) parts.push(spandrel);
+      if (!spandrel) continue;
+      parts.push(spandrel);
+      flags.push(flagsOf(spandrel.getAttribute('position').count / 3, 0));
     }
     if (parts.length === 0) return;
     const geometry = mergeGeometries(parts, false);
     for (const part of parts) part.dispose();
     if (!geometry) return;
+    recordUnseen(geometry, concatFlags(flags));
     const mesh = new THREE.Mesh(geometry, this.paint.materialForFace(face));
     mesh.name = 'wall-face';
     const outward = face.roomId === null ? face.normal : { x: -face.normal.x, z: -face.normal.z };
@@ -385,7 +414,7 @@ export class ShellBuilder {
   private buildJoints(root: THREE.Group): void {
     const height = this.ctx.scene.ceilingHeight;
     for (const core of jointCores(this.ctx.scene)) {
-      const geometry = this.slabGeometry(core.polygon, height, height);
+      const geometry = this.slabGeometry(core.polygon, height, height, { bottom: true, sides: false });
       if (!geometry) continue;
       const mesh = new THREE.Mesh(geometry, this.jointMaterial);
       mesh.name = `joint-${core.nodeId}`;
@@ -559,6 +588,7 @@ export class ShellBuilder {
     const geometry = mergeGeometries(parts, false);
     for (const part of parts) part.dispose();
     if (!geometry) return;
+    recordUnseen(geometry, concatFlags(parts.map(() => SKIRTING_BOX_FLAGS)));
     const board = new THREE.Mesh(geometry, trim);
     board.name = 'wall-face-skirting';
     // No `surface` key: the baseboard is not a paintable pick target.

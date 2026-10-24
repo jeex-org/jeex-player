@@ -19,6 +19,8 @@ import { apartmentScene } from '../demo/scene-data.js';
 import { registriesFromLibrary } from '../scene/registries.js';
 import { validateScene } from '../scene/scene-validator.js';
 import { SceneBuilder } from '../geometry/scene-builder.js';
+import { createGltfModelSource } from '../geometry/model-source.js';
+import { LAMP_PROJECT_FIXTURE as LAMPS } from '../../tests/fixtures/project/fixture-ids.js';
 import { createLightingContext } from '../lighting/lighting-context.js';
 import type { LightingRenderer, LightingThree } from '../lighting/lighting-three.js';
 import { solvePlan } from '../plan/plan-solver.js';
@@ -243,5 +245,51 @@ describe('bakeLights', () => {
     const again: BakeLights = bakeLights(apartmentScene, SHIPPED_BANK);
     expect(again).toEqual(lights);
     expect(JSON.stringify(again)).toBe(JSON.stringify(lights));
+  });
+});
+
+describe('a ceiling lamp in a bake built without models', () => {
+  test('its bulb sits where the live view hangs it, before and after the model whose measured top is dims[1] arrives', async () => {
+    const dir = join(import.meta.dirname, '..', '..', 'tests', 'fixtures', 'project-lamps');
+    const base = 'https://lamps.test/bake/';
+    const manifest = parseProjectManifest(JSON.parse(readFileSync(join(dir, 'project.json'), 'utf8')) as unknown);
+    const scene = JSON.parse(readFileSync(join(dir, 'scene.json'), 'utf8')) as SceneData;
+    const bank = projectBank(manifest, base);
+    const fetch = ((url: string) =>
+      Promise.resolve(
+        new Response(readFileSync(join(dir, url.slice(base.length))), { status: 200 }),
+      )) as unknown as typeof globalThis.fetch;
+    const builder = new SceneBuilder(scene, solvePlan(scene), {
+      catalogue: bank.catalogue,
+      catalogueLibrary: bank.defaultLibrary,
+      resolveFinish: bank.resolveFinish,
+      projectMaterials: manifest.library.materials,
+      modelUrl: (asset) => bank.modelUrl(asset),
+      modelSource: createGltfModelSource({ fetch }),
+    });
+    const root = builder.build().root;
+    const pendant = (): { bulb: THREE.Vector3; body: THREE.Object3D } => {
+      const group = root.getObjectByName(LAMPS.placement.pendant)!;
+      root.updateMatrixWorld(true);
+      let light: THREE.PointLight | undefined;
+      group.traverse((child) => {
+        if ((child as THREE.PointLight).isPointLight) light = child as THREE.PointLight;
+      });
+      return { bulb: light!.getWorldPosition(new THREE.Vector3()), body: light!.parent! };
+    };
+    const before = pendant();
+    await builder.upgradeModels(new AbortController().signal);
+    const after = pendant();
+    // The precondition the bake relies on: the arrived model's measured top in its own frame is the catalogue height.
+    // (`hangFromCeiling` stands a body at minus its top.)
+    const dims = manifest.library.objects.find((object) => object.id === LAMPS.asset.pendant)!.dims;
+    expect(after.body).not.toBe(before.body);
+    expect(after.body.name).toBe(`${LAMPS.variant.pendant}-gltf`);
+    expect(-after.body.position.y).toBeCloseTo(dims[1], 4);
+    const baked = bakeLights(scene, { catalogue: bank.catalogue, catalogueLibrary: bank.defaultLibrary });
+    const lamp = baked.lamps.find((entry) => entry.id === LAMPS.placement.pendant)!;
+    expect(new THREE.Vector3(...lamp.position).distanceTo(before.bulb)).toBeLessThan(1e-6);
+    expect(new THREE.Vector3(...lamp.position).distanceTo(after.bulb)).toBeLessThan(1e-6);
+    builder.dispose();
   });
 });

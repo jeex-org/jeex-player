@@ -18,6 +18,13 @@
  * shows): a ceiling the dollhouse hides at run time is still visible here,
  * since the bake needs it as a caster.
  *
+ * A shell file writes each entry as its parts (`shellParts`): the triangles
+ * a walk can see, then the ones it cannot (`geometry/shell-unseen.ts`), the
+ * second part marked `unseen`. The parts are read from the geometry the
+ * builders recorded, so they describe the shell as built; on an adopted
+ * shell `shellEntries` still lists the same meshes (the children that draw
+ * unseen parts are not shell meshes), but their parts are the adopted ones.
+ *
  * Invariant: an entry's extras depend on the scene and the built shell only,
  * never on a mesh name, so two exports with different id minters answer the
  * same. A mesh this module does not know refuses the whole walk (a
@@ -31,6 +38,7 @@ import { firstFrameColour } from '../materials/library-material.js';
 import { DEFAULT_WALL_FINISH, faceFinishRefOf, floorFinishRefOf } from '../scene/scene-ops.js';
 import { isFaceKey, type FaceKey, type FinishRef, type OpeningType, type SceneData } from '../scene/types.js';
 import { FINISH } from '../materials/finish-ids.js';
+import { unseenTriangles } from '../geometry/shell-unseen.js';
 import { LightBakeError } from './light-bake-error.js';
 import type { ShellMaterialExtras, ShellNodeExtras } from './shell-extras.schema.js';
 
@@ -180,7 +188,8 @@ export function shellEntries(shell: THREE.Object3D, scene: SceneData, ctx: Pick<
   shell.updateMatrixWorld(true);
   const meshes: THREE.Mesh[] = [];
   shell.traverse((object) => {
-    if (!(object instanceof THREE.Mesh)) return;
+    // A mesh under a shell mesh is the unseen part an adopted bake draws live (`shell-adopt.ts`), not a surface of its own.
+    if (!(object instanceof THREE.Mesh) || object.parent instanceof THREE.Mesh) return;
     if (object.userData['shadowOnly'] === true || isPickProxy(object) || underDoorLeaf(object, shell)) return;
     meshes.push(object);
   });
@@ -189,5 +198,35 @@ export function shellEntries(shell: THREE.Object3D, scene: SceneData, ctx: Pick<
     if (Array.isArray(mesh.material)) throw new LightBakeError('shell', `shell mesh ${mesh.name} has more than one material`);
     const { extras, finish } = describe(mesh, shell, scene, ordinals);
     return { mesh, extras, material: { finish }, albedo: albedoOf(finish, mesh.material, ctx) };
+  });
+}
+
+/** One node of a shell file: the seen or the unseen triangles of one shell entry. */
+export type ShellPart = {
+  readonly entry: ShellEntry;
+  /** The entry's extras, plus `unseen: true` on its unseen part. */
+  readonly extras: ShellNodeExtras;
+  readonly unseen: boolean;
+  /** The part's triangles: indices into the entry geometry's triangle order. */
+  readonly triangles: readonly number[];
+};
+
+/**
+ * The nodes a shell file writes for `entries`, in order: per entry its seen
+ * part, then its unseen part, each only when it has triangles.
+ */
+export function shellParts(entries: readonly ShellEntry[]): ShellPart[] {
+  return entries.flatMap((entry) => {
+    const geometry = entry.mesh.geometry;
+    const count = (geometry.index ? geometry.index.count : geometry.getAttribute('position').count) / 3;
+    const flags = unseenTriangles(geometry);
+    const seen: number[] = [];
+    const unseen: number[] = [];
+    for (let t = 0; t < count; t++) (flags?.[t] === 1 ? unseen : seen).push(t);
+    const parts: ShellPart[] = [];
+    if (seen.length > 0) parts.push({ entry, extras: entry.extras, unseen: false, triangles: seen });
+    if (unseen.length > 0)
+      parts.push({ entry, extras: { ...entry.extras, unseen: true } as ShellNodeExtras, unseen: true, triangles: unseen });
+    return parts;
   });
 }

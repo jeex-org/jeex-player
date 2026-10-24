@@ -54,6 +54,15 @@ describe('judgeShellGltf', () => {
     expect(refused((g) => g['meshes'][0].primitives.push(g['meshes'][0].primitives[0]))).toContain('exactly one primitive');
   });
 
+  test('allows `unseen: true` on a floor, wall, skirting or joint part only', () => {
+    const first = (kind: string) => json()['nodes'].findIndex((node: any) => node.extras.jeex.kind === kind);
+    for (const kind of ['floor', 'wall', 'skirting', 'joint'])
+      expect(refused((g) => (g['nodes'][first(kind)].extras.jeex.unseen = true))).toBe('accepted');
+    for (const kind of ['ceiling', 'opening', 'site'])
+      expect(refused((g) => (g['nodes'][first(kind)].extras.jeex.unseen = true))).toContain('unseen');
+    expect(refused((g) => (g['nodes'][first('wall')].extras.jeex.unseen = false))).toContain('unseen');
+  });
+
   test('refuses an unknown kind, an extra contract key and a missing origin', () => {
     expect(refused((g) => (g['nodes'][0].extras.jeex.kind = 'roof'))).toContain('nodes.0.extras.jeex.kind');
     expect(refused((g) => (g['nodes'][0].extras.jeex.colour = 'red'))).toContain('colour');
