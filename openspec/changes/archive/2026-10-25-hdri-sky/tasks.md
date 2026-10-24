@@ -62,6 +62,6 @@ Every task starts with a test that fails for the right reason; the implementatio
 
 ## Workflow follow-up
 
-- Independent review of these artifacts (`review.md`) before implementation starts.
+- Independent review of these artifacts before implementation starts.
 - Owner acceptance on the live viewer with the three real pairs; shots of walk in the demo apartment per preset.
 - Archive the change after the project's review and gate requirements are satisfied.

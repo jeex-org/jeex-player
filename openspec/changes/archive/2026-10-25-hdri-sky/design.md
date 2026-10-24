@@ -2,7 +2,7 @@
 
 ## Context
 
-See proposal.md (Why) and brainstorm.md (Decision). The code this design builds on:
+See proposal.md (Why). The code this design builds on:
 
 1. `src/app/viewer-options.ts` folds `OPTION_SCHEMA` rows (string-transportable kinds) and copies `OPAQUE_PATHS` through; there is no validated object option yet. Validation uses `zod/mini` from `*.schema.ts` modules only.
 2. The walk chunk: `src/app/walk-post-controller.ts` imports `src/render/walk-post.ts` on the first walk/tour frame; `walk-post.ts` re-exports `WalkLighting`. `src/app/walk-lighting-controller.ts` builds it on the first eligible frame and calls `frame(eligible)` every frame.
@@ -167,4 +167,4 @@ Additive. Without `lighting.hdri` nothing changes. Rollback is removing the opti
 
 ## Open Questions
 
-None. The `site`-less recipe choice and the no-retry-until-next-document choice are recorded in brainstorm.md for the review.
+None. The recipe look of a scene without a `site` is D3 item 1; the failure kept until the next document is D11 item 1.

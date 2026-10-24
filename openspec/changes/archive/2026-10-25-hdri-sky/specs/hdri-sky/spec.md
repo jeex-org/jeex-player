@@ -138,7 +138,7 @@ Background and environment SHALL be rotated about the vertical axis by `radians(
 
 ### Requirement: Room lighting captures under the HDRI
 
-Grid and probe captures with the HDRI installed SHALL see the prefiltered HDRI as background at the HDRI environment gain, never the display sky, and SHALL restore the display sky afterwards; captured room probes SHALL never be an input of a capture.
+Grid and probe captures with the HDRI installed, the re-capture of a room whose probe point an edit moved included, SHALL see the prefiltered HDRI as background at the HDRI environment gain, never the display sky, and SHALL restore the display sky afterwards; captured room probes SHALL never be an input of a capture.
 
 #### Scenario: Capture background
 - **WHEN** a room grid is baked with the HDRI installed and the display sky's brightness doubled

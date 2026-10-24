@@ -30,7 +30,7 @@ In `walk` and `tour` everything in a room (shell, furniture, fixtures, door leav
 
 ### Requirement: Room reflection probes
 
-In `walk` and `tour` glossy surfaces SHALL reflect their own room from a probe captured at the room's interior point at 1.5 m height, box-projected onto the room's box, blended with the neighbouring room within 0.4 m of a shared boundary. Probes SHALL be captured without feedback from earlier probes and without mirrors; a fragment outside every room box SHALL reflect the scene's environment: the studio environment, or the HDRI in its full-lighting states.
+In `walk` and `tour` glossy surfaces SHALL reflect their own room from a probe captured at the room's probe point (requirement «Reflection probe placement»), box-projected onto the room's box, blended with the neighbouring room within 0.4 m of a shared boundary. Probes SHALL be captured without feedback from earlier probes and without mirrors; a fragment outside every room box SHALL reflect the scene's environment: the studio environment, or the HDRI in its full-lighting states.
 
 #### Scenario: Reflections line up with walls
 - **WHEN** a mirror-like floor reflects a stripe on the far wall
