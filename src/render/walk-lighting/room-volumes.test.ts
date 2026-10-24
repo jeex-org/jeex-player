@@ -87,8 +87,8 @@ describe('probePoint', () => {
     expect(point.z).toBeLessThan(3);
   });
 
-  test('steps off a furniture footprint', () => {
-    const table = { minX: 1.5, maxX: 2.5, minZ: 0.5, maxZ: 1.5 };
+  test('steps off a tall furniture footprint', () => {
+    const table = { minX: 1.5, maxX: 2.5, minY: 0, maxY: 2, minZ: 0.5, maxZ: 1.5 };
     const point = probePoint(square(0, 0, 4, 2), [table]);
     const inside = point.x > table.minX && point.x < table.maxX && point.z > table.minZ && point.z < table.maxZ;
     expect(inside).toBe(false);
@@ -108,7 +108,7 @@ describe('probePoint keeps a 3D clearance from furniture', () => {
   });
 
   test('without a qualifying point, the largest min(furniture clearance, edge distance) wins', () => {
-    const column: Box3D = { minX: 0.5, maxX: 0.7, minY: 0, maxY: 2.6, minZ: 0.5, maxZ: 0.7 };
+    const column: Box3D = { minX: 0.3, maxX: 0.9, minY: 0, maxY: 2.6, minZ: 0.3, maxZ: 0.9 };
     const point = probePoint(square(0, 0, 1.2, 1.2), [column]);
     const key = (p: { x: number; z: number }) => Math.min(boxDistance({ x: p.x, y: T.probeHeightM, z: p.z }, column), rectEdge(p, 0, 0, 1.2, 1.2));
     expect(key(point)).toBeLessThan(T.probeClearanceM);

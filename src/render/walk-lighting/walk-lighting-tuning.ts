@@ -31,6 +31,14 @@ export const WALK_LIGHTING_TUNING = Object.freeze({
   probesPerFrame: 6,
   /** Height of a room's reflection probe above the floor, metres. */
   probeHeightM: 1.5,
+  /**
+   * Clearance a room's reflection probe keeps from every furniture box in 3D,
+   * metres; a target, not a guarantee (a crowded room takes its clearest
+   * point). Measured on the demo living room: a probe 9 cm from the floor
+   * lamp's glowing shade saw the shade fill its whole upward view, and every
+   * glossy floor there reflected one uniform blob instead of the room.
+   */
+  probeClearanceM: 0.5,
   /** Edge of a reflection probe's capture cube, texels; its PMREM output then has the studio environment's layout. */
   probeSize: 128,
   /** Room boxes the apartment may have; more keeps the direct look and reports an error. */
