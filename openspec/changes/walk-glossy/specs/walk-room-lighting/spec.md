@@ -99,3 +99,15 @@ In walk, on the demo living-room fixture (recorded pose, resolution and floor ma
 #### Scenario: Window in a polished floor
 - **WHEN** a recorded pose sees the floor band where the living room window's mirror image falls, the floor black, non-metal, map-free at roughness 0.07, with the room lighting live on a hardware renderer
 - **THEN** that band is brighter than the floor beside it, in the window's screen column
+
+### Requirement: Emissive surfaces in walk and tour
+
+In `walk` and `tour` the emissive term of every material SHALL be capped so its brightest channel does not exceed one walk value, keeping its chroma (`E × min(1, cap / max(E))`); an emissive term below the cap SHALL pass unchanged. The editing modes SHALL keep their emissive glow exactly.
+
+#### Scenario: Shades not blown out
+- **WHEN** the demo floor lamp wears each glowing shade finish (ivory, opal, warm lamp, ink) and is metered in walk before tone mapping
+- **THEN** the shade's mean brightest channel is at most 0.76 and at least 1.25 times the same shade with its emissive off
+
+#### Scenario: Editing glow unchanged
+- **WHEN** the same shade is metered in orbit, `plan3d` and the editing look before and after a walk session
+- **THEN** its readings are unchanged
