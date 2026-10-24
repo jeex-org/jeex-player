@@ -152,6 +152,7 @@ const PURE_MODULES = [
   'lighting/lighting-three',
   'lighting/shadow-fit',
   'lighting/sun-direction',
+  'lighting/lamp-units',
   ...SCHEMA_MODULES,
 ];
 

@@ -13,6 +13,8 @@ import type { DemoAsset } from '../scene/types.js';
 import type { ModelOutcome, ModelRequest } from './model-source.js';
 import { PROJECT_FIXTURE } from '../../tests/fixtures/project/fixture-ids.js';
 import { HANGING, hangingManifest, modelFrameBox } from '../fixtures/hanging-pendant.js';
+import { LAMP_PROJECT_FIXTURE as LAMPS } from '../../tests/fixtures/project/fixture-ids.js';
+import { ARTIFICIAL_LIGHT_KEY, isArtificialLight } from '../assets/artificial-light.js';
 
 /**
  * Loader checks that need Three.js but no canvas: texture generators return
@@ -299,6 +301,169 @@ describe('a ceiling body no builder made hangs from the ceiling plane', () => {
     // Measured on the builder before non-builder bodies were offset.
     expect(box.min.toArray().map((value) => Number(value.toFixed(6)))).toEqual([0.82, 1.59784, 1.82]);
     expect(box.max.toArray().map((value) => Number(value.toFixed(6)))).toEqual([1.18, 2.65, 2.18]);
+    loader.dispose();
+  });
+});
+
+/* ---------------------------------------------------------- lamp lights --- */
+
+const LAMP_DIR = join(import.meta.dirname, '..', '..', 'tests', 'fixtures', 'project-lamps');
+
+type Editable = { library: { objects: Array<{ variants: Array<Record<string, unknown>> }> } };
+
+/** The lamp fixture's manifest, with an optional edit, parsed the way a mount parses it. */
+function lampManifest(edit?: (manifest: Editable) => void): BakedProjectManifest {
+  const raw = JSON.parse(readFileSync(join(LAMP_DIR, 'project.json'), 'utf8')) as Editable;
+  edit?.(raw);
+  return parseProjectManifest(raw);
+}
+
+function lampLoader(edit?: (manifest: Editable) => void): AssetLoader {
+  const manifest = lampManifest(edit);
+  const bank = projectBank(manifest, PROJECT_BASE);
+  return new AssetLoader([], {
+    defaultLibrary: manifest.library.id,
+    ceilingHeight: 2.65,
+    catalogue: bank.catalogue,
+    resolveFinish: bank.resolveFinish,
+    projectMaterials: manifest.library.materials,
+    modelUrl: (asset) => bank.modelUrl(asset),
+    modelSource: () => Promise.resolve({ group: modelFrameBox([0.3, 0.52, 0.3]), triangles: 12, warnings: [], bytes: 0 }),
+  });
+}
+
+const TABLE_LAMP: DemoAsset = {
+  id: LAMPS.placement.tableLamp,
+  type: LAMPS.asset.tableLamp,
+  asset: LAMPS.asset.tableLamp,
+  variant: LAMPS.variant.tableLamp,
+  position: { x: 1, y: 0, z: 1 },
+  rotationY: 0,
+};
+
+const PENDANT: DemoAsset = {
+  id: LAMPS.placement.pendant,
+  type: LAMPS.asset.pendant,
+  asset: LAMPS.asset.pendant,
+  variant: LAMPS.variant.pendant,
+  position: { x: 2.5, y: 0, z: 2 },
+  rotationY: 0,
+};
+
+function lightsUnder(root: THREE.Object3D): THREE.PointLight[] {
+  const lights: THREE.PointLight[] = [];
+  root.traverse((child) => {
+    if ((child as THREE.PointLight).isPointLight) lights.push(child as THREE.PointLight);
+  });
+  return lights;
+}
+
+/** The first table-lamp variant's `lights`, replaced. */
+const withTableLights =
+  (lights: readonly Record<string, unknown>[]) =>
+  (manifest: Editable): void => {
+    manifest.library.objects[0]!.variants[0]!['lights'] = lights;
+  };
+
+const BULB = { kind: 'point', position: [0, 0.443, 0], colour: '#ffd9a4', lumens: 400, cutoff: 3 } as const;
+
+describe('lamp lights are built on the first body', () => {
+  test('the stand-in of the table lamp holds exactly one tagged PointLight with the authored values', () => {
+    const loader = lampLoader();
+    const { group } = loader.load(TABLE_LAMP);
+    const body = group.children[0]!;
+    const lights = lightsUnder(group);
+    expect(lights).toHaveLength(1);
+    const light = lights[0]!;
+    // A child of the BODY, never of the placement group.
+    expect(light.parent).toBe(body);
+    expect(light.name).toBe(`${LAMPS.placement.tableLamp}-light`);
+    expect(isArtificialLight(light)).toBe(true);
+    expect(light.intensity).toBeCloseTo(1.2, 9);
+    expect(light.distance).toBe(3);
+    expect(light.decay).toBe(2);
+    expect(light.position.toArray()).toEqual([0, 0.443, 0]);
+    const authored = new THREE.Color('#ffd9a4');
+    expect(light.color.toArray()).toEqual(authored.toArray());
+    expect(light.userData[ARTIFICIAL_LIGHT_KEY]).toEqual({ colour: authored.toArray() });
+    loader.dispose();
+  });
+
+  test('a variant without lights gets no light', () => {
+    const { loader } = projectLoader();
+    expect(lightsUnder(loader.load(SOFA).group)).toEqual([]);
+    loader.dispose();
+  });
+
+  test('three lights are named in array order, the first without a number', () => {
+    const loader = lampLoader(withTableLights([BULB, { ...BULB, position: [0.1, 0.4, 0] }, { ...BULB, position: [-0.1, 0.4, 0] }]));
+    const names = lightsUnder(loader.load(TABLE_LAMP).group).map((light) => light.name);
+    const id = LAMPS.placement.tableLamp;
+    expect(names).toEqual([`${id}-light`, `${id}-light-2`, `${id}-light-3`]);
+    loader.dispose();
+  });
+
+  test('every fact light carries its source tag; the pendant reads index 0, 600 lm, cutoff 5.2, no shadow', () => {
+    const loader = lampLoader();
+    const [light] = lightsUnder(loader.load(PENDANT).group);
+    expect(light!.userData['lampLight']).toEqual({
+      source: 'fact',
+      placementId: LAMPS.placement.pendant,
+      index: 0,
+      lumens: 600,
+      cutoff: 5.2,
+      shadow: false,
+    });
+    expect(light!.intensity).toBeCloseTo(1.8, 9);
+    loader.dispose();
+  });
+
+  test('a shadow hint is carried on the light and never cast in this release', () => {
+    const loader = lampLoader(withTableLights([{ ...BULB, shadow: true }]));
+    const [light] = lightsUnder(loader.load(TABLE_LAMP).group);
+    expect(light!.castShadow).toBe(false);
+    expect((light!.userData['lampLight'] as { shadow: boolean }).shadow).toBe(true);
+    loader.dispose();
+  });
+
+  test('a mirrored placement mirrors its light with the body', () => {
+    const loader = lampLoader(withTableLights([{ ...BULB, position: [0.2, 0.443, 0] }]));
+    const plain = loader.load(TABLE_LAMP).group;
+    const mirrored = loader.load({ ...TABLE_LAMP, mirror: { x: true } }).group;
+    const inGroup = (group: THREE.Group): THREE.Vector3 => {
+      group.updateMatrixWorld(true);
+      return group.worldToLocal(lightsUnder(group)[0]!.getWorldPosition(new THREE.Vector3()));
+    };
+    expect(inGroup(plain).x).toBeCloseTo(0.2, 6);
+    expect(inGroup(mirrored).x).toBeCloseTo(-0.2, 6);
+    expect(inGroup(mirrored).y).toBeCloseTo(0.443, 6);
+    loader.dispose();
+  });
+
+  test('a ceiling lamp hangs its light with its body: the pendant bulb sits 0.989 m under the ceiling', () => {
+    const loader = lampLoader();
+    const { group } = loader.load(PENDANT);
+    group.updateMatrixWorld(true);
+    expect(lightsUnder(group)[0]!.getWorldPosition(new THREE.Vector3()).y).toBeCloseTo(2.65 - 0.989, 6);
+    loader.dispose();
+  });
+});
+
+describe('no light without a fact', () => {
+  test('a bank lamp keeps exactly its builder bulb, which carries no fact tag', () => {
+    const loader = new AssetLoader([], {});
+    const lights = lightsUnder(loader.load({ id: PLACEMENT.probe, type: 'lamp', position: origin }).group);
+    expect(lights).toHaveLength(1);
+    expect(lights[0]!.userData['lampLight']).toBeUndefined();
+    expect(isArtificialLight(lights[0]!)).toBe(true);
+    loader.dispose();
+  });
+
+  test('a lit variant that falls back to the failure placeholder holds no light', () => {
+    const loader = lampLoader();
+    const result = loader.load({ ...TABLE_LAMP, id: PLACEMENT.ghost, library: OTHER_LIBRARY });
+    expect(result.degraded).toBe(true);
+    expect(lightsUnder(result.group)).toEqual([]);
     loader.dispose();
   });
 });

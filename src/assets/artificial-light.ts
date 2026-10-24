@@ -35,3 +35,27 @@ export function artificialColour(object: THREE.Object3D): readonly [number, numb
   const colour = tag?.colour;
   return Array.isArray(colour) && colour.length === 3 ? (colour as readonly [number, number, number]) : null;
 }
+
+/** The `userData` key of the tag a light built from a variant's `lights` fact carries. */
+export const LAMP_LIGHT_KEY = 'lampLight';
+
+/**
+ * What a fact light carries beside the artificial tag: where it came from
+ * (`source: 'fact'`, never on a bank builder's bulb), its placement, its index
+ * in the variant's `lights`, and the authored `lumens`, `cutoff` and `shadow`
+ * hint, so the bake reads the fact rather than the live, tinted light.
+ */
+export type LampLightTag = {
+  readonly source: 'fact';
+  readonly placementId: string;
+  readonly index: number;
+  readonly lumens: number;
+  readonly cutoff: number;
+  readonly shadow: boolean;
+};
+
+/** The fact tag `object` carries, or `null` for any other object (a bank bulb included). */
+export function lampLightTag(object: THREE.Object3D): LampLightTag | null {
+  const tag = object.userData[LAMP_LIGHT_KEY] as Partial<LampLightTag> | undefined;
+  return tag?.source === 'fact' ? (tag as LampLightTag) : null;
+}

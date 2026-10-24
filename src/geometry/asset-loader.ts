@@ -37,6 +37,8 @@ import { BUILDERS } from '../assets/asset-builders.js';
 import { GeometryCache, makeBuildKit } from '../assets/asset-kit.js';
 import { prepareGltfBody } from './gltf-body.js';
 import { MIRROR_FACTS_USERDATA_KEY, setBodyMirror } from './asset-mirror.js';
+import { LAMP_LIGHT_KEY, tagArtificialLight, type LampLightTag } from '../assets/artificial-light.js';
+import { lampCandela } from '../lighting/lamp-units.js';
 import {
   countTriangles,
   createGltfModelSource,
@@ -153,6 +155,34 @@ function hangFromCeiling(body: THREE.Object3D, asset: ResolvedAsset, top: number
   if (asset.anchor === 'ceiling' && Number.isFinite(top)) body.position.y = -top;
 }
 
+/**
+ * The live lights of a variant's `lights` fact, for the body they sit under.
+ *
+ * Each is a three.js `PointLight` in the body's own (model) frame, so the
+ * placement's scale, turn and mirror reach it through the body and the group;
+ * its distance and intensity are the fact's, unscaled. Tagged artificial with
+ * the authored colour as «Original», tagged as a fact light for the bake, and
+ * never casting a shadow in this release whatever the hint says.
+ */
+function lampLights(asset: ResolvedAsset): THREE.PointLight[] {
+  return (asset.lights ?? []).map((fact, index) => {
+    const light = tagArtificialLight(new THREE.PointLight(fact.colour, lampCandela(fact.lumens), fact.cutoff, 2));
+    light.name = index === 0 ? `${asset.placementId}-light` : `${asset.placementId}-light-${index + 1}`;
+    light.position.set(fact.position[0], fact.position[1], fact.position[2]);
+    light.castShadow = false;
+    const tag: LampLightTag = {
+      source: 'fact',
+      placementId: asset.placementId,
+      index,
+      lumens: fact.lumens,
+      cutoff: fact.cutoff,
+      shadow: fact.shadow ?? false,
+    };
+    light.userData[LAMP_LIGHT_KEY] = tag;
+    return light;
+  });
+}
+
 export class AssetLoader {
   private readonly finishes: FinishRegistry;
   private readonly geometries = new GeometryCache();
@@ -221,6 +251,8 @@ export class AssetLoader {
     // it and the picker indexes it exactly like anything else.
     if (!built && asset.model) {
       const body = this.pendingBody(asset);
+      // Fact lights only here: a builder's body keeps its own bulb, and nothing else.
+      for (const light of lampLights(asset)) body.add(light);
       hangFromCeiling(body, asset, asset.dims[1]);
       const group = this.dressedGroup(placement, asset, body);
       group.userData['degraded'] = PENDING_MODEL;
