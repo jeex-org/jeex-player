@@ -19,6 +19,7 @@
  */
 
 import { findFinish, finishPairSwatchDataURL } from '../materials/finishes.js';
+import { BUILTIN_FINISHES } from '../materials/builtin-library.js';
 import type { PanelItem, PanelRequest } from './viewer-ui.js';
 import { defaultOpeningVariant } from '../assets/opening-variants.js';
 import type { OpeningListEntry } from '../geometry/opening-builder.js';
@@ -164,7 +165,11 @@ export function interiorPanelRequest(args: InteriorPanelArgs): PanelRequest {
       return {
         id: preset.id,
         label: preset.name,
-        thumbnail: floor && wall ? finishPairSwatchDataURL(floor, wall, 72) : null,
+        // A preset on a finish bound to a library material shows the flat pair below.
+        thumbnail:
+          floor && wall && !BUILTIN_FINISHES.has(floor.id) && !BUILTIN_FINISHES.has(wall.id)
+            ? finishPairSwatchDataURL(floor, wall, 72)
+            : null,
         background: presetChipBackground(preset),
         active: preset.id === args.activeId,
         dataset: { preset: preset.id },

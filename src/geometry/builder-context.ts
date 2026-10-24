@@ -53,6 +53,8 @@ export type BuilderContext = {
   resolve: (ref: FinishRef) => RoomFinishDraw | null;
   /** Where library materials take their maps from; `null` without a project or a WebGL context. */
   textures: LibraryTextures | null;
+  /** Where the bundled finishes take theirs from (the player's own folder); `null` without a WebGL context. */
+  builtinTextures: LibraryTextures | null;
 };
 
 export function createBuilderContext(
@@ -61,6 +63,7 @@ export function createBuilderContext(
   findFinish?: FinishLookup,
   projectMaterials?: readonly ProjectMaterial[],
   textures: LibraryTextures | null = null,
+  builtinTextures: LibraryTextures | null = null,
 ): BuilderContext {
   const lookup = findFinish ?? catalogueFinish;
   const facesByWall = new Map<string, WallFace[]>();
@@ -82,5 +85,6 @@ export function createBuilderContext(
     findFinish: lookup,
     resolve: (ref) => resolveRoomFinish(ref, projectMaterials, lookup),
     textures,
+    builtinTextures,
   };
 }

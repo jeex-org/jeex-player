@@ -469,7 +469,7 @@ export class ViewerApp {
     this.stage = undefined;
     this.doors.dispose();
     this.animator.dispose();
-    this.mount.release();
+    this.mount.dispose();
     this.shell.dispose();
     this.ui.dispose();
   }

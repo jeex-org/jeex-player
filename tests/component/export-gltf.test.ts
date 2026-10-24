@@ -13,6 +13,9 @@ import { metadataTable } from '../../src/scene/metadata-table.js';
 import { solvePlan } from '../../src/plan/plan-solver.js';
 import { closeContainers, openContainer, parkForExport } from './support.js';
 import { readScalars, readStringColumn, type GltfJson } from './glb-conformance.js';
+import { FINISH } from '../../src/materials/finish-ids.js';
+import { BUILTIN_FINISHES } from '../../src/materials/builtin-library.js';
+import { firstFrameColour } from '../../src/materials/library-material.js';
 
 const GLB_MAGIC = 0x46546c67;
 
@@ -191,6 +194,20 @@ describe('exportGlb', () => {
         ]);
       }
     }
+  });
+
+  test('a bundled floor exports flat in its library first-frame colour, without a texture', async () => {
+    const json = await readGlbJson(await exportGlb(fakeDeps()));
+    const materials =
+      (json['materials'] as Array<{ name?: string; pbrMetallicRoughness?: { baseColorFactor?: number[]; baseColorTexture?: unknown } }>) ??
+      [];
+    const oak = materials.find((material) => material.name === FINISH.oak);
+    expect(oak).toBeDefined();
+    expect(oak?.pbrMetallicRoughness?.baseColorTexture).toBeUndefined();
+    const binding = BUILTIN_FINISHES.get(FINISH.oak)!;
+    const colour = firstFrameColour({ id: FINISH.oak, material: binding.material, rotation: binding.rotation });
+    const factor = oak?.pbrMetallicRoughness?.baseColorFactor ?? [];
+    for (const [index, channel] of [colour.r, colour.g, colour.b].entries()) expect(factor[index]).toBeCloseTo(channel, 4);
   });
 
   test('no material carries the light bake facts of an opening part in its extras', async () => {

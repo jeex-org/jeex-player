@@ -23,10 +23,11 @@ import { headlessWebglLaunch } from './tests/headless-webgl.js';
 import { CostShardSequencer } from './tests/component-shards.js';
 import { portEnv } from './scripts/config-input.js';
 import { basisTranscoder } from './scripts/basis-transcoder-plugin.js';
+import { finishMaps } from './scripts/finish-maps-plugin.js';
 
 export default defineConfig({
   // Its own config, not `vite.config.ts`'s: the dev server must answer the Basis transcoder pair here too.
-  plugins: [basisTranscoder()],
+  plugins: [basisTranscoder(), finishMaps()],
   // Pre-bundled up front, not on first import. Vite discovers `three` while
   // the first test file is already running and reloads the page to serve the
   // optimised copy — Vitest reports that as "Vite unexpectedly reloaded a

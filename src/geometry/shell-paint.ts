@@ -36,6 +36,13 @@ import {
 import { FaceMap, type FaceKey, type FinishRef, type FinishSurface, type SceneData, type Vec2 } from '../scene/types.js';
 import { LibrarySurface } from './library-surface.js';
 import type { LibraryDraw } from '../materials/room-finish.js';
+import { BUILTIN_DEFAULT_CEILING } from '../materials/builtin-library.js';
+import { firstFrameColour } from '../materials/library-material.js';
+import { DEFAULT_FLOOR_FINISH } from '../materials/finish-catalogue.js';
+import { FINISH } from '../materials/finish-ids.js';
+
+/** The finish every ceiling of a room that names none wears (the bank's white plaster). */
+const DEFAULT_CEILING_FINISH = FINISH.plaster_white;
 
 /** Default tile size of a wall finish in metres. */
 const WALL_TILE = 0.6;
@@ -59,6 +66,12 @@ export class ShellPaint {
   private readonly trimMaterials = new Map<string, THREE.MeshStandardMaterial>();
   /** Every library-dressed material this paint made, with the surface that owns its maps. */
   private readonly librarySurfaces = new Map<THREE.Material, LibrarySurface>();
+  /**
+   * The one library material every ceiling of a room that names none wears,
+   * made on first ask; `null` until then, and when the default ceiling keeps
+   * the builder's flat plaster.
+   */
+  private defaultCeiling: THREE.MeshStandardMaterial | null = null;
   /** The map loads still in flight (`mapsSettled`). */
   private readonly loads = new Set<Promise<void>>();
   /**
@@ -98,12 +111,17 @@ export class ShellPaint {
     return material;
   }
 
-  /** A library surface's material, flat at once, its maps asked for when the document has a texture source. */
+  /**
+   * A library surface's material, flat at once, its maps asked for when there
+   * is a source for them: the player's own for a bundled finish, the
+   * document's for a project material.
+   */
   private libraryMaterial(draw: LibraryDraw, surface: FinishSurface, outline: readonly Vec2[]): THREE.MeshStandardMaterial {
     const library = new LibrarySurface(draw, surface, outline);
     this.librarySurfaces.set(library.material, library);
-    if (this.ctx.textures !== null) {
-      const load = library.load(this.ctx.textures);
+    const textures = draw.builtin === true ? this.ctx.builtinTextures : this.ctx.textures;
+    if (textures !== null) {
+      const load = library.load(textures);
       const settle = (): void => void this.loads.delete(load);
       this.loads.add(load);
       void load.then(settle, settle);
@@ -124,9 +142,10 @@ export class ShellPaint {
   floorMaterialForRoom(roomId: string, outline: readonly Vec2[]): THREE.MeshStandardMaterial | null {
     const ref = floorFinishRefOf(this.ctx.scene, roomId);
     const resolved = ref === null ? null : this.ctx.resolve(ref);
-    if (resolved?.kind === 'library') return this.libraryMaterial(resolved.draw, 'floor', outline);
-    const finish = resolved?.finish ?? this.ctx.findFinish('oak');
-    return finish === null ? null : this.floorMaterialFor(finish);
+    // A room whose floor resolves nowhere wears the default floor, through the same path.
+    const drawn = resolved ?? this.ctx.resolve(DEFAULT_FLOOR_FINISH);
+    if (drawn?.kind === 'library') return this.libraryMaterial(drawn.draw, 'floor', outline);
+    return drawn === null ? null : this.floorMaterialFor(drawn.finish);
   }
 
   /**
@@ -164,8 +183,9 @@ export class ShellPaint {
    */
   releaseLibrary(): Set<THREE.Material> {
     const released = new Set(this.librarySurfaces.keys());
-    for (const library of this.librarySurfaces.values()) library.release(this.ctx.textures);
+    for (const library of this.librarySurfaces.values()) library.release();
     this.librarySurfaces.clear();
+    this.defaultCeiling = null;
     return released;
   }
 
@@ -219,7 +239,18 @@ export class ShellPaint {
     // A legacy material owns the map clone it wears; a library surface's
     // maps are the texture source's and never pass through here.
     if (!this.librarySurfaces.has(material)) material.map?.dispose();
-    applyFinishToMaterial(material, finish, repeat, repeat);
+    const resolved = this.ctx.resolve(finish.id);
+    if (resolved?.kind !== 'library') {
+      applyFinishToMaterial(material, finish, repeat, repeat);
+      return;
+    }
+    // A library finish painted into a material the builder owns (the
+    // junction cores): flat in its first-frame colour, never a generated map.
+    material.map = null;
+    material.bumpMap = null;
+    material.color.copy(firstFrameColour(resolved.draw));
+    material.roughness = resolved.draw.material.facts.pbr.roughness ?? 1;
+    material.needsUpdate = true;
   }
 
   // ----------------------------------------------------------- lifecycle ----
@@ -351,7 +382,30 @@ export class ShellPaint {
 
   /** Hands a built ceiling over, so a later paint can find it; `fallback` is the shared plaster. */
   registerCeiling(roomId: string, mesh: THREE.Mesh, fallback: THREE.Material): void {
-    this.ceilingMeshes.set(roomId, { meshes: [mesh], fallback });
+    // The builder hands its own flat plaster; a library default replaces it,
+    // on the mesh and as what a cleared ceiling returns to.
+    const shared = this.defaultCeilingMaterial() ?? fallback;
+    if (mesh.material === fallback) mesh.material = shared;
+    this.ceilingMeshes.set(roomId, { meshes: [mesh], fallback: shared });
+  }
+
+  /**
+   * The default ceiling as a library material: the project's own library
+   * material under the default ceiling id when it ships one, else the bundled
+   * default; `null` when neither is a library material (the builder's flat
+   * plaster stays).
+   */
+  private defaultCeilingMaterial(): THREE.MeshStandardMaterial | null {
+    if (this.defaultCeiling !== null) return this.defaultCeiling;
+    const own = this.ctx.resolve(DEFAULT_CEILING_FINISH);
+    let draw: LibraryDraw | null = own?.kind === 'library' ? own.draw : null;
+    if (draw === null && BUILTIN_DEFAULT_CEILING !== null) {
+      const { material, colour, rotation } = BUILTIN_DEFAULT_CEILING;
+      draw = { id: DEFAULT_CEILING_FINISH, material, ...(colour !== undefined && { colour }), rotation, builtin: true };
+    }
+    if (draw === null) return null;
+    this.defaultCeiling = this.libraryMaterial(draw, 'ceiling', []);
+    return this.defaultCeiling;
   }
 
   /** Hands a built baseboard over, so a later paint can find it; `fallback` is the shared default trim. */
@@ -410,7 +464,7 @@ export class ShellPaint {
     const library = this.librarySurfaces.get(material);
     if (library !== undefined) {
       this.librarySurfaces.delete(material);
-      library.release(this.ctx.textures);
+      library.release();
       return;
     }
     (material as THREE.MeshStandardMaterial).map?.dispose();

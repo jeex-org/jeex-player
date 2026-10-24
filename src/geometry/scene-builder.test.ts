@@ -9,6 +9,8 @@
  */
 
 import { CATALOGUE_REGISTRIES } from '../assets/catalogue-registries.js';
+import { BUILTIN_DEFAULT_CEILING } from '../materials/builtin-library.js';
+import { firstFrameColour } from '../materials/library-material.js';
 import { describe, expect, spyOn, test } from 'bun:test';
 import { draftOf, type Draft } from '../shared/committed.js';
 import * as THREE from 'three';
@@ -36,7 +38,6 @@ import {
 import { bayPlan, lShapePlan } from '../fixtures/plan-l-shape.js';
 import { BAY, L_SHAPE } from '../fixtures/plan-l-shape-ids.js';
 import { FINISH } from '../materials/finish-ids.js';
-import { resolveFinish } from '../materials/material-catalogue.js';
 import { ARCHETYPE, OPENING_VARIANT, VARIANT } from '../assets/catalogue-ids.js';
 import { ARC_TOL, arcFromChord } from '../plan/plan-geometry.js';
 import { FaceMap, faceKey, type FaceKey, type SceneData } from '../scene/types.js';
@@ -297,14 +298,20 @@ describe('floors, ceilings and skirting', () => {
     expect(objectNamed(loggia.root, `ceiling-${L_SHAPE.room.b}`)).toBeNull();
   });
 
-  test('ceilings wear the catalogue white plaster', () => {
+  test('ceilings wear the default ceiling library material, flat in its first-frame colour', () => {
     const { root } = build(lShapePlan);
-    const plaster = resolveFinish(FINISH.plaster_white);
-    expect(plaster).not.toBeNull();
     const ceiling = objectNamed(root, `ceiling-${ROOM.a}`) as THREE.Mesh;
     const material = ceiling.material as THREE.MeshStandardMaterial;
-    expect(material.color.getHex()).toBe(new THREE.Color(plaster!.color).getHex());
-    expect(material.roughness).toBe(plaster!.roughness);
+    const binding = BUILTIN_DEFAULT_CEILING!;
+    const draw = {
+      id: FINISH.plaster_white,
+      material: binding.material,
+      rotation: binding.rotation,
+      ...(binding.colour !== undefined && { colour: binding.colour }),
+    };
+    expect(material.name).toBe(FINISH.plaster_white);
+    expect(material.color.getHex()).toBe(firstFrameColour(draw).getHex());
+    expect(material.roughness).toBe(binding.material.facts.pbr.roughness ?? 1);
   });
 
   test('skirting boards carry metre UVs: their u runs as far as the board does', () => {

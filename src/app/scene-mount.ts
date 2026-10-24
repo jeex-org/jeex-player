@@ -44,6 +44,8 @@ import { prepareSunShadow, type SunShadow } from '../render/sun-shadow.js';
 import type { ApartmentRig } from '../lighting/lighting-context.js';
 import type { LibraryTextures } from '../geometry/library-surface.js';
 import { createProjectTextures, type TextureEnv } from './project-textures.js';
+import { createBuiltinTextures } from './builtin-textures.js';
+import { builtinFolder } from '../materials/builtin-folder.js';
 import { lightBakeWiring, type LightBakeWiring } from '../lightmap/light-bake-wiring.js';
 import { debugLightBake } from '../shared/debug-flags.js';
 import { defaultLogger, type Logger } from '../shared/logger.js';
@@ -103,6 +105,8 @@ type SceneMountDeps = {
    * texture is fetched at all.
    */
   textureEnv?: (() => TextureEnv | null) | undefined;
+  /** The folder the bundled finishes' maps are fetched from; next to the player file when absent (tests set it). */
+  builtinFolder?: string | undefined;
   /**
    * Puts the current colour temperature on the artificial lights of a root,
    * or of what changed under it: called with every new root and after every
@@ -156,6 +160,8 @@ export class SceneMount {
   private upgradePass: Promise<void> = Promise.resolve();
   /** The mounted project's texture source, with the library key it belongs to. */
   private textures: { readonly key: string; readonly textures: LibraryTextures } | null = null;
+  /** The bundled finishes' source: one per viewer, made on the first mount with a context, ended by `dispose`. */
+  private builtin: LibraryTextures | null = null;
   /** The arguments of the last `mount`, for `remount`. */
   private last: MountArgs | null = null;
   /**
@@ -267,7 +273,12 @@ export class SceneMount {
     // The viewer's KTX2 transcoder (one per viewer: started by the first KTX2 asset, kept across a
     // context restore and a retry, ended with the viewer), so a `KHR_texture_basisu` GLB can load.
     const ktx2 = this.deps.textureEnv?.()?.ktx2;
-    const builder = new SceneBuilder(model.scene, model.plan, ktx2 === undefined ? options : { ...options, ktx2 });
+    const builtinTextures = this.builtinTextures();
+    const builder = new SceneBuilder(model.scene, model.plan, {
+      ...options,
+      ...(ktx2 !== undefined && { ktx2 }),
+      ...(builtinTextures !== null && { builtinTextures }),
+    });
     this.currentBuilder = builder;
     const built = builder.build();
     this.adopt(built);
@@ -323,6 +334,7 @@ export class SceneMount {
     );
     this.deps.onDocument(model);
     this.scheduleTextures(options.textures);
+    this.scheduleTextures(builtinTextures ?? undefined);
     this.scheduleUpgrade(builder, model);
     // Settled once the first model pass has swapped in every body (with its
     // lamps) and every library map of the shell has attached.
@@ -365,6 +377,25 @@ export class SceneMount {
     if (this.textures !== null && this.textures.key === project.key) return this.textures.textures;
     const env = this.deps.textureEnv?.() ?? null;
     return env === null ? null : { ...createProjectTextures(project.info.baseUrl, env), attached: () => this.invalidate() };
+  }
+
+  /** The viewer's source for the bundled finishes, made on first ask; `null` without a context. */
+  private builtinTextures(): LibraryTextures | null {
+    if (this.builtin !== null) return this.builtin;
+    const env = this.deps.textureEnv?.() ?? null;
+    if (env === null) return null;
+    this.builtin = { ...createBuiltinTextures(env, this.deps.builtinFolder ?? builtinFolder()), attached: () => this.invalidate() };
+    return this.builtin;
+  }
+
+  /**
+   * Releases the document and ends the bundled finishes' source: the viewer
+   * is going away, or booting again (a Retry), which makes a fresh one.
+   */
+  dispose(): void {
+    this.release();
+    this.builtin?.source.dispose();
+    this.builtin = null;
   }
 
   /** Something on screen changed: walk and tour draw the next tick (`render/render-demand.ts`). */

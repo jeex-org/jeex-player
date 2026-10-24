@@ -34,6 +34,7 @@
  */
 
 import { FLOOR_FINISHES, WALL_FINISHES, finishSwatchDataURL, type Finish } from '../materials/finishes.js';
+import { builtinSwatchFor } from '../materials/builtin-folder.js';
 import { activeVariantFor, variantsForPlacement, type AssetVariant, type VariantBank } from '../assets/asset-variants.js';
 import type { VariantAccess } from '../assets/asset-types.js';
 import { findCatalogueEntry } from '../assets/asset-catalogue.js';
@@ -169,10 +170,11 @@ export type SelectionOptionCore = {
   readonly label: string;
   /**
    * Picture the CONTENT declares, already an absolute URL: a catalogue's public
-   * preview or a file of the bake's folder. It BEATS `thumbnail`, because it
-   * is the finished photograph of the variant while the render is a stand-in
-   * of whatever geometry has arrived so far. Absent for every swatch the
-   * viewer's own catalogues answer.
+   * preview, a file of the bake's folder, or the shipped albedo of a bundled
+   * finish that draws a natural scan (`finish-maps/` next to the player). It
+   * BEATS `thumbnail`, because it is the finished photograph of the variant
+   * while the render is a stand-in of whatever geometry has arrived so far.
+   * Like any URL it may fail to load; the panel then shows the flat chip.
    */
   readonly image?: string | undefined;
   readonly thumbnail: string | null;
@@ -445,14 +447,16 @@ function surfaceWordOf(target: FinishTarget): FinishSurface {
   return isFacadeTarget(target) ? 'facade' : 'wall';
 }
 
-/** One finish as a core swatch: the canvas chip, the flat colour, and its op. */
+/** One bundled finish as a core swatch: the shipped picture or flat chip of a bound one, else the canvas chip; its op. */
 function finishOptionCore(finish: Finish, op: SceneOp): SelectionOptionCore {
+  const builtin = builtinSwatchFor(finish.id);
   return {
     id: finish.id,
     label: finish.name,
-    thumbnail: finishSwatchDataURL(finish, 72),
+    ...builtin,
+    thumbnail: builtin === null ? finishSwatchDataURL(finish, 72) : null,
     background: finish.base,
-    palette: finish.accent ? [finish.base, finish.accent] : [finish.base],
+    palette: builtin === null && finish.accent ? [finish.base, finish.accent] : [finish.base],
     op,
   };
 }
@@ -489,7 +493,10 @@ export function finishCore(scene: SceneData, target: FinishTarget, messages: Mes
         const action = finishPickAction(target, material.id, false, material);
         return action ? [libraryOptionCore(material, action.op, bank)] : [];
       }),
+      // A bundled finish the project replaces is offered once, as the project's.
       ...finishes.flatMap((finish) => {
+        const surface = surfaceWordOf(target);
+        if (bank?.materials?.some((m) => m.id === finish.id && 'library' in m && m.apply.includes(surface)) === true) return [];
         const action = finishPickAction(target, finish.id, false);
         return action ? [finishOptionCore(finish, action.op)] : [];
       }),
