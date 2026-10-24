@@ -67,6 +67,18 @@ describe('measureSkyIrradiance', () => {
     expect(half.horizontal).toBeCloseTo(full.horizontal, 6);
   });
 
+  test('half-float infinity and NaN bits read as an infinite and a NaN measurement', () => {
+    for (const [bits, check] of [
+      [0x7c00, (value: number) => value === Number.POSITIVE_INFINITY],
+      [0x7e00, (value: number) => Number.isNaN(value)],
+    ] as const) {
+      const data = new Uint16Array(64 * 32 * 4);
+      for (let k = 0; k < data.length / 2; k += 4) data.fill(bits, k, k + 3);
+      const { horizontal } = measureSkyIrradiance({ data, width: 64, height: 32, sun: panoramaSunDirection(0, 45), coneDeg: 6 });
+      expect(check(horizontal)).toBe(true);
+    }
+  });
+
   test('weights the channels by Rec. 709 luminance', () => {
     const data = uniformSky(256, 128, 0);
     for (let k = 0; k < data.length / 2; k += 4) data[k] = 1;
