@@ -63,6 +63,13 @@ async function centreLuminance(blob: Blob, size = 8): Promise<number> {
   return sum / (data.length / 4);
 }
 
+/** The renderer string of `renderer`'s context, for the record. */
+function debugRenderer(renderer: THREE.WebGLRenderer): string {
+  const gl = renderer.getContext();
+  const info = gl.getExtension('WEBGL_debug_renderer_info');
+  return String(gl.getParameter(info ? info.UNMASKED_RENDERER_WEBGL : gl.RENDERER));
+}
+
 /** The lighting's own refresh, taken before any test wraps it. */
 const REFRESH = original(WalkLighting.prototype, 'refresh');
 
@@ -396,6 +403,34 @@ describe('room lighting on the demo apartment', { timeout: MOUNT_TIMEOUT_MS }, (
     lighting.renderer.toneMappingExposure = exposure;
     expect(wc / living).toBeLessThanOrEqual(0.35);
     expect(wc).toBeGreaterThan(0);
+  });
+
+  test("a probe captured in the WC, where the hall cabinet's bump-mapped oak meets a cube face edge, holds no NaN", () => {
+    // The WC's probe point: from it the hall shoe cabinet (natural oak, a bump map) lies on the edge column of the
+    // cube's +Z face, where the software rasteriser's screen derivatives vanish; three's bump perturbation then
+    // normalised a zero vector, and the one NaN texel spread through the prefilter over the whole probe.
+    const point = new THREE.Vector3(7.5, 1.5, 1.0804411764705883);
+    const rig = lighting.rig as unknown as { setState(state: string): void; state: string };
+    const state = rig.state;
+    rig.setState('capture');
+    for (const grid of lighting.grids) grid.visible = true;
+    lighting.exterior.visible = true;
+    const pmrem = new THREE.PMREMGenerator(lighting.renderer);
+    let nan = 0;
+    try {
+      const target = pmrem.fromScene(lighting.scene, 0, 0.05, 100, { size: T.probeSize, position: point });
+      const buffer = new Uint16Array(target.width * target.height * 4);
+      lighting.renderer.readRenderTargetPixels(target, 0, 0, target.width, target.height, buffer);
+      for (const value of buffer) if (Number.isNaN(THREE.DataUtils.fromHalfFloat(value))) nan += 1;
+      target.dispose();
+    } finally {
+      pmrem.dispose();
+      for (const grid of lighting.grids) grid.visible = false;
+      lighting.exterior.visible = false;
+      rig.setState(state);
+    }
+    record('wcProbeNaN', { renderer: debugRenderer(lighting.renderer), nan });
+    expect(nan).toBe(0);
   });
 
   test('no double counting: doubling the environment changes a rough grey patch by less than 4 %', async () => {
