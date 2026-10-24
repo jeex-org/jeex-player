@@ -38,6 +38,8 @@ import { BaseSequencer, type TestSpecification } from 'vitest/node';
 export const COMPONENT_FILE_COST_S: Readonly<Record<string, number>> = {
   'asset-mirror.test.ts': 10,
   'asset-move.test.ts': 137,
+  'baked-surface-walk.test.ts': 80,
+  'baked-surface.test.ts': 10,
   'camera-preview.test.ts': 1,
   'capture-commands.test.ts': 68,
   'door-hud.test.ts': 1,

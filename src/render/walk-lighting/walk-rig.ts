@@ -20,9 +20,10 @@ import * as THREE from 'three';
 import { setUniformState, type UniformState, type WalkUniforms } from './box-probe-patch.js';
 import { WALK_LIGHTING_TUNING as T } from './walk-lighting-tuning.js';
 import { tagArtificialLight } from '../../assets/artificial-light.js';
+import { APARTMENT_FILL_LIGHT_NAME } from '../../lighting/lighting-context.js';
 
 /** The apartment rig's lights that ignore walls, by the names the lighting context gives them. */
-const WALL_BLIND_LIGHTS = ['jeex-lighting-sky', 'jeex-lighting-fill'] as const;
+const WALL_BLIND_LIGHTS = ['jeex-lighting-sky', APARTMENT_FILL_LIGHT_NAME] as const;
 
 export type WalkRigDeps = {
   scene: THREE.Scene;

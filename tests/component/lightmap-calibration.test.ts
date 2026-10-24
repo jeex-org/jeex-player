@@ -21,6 +21,7 @@
 
 import * as THREE from 'three';
 import { afterEach, describe, expect, test } from 'vitest';
+import { createLightingContext } from '../../src/lighting/lighting-context.js';
 import { rgbmDecode } from '../../src/lightmap/rgbm.js';
 import { CALIBRATION_LAMP, CALIBRATION_ROOM, GOLDEN_LEVELS } from '../fixtures/lightmap-calibration/calibration-facts.js';
 import {
@@ -330,7 +331,49 @@ describe('lightmap calibration', () => {
     calibration.loaded.dispose();
   });
 
-  test.todo(
-    'full rig: with the player lighting rig and the baked-surface marks nothing the bake carries is added again (waits for the lighting to read the marks)',
-  );
+  test('full rig: with the player lighting rig and the baked-surface marks nothing the bake carries is added again', async () => {
+    // The bake's lamp is in the room and marked baked by the binding.
+    const lamp = new THREE.PointLight(0xffffff, 40, 0, 2);
+    const calibration = await boundCalibration({
+      zeroSpecular: true,
+      beforeBind: (shell) => {
+        const placement = new THREE.Group();
+        placement.userData['assetId'] = CALIBRATION_LAMP.id;
+        lamp.position.set(...CALIBRATION_LAMP.position);
+        placement.add(lamp);
+        shell.add(placement);
+      },
+    });
+    expect(lamp.userData['jeexBaked']).toBe(true);
+    const lighting = createLightingContext(THREE, calibration.gl);
+    const rig = lighting.createApartmentRig();
+    rig.attach(calibration.scene);
+    const sun = calibration.scene.getObjectByName('jeex-lighting-sun') as THREE.DirectionalLight;
+    const full = renderFloor(calibration, true);
+    // The reference: the rig's sun alone, everything the bake carries switched off.
+    const environment = calibration.scene.environment;
+    calibration.scene.environment = null;
+    const others: [THREE.Light, number][] = [];
+    calibration.scene.traverse((object) => {
+      const light = object as THREE.Light;
+      if (light.isLight && light !== sun) {
+        others.push([light, light.intensity]);
+        light.intensity = 0;
+      }
+    });
+    const sunOnly = renderFloor(calibration, true);
+    calibration.scene.environment = environment;
+    for (const [light, intensity] of others) light.intensity = intensity;
+    let worst = 0;
+    let peakValue = 0;
+    for (let i = 0; i < full.length; i += 4) {
+      for (let c = 0; c < 3; c++) worst = Math.max(worst, Math.abs(full[i + c]! - sunOnly[i + c]!));
+      peakValue = Math.max(peakValue, peak(sunOnly, i / 4));
+    }
+    console.info(`lightmap calibration: full rig against its sun alone, worst ${worst.toExponential(2)} of peak ${peakValue.toFixed(4)}`);
+    expect(peakValue).toBeGreaterThan(0.05);
+    expect(worst).toBeLessThan(2e-3 * Math.max(1, peakValue));
+    lighting.dispose();
+    calibration.loaded.dispose();
+  });
 });

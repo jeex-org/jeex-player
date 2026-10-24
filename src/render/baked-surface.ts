@@ -4,56 +4,99 @@
  * onto a material.
  *
  * A baked surface is a shell material whose diffuse indirect light, and the
- * direct light of every baked lamp, come from its lightmap. The lighting reads
- * the marks to keep only what the bake left out on such a surface (the live
- * direct sun, specular reflections and live lamps) and to skip the live
- * diffuse of a baked lamp there; a lamp left unmarked counts as live.
+ * diffuse light of every baked lamp, come from its lightmap. On it the
+ * lighting keeps only what the bake left out: the direct sun with its
+ * shadows, specular reflections and live lamps (`render/baked-surface-glsl.ts`
+ * says what changes in the shader). A lamp left unmarked counts as live.
  *
- * `addShaderTransform` is the one way code outside the lighting changes a
- * material's shader: each transform is named by an id and a version, which
- * together enter the material's program key. Here it composes by plain
- * chaining (the previous hook runs first, the previous key is kept); the
- * lighting's half of the seam replaces it with a composer that applies the
- * transforms in its fixed order over chunks it expands once.
+ * Masks: which drawn light is baked is resolved per render and camera by
+ * `render/light-order.ts`, in the material's draw hook, into uniforms every
+ * baked material shares. A capture, or a render nested in another one, has
+ * another camera and so its own masks; on return the outer camera differs
+ * again and its masks are recomputed. Marking a lamp changes only these
+ * values, never a program.
  *
- * Today the marks are plain flags in `userData` and nothing reads them yet.
+ * A copy of a baked material (its compile hooks assigned from the source)
+ * keeps the transforms but not the draw hook: its maker marks it baked again,
+ * and marking completes what is missing even though the copied flag already
+ * says baked.
  */
 
 import type * as THREE from 'three';
+import { bakeFragmentShader } from './baked-surface-glsl.js';
+import { lightMasks, LAMP_BAKED_KEY } from './light-order.js';
+import { addShaderTransform, BAKED_TRANSFORM_ID, hasShaderTransform } from './shader-compose.js';
 
-/** A shader transform: rewrites the program parameters three hands to `onBeforeCompile`. */
-export type ShaderTransform = (shader: THREE.WebGLProgramParametersWithUniforms) => void;
+export { addShaderTransform, type ShaderTransform } from './shader-compose.js';
 
-/** Marks a material whose diffuse light comes from a light bake. */
+/** The material `userData` key a baked surface is marked by. */
+const SURFACE_KEY = 'jeexBakedSurface';
+/** The baked transform's version: changes with its shader text. */
+const BAKED_VERSION = 1;
+
+/** The mask uniforms every baked material shares, resized to three's light counts per render. */
+const MASKS = {
+  jeexPointDiffuse: { value: [] as number[] },
+  jeexSpotDiffuse: { value: [] as number[] },
+  jeexDirDirect: { value: [] as number[] },
+};
+
+/** The (render, scene, camera) the masks were last computed for, by id: no reference keeps a released scene alive. */
+const computed = { frame: -1, scene: -1, camera: -1 };
+
+function updateMasks(renderer: THREE.WebGLRenderer, scene: THREE.Object3D, camera: THREE.Camera): void {
+  const frame = renderer.info.render.frame;
+  if (computed.frame === frame && computed.scene === scene.id && computed.camera === camera.id) return;
+  Object.assign(computed, { frame, scene: scene.id, camera: camera.id });
+  const masks = lightMasks(scene, camera);
+  MASKS.jeexPointDiffuse.value = masks.point;
+  MASKS.jeexSpotDiffuse.value = masks.spot;
+  MASKS.jeexDirDirect.value = masks.directional;
+}
+
+/** Materials whose draw hook this module installed: the runtime state idempotence checks, not the copyable flag. */
+const DRAW_HOOKED = new WeakSet<THREE.Material>();
+
+type DrawHook = (
+  this: THREE.Material,
+  renderer: THREE.WebGLRenderer,
+  scene: THREE.Scene,
+  camera: THREE.Camera,
+  geometry: THREE.BufferGeometry,
+  object: THREE.Object3D,
+  group: THREE.Group,
+) => void;
+
+function installDrawHook(material: THREE.Material): void {
+  // The hook as the function-valued property it is (three declares it as a method).
+  const hooks = material as unknown as { onBeforeRender: DrawHook };
+  const previous = hooks.onBeforeRender;
+  hooks.onBeforeRender = function bakedSurfaceMasks(renderer, scene, camera, geometry, object, group) {
+    updateMasks(renderer, scene, camera);
+    previous.call(this, renderer, scene, camera, geometry, object, group);
+  };
+  DRAW_HOOKED.add(material);
+}
+
+/** Marks a material whose diffuse light comes from a light bake. Idempotent. */
 export function markBakedSurface(material: THREE.MeshStandardMaterial): void {
-  material.userData['jeexBakedSurface'] = true;
+  material.userData[SURFACE_KEY] = true;
+  if (!hasShaderTransform(material, BAKED_TRANSFORM_ID, BAKED_VERSION)) {
+    addShaderTransform(material, BAKED_TRANSFORM_ID, BAKED_VERSION, (shader) => {
+      Object.assign(shader.uniforms, MASKS);
+      shader.fragmentShader = bakeFragmentShader(shader.fragmentShader);
+    });
+  }
+  if (!DRAW_HOOKED.has(material)) installDrawHook(material);
 }
 
 /** Whether a material is marked as a baked surface. */
 export function isBakedSurface(material: THREE.Material): boolean {
-  return material.userData['jeexBakedSurface'] === true;
+  return material.userData[SURFACE_KEY] === true;
 }
 
-/** Marks a lamp as baked (its light is in the bake) or live. */
+/** Marks a lamp as baked (its light is in the bake) or live; live removes the mark, so an unbound lamp is exactly as before. */
 export function setLampBaked(light: THREE.PointLight | THREE.SpotLight, baked: boolean): void {
-  light.userData['jeexBaked'] = baked;
-}
-
-/**
- * Adds `transform` to `material`'s shader, after every transform and hook it
- * already has (each still called with the material as `this`), and
- * `id@version` to its program key. Marks the material for recompiling.
- */
-export function addShaderTransform(material: THREE.Material, id: string, version: number, transform: ShaderTransform): void {
-  // A key never assigned is three's default, which reads the hook in place at call time: capture it now.
-  const defaultKey = !Object.hasOwn(material, 'customProgramCacheKey');
-  const previousIdentity = defaultKey ? material.onBeforeCompile.toString() : '';
-  const previousHook = material.onBeforeCompile.bind(material);
-  const previousKey = material.customProgramCacheKey.bind(material);
-  material.onBeforeCompile = (shader, renderer) => {
-    previousHook(shader, renderer);
-    transform(shader);
-  };
-  material.customProgramCacheKey = () => `${defaultKey ? previousIdentity : previousKey()}|${id}@${String(version)}`;
-  material.needsUpdate = true;
+  if (baked) light.userData[LAMP_BAKED_KEY] = true;
+  else delete light.userData[LAMP_BAKED_KEY];
 }
