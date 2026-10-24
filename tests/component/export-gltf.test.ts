@@ -130,6 +130,47 @@ describe('exportGlb', () => {
     }
   });
 
+  test('a wall-face row carries no id: its id cells are null, and every wall mesh resolves to the face row with its address', async () => {
+    const json = await readGlbJson(await exportGlb(fakeDeps()));
+    const table = (
+      (json['extensions'] as Record<string, unknown>)['EXT_structural_metadata'] as {
+        propertyTables: Array<{ count: number; properties: Record<string, Array<string | null>> }>;
+      }
+    ).propertyTables[0]!;
+    const cell = (key: string, index: number): string | null => table.properties[key]![index] ?? null;
+    let faceRows = 0;
+    for (let index = 0; index < table.count; index += 1) {
+      if (cell('class', index) === 'wallFace') {
+        faceRows += 1;
+        expect([cell('guid', index), cell('ifcGuid', index), cell('id', index)]).toEqual([null, null, null]);
+        expect(cell('wallId', index)).toBeTruthy();
+        expect(cell('side', index)).toMatch(/^[LR]$/);
+      } else {
+        expect(cell('guid', index)).toBe(cell('id', index));
+        expect(cell('id', index)).toBeTruthy();
+      }
+    }
+    expect(faceRows).toBe(solvePlan(lShapePlan).faces.size);
+
+    type FaceExtras = { surface?: string; face?: { room?: string; wallId: string; side: string } };
+    const nodes =
+      (json['nodes'] as Array<{ extras?: FaceExtras; extensions?: { EXT_mesh_features?: { featureIds: Array<{ constant: number }> } } }>) ??
+      [];
+    const wallNodes = nodes.filter((node) => node.extras?.surface === 'wall');
+    expect(wallNodes.length).toBe(faceRows);
+    for (const node of wallNodes) {
+      expect(node.extensions?.EXT_mesh_features).toBeTruthy();
+      const index = node.extensions!.EXT_mesh_features!.featureIds[0]!.constant;
+      const face = node.extras!.face!;
+      expect([cell('class', index), cell('wallId', index), cell('side', index), cell('roomId', index)]).toEqual([
+        'wallFace',
+        face.wallId,
+        face.side,
+        face.room ?? null,
+      ]);
+    }
+  });
+
   test('no material carries the light bake facts of an opening part in its extras', async () => {
     const json = await readGlbJson(await exportGlb(fakeDeps()));
     const materials = (json['materials'] as Array<{ name?: string; extras?: Record<string, unknown> }> | undefined) ?? [];

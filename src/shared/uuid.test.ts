@@ -1,8 +1,8 @@
 import { describe, expect, test } from 'bun:test';
-import { UUID_NAMESPACE_DNS, UUID_NAMESPACE_URL, ifcGuid, uuidV5 } from './uuid.js';
+import { ifcGuid } from './uuid.js';
 
 /**
- * RFC 4122 §4.3 vectors, and the IFC compression round-trip.
+ * The IFC compression: known values, the alphabet, and the round-trip.
  *
  * The parser below lives in the TEST on purpose: nothing in the viewer reads
  * an IFC GUID back, and an exported inverse nobody calls is a dead export. It
@@ -28,39 +28,13 @@ function parseIfcGuid(guid: string): string {
   return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-${hex.slice(12, 16)}-${hex.slice(16, 20)}-${hex.slice(20)}`;
 }
 
-describe('uuidV5', () => {
-  test("the RFC's DNS vector", () => {
-    expect(uuidV5(UUID_NAMESPACE_DNS, 'python.org')).toBe('886313e1-3b8a-5372-9b90-0c9aee199e5d');
-  });
-
-  test('a URL-namespace vector', () => {
-    expect(uuidV5(UUID_NAMESPACE_URL, 'https://example.com')).toBe('4fd35a71-71ef-5a55-a9d9-aa75c889a6d0');
-  });
-
-  test('stamps version 5 and the RFC 4122 variant', () => {
-    const uuid = uuidV5(UUID_NAMESPACE_URL, 'anything at all');
-    expect(uuid).toMatch(/^[0-9a-f]{8}-[0-9a-f]{4}-5[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/);
-  });
-
-  test('is a function of the namespace as well as the name', () => {
-    expect(uuidV5(UUID_NAMESPACE_DNS, 'python.org')).not.toBe(uuidV5(UUID_NAMESPACE_URL, 'python.org'));
-  });
-
-  test('reads a namespace in any case and with braces', () => {
-    const plain = uuidV5(UUID_NAMESPACE_DNS, 'python.org');
-    expect(uuidV5(UUID_NAMESPACE_DNS.toUpperCase(), 'python.org')).toBe(plain);
-    expect(uuidV5(`{${UUID_NAMESPACE_DNS}}`, 'python.org')).toBe(plain);
-  });
-
-  test('refuses a namespace that is not a UUID', () => {
-    expect(() => uuidV5('not-a-uuid', 'x')).toThrow(/namespace/);
-  });
-
-  test('hashes the name as UTF-8, so a non-Latin name is stable', () => {
-    expect(uuidV5(UUID_NAMESPACE_URL, 'спальня')).toMatch(/^[0-9a-f]{8}-/);
-    expect(uuidV5(UUID_NAMESPACE_URL, 'спальня')).toBe(uuidV5(UUID_NAMESPACE_URL, 'спальня'));
-  });
-});
+/** Fixed inputs: UUIDs of every version an entity id or a test may hold, generated once offline. */
+const SAMPLES = [
+  '01a12ff3-14aa-79aa-b152-d6353331ad55',
+  '01a12ff3-14ab-7bed-8487-b57fffc0fb81',
+  'c09c1625-705f-534e-8af2-608f3a350d16',
+  'ffffffff-ffff-ffff-ffff-ffffffffffff',
+];
 
 describe('ifcGuid', () => {
   test('the zero UUID is twenty-two zeros', () => {
@@ -68,21 +42,25 @@ describe('ifcGuid', () => {
   });
 
   test('is always twenty-two characters of the IFC alphabet', () => {
-    for (const name of ['a', 'wall/1', 'спальня', 'x'.repeat(200)]) {
-      const guid = ifcGuid(uuidV5(UUID_NAMESPACE_URL, name));
-      expect({ name, length: guid.length }).toEqual({ name, length: 22 });
+    for (const uuid of SAMPLES) {
+      const guid = ifcGuid(uuid);
+      expect({ uuid, length: guid.length }).toEqual({ uuid, length: 22 });
       expect(guid).toMatch(/^[0-9A-Za-z_$]{22}$/);
     }
   });
 
+  test('a known value: the compression is the published IFC one', () => {
+    expect(ifcGuid('c09c1625-705f-534e-8af2-608f3a350d16')).toBe('30d1ObS5zJJehoO8ywDGqM');
+    expect(ifcGuid('ffffffff-ffff-ffff-ffff-ffffffffffff')).toBe('3$$$$$$$$$$$$$$$$$$$$$');
+  });
+
   test('round-trips: the compression loses nothing', () => {
-    const uuid = uuidV5(UUID_NAMESPACE_URL, 'https://example.com');
-    expect(parseIfcGuid(ifcGuid(uuid))).toBe(uuid);
+    for (const uuid of SAMPLES) expect(parseIfcGuid(ifcGuid(uuid))).toBe(uuid);
   });
 
   test('two different uuids give two different guids', () => {
-    const a = ifcGuid(uuidV5(UUID_NAMESPACE_URL, 'a'));
-    const b = ifcGuid(uuidV5(UUID_NAMESPACE_URL, 'b'));
+    const a = ifcGuid(SAMPLES[0]!);
+    const b = ifcGuid(SAMPLES[1]!);
     expect(a).not.toBe(b);
   });
 

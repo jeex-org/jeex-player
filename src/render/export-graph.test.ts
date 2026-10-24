@@ -106,8 +106,8 @@ describe('exportGraph', () => {
         const face = object.userData['face'] as FaceKey;
         const extensions = object.userData['gltfExtensions'] as { EXT_mesh_features: { featureIds: Array<{ constant: number }> } };
         const row = rows[extensions.EXT_mesh_features.featureIds[0]!.constant]!;
-        expect(row.class).toBe('wallFace');
-        expect(sameFace(faceKey(row.roomId ?? null, row.wallId!, row.side!), face)).toBe(true);
+        if (row.class !== 'wallFace') throw new Error(`a wall mesh points at a ${row.class} row`);
+        expect(sameFace(faceKey(row.roomId ?? null, row.wallId, row.side), face)).toBe(true);
       });
       expect(faces).toBe(plan.faces.size);
     } finally {
