@@ -22,6 +22,18 @@ A material marked as a baked surface SHALL receive no diffuse light from the amb
 - **WHEN** a scene without any baked surface is drawn before and after this change in each mode
 - **THEN** the frames are identical within the tolerance
 
+### Requirement: Reflections on a baked surface
+
+A baked surface SHALL keep every specular reflection a surface that is not baked gets: the environment's (with its multiple-scattering energy), the room probes' in walk and tour, and clearcoat.
+
+#### Scenario: Rough metal under the environment
+- **WHEN** a rough metal baked surface and the same surface unbaked, with an all-zero lightmap and no direct light, are read in an editing mode and in walk
+- **THEN** their pixels are equal within the tolerance
+
+#### Scenario: Room probe and clearcoat
+- **WHEN** a glossy clearcoated baked floor inside a room is read in walk after the bake
+- **THEN** its specular and clearcoat reflections equal those of the same floor unbaked within the tolerance
+
 ### Requirement: Direct light on a baked surface
 
 On a baked surface the sun's direct light and its shadows SHALL stay as on any other surface, and the fill light SHALL contribute nothing. The sun SHALL be recognised by its identity in the lighting rig, never by whether it casts shadows.
@@ -82,12 +94,16 @@ The lightmap's contribution on a baked surface SHALL be scaled by the same inter
 - **WHEN** a room probe is captured in walk
 - **THEN** the baked surface in the capture carries its unscaled lightmap
 
-### Requirement: No recompile on toggles
+### Requirement: No recompile once warmed up
 
-Marking a lamp baked or live, changing a lamp's intensity, switching between modes and capturing SHALL change no compiled program of a baked surface. Marking a material baked SHALL compile it once.
+Marking a material baked SHALL compile it once; the first entry into walk and the grid and probe bake MAY compile programs. Once that warm-up is done, the swap frame, later switches between modes, and marking a lamp baked or live or changing its intensity SHALL compile no new program while the number and kinds of lights stay the same.
 
-#### Scenario: Toggle a lamp
-- **WHEN** a lamp is switched between baked and live over several frames
+#### Scenario: Toggle a lamp after warm-up
+- **WHEN** after the walk bake has completed a lamp is switched between baked and live and its intensity changed over several frames, with no light added or removed
+- **THEN** the number of compiled programs stays constant
+
+#### Scenario: Mode switches after warm-up
+- **WHEN** after the walk bake has completed the viewer switches from walk to an editing mode and back
 - **THEN** the number of compiled programs stays constant
 
 ### Requirement: Shader rewrites compose
@@ -102,10 +118,22 @@ Every rewrite of a material's shader (the walk lighting, the baked policy, a lig
 - **WHEN** a marked material's clone copies its compile hook and gets a lightmap decode of its own
 - **THEN** the clone renders with the walk lighting, the baked policy and its decode, and the source without that decode
 
+### Requirement: Copies of a baked material
+
+A copy of a baked material SHALL be marked baked again by its maker; marking it SHALL complete what the copy lacks even though the copied flag already says baked.
+
+#### Scenario: Marked copy drawn alone
+- **WHEN** a baked material is cloned with its compile hooks and its flag, the clone is marked baked, and the clone is the only baked material drawn beside a baked and a live lamp
+- **THEN** the baked lamp adds no diffuse light to it and the live lamp does
+
 ### Requirement: Context restore
 
-After a lost and restored WebGL context, baked surfaces SHALL keep their policy and lamps their classification without any call from the host.
+After a lost and restored WebGL context, baked surfaces SHALL keep their policy and lamps their classification without any call from the host. Frames that depend on regenerated resources (the environment, the room grids and probes) SHALL match once those are restored and the walk bake has completed.
 
-#### Scenario: Restore
-- **WHEN** the context is lost and restored with a baked surface and a baked lamp in view
-- **THEN** the frame after the restore matches the frame before it within the tolerance
+#### Scenario: Policy survives at once
+- **WHEN** the context is lost and restored with a baked surface whose lightmap is CPU-backed, lit by the sun, a baked lamp and a live lamp
+- **THEN** the first frame after the restore matches the frame before it within the tolerance
+
+#### Scenario: Walk after restore
+- **WHEN** the context is lost and restored in walk with baked surfaces in view
+- **THEN** once the environment is regenerated and the walk bake has completed again, the frame matches the live walk frame before the loss within the tolerance
