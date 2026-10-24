@@ -34,26 +34,29 @@
     {
       "finish": "01a12fdf-1593-72d2-a5f9-a56d9c522980",
       "slug": "terrazzo",
-      "kept": true,
-      "why": "pending"
+      "variant": "01a16d82-a7b9-72c4-96ad-aa89e16a9476",
+      "version": "01a16d82-a7b9-72c4-96ad-aa8ae418c06f",
+      "colour": "#a7b5a6"
     },
     {
       "finish": "01a12fdf-1594-715c-a2ec-7257f0ac0434",
       "slug": "limestone",
-      "kept": true,
-      "why": "pending"
+      "variant": "01a16dc2-d870-773e-be4f-b43b2f99f4cf",
+      "version": "01a16dc2-d870-773e-be4f-b43c258bdbf3"
     },
     {
       "finish": "01a12fdf-1595-71e8-be84-9227216ac42d",
       "slug": "ceramic_light",
-      "kept": true,
-      "why": "pending"
+      "variant": "01a16dc2-da93-70de-8f65-109f6270c8dd",
+      "version": "01a16dc2-da93-70de-8f65-10a0c04bd988",
+      "colour": "#e9e5dc"
     },
     {
       "finish": "01a12fdf-1596-7992-9061-a9a730fd7840",
       "slug": "ceramic_graphite",
-      "kept": true,
-      "why": "pending"
+      "variant": "01a16dc2-da93-70de-8f65-109f6270c8dd",
+      "version": "01a16dc2-da93-70de-8f65-10a0c04bd988",
+      "colour": "#4c4c4a"
     },
     {
       "finish": "01a12fdf-1597-7e0c-8b3e-f091fb6af634",
@@ -105,8 +108,9 @@
     {
       "finish": "01a12fdf-159e-7413-8248-0060d7df7693",
       "slug": "tiles_white",
-      "kept": true,
-      "why": "pending"
+      "variant": "01a16dc2-dcee-730b-ae62-81c69daba3df",
+      "version": "01a16dc2-dcee-730b-ae62-81c7651f02ed",
+      "colour": "#e6e2d8"
     }
   ],
   "defaults": {
@@ -555,6 +559,289 @@
       }
     },
     {
+      "version": "01a16d82-a7b9-72c4-96ad-aa8ae418c06f",
+      "variant": "01a16d82-a7b9-72c4-96ad-aa89e16a9476",
+      "name": "Terrazzo 001, terrazzo",
+      "kind": "scan",
+      "facts": {
+        "tileM": [
+          1,
+          1
+        ],
+        "grain": "none",
+        "suitability": "continuous",
+        "normalStrength": 1,
+        "colourMode": "tintable",
+        "tint": {
+          "recipe": "luma-mid@1",
+          "suggestedColours": [
+            {
+              "name": "natural",
+              "hex": "#c3bfc1"
+            }
+          ]
+        },
+        "averageColour": "#808080",
+        "pbr": {}
+      },
+      "maps": {
+        "albedoTint": {
+          "colourSpace": "srgb",
+          "files": {
+            "256": {
+              "path": "tex/01a16d82-a7b9-72c4-96ad-aa8ae418c06f/albedoTint.256.webp",
+              "bytes": 20966,
+              "sha256": "176f783cb055e11b2f7a58ef8338b934d6be543698ed1474cbaecb1abd08ff06"
+            },
+            "512": {
+              "path": "tex/01a16d82-a7b9-72c4-96ad-aa8ae418c06f/albedoTint.512.webp",
+              "bytes": 73706,
+              "sha256": "5e41b4652111811ab6d9419806a69d9edfbab7d48dc312206ae5c43e7897a4df"
+            },
+            "768": {
+              "path": "tex/01a16d82-a7b9-72c4-96ad-aa8ae418c06f/albedoTint.768.webp",
+              "bytes": 153744,
+              "sha256": "5e1ad2cb17c408244a2286aec2775a37dea211f3cfba1758c7b741b432388c36"
+            }
+          }
+        },
+        "normal": {
+          "colourSpace": "linear",
+          "convention": "opengl",
+          "files": {
+            "256": {
+              "path": "tex/01a16d82-a7b9-72c4-96ad-aa8ae418c06f/normal.256.webp",
+              "bytes": 39544,
+              "sha256": "e08af04d53506f6050178d75d6a7283013af61c288a5ed0b8bd30cb12174121d"
+            },
+            "512": {
+              "path": "tex/01a16d82-a7b9-72c4-96ad-aa8ae418c06f/normal.512.webp",
+              "bytes": 207574,
+              "sha256": "5c699587fa62921794b914dd4f462ff6176fef1f6c1810799602245ef65a65ad"
+            },
+            "768": {
+              "path": "tex/01a16d82-a7b9-72c4-96ad-aa8ae418c06f/normal.768.webp",
+              "bytes": 536128,
+              "sha256": "0a972b7186832f30af73a6dc045c3a1ad23ffb0382c6eb430568d12fcd9dd48f"
+            }
+          }
+        },
+        "arm": {
+          "colourSpace": "linear",
+          "files": {
+            "256": {
+              "path": "tex/01a16d82-a7b9-72c4-96ad-aa8ae418c06f/arm.256.webp",
+              "bytes": 29554,
+              "sha256": "54e0d6c1bf29014aa92726ff2b73ec8b13702b078de740c3bea973fd5e267941"
+            },
+            "512": {
+              "path": "tex/01a16d82-a7b9-72c4-96ad-aa8ae418c06f/arm.512.webp",
+              "bytes": 107148,
+              "sha256": "4b4c88f408996c9b8fafd287d46d55eae95e1c7039930d670d1edfee9f102043"
+            },
+            "768": {
+              "path": "tex/01a16d82-a7b9-72c4-96ad-aa8ae418c06f/arm.768.webp",
+              "bytes": 230366,
+              "sha256": "91bfc1a2c32674203ceec161cb846eaf7dab9791c894b381c294347abea00a99"
+            }
+          }
+        }
+      },
+      "source": {
+        "provider": "ambientcg",
+        "sourceName": "Terrazzo001",
+        "sourcePage": "https://ambientcg.com/a/Terrazzo001",
+        "licence": "CC0-1.0"
+      }
+    },
+    {
+      "version": "01a16dc2-d870-773e-be4f-b43c258bdbf3",
+      "variant": "01a16dc2-d870-773e-be4f-b43b2f99f4cf",
+      "name": "Tiles 143, limestone",
+      "kind": "scan",
+      "facts": {
+        "tileM": [
+          3.72,
+          3.72
+        ],
+        "grain": "unknown",
+        "suitability": "continuous",
+        "normalStrength": 1,
+        "colourMode": "natural",
+        "averageColour": "#dab58e",
+        "pbr": {}
+      },
+      "maps": {
+        "albedo": {
+          "colourSpace": "srgb",
+          "files": {
+            "256": {
+              "path": "tex/01a16dc2-d870-773e-be4f-b43c258bdbf3/albedo.256.webp",
+              "bytes": 11720,
+              "sha256": "151b5f9b9c946ac09e32d2ef222d8669295d55cd9b8756de249b609e43f30ef0"
+            },
+            "512": {
+              "path": "tex/01a16dc2-d870-773e-be4f-b43c258bdbf3/albedo.512.webp",
+              "bytes": 45648,
+              "sha256": "d4ca121b958c709198afd5a7370cfadc6737dd8a7f15ad8ac8d877e041f41289"
+            },
+            "768": {
+              "path": "tex/01a16dc2-d870-773e-be4f-b43c258bdbf3/albedo.768.webp",
+              "bytes": 102986,
+              "sha256": "cba425e032e5961437989c0a525aaff5afa25d4160fae71e66ef8e18b3212d4b"
+            }
+          }
+        },
+        "normal": {
+          "colourSpace": "linear",
+          "convention": "opengl",
+          "files": {
+            "256": {
+              "path": "tex/01a16dc2-d870-773e-be4f-b43c258bdbf3/normal.256.webp",
+              "bytes": 17888,
+              "sha256": "49d286b4415ac58262ac75cb1e854c86b1243ef206434c0b542531f8547b2c94"
+            },
+            "512": {
+              "path": "tex/01a16dc2-d870-773e-be4f-b43c258bdbf3/normal.512.webp",
+              "bytes": 78780,
+              "sha256": "77af2e26a6d993d3c655a5a8040c4f748bdae9d30e94119e5d333593f23bc359"
+            },
+            "768": {
+              "path": "tex/01a16dc2-d870-773e-be4f-b43c258bdbf3/normal.768.webp",
+              "bytes": 188328,
+              "sha256": "9916f9317e4f500893b74398dde92300b2f015bf4714a8ff4d3eaefae6251e83"
+            }
+          }
+        },
+        "arm": {
+          "colourSpace": "linear",
+          "files": {
+            "256": {
+              "path": "tex/01a16dc2-d870-773e-be4f-b43c258bdbf3/arm.256.webp",
+              "bytes": 26046,
+              "sha256": "2b1447b8c3c93d5e4157630b520c2901ce143826839427aac3656ad2df1c6da0"
+            },
+            "512": {
+              "path": "tex/01a16dc2-d870-773e-be4f-b43c258bdbf3/arm.512.webp",
+              "bytes": 102680,
+              "sha256": "382e424e2d65341dd7f4a2699e80e070c8032dd07a54fd2893b70e0a1577ab17"
+            },
+            "768": {
+              "path": "tex/01a16dc2-d870-773e-be4f-b43c258bdbf3/arm.768.webp",
+              "bytes": 238218,
+              "sha256": "a1d19c345794febf0f88b19c13144ebeded6b6a31ac3b8751e072951f432d7be"
+            }
+          }
+        }
+      },
+      "source": {
+        "provider": "ambientcg",
+        "sourceName": "Tiles143",
+        "sourcePage": "https://ambientcg.com/a/Tiles143",
+        "licence": "CC0-1.0"
+      }
+    },
+    {
+      "version": "01a16dc2-da93-70de-8f65-10a0c04bd988",
+      "variant": "01a16dc2-da93-70de-8f65-109f6270c8dd",
+      "name": "Tiles 105, ceramic light / ceramic graphite",
+      "kind": "scan",
+      "facts": {
+        "tileM": [
+          5,
+          5
+        ],
+        "grain": "unknown",
+        "suitability": "continuous",
+        "normalStrength": 1,
+        "colourMode": "tintable",
+        "tint": {
+          "recipe": "luma-mid@1",
+          "suggestedColours": [
+            {
+              "name": "natural",
+              "hex": "#f9f9f9"
+            }
+          ]
+        },
+        "averageColour": "#808080",
+        "pbr": {
+          "roughness": 1,
+          "clearcoat": 0.6,
+          "clearcoatRoughness": 0.1
+        }
+      },
+      "maps": {
+        "albedoTint": {
+          "colourSpace": "srgb",
+          "files": {
+            "256": {
+              "path": "tex/01a16dc2-da93-70de-8f65-10a0c04bd988/albedoTint.256.webp",
+              "bytes": 1180,
+              "sha256": "483e7564cac4e83addb7f5d88dd63aab68cbeeaa82411ad2cabeed60e059ade8"
+            },
+            "512": {
+              "path": "tex/01a16dc2-da93-70de-8f65-10a0c04bd988/albedoTint.512.webp",
+              "bytes": 3316,
+              "sha256": "4f2fe818c683bfc3b9d3950edc63ac083559fdd26cb7b11dced1fc9b5d8361fe"
+            },
+            "768": {
+              "path": "tex/01a16dc2-da93-70de-8f65-10a0c04bd988/albedoTint.768.webp",
+              "bytes": 7184,
+              "sha256": "214fd0883d39c639d775bc853fa8a12103284d0214cd38f39c45e247f88a07ca"
+            }
+          }
+        },
+        "normal": {
+          "colourSpace": "linear",
+          "convention": "opengl",
+          "files": {
+            "256": {
+              "path": "tex/01a16dc2-da93-70de-8f65-10a0c04bd988/normal.256.webp",
+              "bytes": 25642,
+              "sha256": "39964522f5436cdc363f204450ae61db71897590903674a04039d60541318123"
+            },
+            "512": {
+              "path": "tex/01a16dc2-da93-70de-8f65-10a0c04bd988/normal.512.webp",
+              "bytes": 81762,
+              "sha256": "f961a8aba7c5fcd95b2108fdd3992dd9d40b9039a232f7a2cbbcf1e6f4f78344"
+            },
+            "768": {
+              "path": "tex/01a16dc2-da93-70de-8f65-10a0c04bd988/normal.768.webp",
+              "bytes": 149004,
+              "sha256": "1ef8f9ac2b03338c2488169cd50ed8ea3081dcfba40e9feb178385b350a83d2d"
+            }
+          }
+        },
+        "arm": {
+          "colourSpace": "linear",
+          "files": {
+            "256": {
+              "path": "tex/01a16dc2-da93-70de-8f65-10a0c04bd988/arm.256.webp",
+              "bytes": 11058,
+              "sha256": "0a2ee12dbe76170b8b21164c2637a5b5aef538872ba3b50271e3782eec216b54"
+            },
+            "512": {
+              "path": "tex/01a16dc2-da93-70de-8f65-10a0c04bd988/arm.512.webp",
+              "bytes": 36266,
+              "sha256": "b3723465561b00353ffb66c28a6d0afe78d2e55ea242f2229e03eac7284be87a"
+            },
+            "768": {
+              "path": "tex/01a16dc2-da93-70de-8f65-10a0c04bd988/arm.768.webp",
+              "bytes": 73648,
+              "sha256": "cba0102ee35852f3329dd1a1f5bd31f39653b4b7c2539f0091bfd981cf2cc47d"
+            }
+          }
+        }
+      },
+      "source": {
+        "provider": "ambientcg",
+        "sourceName": "Tiles105",
+        "sourcePage": "https://ambientcg.com/a/Tiles105",
+        "licence": "CC0-1.0"
+      }
+    },
+    {
       "version": "01a1689e-c2d9-7246-a313-fcd4f0df5a93",
       "variant": "01a1689e-3512-757a-8276-36198fb4d666",
       "name": "Beige Wall 001",
@@ -647,6 +934,106 @@
         "provider": "polyhaven",
         "sourceName": "beige_wall_001",
         "sourcePage": "https://polyhaven.com/a/beige_wall_001",
+        "licence": "CC0-1.0"
+      }
+    },
+    {
+      "version": "01a16dc2-dcee-730b-ae62-81c7651f02ed",
+      "variant": "01a16dc2-dcee-730b-ae62-81c69daba3df",
+      "name": "Tiles 133 A, tiles white",
+      "kind": "scan",
+      "facts": {
+        "tileM": [
+          3.6,
+          3.6
+        ],
+        "grain": "unknown",
+        "suitability": "continuous",
+        "normalStrength": 1,
+        "colourMode": "tintable",
+        "tint": {
+          "recipe": "luma-mid@1",
+          "suggestedColours": [
+            {
+              "name": "natural",
+              "hex": "#d2dfe1"
+            }
+          ]
+        },
+        "averageColour": "#808080",
+        "pbr": {
+          "roughness": 1,
+          "clearcoat": 0.6,
+          "clearcoatRoughness": 0.1
+        }
+      },
+      "maps": {
+        "albedoTint": {
+          "colourSpace": "srgb",
+          "files": {
+            "256": {
+              "path": "tex/01a16dc2-dcee-730b-ae62-81c7651f02ed/albedoTint.256.webp",
+              "bytes": 3938,
+              "sha256": "b80d04d443422f5ef53de615ac6a0107a50e1f32fa230b27a727076df4c67144"
+            },
+            "512": {
+              "path": "tex/01a16dc2-dcee-730b-ae62-81c7651f02ed/albedoTint.512.webp",
+              "bytes": 10312,
+              "sha256": "8bea73e9b0d582974809b01ee43977523e5a1dffcb3c45415cc26d2b8a3ea7dd"
+            },
+            "768": {
+              "path": "tex/01a16dc2-dcee-730b-ae62-81c7651f02ed/albedoTint.768.webp",
+              "bytes": 19256,
+              "sha256": "16448928a5aa1327953b6be77d842dcf7c9dbce899c40b1bf827b966a253b6a2"
+            }
+          }
+        },
+        "normal": {
+          "colourSpace": "linear",
+          "convention": "opengl",
+          "files": {
+            "256": {
+              "path": "tex/01a16dc2-dcee-730b-ae62-81c7651f02ed/normal.256.webp",
+              "bytes": 47812,
+              "sha256": "8d1022ad41a3e2f419488af2e9214c7656b47c6cd5511eb68e996a3f1d475da2"
+            },
+            "512": {
+              "path": "tex/01a16dc2-dcee-730b-ae62-81c7651f02ed/normal.512.webp",
+              "bytes": 167430,
+              "sha256": "cabdef20f5f59f66ec6ebef301b13a16ec947c5f9c20caeb7eed014cdfb795f3"
+            },
+            "768": {
+              "path": "tex/01a16dc2-dcee-730b-ae62-81c7651f02ed/normal.768.webp",
+              "bytes": 356086,
+              "sha256": "2def5e01ea8688258e59f23cb6e9b3460382f694a96f565cc6071070a96f7fbc"
+            }
+          }
+        },
+        "arm": {
+          "colourSpace": "linear",
+          "files": {
+            "256": {
+              "path": "tex/01a16dc2-dcee-730b-ae62-81c7651f02ed/arm.256.webp",
+              "bytes": 30490,
+              "sha256": "461e65ec90777c0d8ad470cabe11d477d0096cf2b1aed9a695c503333b9a2110"
+            },
+            "512": {
+              "path": "tex/01a16dc2-dcee-730b-ae62-81c7651f02ed/arm.512.webp",
+              "bytes": 109536,
+              "sha256": "8d75196da03c3340dafdc34cca452155fa71ffaba52d5bb32fa0aa73edb1f51b"
+            },
+            "768": {
+              "path": "tex/01a16dc2-dcee-730b-ae62-81c7651f02ed/arm.768.webp",
+              "bytes": 240388,
+              "sha256": "52ee0165d4340f204c8add980926bb3d9bbcb87f5461c04ffee84d8b09594569"
+            }
+          }
+        }
+      },
+      "source": {
+        "provider": "ambientcg",
+        "sourceName": "Tiles133A",
+        "sourcePage": "https://ambientcg.com/a/Tiles133A",
         "licence": "CC0-1.0"
       }
     }

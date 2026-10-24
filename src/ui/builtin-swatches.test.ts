@@ -62,10 +62,10 @@ describe('bundled finish swatches', () => {
   });
 
   test('a kept finish keeps its generated swatch', () => {
-    const core = finishCore(lShapePlan, { surface: 'floor', roomId: ROOM }, EN)!;
-    const stone = core.options.find((option) => option.id === FINISH.stone)!;
-    expect(stone.thumbnail).toBe('data:image/png;base64,GENERATED');
-    expect(generated).toContain(FINISH.stone);
+    const core = finishCore(lShapePlan, { surface: 'wall', roomId: ROOM }, EN)!;
+    const stripes = core.options.find((option) => option.id === FINISH.wallpaper_sage)!;
+    expect(stripes.thumbnail).toBe('data:image/png;base64,GENERATED');
+    expect(generated).toContain(FINISH.wallpaper_sage);
   });
 
   test('the order and the names of the bank stay as they were', () => {
@@ -115,7 +115,7 @@ describe('interior preset chips', () => {
   });
 
   test('a preset on two kept finishes keeps its generated chip', () => {
-    expect(request([FINISH.stone, FINISH.wallpaper_cream]).items[0]!.thumbnail).toBe('data:image/png;base64,GENERATED');
-    expect(generated).toEqual([`${FINISH.stone}+${FINISH.wallpaper_cream}`]);
+    expect(request([FINISH.wallpaper_sage, FINISH.wallpaper_cream]).items[0]!.thumbnail).toBe('data:image/png;base64,GENERATED');
+    expect(generated).toEqual([`${FINISH.wallpaper_sage}+${FINISH.wallpaper_cream}`]);
   });
 });

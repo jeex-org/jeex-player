@@ -187,13 +187,14 @@ export const LAZY_WASM_LIMITS: Readonly<Record<string, number>> = { 'lazy-jeex-v
 /**
  * Hard limit for the bundled finishes' maps a build ships in `finish-maps/`,
  * bytes on disk (WebP does not gzip). Set from the measured folder plus 5 %:
- * 5,821,304 bytes of maps for six library versions (five floor scans and the
- * wall and ceiling plaster) at 256, 512 and 768 px, measured 2026-10-24 right
- * after `scripts/finish-maps-fetch.ts`, plus `SOURCES.md`. Most of it is the
+ * 9,406,636 bytes of maps for ten library versions (nine floor and wall
+ * scans and the wall and ceiling plaster) at 256, 512 and 768 px, measured
+ * 2026-10-24 right after `scripts/finish-maps-fetch.ts` bound every finish but
+ * the two striped wallpapers, plus `SOURCES.md`. Most of it is the
  * ARM packs, which the library ships lossless. A re-fetch that binds more
  * finishes re-measures and updates this comment; never raise it from memory.
  */
-export const FINISH_MAPS_BUDGET_BYTES = Math.round(5_821_304 * 1.05);
+export const FINISH_MAPS_BUDGET_BYTES = Math.round(9_406_636 * 1.05);
 
 /** Every file under `dir`, recursively, with its size. */
 function filesUnder(dir: string): { path: string; bytes: number }[] {

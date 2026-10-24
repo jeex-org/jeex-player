@@ -194,7 +194,11 @@ describe('a bare scene in a viewer', () => {
     subject.mount.mountDocument(bare());
     await settle();
     const versions = new Set(subject.fetched.map((url) => /tex\/([0-9a-f-]{36})\//.exec(url)?.[1]));
-    const onScreen = new Set([OAK, BUILTIN_FINISHES.get(FINISH.sand)!.material.versionId]);
+    const onScreen = new Set([
+      OAK,
+      BUILTIN_FINISHES.get(FINISH.stone)!.material.versionId,
+      BUILTIN_FINISHES.get(FINISH.sand)!.material.versionId,
+    ]);
     for (const version of versions) expect(onScreen.has(version!)).toBe(true);
   });
 
