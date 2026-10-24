@@ -14,7 +14,7 @@ import { standInSidecar, standInUnwrap } from '../src/fixtures/shell-unwrap.js';
 import { SceneBuilder } from '../src/geometry/scene-builder.js';
 import type { LightBake } from '../src/lightmap/light-bake.js';
 import { applyBakedShell } from '../src/lightmap/baked-shell.js';
-import { exportShellForBake } from '../src/lightmap/shell-export.js';
+import { exportShellForBake, SHIPPED_FINISHES } from '../src/lightmap/shell-export.js';
 import { shellInputsHash } from '../src/lightmap/shell-inputs.js';
 import { solvePlan } from '../src/plan/plan-solver.js';
 import CALIBRATION from '../tests/fixtures/lightmap-calibration/sidecar.json' with { type: 'json' };
@@ -77,6 +77,7 @@ const live = draw('live');
 let n = 0;
 const exported = await exportShellForBake(apartmentScene, {
   mintId: () => `01a1f100-0000-7000-8000-${(n++).toString(16).padStart(12, '0')}`,
+  finishes: SHIPPED_FINISHES,
 });
 const unwrapped = await standInUnwrap(exported.glb);
 const bake = await standInSidecar(unwrapped, CALIBRATION as unknown as LightBake, apartmentScene.id, await shellInputsHash(apartmentScene));

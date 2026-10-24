@@ -14,7 +14,8 @@ import { draftOf } from '../shared/committed.js';
 import type { SceneData } from '../scene/types.js';
 import { glbJson } from '../fixtures/shell-unwrap.js';
 import { judgeShellGltf, type ShellNodeExtras } from './shell-extras.schema.js';
-import { exportShellForBake } from './shell-export.js';
+import { exportShellForBake, SHIPPED_FINISHES } from './shell-export.js';
+import { projectFinishes } from '../materials/project-finishes.js';
 import { liveShellEntries } from './baked-shell.js';
 import { shellInputsHash } from './shell-inputs.js';
 import { NATURAL_SCAN } from '../fixtures/library-materials.js';
@@ -28,7 +29,7 @@ export function minter(prefix: string): () => string {
 }
 
 const A = minter('01a1b000');
-const exported = await exportShellForBake(apartmentScene, { mintId: A });
+const exported = await exportShellForBake(apartmentScene, { mintId: A, finishes: SHIPPED_FINISHES });
 const json = glbJson(exported.glb);
 const extras = json.nodes.map((node) => node.extras.jeex);
 
@@ -120,12 +121,44 @@ describe('exportShellForBake', () => {
   });
 
   test('refuses a minted id that is not a UUID v7, and one minted twice', async () => {
-    expect(exportShellForBake(apartmentScene, { mintId: () => 'wall-face' })).rejects.toThrow('not a UUID v7');
-    expect(exportShellForBake(apartmentScene, { mintId: () => '01a1b000-0000-7000-8000-000000000000' })).rejects.toThrow('minted twice');
+    expect(exportShellForBake(apartmentScene, { mintId: () => 'wall-face', finishes: SHIPPED_FINISHES })).rejects.toThrow('not a UUID v7');
+    expect(
+      exportShellForBake(apartmentScene, { mintId: () => '01a1b000-0000-7000-8000-000000000000', finishes: SHIPPED_FINISHES }),
+    ).rejects.toThrow('minted twice');
+  });
+
+  test('the finishes are a required argument: a call without them is a type error and is refused', async () => {
+    // @ts-expect-error -- the caller always names the finishes the live view paints with.
+    await expect(exportShellForBake(apartmentScene, { mintId: minter('01a1d100') })).rejects.toThrow('finishes');
+  });
+
+  test('a project that answers a bundled finish id with its own finish gives the project’s albedo, as the live project view paints it', async () => {
+    const tone = '#aa2020';
+    const material: ProjectMaterial = {
+      id: DEFAULT_WALL_FINISH,
+      name: 'Project wall',
+      tags: ['wall'],
+      apply: ['wall'],
+      generator: { kind: 'painted_plaster', tone, seed: 3 },
+      tile: 2.4,
+    };
+    const red = new THREE.Color(tone);
+    const albedos = (glb: ArrayBuffer): string[] =>
+      glbJson(glb).materials.map((m) =>
+        JSON.stringify(
+          (m as unknown as { pbrMetallicRoughness: { baseColorFactor: number[] } }).pbrMetallicRoughness.baseColorFactor
+            .slice(0, 3)
+            .map((v) => v.toFixed(3)),
+        ),
+      );
+    const want = JSON.stringify([red.r, red.g, red.b].map((v) => v.toFixed(3)));
+    const project = await exportShellForBake(apartmentScene, { mintId: minter('01a1d200'), finishes: projectFinishes([material]) });
+    expect(albedos(project.glb)).toContain(want);
+    expect(albedos(exported.glb)).not.toContain(want);
   });
 
   test('two minters give different names and the same digest and extras', async () => {
-    const other = await exportShellForBake(apartmentScene, { mintId: minter('01a1c000') });
+    const other = await exportShellForBake(apartmentScene, { mintId: minter('01a1c000'), finishes: SHIPPED_FINISHES });
     expect(other.names).not.toEqual(exported.names);
     expect(other.shellInputsHash).toBe(exported.shellInputsHash);
     expect(glbJson(other.glb).nodes.map((node) => node.extras)).toEqual(json.nodes.map((node) => node.extras));

@@ -9,6 +9,8 @@ import { readFileSync } from 'node:fs';
 import type { z } from 'zod/mini';
 import type { LightBake } from './light-bake.js';
 import { judgeLightBake, lightBakeSchema } from './light-bake.schema.js';
+import { BAKE_LIGHTS_RECIPE, BAKE_SKY_HEMISPHERE_RECIPE } from './bake-lights.schema.js';
+import { LIGHTING_STANDARD_VERSION } from '../lighting/lighting-standard.js';
 
 const FIXTURE = new URL('../../tests/fixtures/lightmap-calibration/sidecar.json', import.meta.url);
 const fixture = (): Record<string, unknown> => JSON.parse(readFileSync(FIXTURE, 'utf8')) as Record<string, unknown>;
@@ -41,6 +43,19 @@ describe('judgeLightBake', () => {
   test('accepts an apartment bake that names its shell inputs, and refuses a digest of another grammar', () => {
     expect(judgeLightBake(edited((d) => (d.shellInputsHash = `sha256:${'a'.repeat(64)}`))).ok).toBe(true);
     expect(refusal(edited((d) => (d.shellInputsHash = 'a'.repeat(64))))).toContain('shellInputsHash: not a sha256 digest');
+  });
+
+  test('accepts the lights a bake took and a two-hemisphere sky, and refuses a recipe the player does not know', () => {
+    const lights = { recipe: BAKE_LIGHTS_RECIPE, standardVersion: LIGHTING_STANDARD_VERSION, skyRecipe: BAKE_SKY_HEMISPHERE_RECIPE };
+    const withLights = edited((d) => {
+      d.lights = lights;
+      d.sky = { upper: [0.28, 0.28, 0.27], lower: [0.03, 0.03, 0.03] };
+    });
+    expect(judgeLightBake(withLights).ok).toBe(true);
+    expect(refusal(edited((d) => (d.lights = { ...lights, recipe: 'jeex-bake-lights@0' })))).toContain('lights.recipe');
+    expect(refusal(edited((d) => (d.lights = { ...lights, skyRecipe: 'hdri@1' })))).toContain('lights.skyRecipe');
+    expect(refusal(edited((d) => (d.lights = { ...lights, standardVersion: 0 })))).toContain('lights.standardVersion');
+    expect(refusal(edited((d) => (d.lights = { ...lights, lamps: 3 })))).toContain('lights.lamps');
   });
 
   test('refuses a contract the player does not know, naming the field', () => {
