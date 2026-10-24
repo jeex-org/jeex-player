@@ -291,9 +291,22 @@ export class CameraPreview {
     const box = this.window.getBoundingClientRect();
     const canvas = this.deps.renderer()?.domElement.getBoundingClientRect();
     const { x, y, z } = checkpoint.position;
-    return [mode, x, y, z, checkpoint.yaw, checkpoint.pitch, box.left, box.top, box.width, box.height, canvas?.left, canvas?.top, canvas?.width, canvas?.height].join(
-      ',',
-    );
+    return [
+      mode,
+      x,
+      y,
+      z,
+      checkpoint.yaw,
+      checkpoint.pitch,
+      box.left,
+      box.top,
+      box.width,
+      box.height,
+      canvas?.left,
+      canvas?.top,
+      canvas?.width,
+      canvas?.height,
+    ].join(',');
   }
 
   private setVisible(visible: boolean): void {

@@ -152,7 +152,21 @@ function harness(checkpoints: TourCheckpoint[] = [CAM_A, CAM_B]): Harness {
   });
   overlay.group.visible = true;
   overlay.setScene(doc);
-  return { canvas, keys, overlay, camera, top, selections, edits, placing, framed, world, timer, reload: () => overlay.setScene(doc), changes };
+  return {
+    canvas,
+    keys,
+    overlay,
+    camera,
+    top,
+    selections,
+    edits,
+    placing,
+    framed,
+    world,
+    timer,
+    reload: () => overlay.setScene(doc),
+    changes,
+  };
 }
 
 /** Stands the author at `from` looking at `at`. */

@@ -320,9 +320,10 @@ function allowOneScreenshot(): void {
  * Stops the page drawing, so a screenshot that follows costs one composite
  * instead of a race with the render loop.
  *
- * The viewer draws on every animation frame even when nothing moves, and on
- * SwiftShader every capture `toHaveScreenshot` takes queues behind those
- * frames in the GPU process: on a loaded machine a frame of a full-window
+ * A resting view draws nothing (every mode but `plan2d` draws on demand),
+ * but one still easing, animating or showing a selection aura draws on every
+ * animation frame, and on SwiftShader every capture `toHaveScreenshot` takes
+ * queues behind those frames in the GPU process: on a loaded machine a frame of a full-window
  * canvas took 2.7 s and a single capture of a resting canvas 40-50 s, past
  * `SCREENSHOT_TIMEOUT_MS` before any comparison. The page's
  * `requestAnimationFrame` is replaced by one that never calls back, so the

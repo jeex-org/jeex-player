@@ -1293,6 +1293,7 @@ describe('a pixel-ratio change at a fixed CSS box', () => {
    */
   function dpr() {
     const globals = globalThis as { ResizeObserver?: unknown; matchMedia?: unknown; window?: unknown };
+    const had = { ResizeObserver: 'ResizeObserver' in globals, matchMedia: 'matchMedia' in globals, window: 'window' in globals };
     const saved = { ResizeObserver: globals.ResizeObserver, matchMedia: globals.matchMedia, window: globals.window };
     const observers: ResizeObserverCallback[] = [];
     globals.ResizeObserver = class {
@@ -1308,10 +1309,12 @@ describe('a pixel-ratio change at a fixed CSS box', () => {
     });
     const screen = { devicePixelRatio: 1 };
     globals.window = screen;
+    // A global that was absent goes away again: other files test for its presence, not its value.
     const restore = (): void => {
-      globals.ResizeObserver = saved.ResizeObserver;
-      globals.matchMedia = saved.matchMedia;
-      globals.window = saved.window;
+      for (const key of ['ResizeObserver', 'matchMedia', 'window'] as const) {
+        if (had[key]) globals[key] = saved[key];
+        else delete globals[key];
+      }
     };
     const { renderer, calls } = stubRuntime();
     const queue: Array<() => void> = [];
