@@ -10,7 +10,14 @@
  */
 
 import { expect, test } from '@playwright/test';
-import { expectCanvasScreenshot, expectChromeScreenshot, expectNoNewA11yViolations, waitForBoot, waitForChromeIdle } from './support.js';
+import {
+  expectCanvasScreenshot,
+  expectChromeScreenshot,
+  expectNoNewA11yViolations,
+  screenshotOnly,
+  waitForBoot,
+  waitForChromeIdle,
+} from './support.js';
 import { scaled } from './time-scale.js';
 
 /** The iframe frame-title and color-contrast findings are fixed. */
@@ -129,6 +136,7 @@ test('dispose tells the frame, then takes the iframe out of the page', async ({ 
 });
 
 test('the host page and the framed chrome look as they did', async ({ page }) => {
+  screenshotOnly();
   // The pointer RESTS ON the framed control bar (its brand lockup, which has
   // no hover style), so the bar stays open for the whole capture: its idle
   // timer re-arms while the bar is `:hover` (`ViewerChrome.wake`). A pointer
@@ -150,6 +158,7 @@ test('the host page and the framed chrome look as they did', async ({ page }) =>
 });
 
 test('the framed apartment is still being rendered', async ({ page }) => {
+  screenshotOnly();
   // The baseline is of the resting viewer: the bar collapsed, as nothing here touches it.
   await waitForChromeIdle(page.frameLocator('#stage iframe'));
   await expectCanvasScreenshot(page.frameLocator('#stage iframe').locator('[data-jeex="scene-canvas"]'), 'embed-iframe-canvas.png');

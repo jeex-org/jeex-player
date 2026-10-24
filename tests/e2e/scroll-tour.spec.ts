@@ -14,6 +14,7 @@ import {
   expectChromeScreenshot,
   expectNoNewA11yViolations,
   holdFrames,
+  screenshotOnly,
   waitForBoot,
   waitForCameraStill,
   waitForChromeIdle,
@@ -79,6 +80,7 @@ test('the run stays paused: scrolling scrubs, it does not start playback', async
 });
 
 test('the host page looks as it did', async ({ page }) => {
+  screenshotOnly();
   // Input is off here, so the bar always collapses; the baseline is of that
   // resting state, waited for BEFORE the frames are held (the idle timer is
   // a timeout, not a frame, and holding frames does not stop it).
@@ -88,6 +90,7 @@ test('the host page looks as it did', async ({ page }) => {
 });
 
 test('the apartment is still being rendered behind the copy', async ({ page }) => {
+  screenshotOnly();
   // The page opens the clip where the scroll offset is, which is an eased
   // flight; the baseline is of where it lands.
   await waitForCameraStill(page);

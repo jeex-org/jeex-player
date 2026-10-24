@@ -11,6 +11,7 @@ import {
   modeButton,
   pressMode,
   sceneChildren,
+  screenshotOnly,
   viewerRoot,
   waitForBoot,
 } from './support.js';
@@ -104,6 +105,7 @@ test('the mini-map is on screen in walk and gone in orbit', async ({ page }) => 
 });
 
 test('the chrome looks as it did', async ({ page }) => {
+  screenshotOnly();
   // The pointer RESTS ON the brand lockup (no hover style of its own), so the
   // bar's idle timer keeps re-arming and the baseline is of the open bar
   // however long the capture takes, never of the reveal pill it collapses to
@@ -116,6 +118,7 @@ test('the chrome looks as it did', async ({ page }) => {
 });
 
 test('the apartment is still being rendered', async ({ page }) => {
+  screenshotOnly();
   await expectCanvasScreenshot(page.locator('[data-jeex="scene-canvas"]'), 'index-canvas.png');
 });
 
