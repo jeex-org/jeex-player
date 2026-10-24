@@ -124,14 +124,19 @@ describe.skipIf(!HARDWARE)(`walk gloss and white balance in the demo living room
     scene.traverse((object) => {
       const mesh = object as THREE.Mesh;
       if (!mesh.isMesh) return;
-      // A mesh that draws nothing (a pick proxy: an invisible material) must stay undrawn, or it covers what it wraps.
-      if ([mesh.material].flat().every((material) => !material.visible || !material.colorWrite)) {
+      // A mesh that draws nothing or draws see-through (a pick proxy, the selection aura) and is not classified stays
+      // undrawn: painted opaque black it would cover what it wraps.
+      const index0 = classify(mesh);
+      if (
+        [mesh.material].flat().every((material) => !material.visible || !material.colorWrite) ||
+        (index0 === null && [mesh.material].flat().some((material) => material.transparent))
+      ) {
         if (mesh.visible) hidden.push(mesh);
         mesh.visible = false;
         return;
       }
       swapped.set(mesh, mesh.material);
-      const index = classify(mesh);
+      const index = index0;
       mesh.material = index === null ? none : palette[index]!;
     });
     scene.background =
@@ -232,27 +237,50 @@ describe.skipIf(!HARDWARE)(`walk gloss and white balance in the demo living room
   }
 
   /** Mean linear luminance of the black r 0.07 living floor in the glass's screen columns and beside them. */
-  function windowBand(view: THREE.Camera): { columns: [number, number]; inside: number; beside: number; counts: [number, number] } {
+  /**
+   * The black r 0.07 living floor split by geometry: pixels whose mirror ray (the view ray reflected at the floor)
+   * meets a living-room pane, the window's mirror image, against the rest; mean linear luminance of each.
+   */
+  function windowBand(view: THREE.PerspectiveCamera): { band: number; rest: number; counts: [number, number]; panes: number } {
+    const living = lighting.volumes.boxes.filter((b) => b.roomId === LIVING);
+    const panes: THREE.Mesh[] = [];
+    lighting.scene.traverse((object) => {
+      const mesh = object as THREE.Mesh;
+      if (!mesh.isMesh || !isGlass(mesh)) return;
+      const c = new THREE.Box3().setFromObject(mesh).getCenter(new THREE.Vector3());
+      if (
+        living.some(
+          (b) =>
+            c.x > b.selection.min.x - 0.3 &&
+            c.x < b.selection.max.x + 0.3 &&
+            c.z > b.selection.min.z - 0.3 &&
+            c.z < b.selection.max.z + 0.3,
+        )
+      )
+        panes.push(mesh);
+    });
     const restore = blackFloor(0.07);
     try {
-      const classes = mask(view, (mesh) => (isGlass(mesh) ? 1 : LIVING_FLOOR.test(mesh.name) ? 0 : null));
+      const classes = mask(view, (mesh) => (LIVING_FLOOR.test(mesh.name) ? 0 : null));
       const pixels = linearShot(view);
-      let x0 = SIZE.w;
-      let x1 = -1;
-      for (let i = 0; i < classes.length; i += 1) {
-        if (classes[i] !== 1) continue;
-        x0 = Math.min(x0, i % SIZE.w);
-        x1 = Math.max(x1, i % SIZE.w);
-      }
-      const inside: number[] = [];
-      const beside: number[] = [];
+      const ray = new THREE.Raycaster();
+      const floorPlane = new THREE.Plane(new THREE.Vector3(0, 1, 0), 0);
+      const hit = new THREE.Vector3();
+      const band: number[] = [];
+      const rest: number[] = [];
       for (let i = 0; i < classes.length; i += 1) {
         if (classes[i] !== 0) continue;
         const x = i % SIZE.w;
-        (x >= x0 && x <= x1 ? inside : beside).push(luminance(pixels[i * 4]!, pixels[i * 4 + 1]!, pixels[i * 4 + 2]!));
+        const y = Math.floor(i / SIZE.w);
+        ray.setFromCamera(new THREE.Vector2(((x + 0.5) / SIZE.w) * 2 - 1, ((y + 0.5) / SIZE.h) * 2 - 1), view);
+        if (!ray.ray.intersectPlane(floorPlane, hit)) continue;
+        const mirrored = ray.ray.direction.clone().setY(-ray.ray.direction.y);
+        ray.set(hit.clone().addScaledVector(mirrored, 1e-3), mirrored);
+        const value = luminance(pixels[i * 4]!, pixels[i * 4 + 1]!, pixels[i * 4 + 2]!);
+        (ray.intersectObjects(panes, false).length > 0 ? band : rest).push(value);
       }
       const mean = (list: number[]): number => list.reduce((sum, v) => sum + v, 0) / Math.max(1, list.length);
-      return { columns: [x0, x1], inside: mean(inside), beside: mean(beside), counts: [inside.length, beside.length] };
+      return { band: mean(band), rest: mean(rest), counts: [band.length, rest.length], panes: panes.length };
     } finally {
       restore();
     }
@@ -347,8 +375,8 @@ describe.skipIf(!HARDWARE)(`walk gloss and white balance in the demo living room
       before,
       after,
     });
-    expect(after.columns[1]).toBeGreaterThan(after.columns[0]);
-    expect(after.inside).toBeGreaterThan(after.beside);
+    expect(after.counts[0]).toBeGreaterThan(200);
+    expect(after.band).toBeGreaterThan(after.rest);
   });
 
   test('white balance at the walk start: the ceiling reads warm white, a saturated finish and the sky keep their hue', () => {
@@ -369,49 +397,58 @@ describe.skipIf(!HARDWARE)(`walk gloss and white balance in the demo living room
         Math.max(c.r, c.g, c.b) - Math.min(c.r, c.g, c.b) < 0.08 * Math.max(c.r, c.g, c.b)
       );
     };
-    // Saturated furniture finishes, each its own class; the one covering most pixels is metered.
-    const frustumAll = new THREE.Frustum().setFromProjectionMatrix(
-      new THREE.Matrix4().multiplyMatrices(view.projectionMatrix, view.matrixWorldInverse),
-    );
-    const candidates: THREE.Mesh[] = [];
-    let owned = 0;
-    lighting.scene.traverse((object) => {
-      const mesh = object as THREE.Mesh;
-      if (!mesh.isMesh || candidates.length >= MASK_CLASSES - FURNITURE_CLASS0 || !frustumAll.intersectsObject(mesh)) return;
-      let owner: THREE.Object3D | null = mesh;
-      while (owner && owner.userData['assetId'] === undefined) owner = owner.parent;
-      if (!owner) return;
-      const c = ([mesh.material].flat()[0] as THREE.MeshStandardMaterial).color as THREE.Color | undefined;
-      if (!c) return;
-      const top = Math.max(c.r, c.g, c.b);
-      owned += 1;
-      if (top > 0.05 && (top - Math.min(c.r, c.g, c.b)) / top > 0.2) candidates.push(mesh);
-    });
-    // The sky is what the background shows (glazing draws nothing into a mask).
-    const classes = mask(
-      view,
-      (mesh) => {
-        if (mesh.name === `ceiling-${LIVING}`) return 0;
-        if (neutralWall(mesh)) return 1;
-        const k = candidates.indexOf(mesh);
-        return k < 0 ? null : FURNITURE_CLASS0 + k;
-      },
-      3,
-    );
-    const counts = new Map<number, number>();
-    for (const k of classes) if (k >= FURNITURE_CLASS0) counts.set(k, (counts.get(k) ?? 0) + 1);
-    const furnitureClass = [...counts.entries()].sort((a, b) => b[1] - a[1])[0]?.[0] ?? -1;
-    const furniture = furnitureClass < 0 ? null : candidates[furnitureClass - FURNITURE_CLASS0]!;
-    const pixels = linearShot(view);
-    const sums = [0, 1, 2, 3].map(() => [0, 0, 0, 0]);
-    for (let i = 0; i < classes.length; i += 1) {
-      const raw = classes[i]!;
-      const k = raw >= FURNITURE_CLASS0 ? (raw === furnitureClass ? 2 : -1) : raw;
-      if (k < 0 || k > 3) continue;
-      for (let c = 0; c < 3; c += 1) sums[k]![c]! += pixels[i * 4 + c]!;
-      sums[k]![3]! += 1;
-    }
-    const mean = (k: number): Rgb => [0, 1, 2].map((c) => sums[k]![c]! / Math.max(1, sums[k]![3]!)) as unknown as Rgb;
+    // What one view shows of the ceiling, neutral walls, the most-covering saturated furniture finish and the sky.
+    const meter = (at: THREE.PerspectiveCamera) => {
+      // Saturated furniture finishes, each its own class; the one covering most pixels is metered.
+      const frustumAll = new THREE.Frustum().setFromProjectionMatrix(
+        new THREE.Matrix4().multiplyMatrices(at.projectionMatrix, at.matrixWorldInverse),
+      );
+      const candidates: THREE.Mesh[] = [];
+      let owned = 0;
+      lighting.scene.traverse((object) => {
+        const mesh = object as THREE.Mesh;
+        if (!mesh.isMesh || candidates.length >= MASK_CLASSES - FURNITURE_CLASS0 || !frustumAll.intersectsObject(mesh)) return;
+        let owner: THREE.Object3D | null = mesh;
+        while (owner && owner.userData['assetId'] === undefined) owner = owner.parent;
+        if (!owner) return;
+        const c = ([mesh.material].flat()[0] as THREE.MeshStandardMaterial).color as THREE.Color | undefined;
+        if (!c) return;
+        const top = Math.max(c.r, c.g, c.b);
+        owned += 1;
+        if (top > 0.05 && (top - Math.min(c.r, c.g, c.b)) / top > 0.2) candidates.push(mesh);
+      });
+      // The sky is what the background shows (glazing draws nothing into a mask).
+      const classes = mask(
+        at,
+        (mesh) => {
+          if (mesh.name === `ceiling-${LIVING}`) return 0;
+          if (neutralWall(mesh)) return 1;
+          const k = candidates.indexOf(mesh);
+          return k < 0 ? null : FURNITURE_CLASS0 + k;
+        },
+        3,
+      );
+      const counts = new Map<number, number>();
+      for (const k of classes) if (k >= FURNITURE_CLASS0) counts.set(k, (counts.get(k) ?? 0) + 1);
+      const furnitureClass = [...counts.entries()].sort((a, b) => b[1] - a[1])[0]?.[0] ?? -1;
+      const furniture = furnitureClass < 0 ? null : candidates[furnitureClass - FURNITURE_CLASS0]!;
+      const pixels = linearShot(at);
+      const sums = [0, 1, 2, 3].map(() => [0, 0, 0, 0]);
+      for (let i = 0; i < classes.length; i += 1) {
+        const raw = classes[i]!;
+        const k = raw >= FURNITURE_CLASS0 ? (raw === furnitureClass ? 2 : -1) : raw;
+        if (k < 0 || k > 3) continue;
+        for (let c = 0; c < 3; c += 1) sums[k]![c]! += pixels[i * 4 + c]!;
+        sums[k]![3]! += 1;
+      }
+      const mean = (k: number): Rgb => [0, 1, 2].map((c) => sums[k]![c]! / Math.max(1, sums[k]![3]!)) as unknown as Rgb;
+      return { sums, mean, furniture, owned, candidates: candidates.length };
+    };
+    const atStart = meter(view);
+    const { sums, mean } = atStart;
+    const atGloss = meter(poseCamera(POSE_GLOSS.position, POSE_GLOSS.target));
+    const atWindow = meter(poseCamera(POSE_WINDOW.position, POSE_WINDOW.target));
+    const furniture = atGloss.furniture;
     const ceiling = mean(0);
     const walls = mean(1);
     const neutral = [0, 1, 2].map((c) => (sums[0]![c]! + sums[1]![c]!) / Math.max(1, sums[0]![3]! + sums[1]![3]!)) as unknown as Rgb;
@@ -425,15 +462,16 @@ describe.skipIf(!HARDWARE)(`walk gloss and white balance in the demo living room
       else hi = mid;
     }
     const tuned = times(WALK_WHITE_BALANCE, ceiling);
-    const fabric = mean(2);
-    const sky = mean(3);
+    // Furniture from the gloss pose and sky from the bay pose: the walk start sees neither.
+    const fabric = atGloss.mean(2);
+    const sky = atWindow.mean(3);
     const fabricAfter = times(WALK_WHITE_BALANCE, fabric);
     const skyAfter = times(WALK_WHITE_BALANCE, sky);
     const argmax = (c: Rgb): number => c.indexOf(Math.max(...c));
     record('whiteBalance', {
       domain: 'scene linear (float target, no tone mapping, no exposure)',
       pose: { position: start.position.toArray(), quaternion: start.quaternion.toArray(), fov: start.fov, size: SIZE },
-      pixels: sums.map((s) => s[3]),
+      pixels: { start: sums.map((x) => x[3]), gloss: atGloss.sums.map((x) => x[3]), window: atWindow.sums.map((x) => x[3]) },
       ceiling,
       walls,
       neutral,
@@ -442,7 +480,7 @@ describe.skipIf(!HARDWARE)(`walk gloss and white balance in the demo living room
       ceilingRbBefore: ceiling[0] / ceiling[2],
       ceilingAfter: tuned,
       ceilingRbAfter: tuned[0] / tuned[2],
-      furnitureMeshes: { owned, candidates: candidates.length },
+      furnitureMeshes: { owned: atGloss.owned, candidates: atGloss.candidates },
       furniture: {
         mesh: furniture?.name,
         material: furniture ? ([furniture.material].flat()[0] as THREE.Material).name : null,
@@ -458,6 +496,54 @@ describe.skipIf(!HARDWARE)(`walk gloss and white balance in the demo living room
     expect(tuned[1]).toBeGreaterThanOrEqual(tuned[2]);
     expect(furniture).not.toBeNull();
     expect(argmax(fabricAfter)).toBe(argmax(fabric));
-    if (sums[3]![3]! > 0) expect(skyAfter[2] / skyAfter[0]).toBeGreaterThanOrEqual((sky[2] / sky[0]) * 0.999);
+    expect(atWindow.sums[3]![3]!).toBeGreaterThan(100);
+    expect(skyAfter[2] / skyAfter[0]).toBeGreaterThanOrEqual((sky[2] / sky[0]) * 0.999);
+  });
+
+  test("a panorama in walk carries the screen's white balance: the ceiling straight up reads the same hue as a still", async () => {
+    let eye: THREE.Vector3 | null = null;
+    const update = Object.getOwnPropertyDescriptor(THREE.CubeCamera.prototype, 'update')!.value as THREE.CubeCamera['update'];
+    const spy = vi.spyOn(THREE.CubeCamera.prototype, 'update').mockImplementation(function (this: THREE.CubeCamera, ...args) {
+      eye ??= this.position.clone();
+      update.apply(this, args);
+    });
+    const panorama = await handle.capture.panorama({ width: 512, roomId: LIVING, caption: false });
+    spy.mockRestore();
+    expect(eye).not.toBeNull();
+    const up = eye!.clone().add(new THREE.Vector3(0.001, 1, 0));
+    const still = await handle.capture.still({ width: 256, height: 256, camera: { position: eye!, target: up }, fov: 60, caption: false });
+    const decode = (byte: number): number => {
+      const v = byte / 255;
+      return v <= 0.04045 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4;
+    };
+    const meanOf = async (blob: Blob, inside: (x: number, y: number, w: number, h: number) => boolean): Promise<Rgb> => {
+      const bitmap = await createImageBitmap(blob);
+      const canvas = new OffscreenCanvas(bitmap.width, bitmap.height);
+      const context = canvas.getContext('2d')!;
+      context.drawImage(bitmap, 0, 0);
+      const { data } = context.getImageData(0, 0, bitmap.width, bitmap.height);
+      const sum = [0, 0, 0];
+      let n = 0;
+      for (let y = 0; y < bitmap.height; y += 1)
+        for (let x = 0; x < bitmap.width; x += 1) {
+          if (!inside(x, y, bitmap.width, bitmap.height)) continue;
+          const o = (y * bitmap.width + x) * 4;
+          for (let c = 0; c < 3; c += 1) sum[c]! += decode(data[o + c]!);
+          n += 1;
+        }
+      return sum.map((v) => v / Math.max(1, n)) as unknown as Rgb;
+    };
+    // The panorama's top rows look within 14 degrees of straight up; so does the still's centre disc.
+    const fromPanorama = await meanOf(panorama.blob, (_x, y, _w, h) => y < h * 0.08);
+    const fromStill = await meanOf(
+      still.blob,
+      (x, y, w, h) => Math.hypot(x - w / 2, y - h / 2) < ((w / 2) * Math.tan((14 * Math.PI) / 180)) / Math.tan((30 * Math.PI) / 180),
+    );
+    const ratios = (c: Rgb): [number, number] => [c[0] / c[1], c[2] / c[1]];
+    record('panoramaVsStill', { eye: eye!.toArray(), panorama: fromPanorama, still: fromStill });
+    const [pr, pb] = ratios(fromPanorama);
+    const [sr, sb] = ratios(fromStill);
+    expect(Math.abs(pr - sr) / sr).toBeLessThan(0.02);
+    expect(Math.abs(pb - sb) / sb).toBeLessThan(0.02);
   });
 });
