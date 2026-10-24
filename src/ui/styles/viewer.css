@@ -996,6 +996,13 @@
   .jeex-viewer .settings-extension[data-side='start'][data-placement='under'] {
     inset-inline: 0 auto;
   }
+  /* Under the bar, `settings-panel.ts` moves the plate inwards past the producer's mark or a lifted minimap, which keep their places. */
+  .jeex-viewer .settings-extension[data-side='start'] {
+    margin-inline-start: var(--jeex-settings-shift, 0px);
+  }
+  .jeex-viewer .settings-extension[data-side='end'] {
+    margin-inline-end: var(--jeex-settings-shift, 0px);
+  }
   .jeex-viewer .settings-panel[data-anchor='left'] {
     right: auto;
     left: var(--jeex-settings-left, 12px);

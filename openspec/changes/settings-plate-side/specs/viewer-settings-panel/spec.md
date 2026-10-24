@@ -73,3 +73,15 @@ With `settings.side: 'start'` the button SHALL sit beside the bar's start with t
 #### Scenario: Keyboard order on the start side
 - **WHEN** a keyboard user tabs through the bar with the button on the start side
 - **THEN** the settings button comes before the bar's first control, Shift+Tab goes back the same way, and Escape closes the panel with focus on the button
+
+### Requirement: Plate under the bar beside viewer content
+
+When the settings plate sits under the bar, it SHALL NOT cover the viewer's own content in that row, and that content SHALL keep its place: the plate SHALL move along the row, inwards from the bar's edge, to 8 px past the content. This covers the producer's mark at the top start and the minimap a narrow walk lifts under the bar at the top end.
+
+#### Scenario: Producer's mark
+- **WHEN** a project carries a producer's mark and a start-side plate sits under the bar (at 400 or 560 px of viewer width)
+- **THEN** the plate sits in the same row 8 px after the mark, the mark stays where it was, and a tap at the button's centre reaches the button
+
+#### Scenario: Lifted minimap
+- **WHEN** a narrow viewer (562 px or less) in walk lifts the minimap under the bar and the end-side plate sits under the bar
+- **THEN** the plate sits in the same row 8 px before the minimap, the minimap stays where it was, and a tap at the button's centre reaches the button

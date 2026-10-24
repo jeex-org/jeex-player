@@ -345,11 +345,15 @@ describe('the settings panel', { timeout: MOUNT_TIMEOUT_MS }, () => {
       });
       viewers.push(viewer);
       await viewer.ready;
-      const bar = node(viewer, 'control-bar')!.getBoundingClientRect();
       const extension = node(viewer, 'settings-extension')!;
+      await until(() => extension.dataset['placement'] !== undefined, 'the plate placed');
+      const bar = node(viewer, 'control-bar')!.getBoundingClientRect();
       const plate = extension.getBoundingClientRect();
       const box = viewer.element.getBoundingClientRect();
       const where = `${side} ${extension.dataset['placement']} bar ${bar.left}..${bar.right} plate ${plate.left}..${plate.right} box ${box.left}..${box.right}`;
+      // The bar sits off-centre to the left here, so the room differs by side: the fit check of the chosen side puts the
+      // start (right) plate beside the bar and the end (left) plate, with no room left of the bar, under it.
+      expect(extension.dataset['placement'], where).toBe(side === 'start' ? 'beside' : 'under');
       // Beside the mirrored edge, or under it when there is no room beside it.
       if (extension.dataset['placement'] === 'under') {
         expect(Math.abs(side === 'start' ? plate.right - bar.right : plate.left - bar.left), where).toBeLessThan(1.5);
@@ -369,4 +373,123 @@ describe('the settings panel', { timeout: MOUNT_TIMEOUT_MS }, () => {
       viewer.dispose();
     }
   });
+});
+
+/**
+ * Viewer content that keeps its place in the row under the bar: the producer's
+ * mark (top start, from a project manifest) and the minimap a narrow walk
+ * lifts under the bar (top end). The plate moves past them; neither moves.
+ * `elementFromPoint` at the button's centre is the real tap check: a covered
+ * button answers with whatever covers it.
+ */
+describe('the plate under the bar and its neighbours', () => {
+  const PROJECT_URL = '/tests/fixtures/project/project.json';
+  const PROJECT_BASE = new URL('/tests/fixtures/project/', window.location.origin).href;
+  /** One bake build per case on a shared software GPU. */
+  const PROJECT_TIMEOUT_MS = 180_000;
+
+  async function markedProject(): Promise<ViewerOptionsInput> {
+    const manifest = (await (await fetch(PROJECT_URL)).json()) as { scene: string };
+    const scene = (await (await fetch(new URL(manifest.scene, PROJECT_BASE).href)).json()) as unknown;
+    return {
+      scene: { document: scene, library: { manifest: { ...manifest, mark: { href: 'https://example.org/' } }, baseUrl: PROJECT_BASE } },
+    };
+  }
+
+  /** Two tour cameras (fixed UUID v7 ids), so walk shows its camera stepper and a narrow viewer lifts the minimap under the bar. */
+  const withCameras = (): ViewerOptionsInput => ({
+    scene: {
+      repository: new InlineSceneRepository({
+        ...demoScene(),
+        tourCheckpoints: [
+          { id: '01a16c02-9b31-7261-9c3a-694f043f09f7', position: { x: 4.4, y: 1.55, z: 2.4 }, yaw: 0.5, pitch: -0.3 },
+          { id: '01a16c02-9b32-77d7-91ee-b847aa52bf0f', position: { x: 1.1, y: 1.5, z: 5.2 }, yaw: -Math.PI / 2, pitch: -0.4 },
+        ],
+      }),
+    },
+  });
+
+  const apart = (a: DOMRect, b: DOMRect): boolean => a.right <= b.left || b.right <= a.left || a.bottom <= b.top || b.bottom <= a.top;
+
+  function tappable(button: HTMLElement): boolean {
+    // `elementFromPoint` sees only what is inside the window, and the containers of one test stack down the page.
+    button.scrollIntoView({ block: 'center', inline: 'center' });
+    const at = button.getBoundingClientRect();
+    const hit = document.elementFromPoint(at.left + at.width / 2, at.top + at.height / 2);
+    return hit !== null && button.contains(hit);
+  }
+
+  for (const width of [400, 560]) {
+    test(
+      `at ${width} px the start-side plate sits after the producer's mark in its row; the mark stays and the button takes the tap`,
+      async () => {
+        const viewer = await mount(
+          width,
+          { ...(await markedProject()), settings: { show: true, side: 'start' }, chrome: { autoHide: false } },
+          640,
+        );
+        const mark = node(viewer, 'project-mark')!;
+        const extension = node(viewer, 'settings-extension')!;
+        const button = node(viewer, 'settings-button')!;
+        await until(() => apart(extension.getBoundingClientRect(), mark.getBoundingClientRect()), 'the plate past the mark');
+        const box = viewer.element.getBoundingClientRect();
+        const at = mark.getBoundingClientRect();
+        const plate = extension.getBoundingClientRect();
+        const bar = node(viewer, 'control-bar')!.getBoundingClientRect();
+        // The mark where its own rule puts it: 10 px in, 78 px down.
+        expect([at.left - box.left, at.top - box.top]).toEqual([10, 78]);
+        // Same row under the bar, 8 px after the mark, inside the viewer.
+        expect(plate.top).toBeGreaterThan(bar.bottom);
+        expect(plate.left - at.right).toBeCloseTo(8, 0);
+        expect(plate.right).toBeLessThanOrEqual(box.right);
+        expect(tappable(button)).toBe(true);
+      },
+      PROJECT_TIMEOUT_MS,
+    );
+  }
+
+  for (const width of [400, 560]) {
+    test(
+      `at ${width} px in a 330 px high walk the end-side plate moves past the lifted minimap; the minimap stays and the button takes the tap`,
+      async () => {
+        // 330 px high: the stepper lifts the card until its top reaches 8 px under the bar (a short embed, `styles/viewer.css`).
+        const plain = await mount(width, { ...withCameras(), view: { mode: 'walk' }, chrome: { autoHide: false } }, 330);
+        await until(() => node(plain, 'walk-cameras')?.hidden === false, 'the camera stepper shown');
+        await until(
+          () => node(plain, 'minimap')!.getBoundingClientRect().top - plain.element.getBoundingClientRect().top < 120,
+          'the minimap lifted',
+        );
+        const minimapBefore = node(plain, 'minimap')!.getBoundingClientRect();
+        // Lifted under the bar: this is the row the plate shares.
+        expect(minimapBefore.top - plain.element.getBoundingClientRect().top).toBeLessThan(120);
+        const origin = plain.element.getBoundingClientRect();
+        const expected = [minimapBefore.left - origin.left, minimapBefore.top - origin.top, minimapBefore.width, minimapBefore.height];
+        plain.dispose();
+        const viewer = await mount(
+          width,
+          { ...withCameras(), view: { mode: 'walk' }, settings: { show: true }, chrome: { autoHide: false } },
+          330,
+        );
+        await until(() => node(viewer, 'walk-cameras')?.hidden === false, 'the camera stepper shown');
+        const minimap = node(viewer, 'minimap')!;
+        const extension = node(viewer, 'settings-extension')!;
+        const button = node(viewer, 'settings-button')!;
+        // The card glides up when the stepper appears: wait for its lifted place, then for the plate to clear it.
+        await until(
+          () => minimap.getBoundingClientRect().top - viewer.element.getBoundingClientRect().top === expected[1],
+          'the minimap lifted',
+        );
+        await until(() => apart(extension.getBoundingClientRect(), minimap.getBoundingClientRect()), 'the plate past the minimap');
+        const box = viewer.element.getBoundingClientRect();
+        const at = minimap.getBoundingClientRect();
+        expect([at.left - box.left, at.top - box.top, at.width, at.height]).toEqual(expected);
+        const plate = extension.getBoundingClientRect();
+        expect(plate.top).toBeGreaterThan(node(viewer, 'control-bar')!.getBoundingClientRect().bottom);
+        expect(at.left - plate.right).toBeCloseTo(8, 0);
+        expect(plate.left).toBeGreaterThanOrEqual(box.left);
+        expect(tappable(button)).toBe(true);
+      },
+      MOUNT_TIMEOUT_MS,
+    );
+  }
 });

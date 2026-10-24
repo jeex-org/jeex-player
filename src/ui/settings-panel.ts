@@ -34,6 +34,8 @@ import { linkedAbortController, listenerOptions } from '../shared/abort.js';
 import { TEMPERATURE_RANGE } from '../lighting/temperature-range.js';
 import { isLightTemperature } from '../lighting/colour-temperature.js';
 import type { Messages } from './messages.js';
+import { MINIMAP_NAME } from './minimap.js';
+import { PROJECT_MARK_NAME } from './project-mark.js';
 import type { ViewerRoots } from './viewer-shell.js';
 
 /** Where the thumb rests while the value is «Original»: neutral white. */
@@ -46,6 +48,14 @@ const NEUTRAL_MAX_K = 4600;
 /** The gap between the bar's end and the button's plate beside it, and the least room left to the viewer's edge, CSS px. */
 const PLATE_GAP_PX = 4;
 const EDGE_MARGIN_PX = 8;
+/** The room the plate under the bar keeps from viewer content it moves past along that row, CSS px. */
+const NEIGHBOUR_GAP_PX = 8;
+/**
+ * Viewer content in the row under the bar that keeps its place: the
+ * producer's mark (top start) and the minimap lifted under the bar in a narrow
+ * walk (top end). New UI never displaces it; the plate moves along the row.
+ */
+const NEIGHBOURS = `:scope > [data-jeex="${PROJECT_MARK_NAME}"], :scope > [data-jeex="${MINIMAP_NAME}"]`;
 
 /** The control bar edge the button attaches to (`options.settings.side`). */
 export type SettingsSide = 'start' | 'end';
@@ -136,6 +146,9 @@ export class SettingsPanel {
   private opened = false;
   /** Read once: the first `setEnabled(true)` builds the nodes on this side. */
   private side: SettingsSide = 'end';
+  /** How far the plate under the bar is moved inwards past a neighbour, CSS px (`--jeex-settings-shift`). */
+  private shift = 0;
+  private reflowFrame: number | undefined;
   /** The document listener of an open panel; aborted on close. */
   private outside: AbortController | null = null;
   private focusTimer: number | undefined;
@@ -212,7 +225,24 @@ export class SettingsPanel {
     return true;
   }
 
+  /**
+   * Something that can move a neighbour without resizing the bar or the
+   * viewer happened (a mode change, the producer's mark arriving): placed
+   * again on the next frame, once the styles it triggers have applied.
+   */
+  reflow(): void {
+    if (!this.nodes || this.reflowFrame !== undefined) return;
+    this.reflowFrame = window.requestAnimationFrame(() => {
+      this.reflowFrame = undefined;
+      if (this.deps.signal?.aborted === true) return;
+      this.place();
+      if (this.opened) this.anchor();
+    });
+  }
+
   dispose(): void {
+    if (this.reflowFrame !== undefined) window.cancelAnimationFrame(this.reflowFrame);
+    this.reflowFrame = undefined;
     if (this.focusTimer !== undefined) window.clearTimeout(this.focusTimer);
     this.focusTimer = undefined;
     this.outside?.abort();
@@ -299,6 +329,35 @@ export class SettingsPanel {
     const room = PLATE_GAP_PX + nodes.extension.offsetWidth + EDGE_MARGIN_PX;
     const fits = this.onLeft() ? bar.left - room >= frame.left : bar.right + room <= frame.right;
     nodes.extension.dataset['placement'] = fits ? 'beside' : 'under';
+    this.clearNeighbours(bar);
+  }
+
+  /**
+   * Under the bar, moves the plate inwards along its row until it clears every
+   * neighbour it would cover, `NEIGHBOUR_GAP_PX` past it; beside the bar it
+   * stays where it is. Neighbours are watched, so a mark a locale makes wider
+   * moves the plate again.
+   */
+  private clearNeighbours(bar: DOMRect): void {
+    const extension = this.nodes!.extension;
+    const at = extension.getBoundingClientRect();
+    const inward = this.onLeft() ? 1 : -1;
+    const left = at.left - inward * this.shift;
+    const right = left + at.width;
+    let shift = 0;
+    if (at.top >= bar.bottom) {
+      for (const neighbour of this.deps.roots.viewport.querySelectorAll<HTMLElement>(NEIGHBOURS)) {
+        this.observer?.observe(neighbour);
+        const box = neighbour.getBoundingClientRect();
+        if (box.width === 0 || box.bottom <= at.top || box.top >= at.bottom) continue;
+        if (box.right <= left + inward * shift || box.left >= right + inward * shift) continue;
+        shift = inward > 0 ? box.right + NEIGHBOUR_GAP_PX - left : right - (box.left - NEIGHBOUR_GAP_PX);
+      }
+    }
+    if (shift === this.shift) return;
+    this.shift = shift;
+    if (shift > 0) extension.style.setProperty('--jeex-settings-shift', `${Math.round(shift)}px`);
+    else extension.style.removeProperty('--jeex-settings-shift');
   }
 
   private bind(): void {
@@ -389,7 +448,7 @@ export class SettingsPanel {
       return;
     }
     delete nodes.panel.dataset['anchor'];
-    const right = Math.max(8, frame.right - button.right);
+    const right = Math.max(EDGE_MARGIN_PX, frame.right - button.right);
     nodes.panel.style.setProperty('--jeex-settings-right', `${Math.round(right)}px`);
   }
 

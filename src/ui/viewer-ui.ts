@@ -28,7 +28,7 @@ import type { FullscreenController } from './fullscreen-controller.js';
 import { SelectionPanel, type PanelRequest } from './selection-panel.js';
 import { TourBar } from './tour-bar.js';
 import { ViewerChrome, type ChromeCommands, type ChromeFlags, type FullscreenButtonFlags } from './viewer-chrome.js';
-import { SettingsPanel } from './settings-panel.js';
+import { SettingsPanel, type SettingsSide } from './settings-panel.js';
 
 /** The slice of `ViewerOptions` the chrome is laid out from. */
 export type ChromeOptions = {
@@ -36,7 +36,7 @@ export type ChromeOptions = {
   fullscreenButton: FullscreenButtonFlags;
   readonly: boolean;
   /** The settings button (`settings-panel.ts`); the value it shows comes from `setLightTemperature`. */
-  settings: { show: boolean; side: 'start' | 'end' };
+  settings: { show: boolean; side: SettingsSide };
 };
 
 export type { PanelItem, PanelRequest } from './selection-panel.js';
@@ -171,6 +171,8 @@ export class ViewerUI implements DirectorChrome {
    */
   setProjectMark(mark: { readonly href: string } | null | undefined): void {
     this.mark.set(mark);
+    // The mark sits in the row under the bar's start: a plate there moves past it.
+    this.settings.reflow();
   }
 
   /** Adopts a new catalogue: every string the UI owns is re-rendered. */
@@ -233,6 +235,8 @@ export class ViewerUI implements DirectorChrome {
   }
   setModeButtons(mode: ViewerMode): void {
     this.chrome.setModeButtons(mode);
+    // Walk lifts the minimap into the row under the bar's end in a narrow viewer: a plate there moves past it.
+    this.settings.reflow();
   }
   setFurnitureState(visible: boolean): void {
     this.chrome.setFurnitureState(visible);

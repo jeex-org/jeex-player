@@ -29,7 +29,8 @@ as described under [Versioning](#versioning).
   attaches the settings button to the control bar's start instead of its end,
   beside it or under it in narrow viewers, with the panel anchored by its start
   edge and the button first in the bar's keyboard order. Start and end follow
-  the bar's writing direction.
+  the bar's writing direction. Under the bar the plate moves along its row past
+  the producer's mark and a lifted walk minimap, which keep their places.
 - `jeex-viewer/lighting` exports `colourTemperatureRgb` and
   `isLightTemperature`, and `LIGHTING_STANDARD.temperature` holds the range.
   `LIGHTING_STANDARD_VERSION` stays 1.
