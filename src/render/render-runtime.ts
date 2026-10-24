@@ -141,6 +141,13 @@ export class RenderRuntime {
   private renderEnabled = true;
   /** `now()` of the last frame actually drawn, for the keep-warm heartbeat. */
   private lastDrawn = Number.NEGATIVE_INFINITY;
+  /**
+   * `now()` read right AFTER the last display draw returned: the keep-warm
+   * heartbeat counts from the end of a draw, so a draw slower than
+   * `KEEP_WARM_MS` (a slow device) cannot make every flat-plan tick draw.
+   * `lastDrawn` stays the frame's start: telemetry tells a drawn tick by it.
+   */
+  private keptWarm = Number.NEGATIVE_INFINITY;
   private readonly viewport: ViewportBox;
   private readonly hooks: Fanout<[number, number]>;
   private readonly postRenderHooks: Fanout<[number, number]>;
@@ -632,10 +639,11 @@ export class RenderRuntime {
       camera &&
       this.demand.shouldDraw(camera, this.mode()) &&
       this.gate.open &&
-      (this.renderEnabled || now - this.lastDrawn >= KEEP_WARM_MS)
+      (this.renderEnabled || now - this.keptWarm >= KEEP_WARM_MS)
     ) {
       this.draw(camera, delta);
       this.lastDrawn = now;
+      this.keptWarm = this.now();
       this.demand.commit(camera);
       this.firstDraw.drawn();
       this.releaseCompile?.(); // the real background drew with the stand-in's program
