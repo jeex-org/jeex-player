@@ -611,7 +611,7 @@ export class ViewerEditor {
 
   /**
    * Per-frame aura tick: advances the live aura and reaps the finished ones.
-   * Answers whether an aura was on screen (walk and tour redraw while one is).
+   * Answers whether an aura was on screen (the view redraws while one is).
    */
   updateGlows(nowMs: number): boolean {
     const animated = this.selectionGlow !== null || this.fadingGlows.length > 0;

@@ -10,7 +10,8 @@
  * Drawing on demand (`render/render-demand.ts`): whatever these hooks see
  * change on a tick — a shell switch or cutaway, the walk floor ring, a door
  * or furniture frame up to the final one, the selection tint while it fades,
- * an aura while it exists — asks walk and tour to draw that tick.
+ * an aura while it exists — asks for a draw that tick (every mode but
+ * `plan2d` draws on demand).
  *
  * `ViewerStage` puts the CAMERA hook in front of all of these
  * (`viewer-stage.orderFrameHooks`); nothing here may assume anything about the

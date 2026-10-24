@@ -9,8 +9,9 @@
  * resources and the frame clock; every scene-specific update runs as a frame
  * hook registered by the composition root, in registration order, before the
  * single draw of that frame: straight to the screen, or through the post-
- * processing chain attached with `setPostProcessor` (walk and tour). In walk
- * and tour the draw happens only on demand (`render-demand.ts`, `demand`).
+ * processing chain attached with `setPostProcessor` (walk and tour). In every
+ * mode but `plan2d` the draw happens only on demand (`render-demand.ts`,
+ * `demand`); `plan2d` draws its keep-warm heartbeat.
  *
  * First-picture invariant: a started loop draws its first picture only once
  * the scene's programs were compiled asynchronously, or the bound passed
@@ -58,7 +59,7 @@ import type { PostProcessor } from './post-processor.js';
 import { RenderDemand } from './render-demand.js';
 import { FirstDrawGate, FirstDrawSignal } from './first-draw.js';
 import { compileScene } from './scene-compile.js';
-import { devicePixelRatioOf, measureEntry, observeBox, type ObservedBox, type ViewportBox } from './viewport-box.js';
+import { devicePixelRatioOf, measureEntry, observeBox, watchPixelRatio, type ObservedBox, type ViewportBox } from './viewport-box.js';
 
 /** Device pixel ratio cap: above this the fill cost outgrows the visible gain. */
 const PIXEL_RATIO_CAP = 1.7;
@@ -117,7 +118,7 @@ type RenderRuntimeOptions = {
   signal?: AbortSignal | undefined;
   /** A frame hook threw. The frame goes on; the composition root reports it. */
   onError?: ((error: unknown) => void) | undefined;
-  /** The camera mode now: walk and tour draw on demand (`render-demand.ts`). */
+  /** The camera mode now: every mode but `plan2d` draws on demand (`render-demand.ts`). */
   mode?: (() => string | undefined) | undefined;
 };
 
@@ -327,39 +328,21 @@ export class RenderRuntime {
     this.handle = this.schedule(this.frame);
   }
 
-  /**
-   * Follows the display's device pixel ratio.
-   *
-   * There is no `devicepixelratiochange` event: the documented pattern is a
-   * `(resolution: Ndppx)` media query for the CURRENT ratio, which stops
-   * matching the moment the window is dragged onto a display with another one.
-   * The listener is one-shot and re-armed for the new ratio, so this costs one
-   * live listener whatever happens.
-   */
+  /** Follows the display's device pixel ratio (`viewport-box.watchPixelRatio`): a change refits the drawing buffer. */
   private watchPixelRatio(): void {
-    if (typeof matchMedia !== 'function') return;
-    const arm = (): void => {
-      const query = matchMedia(`(resolution: ${devicePixelRatioOf()}dppx)`);
-      query.addEventListener(
-        'change',
-        () => {
-          this.resize();
-          arm();
-        },
-        { once: true, signal: this.listeners.signal },
-      );
-    };
-    arm();
+    watchPixelRatio(() => this.resize(), this.listeners.signal);
   }
 
   /**
    * The ratio the drawing buffer is built at: measured from the device box
-   * where the browser reports one, `window.devicePixelRatio` otherwise, capped
-   * because above the cap the fill cost outgrows the visible gain.
+   * where the browser reports one, the CURRENT `window.devicePixelRatio`
+   * otherwise (a fallback box computed with an older ratio is stale after a
+   * ratio change at the same CSS size), capped because above the cap the fill
+   * cost outgrows the visible gain.
    */
   private pixelRatio(): number {
     const box = this.box;
-    const measured = box && box.cssWidth > 0 ? box.deviceWidth / box.cssWidth : devicePixelRatioOf();
+    const measured = box?.measured && box.cssWidth > 0 ? box.deviceWidth / box.cssWidth : devicePixelRatioOf();
     return Math.min(measured, this.pixelRatioCap);
   }
 
@@ -649,9 +632,9 @@ export class RenderRuntime {
       this.releaseCompile?.(); // the real background drew with the stand-in's program
       this.releaseCompile = null;
     }
-    // The post-render hooks run on skipped ticks too (plan2d, a resting walk):
-    // the camera-preview card's visibility sync lives there. A drawing hook
-    // guards itself, and none may draw on a skipped tick in walk or tour.
+    // The post-render hooks run on skipped ticks too (plan2d, a resting view):
+    // a drawing hook guards itself, and none may draw on a skipped tick (the
+    // camera-preview inset draws only after a main draw).
     this.postRenderHooks.emit(delta, now);
   };
 

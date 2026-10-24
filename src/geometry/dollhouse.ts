@@ -92,7 +92,7 @@ export class Dollhouse {
 
   /**
    * Whether what the shell draws changed since the last call: a shell switch
-   * or a wall cut away or put back. Walk and tour redraw on it
+   * or a wall cut away or put back. The on-demand modes redraw on it
    * (`render/render-demand.ts`).
    */
   takeChanged(): boolean {

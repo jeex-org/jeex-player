@@ -115,7 +115,7 @@ export class SelectionHighlight {
   /**
    * Advances the fade. `now` is the frame clock (`render-runtime.ts`'s hook).
    * Answers whether the picture changed since the last call: a set, clear or
-   * recolour, or a fade step (walk and tour redraw on it, `render-demand.ts`).
+   * recolour, or a fade step (the view redraws on it, `render-demand.ts`).
    */
   update(now: number): boolean {
     const pending = this.pending;

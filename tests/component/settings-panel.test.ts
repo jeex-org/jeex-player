@@ -152,9 +152,9 @@ describe('the settings button', { timeout: MOUNT_TIMEOUT_MS }, () => {
 });
 
 /**
- * A press, dispatched as the other component files do: a live viewer on the
- * software rasteriser keeps the page busy every frame, and Playwright's
- * pointer actions never complete over it.
+ * A press, dispatched as the other component files do. One test below clicks
+ * for real (a resting viewer leaves the page idle); the rest keep the
+ * dispatched press, which needs no pointer travel.
  */
 function press(target: HTMLElement): void {
   target.dispatchEvent(new PointerEvent('pointerdown', { bubbles: true, composed: true, isPrimary: true }));
@@ -174,6 +174,16 @@ describe('the settings panel', { timeout: MOUNT_TIMEOUT_MS }, () => {
     const panel = node(viewer, 'settings-panel')!;
     return { button, panel, slider: panel.querySelector<HTMLInputElement>('input[type="range"]')! };
   }
+
+  test('a real pointer click on the settings button of a mounted viewer opens the panel', async () => {
+    // A real Playwright click, not a dispatched one: the resting viewer draws on demand and leaves the page idle,
+    // on the software rasteriser too. The bar is pinned open so the click never races its idle hide.
+    const viewer = await mount(900, { settings: { show: true }, chrome: { autoHide: false } });
+    const button = node<HTMLButtonElement>(viewer, 'settings-button')!;
+    await userEvent.click(button);
+    expect(node(viewer, 'settings-panel')!.hidden).toBe(false);
+    expect(button.getAttribute('aria-expanded')).toBe('true');
+  });
 
   test('opens on «Original» with the thumb at rest; the keyboard steps 100 K, Escape closes and gives focus back', async () => {
     const viewer = await mount(900, { settings: { show: true } });

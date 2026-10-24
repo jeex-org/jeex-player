@@ -21,7 +21,7 @@ import type { FinishSurface, Vec2 } from '../scene/types.js';
 /**
  * The document's texture source and the device class it draws sizes by;
  * `null` without a WebGL context. `attached` hears every surface whose maps
- * were just attached: the picture changed (walk and tour draw on demand).
+ * were just attached: the picture changed (the view draws on demand).
  */
 export type LibraryTextures = {
   readonly source: TextureSource;

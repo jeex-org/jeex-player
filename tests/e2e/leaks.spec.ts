@@ -55,8 +55,8 @@ test('twenty mount/dispose cycles leave no canvases and no runaway heap', async 
   test.slow();
   await page.goto('/');
   await waitForBoot(page, 'window.__appReady === true');
-  // The demo page's own viewer is disposed before the cycles start. It draws
-  // a frame on every animation frame, and every step of a cycle's boot that
+  // The demo page's own viewer is disposed before the cycles start. While it
+  // eases or animates it draws a frame on every animation frame, and every step of a cycle's boot that
   // waits for a task queues behind that frame: under SwiftShader on a loaded
   // machine a frame took 2.4 s and a cycle 7 s with the page's viewer drawing,
   // 1.1 s with it disposed, so twenty cycles ran past the 180 s budget on

@@ -44,7 +44,7 @@ export function tintArtificialLights(root: THREE.Object3D, temperature: LightTem
 export type LightTemperatureDeps = {
   /** The live scene, `undefined` before the renderer exists. */
   scene: () => THREE.Object3D | undefined;
-  /** Something on screen changed: walk and tour draw the next tick (`render-demand.ts`). */
+  /** Something on screen changed: the next tick draws (`render-demand.ts`). */
   invalidate: () => void;
 };
 

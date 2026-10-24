@@ -176,6 +176,33 @@ export function watchdogTimeoutMessage(
   ].join('\n');
 }
 
+/**
+ * Files that run in a serial step of their own, after the parallel tier: one
+ * worker, no file parallelism, coverage off, same browser and GPU settings.
+ * Exact kept-vs-forced frame comparison is a single-tenant GPU check; under
+ * concurrent GPU rendering the first kept draw differs by ±1–8 levels on thin
+ * edges.
+ */
+export const SERIAL_GPU_FILES: readonly string[] = [
+  'tests/component/render-on-demand.test.ts',
+  'tests/component/baked-surface-walk.test.ts',
+];
+
+/**
+ * The Vitest runs `test:component` makes, in order. A plain run is the
+ * parallel tier without the serial files, then the serial step. A sharded run
+ * (hosted CI: one worker per runner, so each runner is single-tenant already)
+ * and a run naming its own files stay one run, as asked.
+ */
+export function vitestRunsFor(args: readonly string[]): string[][] {
+  const namesFiles = args.some((arg, at) => !arg.startsWith('-') && !(at > 0 && args[at - 1] === '--shard'));
+  if (shardOf(args) !== undefined || namesFiles) return [[...args]];
+  return [
+    [...args, ...SERIAL_GPU_FILES.map((file) => `--exclude=${file}`)],
+    [...args, '--coverage.enabled=false', '--no-file-parallelism', '--maxWorkers=1', ...SERIAL_GPU_FILES],
+  ];
+}
+
 /** The `<index>/<count>` of a `--shard` among Vitest's arguments, either spelling; `undefined` when the run is not sharded. */
 export function shardOf(args: readonly string[]): string | undefined {
   for (let at = 0; at < args.length; at += 1) {
@@ -285,14 +312,12 @@ function liveBrowserCount(): number {
 function runVitestUnderWatchdog(): void {
   const timeoutMs = resolveTimeoutMs(process.env['JEEX_COMPONENT_TIMEOUT_MS']);
   const extraArgs = process.argv.slice(2);
-  const child = spawn('bunx', ['vitest', 'run', '--config', 'vitest.config.ts', ...extraArgs], {
-    stdio: 'inherit',
-    detached: true,
-  });
+  const runs = vitestRunsFor(extraArgs);
+  let child: ReturnType<typeof spawn> | null = null;
 
   const timer = setTimeout(() => {
     console.error(watchdogTimeoutMessage(timeoutMs, liveBrowserCount(), MEASURED_TIER_COST_MS, shardOf(extraArgs)));
-    if (typeof child.pid === 'number') {
+    if (typeof child?.pid === 'number') {
       try {
         process.kill(-child.pid, 'SIGKILL'); // Negative pid: the whole process group, browser children included.
       } catch {
@@ -303,20 +328,37 @@ function runVitestUnderWatchdog(): void {
   }, timeoutMs);
   timer.unref();
 
-  child.on('error', (error) => {
-    clearTimeout(timer);
-    console.error(`test:component: failed to start Vitest: ${error.message}`);
-    process.exit(1);
-  });
-
-  child.on('exit', (code, signal) => {
-    clearTimeout(timer);
-    if (signal) {
-      console.error(`test:component: Vitest exited on signal ${signal}`);
-      process.exit(1);
+  // The runs go one after the other; the first red one ends the tier with its code.
+  const next = (index: number): void => {
+    const args = runs[index];
+    if (args === undefined) {
+      clearTimeout(timer);
+      process.exit(0);
     }
-    process.exit(code ?? 1);
-  });
+    if (index > 0) console.error(`test:component: serial GPU step: ${SERIAL_GPU_FILES.join(', ')}`);
+    child = spawn('bunx', ['vitest', 'run', '--config', 'vitest.config.ts', ...args], {
+      stdio: 'inherit',
+      detached: true,
+    });
+    child.on('error', (error) => {
+      clearTimeout(timer);
+      console.error(`test:component: failed to start Vitest: ${error.message}`);
+      process.exit(1);
+    });
+    child.on('exit', (code, signal) => {
+      if (signal) {
+        clearTimeout(timer);
+        console.error(`test:component: Vitest exited on signal ${signal}`);
+        process.exit(1);
+      }
+      if (code !== 0) {
+        clearTimeout(timer);
+        process.exit(code ?? 1);
+      }
+      next(index + 1);
+    });
+  };
+  next(0);
 }
 
 if (import.meta.main) {
