@@ -19,7 +19,7 @@ See proposal.md and brainstorm.md. Today `installWalkPatch` (`src/render/walk-li
 ## Decisions
 
 1. **Modules.**
-   1. `src/render/shader-compose.ts`: the composer (`addShaderTransform`, `ShaderTransform`, the owned-chunk expansion, the order, the key). Boot bundle: the baked policy needs it in the editing modes.
+   1. `src/render/shader-compose.ts`: the composer (`addShaderTransform`, `ShaderTransform`, the owned-chunk expansion, the order, the key), imported by the walk patch and the baked policy alike.
    2. `src/render/baked-surface.ts`: the four agreed exports (re-exporting the composer's two), flag reads and writes on the sibling's `userData` keys, and the per-draw mask hook. `markBakedSurface` sets the flag, registers the baked transform and installs the mask hook. Its idempotence checks the installed runtime state (a `WeakSet` of materials whose mask hook it installed, and the transform's presence in the composer's list), never the flag alone: `Material.clone()` copies `userData`, so a clone arrives flagged but without its draw hook.
    3. `src/render/baked-surface-glsl.ts`: the baked transform's text and its anchors (`BAKED_CHUNK_ANCHORS`, pinned by a unit test against the installed chunks, as `ENGINE_CHUNK_ANCHORS` is for the walk).
    4. `src/render/light-order.ts`: the adapter that reproduces three r186.1's `WebGLLights` order for a scene and camera and returns the point, spot and directional masks. Pure over the scene graph; no renderer internals read.
@@ -53,7 +53,7 @@ See proposal.md and brainstorm.md. Today `installWalkPatch` (`src/render/walk-li
 
 6. **Context restore**: hooks live on the materials and the uniforms in module state, so three's recompile after a restore re-applies the transforms and the next draw recomputes the masks. Two tests: with a CPU-backed lightmap and direct lights only, the first restored frame equals the frame before the loss (policy and masks survive at once); in walk, equality holds only after the runtime has regenerated the environment and the walk lighting has re-baked its grids and probes (render targets lose their contents on a loss, and the direct look is shown meanwhile).
 
-7. **Budgets**: the composer, the baked policy and the adapter enter the boot bundle (estimated a few KB gzip, inside the 700 KB IIFE budget; measured by `budget-check`). The walk chunk is re-measured after `bun run build:lib`; if it crosses its limit (last measured + 1 KB) from this legitimate growth, the limit is re-measured under that rule in this delivery.
+7. **Budgets**: the composer, the baked policy and the adapter go wherever their first importer is: today the walk patch, so the lazy walk chunk; once the viewer applies light bakes at mount they move into the boot bundle (a few KB gzip, inside the 700 KB IIFE budget; measured by `budget-check`). The walk chunk is re-measured after `bun run build:lib`; if it crosses its limit (last measured + 1 KB) from this legitimate growth, the limit is re-measured under that rule in this delivery.
 
 ## Risks / Trade-offs
 

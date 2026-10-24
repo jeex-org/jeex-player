@@ -116,11 +116,15 @@ function preflightShader(clone: THREE.MeshStandardMaterial, node: string): void 
 /** The clone of `source` bound to `texture`: its hooks kept, the lightmap set, decoded and marked. */
 function bakedClone(source: THREE.MeshStandardMaterial, texture: THREE.Texture, bake: LightBake): THREE.MeshStandardMaterial {
   const clone = source.clone();
-  // `Material.clone` copies neither hook; the decode composes onto the source's own, run with the clone as `this`.
+  // `Material.clone` copies neither hook; both are assigned unbound, so three runs them with the clone as
+  // `this`. The shader composer (`render/shader-compose.ts`) resolves its own copied hooks through `this`
+  // and gives the clone its own copy of the source's transforms; a bound copy would lose that identity.
   const identity = source.onBeforeCompile.toString();
-  clone.onBeforeCompile = source.onBeforeCompile.bind(clone);
-  // three's default key (never assigned) names the hook's source, which a bound copy no longer shows.
-  clone.customProgramCacheKey = Object.hasOwn(source, 'customProgramCacheKey') ? source.customProgramCacheKey.bind(clone) : () => identity;
+  Object.assign(clone, {
+    onBeforeCompile: Reflect.get(source, 'onBeforeCompile'),
+    // three's default key (never assigned) names the CURRENT hook's source; it is pinned to the source's.
+    customProgramCacheKey: Object.hasOwn(source, 'customProgramCacheKey') ? Reflect.get(source, 'customProgramCacheKey') : () => identity,
+  });
   // A shell AO map would darken light the bake already occluded.
   clone.aoMap = null;
   clone.lightMap = texture;

@@ -9,8 +9,8 @@ import * as THREE from 'three';
 import { afterEach, describe, expect, test } from 'vitest';
 import { rgbmDecode } from '../../src/lightmap/rgbm.js';
 import { decorateRgbm } from '../../src/lightmap/lightmap-shader.js';
-import { addShaderTransform } from '../../src/render/baked-surface.js';
-import { patchFragmentShader } from '../../src/render/walk-lighting/box-probe-patch.js';
+import { addShaderTransform, markBakedSurface } from '../../src/render/baked-surface.js';
+import { createWalkUniforms, installWalkPatch, patchFragmentShader } from '../../src/render/walk-lighting/box-probe-patch.js';
 import { closeRenderers, renderLinear, renderer } from './lightmap-support.js';
 
 afterEach(closeRenderers);
@@ -91,7 +91,15 @@ describe('RGBM decode', () => {
     expect(Math.abs(got[0] / expected[0] - 1)).toBeLessThan(0.005);
   });
 
-  test.todo(
-    'the decode holds when the walk lighting installs its patch on a bound material (waits for the lighting to compose its hook through addShaderTransform)',
-  );
+  test('the decode holds when the walk lighting installs its patch on a decoded, baked-marked material', () => {
+    const material = whiteLambert();
+    decorateRgbm(material, 8);
+    markBakedSurface(material);
+    const root = new THREE.Group();
+    root.add(new THREE.Mesh(new THREE.PlaneGeometry(), material));
+    expect(installWalkPatch(root, createWalkUniforms())).toBe(1);
+    expect(material.customProgramCacheKey()).toMatch(/\|jeex-walk-lighting@2\|jeex-baked-surface@1\|jeex-lightmap-rgbm-r8@1$/);
+    const got = readCentre(material);
+    for (let c = 0; c < 3; c++) expect(Math.abs(got[c]! / expected[c]! - 1)).toBeLessThan(0.005);
+  });
 });

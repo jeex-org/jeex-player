@@ -4,8 +4,8 @@
  * lamps, every specular term) and what it drops (ambient, hemisphere, light
  * probes, the probe grid, the environment's diffuse, the fill, baked lamps'
  * diffuse), per drawn light whatever three's light order, without a
- * recompile, across nested renders, copies, the lightmap decode's seam and a
- * context restore.
+ * recompile, across nested renders, copies, the lightmap binding's RGBM
+ * decode and a context restore.
  *
  * Diffuse assertions use a grey `MeshPhysicalMaterial` with
  * `specularIntensity` 0, so no specular term hides in them.
@@ -14,7 +14,8 @@
 import * as THREE from 'three';
 import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
 import { afterEach, describe, expect, test } from 'vitest';
-import { addShaderTransform, markBakedSurface, setLampBaked } from '../../src/render/baked-surface.js';
+import { decorateRgbm } from '../../src/lightmap/lightmap-shader.js';
+import { markBakedSurface, setLampBaked } from '../../src/render/baked-surface.js';
 import { FILL_LIGHT_NAME } from '../../src/render/light-order.js';
 import { packAtlas, type Rgb } from '../../src/render/walk-lighting/exterior-sh.js';
 import { RoomGrid } from '../../src/render/walk-lighting/room-grid.js';
@@ -422,22 +423,6 @@ describe('baked and live lamps', () => {
 
 /* -------------------------------------------------- composition and copies */
 
-/** The lightmap binding's RGBM decode, written literally as that change registers it. */
-function decorateRgbmStandIn(material: THREE.Material): void {
-  addShaderTransform(material, 'jeex-lightmap-rgbm-r8', 1, (shader) => {
-    const glsl = `
-#ifdef USE_LIGHTMAP
-#define JEEX_RGBM_RANGE 8.000000
-#define lightMapIntensity ( lightMapIntensity * lightMapTexel.a * JEEX_RGBM_RANGE )
-#endif`;
-    const token = '#include <lightmap_pars_fragment>';
-    const declaration = 'uniform float lightMapIntensity;';
-    const anchor = shader.fragmentShader.includes(token) ? token : declaration;
-    if (!shader.fragmentShader.includes(anchor)) throw new Error('lightmap decode: no anchor');
-    shader.fragmentShader = shader.fragmentShader.replace(anchor, `${anchor}${glsl}`);
-  });
-}
-
 /** An RGBM lightmap texel: rgb 128, alpha 32 → 0.502 × 0.125 × 8 = 0.502 linear. */
 function rgbmMap(): THREE.DataTexture {
   const texture = new THREE.DataTexture(new Uint8Array([128, 128, 128, 32]), 1, 1);
@@ -447,7 +432,7 @@ function rgbmMap(): THREE.DataTexture {
 }
 
 describe('composition', () => {
-  test('the decode composes with the walk patch and the baked mark in any registration order, as one program', () => {
+  test("the lightmap binding's RGBM decode composes with the walk patch and the baked mark in any registration order, as one program", () => {
     const gl = renderer();
     const uniforms = createWalkUniforms();
     const readOne = (order: 'decode first' | 'walk first'): { value: [number, number, number]; key: string } => {
@@ -455,13 +440,13 @@ describe('composition', () => {
       const scene = new THREE.Scene();
       scene.add(plane(material));
       if (order === 'decode first') {
-        decorateRgbmStandIn(material);
+        decorateRgbm(material, 8);
         markBakedSurface(material);
         installWalkPatch(scene, uniforms);
       } else {
         installWalkPatch(scene, uniforms);
         markBakedSurface(material);
-        decorateRgbmStandIn(material);
+        decorateRgbm(material, 8);
       }
       return { value: read(gl, scene).at(...CENTRE), key: material.customProgramCacheKey() };
     };
@@ -485,7 +470,7 @@ describe('composition', () => {
       onBeforeCompile: Reflect.get(source, 'onBeforeCompile'),
       customProgramCacheKey: Reflect.get(source, 'customProgramCacheKey'),
     });
-    decorateRgbmStandIn(clone);
+    decorateRgbm(clone, 8);
     markBakedSurface(clone);
     const bakedLamp = pointLamp();
     setLampBaked(bakedLamp, true);
