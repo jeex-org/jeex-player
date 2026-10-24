@@ -32,8 +32,15 @@ export function isArtificialLight(object: THREE.Object3D): object is THREE.Light
 /** The original colour a tagged object carries, or `null`. */
 export function artificialColour(object: THREE.Object3D): readonly [number, number, number] | null {
   const tag = object.userData[ARTIFICIAL_LIGHT_KEY] as Partial<ArtificialLightTag> | undefined;
-  const colour = tag?.colour;
-  return Array.isArray(colour) && colour.length === 3 ? (colour as readonly [number, number, number]) : null;
+  const colour: unknown = tag?.colour;
+  if (!Array.isArray(colour) || colour.length !== 3) return null;
+  const [r, g, b]: unknown[] = colour;
+  return isFiniteNumber(r) && isFiniteNumber(g) && isFiniteNumber(b) ? (colour as [number, number, number]) : null;
+}
+
+/** A number that is neither NaN nor ±Infinity; a tag may arrive from a GLB's extras untyped. */
+function isFiniteNumber(value: unknown): value is number {
+  return typeof value === 'number' && Number.isFinite(value);
 }
 
 /** The `userData` key of the tag a light built from a variant's `lights` fact carries. */
@@ -54,8 +61,20 @@ export type LampLightTag = {
   readonly shadow: boolean;
 };
 
-/** The fact tag `object` carries, or `null` for any other object (a bank bulb included). */
+/**
+ * The fact tag `object` carries, or `null` for any other object (a bank bulb
+ * included) and for a tag whose fields have the wrong types: a GLB node's
+ * `extras` reach `userData` unfiltered, so the fields are checked here.
+ */
 export function lampLightTag(object: THREE.Object3D): LampLightTag | null {
-  const tag = object.userData[LAMP_LIGHT_KEY] as Partial<LampLightTag> | undefined;
-  return tag?.source === 'fact' ? (tag as LampLightTag) : null;
+  const tag = object.userData[LAMP_LIGHT_KEY] as Partial<Record<keyof LampLightTag, unknown>> | undefined;
+  if (tag?.source !== 'fact') return null;
+  const { placementId, index, lumens, cutoff, shadow } = tag;
+  return typeof placementId === 'string' &&
+    Number.isInteger(index) &&
+    isFiniteNumber(lumens) &&
+    isFiniteNumber(cutoff) &&
+    typeof shadow === 'boolean'
+    ? (tag as LampLightTag)
+    : null;
 }

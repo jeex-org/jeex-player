@@ -143,4 +143,31 @@ describe('collectLampLights', () => {
     expect(root.getObjectByName(FURNITURE_GROUP_NAME)).toBeDefined();
     builder.dispose();
   });
+
+  test('forged tags are skipped: only a point light whose tag fields have the right types', () => {
+    const { builder, root } = lampScene();
+    const fact = { source: 'fact', placementId: LAMPS.placement.tableLamp, index: 0, lumens: 400, cutoff: 3, shadow: false };
+    // A GLB's node extras land in userData unfiltered, so a plain node can carry both tags.
+    const forged = new THREE.Object3D();
+    forged.userData = { assetId: 'forged', lampLight: fact, artificialLight: { colour: [1, 1, 1] } };
+    root.add(forged);
+    const badFields: Array<Record<string, unknown>> = [
+      { lumens: '400' },
+      { lumens: Number.POSITIVE_INFINITY },
+      { cutoff: Number.NaN },
+      { index: 0.5 },
+      { shadow: 'yes' },
+      { placementId: 7 },
+    ];
+    for (const bad of badFields) {
+      const light = new THREE.PointLight();
+      light.userData = { assetId: 'forged', lampLight: { ...fact, ...bad }, artificialLight: { colour: [1, 1, 1] } };
+      root.add(light);
+    }
+    const badColour = new THREE.PointLight();
+    badColour.userData = { assetId: 'forged', lampLight: fact, artificialLight: { colour: ['1', 1, 1] } };
+    root.add(badColour);
+    expect(collectLampLights(root).map((entry) => entry.placementId)).toEqual([LAMPS.placement.tableLamp, LAMPS.placement.pendant]);
+    builder.dispose();
+  });
 });

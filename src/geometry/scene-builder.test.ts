@@ -1320,14 +1320,23 @@ describe('a hanging project pendant, through the builder', () => {
     builder.dispose();
   });
 
-  test('walk obstacles, plan facts and the layout lint are identical before and after, and match the drawn box', async () => {
+  test('the document facts (walk obstacles, plan facts, layout lint) are unchanged by the build and the upgrade', async () => {
     const scene = hangingScene();
     const plan = solvePlan(scene);
     const before = facts(scene, plan);
     const builder = hangingBuilder(scene);
-    const { root } = builder.build();
+    builder.build();
     await builder.upgradeModels(new AbortController().signal);
     expect(facts(scene, plan)).toEqual(before);
+    builder.dispose();
+  });
+
+  test('the drawn box after the upgrade matches the catalogue mount the walk and lint read', async () => {
+    const scene = hangingScene();
+    const before = facts(scene, solvePlan(scene));
+    const builder = hangingBuilder(scene);
+    const { root } = builder.build();
+    await builder.upgradeModels(new AbortController().signal);
     const mounts = (before as { mounts: Array<{ id: string; mount: { low: number; high: number } }> }).mounts;
     // Within 5 mm: the bank ceiling light's builder draws 2 mm more than its catalogue drop.
     for (const id of [HANGING.placement, BANK_CEILING]) {

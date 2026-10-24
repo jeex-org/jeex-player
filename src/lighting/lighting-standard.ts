@@ -192,8 +192,9 @@ export const LIGHTING_STANDARD = deepFreeze({
    * into candela, `cd = lm / 4π × exposure`. Calibrated at one point, 400 lm =
    * 1.2 cd (the bank table lamp), so a baked lamp reads as bright as the bank
    * lamp it reproduces; it moves with any exposure or tone-mapping change of
-   * the display. It changes no rig value, so the appearance version does not
-   * depend on it.
+   * the display. Adding it changed no look, so the version stays 1; a change
+   * of `exposure` changes how every lamp looks and raises
+   * `LIGHTING_STANDARD_VERSION`.
    */
   lamp: { exposure: (1.2 * 4 * Math.PI) / 400 },
 });

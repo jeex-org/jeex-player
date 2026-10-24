@@ -1,9 +1,9 @@
 /**
  * The lamp lights of a built scene, as plain data for the lightmap bake.
  *
- * Only lights built from a variant's `lights` fact are collected (the tag
- * `assets/artificial-light.ts` names), never a bank builder's bulb nor any
- * other light. Each entry is in world space and carries the AUTHORED linear
+ * Only point lights built from a variant's `lights` fact are collected (the
+ * tag `assets/artificial-light.ts` names, its fields type-checked), never a
+ * bank builder's bulb, any other light, nor a plain node carrying the tag. Each entry is in world space and carries the AUTHORED linear
  * colour from the artificial-light tag, not the live colour a light
  * temperature tinted, and the candela of the one shared conversion
  * (`lighting/lamp-units.ts`).
@@ -55,6 +55,8 @@ export function collectLampLights(root: THREE.Object3D): CollectedLampLight[] {
   const entries: CollectedLampLight[] = [];
   const world = new THREE.Vector3();
   root.traverse((object) => {
+    // Only a real point light: a GLB node can carry forged tags in its extras.
+    if (!(object as Partial<THREE.PointLight>).isPointLight) return;
     const tag = lampLightTag(object);
     const colour = tag === null ? null : artificialColour(object);
     if (tag === null || colour === null) return;
