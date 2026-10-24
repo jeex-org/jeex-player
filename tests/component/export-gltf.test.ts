@@ -130,6 +130,16 @@ describe('exportGlb', () => {
     }
   });
 
+  test('no material carries the light bake facts of an opening part in its extras', async () => {
+    const json = await readGlbJson(await exportGlb(fakeDeps()));
+    const materials = (json['materials'] as Array<{ name?: string; extras?: Record<string, unknown> }> | undefined) ?? [];
+    expect(materials.length).toBeGreaterThan(0);
+    const leaking = materials.filter(
+      (material) => material.extras?.['jeexFinish'] !== undefined || material.extras?.['jeexGlass'] !== undefined,
+    );
+    expect(leaking.map((material) => material.name ?? '(unnamed)')).toEqual([]);
+  });
+
   test('`includeFurniture: false` drops the furniture group from the export', async () => {
     const withFurniture = await readGlbJson(await exportGlb(fakeDeps()));
     const withoutFurniture = await readGlbJson(await exportGlb(fakeDeps(), { includeFurniture: false }));

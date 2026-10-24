@@ -129,7 +129,7 @@ const wallSideSchema = z.enum(['L', 'R']);
  * `FaceKey`: strict, like `isFaceKey` — a face carries its owners and its side
  * and nothing else, so an unknown key is refused rather than stripped.
  */
-const faceKeySchema = z.strictObject({ room: z.optional(uuidSchema), wallId: uuidSchema, side: wallSideSchema });
+export const faceKeySchema = z.strictObject({ room: z.optional(uuidSchema), wallId: uuidSchema, side: wallSideSchema });
 
 /**
  * `FinishObject` (schema 2.3): strict, its `material` a UUID v7, `colour`
@@ -152,7 +152,7 @@ const finishObjectSchema = z
   );
 
 /** `FinishRef`: a bare finish UUID (judged against the registries, like every finish) or a `FinishObject`. */
-const finishRefSchema = z.union([z.string(), finishObjectSchema]);
+export const finishRefSchema = z.union([z.string(), finishObjectSchema]);
 
 /** `FaceFinish`: one entry of `finishes.faces`, the face plus the finish it wears. */
 const faceFinishSchema = z.strictObject({
