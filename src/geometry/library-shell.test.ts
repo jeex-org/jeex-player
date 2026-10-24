@@ -21,6 +21,7 @@ import { LIBRARY_REGISTRIES } from '../fixtures/library-finishes.js';
 import { FINISH } from '../materials/finish-ids.js';
 import { TextureSource } from '../materials/texture-source.js';
 import { createLogger } from '../shared/logger.js';
+import type { LibraryMaterial, ProjectMaterial } from '../materials/finish-types.js';
 
 const ROOM = L_SHAPE.room;
 
@@ -369,5 +370,56 @@ describe('mapsSettled', () => {
     await Promise.resolve();
     await Promise.resolve();
     expect(settled).toBe(true);
+  });
+});
+
+describe('room-surface materials apart from the project materials (the export draws room surfaces only)', () => {
+  test('`surfaceMaterials` dresses the room surfaces when `projectMaterials` is absent', () => {
+    const scene = dressed();
+    const { root } = new SceneBuilder(scene, solvePlan(scene), {
+      surfaceMaterials: LIBRARY_MATERIALS,
+      findFinish: PROJECT.findFinish,
+    }).build();
+    const floor = (root.getObjectByName(`floor-${ROOM.a}`) as THREE.Mesh).material as THREE.MeshStandardMaterial;
+    expect(floor.name).toBe(NATURAL_SCAN.id);
+    expect(hexOf(floor)).toBe('#9a7b56');
+  });
+});
+
+describe('a texture handle that takes no compressed maps', () => {
+  test('a KTX2 material asks it for nothing and stays flat; a WebP one is loaded as before', async () => {
+    const network = stubTextures();
+    const library = NATURAL_SCAN as ProjectMaterial & { library: LibraryMaterial };
+    const ktx2: ProjectMaterial = {
+      ...NATURAL_SCAN,
+      library: {
+        ...library.library,
+        maps: Object.fromEntries(
+          Object.entries(library.library.maps).map(([role, map]) => [
+            role,
+            {
+              ...map,
+              files: Object.fromEntries(Object.entries(map.files).map(([size, path]) => [size, path.replace('.webp', '.ktx2')])),
+            },
+          ]),
+        ),
+      },
+    };
+    const scene = dressed();
+    const options = (material: ProjectMaterial): SceneBuilderOptions => ({
+      surfaceMaterials: [material, ...LIBRARY_MATERIALS.filter((entry) => entry.id !== material.id)],
+      findFinish: PROJECT.findFinish,
+      textures: { ...network.textures, compressed: false },
+    });
+    const flat = new SceneBuilder(scene, solvePlan(scene), options(ktx2));
+    const flatRoot = flat.build().root;
+    await flat.mapsSettled();
+    await flush();
+    expect(network.fetched.filter((url) => url.endsWith('.ktx2'))).toEqual([]);
+    expect(((flatRoot.getObjectByName(`floor-${ROOM.a}`) as THREE.Mesh).material as THREE.MeshStandardMaterial).map).toBeNull();
+    const textured = new SceneBuilder(scene, solvePlan(scene), options(NATURAL_SCAN));
+    const texturedRoot = textured.build().root;
+    await textured.mapsSettled();
+    expect(((texturedRoot.getObjectByName(`floor-${ROOM.a}`) as THREE.Mesh).material as THREE.MeshStandardMaterial).map).not.toBeNull();
   });
 });
