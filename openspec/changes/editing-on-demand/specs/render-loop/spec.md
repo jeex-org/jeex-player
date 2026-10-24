@@ -64,11 +64,15 @@ In `orbit` and `plan3d` a display draw SHALL follow every visible change of the 
 
 ### Requirement: A selection aura keeps drawing
 
-While a selected object's aura is shown in `orbit` or `plan3d`, the view SHALL keep drawing on every tick, because the aura animates; once the selection is cleared and the clearing is drawn, the view SHALL rest.
+While an editor selection aura is on screen in `orbit` or `plan3d`, including its fade-out after the selection is cleared, the view SHALL draw on every tick, because the aura animates; after the aura's final removal is drawn the view SHALL rest. A host-set selection tint without an aura SHALL draw through its finite fade and then rest.
 
-#### Scenario: Selection then clear
-- **WHEN** an object is selected in `orbit`, and later the selection is cleared at an unchanged pose
-- **THEN** every tick draws while the aura is shown, the unselected picture is drawn on the next tick after clearing, and the view rests afterwards
+#### Scenario: Editor aura through its fade-out
+- **WHEN** an object is selected in the editor in `orbit`, and later the selection is cleared at an unchanged pose
+- **THEN** every tick draws while the aura is shown and while it fades out, the picture without the aura is drawn, and the view rests afterwards
+
+#### Scenario: Host selection tint
+- **WHEN** the host sets a selection at an unchanged pose in `orbit`
+- **THEN** ticks draw through the tint's fade, and the view rests once the fade ends
 
 ### Requirement: The camera-preview inset under on-demand drawing
 
@@ -98,14 +102,22 @@ In `plan2d` the scene behind the opaque plan drawing SHALL keep being drawn at t
 
 In `orbit` and `plan3d` a display draw SHALL follow a resize, a pixel-ratio change (the plan canvas included), returning to a visible tab, a reattached or revealed canvas, and a GPU context restore. The first display draw SHALL still wait for shader compilation, and a viewer mounted hidden SHALL still announce readiness without drawing and draw when revealed. Captures SHALL render on their own paths and SHALL NOT clear pending demand.
 
-#### Scenario: Resize and pixel ratio
-- **WHEN** the canvas is resized, or only its pixel ratio changes, while the camera rests in `orbit`
+#### Scenario: Resize
+- **WHEN** the canvas is resized while the camera rests in `orbit`
 - **THEN** one display draw follows the fit, and the view rests afterwards
+
+#### Scenario: Pixel ratio only
+- **WHEN** only the device pixel ratio changes at a fixed CSS size, in `orbit` or in `plan2d`
+- **THEN** the drawing buffer and the plan canvas are refitted to the new ratio, one display draw follows in `orbit`, and `plan2d` keeps its heartbeat
+
+#### Scenario: Hidden mount
+- **WHEN** a viewer is mounted hidden in `orbit` and later revealed
+- **THEN** it announces readiness without a display draw while hidden, draws on reveal, and rests afterwards
 
 #### Scenario: Context restore
 - **WHEN** the GPU context is lost and restored in `orbit`
 - **THEN** the view draws again after compilation and rests afterwards
 
 #### Scenario: Still with pending demand
-- **WHEN** a still or a panorama is captured in `orbit` while a redraw is pending
-- **THEN** the capture succeeds and the pending redraw still happens on the next tick
+- **WHEN** a still or a panorama is captured in `orbit` while one non-animating redraw is pending and no display tick runs during the capture
+- **THEN** the capture succeeds without a display draw, and the pending redraw happens on the next display tick

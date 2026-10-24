@@ -10,7 +10,7 @@ The editing modes (`orbit`, labelled «360», and `plan3d`) draw a full frame on
 - Visible changes that reach the screen today only because every frame draws now request a draw: checkpoint markers, gizmos, hover, invalid tint, placement ghost, drags, rebuilds and revert; asset move, nudge and mirror previews, their revert, and the placement legality mask.
 - The stage reorders its frame end: the checkpoint trajectory's deferred rebuild runs before the draw decision, and the camera-preview inset draws only right after a main frame; opening, closing, dragging, resizing and relocating the inset request a draw, and closing it redraws the main picture.
 - `plan2d` keeps its keep-warm heartbeat (stated in the spec as the one mode that does not rest, with its reason). A selected object's animated aura keeps the view drawing while it is shown, by design.
-- The first-picture gate, hidden mounts, resume, resize and pixel-ratio redraws, the sun-shadow cache and captures keep their behaviour.
+- The first-picture gate, hidden mounts, resume, resize redraws, the sun-shadow cache and captures keep their behaviour. A pixel-ratio-only change now refits the drawing buffer and the plan canvas (today it can keep the old buffer size, hidden by continuous drawing).
 - Tests: the component test that pinned «editing modes keep drawing every tick» is replaced by idle and per-source redraw proofs on the GPU and on software rendering, with a test-side skipped-draw verifier; one settings-panel test returns to a real pointer click on a mounted viewer.
 
 ## Capabilities
@@ -26,7 +26,7 @@ None.
 
 ## Impact
 
-- Code: `src/render/render-demand.ts` (mode set), `src/app/viewer-stage.ts` (frame-end ordering), `src/ui/camera-preview.ts` (sync split from draw), `src/camera/checkpoint-overlay.ts` and `src/app/asset-move-wiring.ts` (request points), with the asset surface overlay show and remove.
+- Code: `src/render/render-demand.ts` (mode set), `src/app/viewer-stage.ts` (frame-end ordering), `src/ui/camera-preview.ts` (sync split from draw), `src/camera/checkpoint-overlay.ts` and `src/app/asset-move-wiring.ts` (request points), with the asset surface overlay show and remove; `src/render/render-runtime.ts` and `src/ui/plan-modes.ts` (pixel-ratio refit); `src/app/debug-parts.ts` and `src/app/viewer-debug.ts` (`insetDraws`).
 - Tests: `tests/component/render-on-demand.test.ts`, `tests/component/settings-panel.test.ts`, unit tests next to the changed modules, a test-only skipped-draw verifier helper.
-- Public API: unchanged. `__viewerDebug.renderDemand()` keeps its shape. Chrome and canvas e2e baselines must stay unchanged.
+- Public API: unchanged. `__viewerDebug.renderDemand()` retains `ticks` and `draws` and adds `insetDraws`. Chrome and canvas e2e baselines must stay unchanged.
 - Hosts: a resting editing view stops drawing; nothing a host reads (`getState()`, events, captures) changes.
