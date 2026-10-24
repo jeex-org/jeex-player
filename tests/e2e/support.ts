@@ -254,6 +254,18 @@ export type AxeViolation = { id: string; impact: string; nodes: number; help: st
  * green while those fixes land.
  */
 export async function axeScan(page: Page): Promise<AxeViolation[]> {
+  // Colours are judged at rest: a CSS transition still running (a mode button
+  // fading to its active colours) would be measured half-way. A page whose
+  // canvas rests no longer slows the steps before the scan, so the scan can
+  // land inside one.
+  await page.evaluate(() =>
+    Promise.all(
+      document
+        .getAnimations()
+        .filter((animation) => animation instanceof CSSTransition)
+        .map((animation) => animation.finished.catch(() => undefined)),
+    ),
+  );
   const results = await new AxeBuilder({ page }).withTags(WCAG_TAGS).analyze();
   return results.violations
     .map((violation) => ({

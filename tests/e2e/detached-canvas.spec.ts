@@ -20,13 +20,16 @@ import { waitForBoot } from './support.js';
 
 /** The page's modules, imported inside the page (see `leaks.spec.ts` for why through a computed path). */
 type ViewerModule = {
-  mountViewer: (container: HTMLElement, options: unknown) => { ready: Promise<void>; dispose(): void };
+  mountViewer: (
+    container: HTMLElement,
+    options: unknown,
+  ) => { ready: Promise<void>; dispose(): void; setLightTemperature(temperature: number | null): void };
   InlineSceneRepository: new (scene: unknown) => unknown;
 };
 type SceneModule = { apartmentScene: unknown };
 type ProbeWindow = Window & {
   __draws: number;
-  __probe?: { box: HTMLElement; host: HTMLElement; dispose(): void };
+  __probe?: { box: HTMLElement; host: HTMLElement; dispose(): void; redraw(): void; redrawAgain(): void };
 };
 
 /** Long enough for any frame already queued at removal to have run, ms. */
@@ -75,16 +78,26 @@ test('a viewer removed without dispose stops drawing, and drawing resumes when i
       debug: false,
     });
     await handle.ready;
-    (window as unknown as ProbeWindow).__probe = { box, host, dispose: () => handle.dispose() };
+    (window as unknown as ProbeWindow).__probe = {
+      box,
+      host,
+      dispose: () => handle.dispose(),
+      redraw: () => handle.setLightTemperature(3000),
+      redrawAgain: () => handle.setLightTemperature(5000),
+    };
   });
 
+  // A resting view draws only on a change: one is asked for, and it draws.
   const attached = await draws(page);
+  await page.evaluate(() => (window as unknown as ProbeWindow).__probe?.redraw());
   await expect.poll(() => draws(page)).toBeGreaterThanOrEqual(attached + RUNNING_DRAWS);
 
   // The host takes the viewer's container off the page and does not dispose it.
   await page.evaluate(() => (window as unknown as ProbeWindow).__probe?.box.remove());
   await page.waitForTimeout(SETTLE_MS);
   const parked = await draws(page);
+  // A change asked for while parked is drawn only once the canvas is back.
+  await page.evaluate(() => (window as unknown as ProbeWindow).__probe?.redrawAgain());
   await page.waitForTimeout(QUIET_MS);
   expect(await draws(page), 'nothing may be drawn while the canvas is off the page').toBe(parked);
 
