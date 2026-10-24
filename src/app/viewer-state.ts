@@ -6,7 +6,7 @@
  * player, the furniture switch from the composition root, the locale from the
  * catalogue, and the document's identity from the mounted model.
  *
- * Consistency invariant: the eight fields are read in one synchronous pass, so
+ * Consistency invariant: the nine fields are read in one synchronous pass, so
  * they describe ONE moment. That is the whole point of the call — a host
  * rendering its own chrome from five separate getters can catch them
  * disagreeing, and across a frame boundary five getters are five messages.
@@ -30,6 +30,8 @@ type ViewerStateDeps = {
   walkCamera: () => { index: number | null; count: number };
   /** The tour-camera tool: the camera looked through, and whether click-to-place is waiting. */
   checkpoints: () => { lookThrough: string | null; placing: boolean };
+  /** The colour temperature of the artificial light, `null` for «Original». */
+  lightTemperature: () => number | null;
 };
 
 export function readViewerState(deps: ViewerStateDeps): ViewerState {
@@ -43,5 +45,6 @@ export function readViewerState(deps: ViewerStateDeps): ViewerState {
     rev: model?.rev ?? 0,
     walk: { camera: deps.walkCamera() },
     checkpoints: deps.checkpoints(),
+    lightTemperature: deps.lightTemperature(),
   };
 }

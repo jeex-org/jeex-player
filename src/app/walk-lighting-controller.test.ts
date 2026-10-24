@@ -10,6 +10,9 @@ class FakeLighting implements WalkLightingHandle<Doc> {
   frames: boolean[] = [];
   loads: Doc[] = [];
   refreshes: LightingScope[] = [];
+  /** Probes still to re-capture after a relight, one per eligible live frame. */
+  pendingProbes = 0;
+  relights = 0;
   disposed = false;
   loadError: Error | null = null;
   private left: number;
@@ -23,7 +26,15 @@ class FakeLighting implements WalkLightingHandle<Doc> {
   }
   frame(eligible: boolean): void {
     this.frames.push(eligible);
+    if (eligible && this.phase === 'live' && this.pendingProbes > 0) this.pendingProbes -= 1;
     if (eligible && this.phase !== 'live' && --this.left <= 0) this.phase = 'live';
+  }
+  get recapturing(): boolean {
+    return this.phase === 'live' && this.pendingProbes > 0;
+  }
+  relight(): void {
+    this.relights += 1;
+    this.pendingProbes = 3;
   }
   refresh(scope: LightingScope): void {
     this.refreshes.push(scope);
@@ -228,5 +239,54 @@ describe('WalkLightingController.update answers whether the look changed (walk a
     };
     expect(controller.update('walk')).toBe(true);
     expect(controller.update('walk')).toBe(false);
+  });
+});
+
+describe('WalkLightingController.relit (a new colour of the artificial light)', () => {
+  async function live() {
+    const context = setup({ bakeFrames: 1 });
+    context.controller.update('walk');
+    await context.finishBuild();
+    context.controller.update('walk');
+    return context;
+  }
+
+  test('re-captures the probes once the value has settled for 250 ms, coalescing repeated input', async () => {
+    const { controller, built, tick } = await live();
+    controller.relit();
+    tick(100);
+    controller.relit();
+    tick(200);
+    controller.update('walk');
+    expect(built[0]!.relights).toBe(0);
+    tick(50);
+    controller.update('walk');
+    expect(built[0]!.relights).toBe(1);
+    // Nothing more without a new value.
+    tick(1000);
+    controller.update('walk');
+    expect(built[0]!.relights).toBe(1);
+    expect(built[0]!.refreshes).toEqual([]);
+  });
+
+  test('every frame that writes a probe asks for a draw; the frames after the last do not', async () => {
+    const { controller, built, tick } = await live();
+    controller.relit();
+    tick(300);
+    // The relight frame writes the first probe, the next two the others.
+    expect([controller.update('walk'), controller.update('walk'), controller.update('walk')]).toEqual([true, true, true]);
+    expect(built[0]!.pendingProbes).toBe(0);
+    expect(controller.update('walk')).toBe(false);
+  });
+
+  test('a change made outside walk re-captures on the next entry into walk', async () => {
+    const { controller, built, tick } = await live();
+    controller.update('orbit');
+    controller.relit();
+    tick(5000);
+    controller.update('orbit');
+    expect(built[0]!.relights).toBe(0);
+    controller.update('walk');
+    expect(built[0]!.relights).toBe(1);
   });
 });

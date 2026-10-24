@@ -126,4 +126,12 @@ export const DE: Record<MessageKey, string> = {
   'viewer.label': 'JEEX Wohnungs-Viewer',
   'canvas.label': 'Interaktive 3D-Wohnungsszene',
   'canvas.fallbackLabel': 'Präsentationsvorschau der Wohnungsszene',
+  'settings.label': 'Einstellungen',
+  'settings.title': 'Viewer-Einstellungen',
+  'settings.temperature': 'Lichttemperatur',
+  'settings.original': 'Original',
+  'settings.temperatureValue': '{kelvin} K · {tone}',
+  'settings.warm': 'warm',
+  'settings.neutral': 'neutral',
+  'settings.cool': 'kühl',
 };

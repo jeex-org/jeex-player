@@ -78,6 +78,8 @@ export type CommandMethod =
   | 'getScene'
   | 'setFurnitureVisible'
   | 'setLocale'
+  /** The colour temperature of the artificial light, `{ temperature: number | null }`; the `lightTemperature` event carries it back. */
+  | 'setLightTemperature'
   /** Re-measures the frame's container; the host calls it after its own layout change. */
   | 'resize'
   /** One still, answered as `{ png: ArrayBuffer; provenance }` — a structured clone, not a data URL. */
@@ -153,7 +155,7 @@ export type ErrorCode =
 /**
  * What the frame pushes to the host, unasked, and what each event carries.
  *
- * It mirrors `ViewerEventMap` (`app/viewer-events.ts`) and adds the tour's four:
+ * It mirrors a part of `ViewerEventMap` (`app/viewer-events.ts`, `lightTemperature` included) and adds the tour's four:
  * `progress`, `state`, `ended` — and `disposed`, which the HOST handle raises
  * for itself when it tears the frame down.
  */
@@ -175,6 +177,8 @@ export type EmbedEventMap = {
    * `autoHeight`). Only `embed.html` raises it; a hand-built frame page may not.
    */
   size: { width: number; height: number };
+  /** The colour temperature of the artificial light changed: kelvin or `null` («Original»), and who changed it. */
+  lightTemperature: { temperature: number | null; source: 'host' | 'panel' };
   disposed: undefined;
 };
 
@@ -256,6 +260,7 @@ export const METHOD_LIST = [
   'getScene',
   'setFurnitureVisible',
   'setLocale',
+  'setLightTemperature',
   'resize',
   'captureStill',
   'capturePanorama',

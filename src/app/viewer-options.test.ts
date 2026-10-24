@@ -71,6 +71,8 @@ function sampleValueFor(spec: OptionSpec): { raw: string; resolved: unknown } {
       return { raw: 'https://stats.example/player', resolved: 'https://stats.example/player' };
     case 'switch':
       return { raw: 'off', resolved: 'off' };
+    case 'temperature':
+      return { raw: '3000', resolved: 3000 };
   }
 }
 
@@ -113,6 +115,8 @@ describe('resolveViewerOptions', () => {
       debug: DEFAULT_VIEWER_OPTIONS.debug,
       scene: { url: undefined },
       analytics: { mode: 'on', endpoint: undefined },
+      settings: { show: false },
+      lighting: { temperature: null },
       onLog: logged.sink,
     });
     // The tour only engages at start in `view.mode: 'tour'`; `tour.mode` says
@@ -175,6 +179,8 @@ describe('resolveViewerOptions', () => {
       debug: DEFAULT_VIEWER_OPTIONS.debug,
       scene: { url: undefined },
       analytics: { mode: 'on', endpoint: undefined },
+      settings: { show: false },
+      lighting: { temperature: null },
       onLog: logged.sink,
     });
     expect(Object.keys(resolved)).toEqual([
@@ -196,6 +202,8 @@ describe('resolveViewerOptions', () => {
       'debug',
       'scene',
       'analytics',
+      'settings',
+      'lighting',
       'onLog',
     ]);
   });
@@ -733,6 +741,8 @@ describe('OPTION_SCHEMA', () => {
         'scene.url',
         'analytics.mode',
         'analytics.endpoint',
+        'settings.show',
+        'lighting.temperature',
       ].sort(),
     );
   });
@@ -1043,5 +1053,47 @@ describe('resolveTexture: a host object', () => {
   test('has no query or attribute spelling', () => {
     expect(optionsFromQuery('?resolveTexture=x&resolve-texture=y')).not.toHaveProperty('resolveTexture');
     expect(optionsFromDataset({ resolveTexture: 'x' })).not.toHaveProperty('resolveTexture');
+  });
+});
+
+describe('settings.show and lighting.temperature', () => {
+  test('the settings button is off and the temperature «Original» by default', () => {
+    const options = resolve();
+    expect(options.settings).toEqual({ show: false });
+    expect(options.lighting).toEqual({ temperature: null });
+  });
+
+  test('a host turns the button on and sets a temperature, or «Original» with null', () => {
+    expect(resolve({ settings: { show: true }, lighting: { temperature: 2700 } })).toMatchObject({
+      settings: { show: true },
+      lighting: { temperature: 2700 },
+    });
+    expect(resolve({ lighting: { temperature: null } }).lighting.temperature).toBeNull();
+    expect(warnings()).toEqual([]);
+  });
+
+  test('a temperature outside the range, off its step or not a number falls back to «Original» with one warning each', () => {
+    for (const bad of [2000, 7000, 3050, Number.NaN, '3000', true]) {
+      logged.clear();
+      expect(resolve({ lighting: { temperature: bad as never } }).lighting.temperature).toBeNull();
+      expect(warnings()).toHaveLength(1);
+      expect(warnings()[0]).toContain('lighting.temperature');
+    }
+  });
+
+  test('?settings= and ?lightTemperature= are the query spellings; original means «Original»', () => {
+    expect(optionsFromQuery('?settings=1&lightTemperature=3000')).toEqual({ settings: { show: true }, lighting: { temperature: 3000 } });
+    expect(optionsFromQuery('?lightTemperature=original')).toEqual({ lighting: { temperature: null } });
+    expect(resolve(optionsFromQuery('?lightTemperature=warm') as ViewerOptionsInput).lighting.temperature).toBeNull();
+    expect(warnings()).toHaveLength(1);
+  });
+
+  test('data-settings and data-light-temperature are the attribute spellings', () => {
+    expect(optionsFromDataset({ settings: 'true', lightTemperature: '6500' })).toEqual({
+      settings: { show: true },
+      lighting: { temperature: 6500 },
+    });
+    expect(OPTION_SCHEMA['settings.show'].attr).toBe('settings');
+    expect(OPTION_SCHEMA['lighting.temperature'].attr).toBe('light-temperature');
   });
 });

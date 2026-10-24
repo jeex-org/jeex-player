@@ -7,8 +7,32 @@ as described under [Versioning](#versioning).
 
 ## [Unreleased]
 
+### Added
+
+- **Light temperature.** The interior's artificial light (the object bank's
+  lamps and the walk ambient floor) takes a colour temperature from 2700 K to
+  6500 K in steps of 100, or «Original» (the default, today's look). Daylight,
+  the studio environment and material previews do not change. Set it with
+  `lighting.temperature`, the live `light-temperature` attribute,
+  `?lightTemperature=`, `handle.setLightTemperature` (anything else throws
+  `bad-params`) or the iframe command `setLightTemperature`; read it from
+  `getState().lightTemperature` and the `lightTemperature` event
+  (`jeex-light-temperature`, iframe event `lightTemperature`).
+- **Settings button and panel** (`settings.show`, attribute `settings`, query
+  `settings`; off by default): attached to the control bar's end next to
+  Interior styles without moving any control, under the bar's end in viewers
+  600 px wide or narrower, opening a non-modal panel with the light
+  temperature. Hosts that place their own button at the bar's end need to leave
+  room for it.
+- `jeex-viewer/lighting` exports `colourTemperatureRgb` and
+  `isLightTemperature`, and `LIGHTING_STANDARD.temperature` holds the range.
+  `LIGHTING_STANDARD_VERSION` stays 1.
+
 ### Changed
 
+- **Direct sunlight inside rooms in walk and tour** is scaled to the walk
+  exposure, so sunlit floors keep their texture; facades and the editing modes
+  keep their sun.
 - **Breaking for light-DOM hosts: the chrome holds its look against the
   page's global CSS.** With `mountViewer` or `<jeex-viewer shadow="none">`,
   unlayered page rules no heavier than one class, attribute or pseudo-class

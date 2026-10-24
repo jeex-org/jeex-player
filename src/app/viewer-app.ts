@@ -101,9 +101,7 @@ export class ViewerApp {
     tour: this.tour,
     messages: () => this.messages,
     director: () => this.stage?.director,
-    setMode: (mode) => this.handle.setMode(mode),
-    setFurnitureVisible: (visible) => this.handle.setFurnitureVisible(visible),
-    furnitureVisible: () => this.furnitureVisible,
+    handle: () => this.handle,
     onFullscreenUnavailable: (message) => this.ui.setHint(message),
     usage: this.usage,
   });
@@ -120,6 +118,7 @@ export class ViewerApp {
     messages: () => this.messages,
     shellState: () => this.dollhouse.state,
     ready: () => this.booted,
+    artificialLights: (root) => this.handle.lightTemperature.apply(root),
   });
   /**
    * The `ViewerHandle` read/write methods (`handle-commands.ts`); built at the
@@ -233,6 +232,7 @@ export class ViewerApp {
       onModelsSettled: (model, result) => this.telemetry.modelsSettled(model, result),
       usage: this.usage,
       textureEnv: () => textureEnvOf(this.stage?.runtime.renderer, this.options.resolveTexture, this.log, this.ktx2),
+      artificialLights: (root) => this.handle.lightTemperature.apply(root),
     });
     this.telemetry = telemetryWiring({
       ...embedding,

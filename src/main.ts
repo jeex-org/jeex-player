@@ -35,8 +35,10 @@ if (!container) throw new ViewerLibError('internal', 'demo page: no #app contain
 // a source of options at all. A library that carried any of them would be
 // making them for every host.
 const lang = document.documentElement.lang.slice(0, 2).toLowerCase();
+const query = optionsFromQuery(location.search);
 const handle = mountViewer(container, {
-  ...optionsFromQuery(location.search),
+  ...query,
+  settings: { show: true, ...query.settings }, // the demo offers its settings; `?settings=0` hides them
   scene: { repository: new LocalFixtureRepository() },
   ...(isLocale(lang) ? { locale: lang } : {}),
 });

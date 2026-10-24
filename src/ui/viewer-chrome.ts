@@ -44,6 +44,8 @@ export type ChromeCommands = {
    * bottom of the button that asked). No-op when the scene ships no presets.
    */
   openInteriors: (anchor: { x: number; y: number }) => void;
+  /** The settings panel chose a light temperature, or «Original» (`null`). */
+  setLightTemperature: (temperature: number | null) => void;
 };
 
 /**
@@ -121,6 +123,8 @@ export class ViewerChrome {
   private collapsed = false;
   /** `options.chrome.autoHide`; `false` pins the bar open and arms no idle timer. */
   private autoHide = true;
+  /** A panel hanging off the bar is open (the settings): the bar stays awake until it closes. */
+  private pinned = false;
   /** `options.chrome` as last pushed in; `undefined` until the boot pushes it, so nothing is laid out before. */
   private chromeFlags?: ShellChromeFlags | undefined;
   /** `options.fullscreenButton.show`. */
@@ -610,6 +614,12 @@ export class ViewerChrome {
 
   // ---- Auto-hide ----------------------------------------------------------
 
+  /** Keeps the bar awake while a panel attached to it is open; letting go arms the idle timer again. */
+  setPinned(pinned: boolean): void {
+    this.pinned = pinned;
+    this.wake(pinned);
+  }
+
   /**
    * Shows the control bar; without `force` it collapses again after a pause.
    *
@@ -632,7 +642,7 @@ export class ViewerChrome {
     this.revealControls.setAttribute('aria-hidden', 'true');
     this.revealControls.tabIndex = -1;
     this.deps.onCollapseChanged();
-    if (force || !this.autoHide) return;
+    if (force || !this.autoHide || this.pinned) return;
     this.hideTimer = window.setTimeout(() => {
       // Keep the bar while the pointer rests on it; check again shortly.
       if (this.controlBar.matches(':hover')) {

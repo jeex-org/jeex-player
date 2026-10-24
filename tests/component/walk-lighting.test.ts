@@ -686,6 +686,8 @@ describe('reflections from the room probes', { timeout: MOUNT_TIMEOUT_MS }, () =
     world.dispose();
   });
 
+  // No sunlight on the strip, so the step measured is the probe blend's alone (with the sun on, its
+  // patches made «elsewhere» large enough to hide a 0.173 seam: 2026-10-24, fixed in the projection).
   test('across an open boundary the floor’s reflection changes smoothly, no step larger than elsewhere', () => {
     const B: Box = { x0: 4.1, x1: 8.1, z0: 0, z1: 4 };
     const world = lit(
@@ -694,8 +696,25 @@ describe('reflections from the room probes', { timeout: MOUNT_TIMEOUT_MS }, () =
         { id: 'b', box: B },
       ],
       (scene) => {
+        // No sunlight on the strip: the step measured is the probe blend's alone.
+        (scene.getObjectByName('jeex-lighting-sun') as THREE.Light).intensity = 0;
         room(scene, A, { side: 'x1' });
         room(scene, B, { side: 'x0' });
+        // One open space: the walls and the ceiling run on across the 0.1 m between the two boxes.
+        const bridge = new THREE.MeshStandardMaterial({ color: 0x9a9a9a, roughness: 0.9 });
+        for (const [z, yaw] of [
+          [0.01, 0],
+          [3.99, Math.PI],
+        ] as const) {
+          const wall = new THREE.Mesh(new THREE.PlaneGeometry(0.1, HEIGHT_M), bridge);
+          wall.position.set(4.05, HEIGHT_M / 2, z);
+          wall.rotation.y = yaw;
+          scene.add(wall);
+        }
+        const ceiling = new THREE.Mesh(new THREE.PlaneGeometry(0.1, 4), bridge);
+        ceiling.rotation.x = Math.PI / 2;
+        ceiling.position.set(4.05, HEIGHT_M - 0.01, 2);
+        scene.add(ceiling);
         floor(scene, { x0: 0, x1: 8.1, z0: 0, z1: 4 }, 0.25);
         light(scene, [0.04, 1.6, 3], [0.06, 1.3, 2]);
       },
@@ -716,6 +735,30 @@ describe('reflections from the room probes', { timeout: MOUNT_TIMEOUT_MS }, () =
     const max = (list: typeof steps): number => Math.max(...list.map((s) => s.step));
     record('doorwaySteps', { near: max(near), elsewhere: max(far) });
     expect(max(near)).toBeLessThanOrEqual(Math.max(max(far) * 1.5, 1e-3));
+    world.dispose();
+  });
+
+  test('just beyond an open boundary, a reflection heading back into the room still ends on its far wall', () => {
+    const world = lit([{ id: 'a', box: A }], (scene) => {
+      (scene.getObjectByName('jeex-lighting-sun') as THREE.Light).intensity = 0;
+      room(scene, A, { side: 'x1' });
+      floor(scene, { x0: 0, x1: 8.1, z0: 0, z1: 4 }, 0.05);
+      // A bar on the far wall where the floor near the opening reflects it (about 1.2-1.4 m up);
+      // a projection that misses the far wall ends on the ceiling and reads the wall above it.
+      light(scene, [0.04, 0.45, 3], [0.06, 1.325, 2]);
+    });
+    // Low, beyond the room, looking back in: every reflected ray heads into the room along x.
+    const { pixels, camera } = world.shoot({ x: 5.5, y: 0.5, z: 2 }, { x: 4, y: 0, z: 2 });
+    const at = (x: number): number => {
+      const p = new THREE.Vector3(x, 0, 2).project(camera);
+      return world.lum(pixels, Math.round(((p.x + 1) / 2) * world.size.w), Math.round(((p.y + 1) / 2) * world.size.h));
+    };
+    // 3.9 is inside the box; 4.03 is outside it but inside the room's selection (the half wall), so only this box reflects there.
+    const inside = at(3.9);
+    const beyond = at(4.03);
+    record('openBoundaryBackward', { inside, beyond });
+    expect(inside).toBeGreaterThan(0.5);
+    expect(beyond).toBeGreaterThan(inside * 0.5);
     world.dispose();
   });
 });

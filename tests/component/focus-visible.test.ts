@@ -26,6 +26,7 @@ function buildChrome(shell: Shell): ViewerChrome {
     toggleFullscreen: noop,
     toggleFurniture: noop,
     openInteriors: noop,
+    setLightTemperature: noop,
   };
   const deps: ViewerChromeDeps = {
     roots: shell.roots,

@@ -34,6 +34,7 @@ beforeEach(() => {
     toggleFullscreen: noop,
     toggleFurniture: noop,
     openInteriors: noop,
+    setLightTemperature: noop,
   };
   const chrome = new ViewerChrome({
     roots: shell.roots,

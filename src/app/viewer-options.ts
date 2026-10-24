@@ -23,8 +23,9 @@ import { SLOT_VALUES, closedSet } from './option-sets.js';
 import type { Locale } from '../ui/messages.js';
 import type { SceneSource } from '../scene/scene-repository.js';
 import { createLogger, type Logger, type LogSink } from '../shared/logger.js';
-import { resolveBySpec, warnInvalid, withOptionSink, type OptionKind, type OptionSpec } from './option-resolvers.js';
+import { resolveBySpec, warnInvalid, withOptionSink, type OptionSpec } from './option-resolvers.js';
 import { blankRecord, containerFor, descend, split, toDatasetKey, type SectionShorthands } from './option-paths.js';
+import { asFlag, convertRaw } from './option-raw.js';
 
 export type TourStartMode = 'play' | 'paused' | 'off';
 
@@ -235,6 +236,19 @@ export type ViewerOptions = {
    * the default endpoint.
    */
   analytics: { mode: 'on' | 'off'; endpoint?: string | undefined };
+  /** The viewer's settings button, next to «Interior style»: off by default, so visitors see none. */
+  settings: { show: boolean };
+  lighting: {
+    /**
+     * Colour temperature of the interior's artificial light (the lamps and the
+     * walk's ambient floor), kelvin in steps of 100, or `null` for «Original»
+     * (the default: every light keeps its own colour). Daylight never changes.
+     * @minimum 2700
+     * @maximum 6500
+     * @multipleOf 100
+     */
+    temperature: number | null;
+  };
 };
 
 /**
@@ -295,6 +309,8 @@ export const DEFAULT_VIEWER_OPTIONS: ViewerOptions = {
   // the demo page is the one that passes the fixture (`main.ts`).
   scene: {},
   analytics: { mode: 'on' },
+  settings: { show: false },
+  lighting: { temperature: null },
 };
 
 /**
@@ -350,7 +366,9 @@ export type OptionPath =
   | 'debug'
   | 'scene.url'
   | 'analytics.mode'
-  | 'analytics.endpoint';
+  | 'analytics.endpoint'
+  | 'settings.show'
+  | 'lighting.temperature';
 
 /**
  * The single source of every mount option: what it is, its default, and how
@@ -432,6 +450,8 @@ export const OPTION_SCHEMA = {
   'scene.url': { kind: 'string', default: undefined, query: 'scene', attr: 'src' },
   'analytics.mode': { kind: 'switch', values: ANALYTICS_MODES, default: 'on', query: 'analytics', attr: 'analytics' },
   'analytics.endpoint': { kind: 'endpoint', default: undefined, query: 'analyticsEndpoint', attr: 'analytics-endpoint' },
+  'settings.show': { kind: 'flag', default: DEFAULT_VIEWER_OPTIONS.settings.show, query: 'settings', attr: 'settings' },
+  'lighting.temperature': { kind: 'temperature', default: null, query: 'lightTemperature', attr: 'light-temperature' },
 } as const satisfies Record<OptionPath, OptionSpec>;
 
 /** `overlay="kiosk"`/`"embed"`/`"unbranded"`: sugar over other options, not itself a `ViewerOptions` field. */
@@ -608,42 +628,6 @@ function foldOptions(given: (path: string) => unknown): ViewerOptions {
     else containerFor(result, section, blankRecord)[field] = value;
   }
   return result as unknown as ViewerOptions;
-}
-
-/**
- * `0`/`1` and `false`/`true` are the accepted spellings. Anything else is
- * handed on as it is so the resolver reports it, rather than being silently
- * read as "false".
- */
-function asFlag(raw: string): boolean {
-  if (raw === '1' || raw === 'true') return true;
-  if (raw === '0' || raw === 'false') return false;
-  return raw as unknown as boolean;
-}
-
-/** Converts one raw string to the shape its `OptionKind` expects; validation happens in `resolveViewerOptions`. */
-function convertRaw(kind: OptionKind, raw: string): unknown {
-  switch (kind) {
-    case 'flag':
-      return asFlag(raw);
-    case 'fraction':
-    case 'pixels':
-      // `Number('')` is 0: an empty `?fullscreenButtonRight=` stays a string so it warns and falls back.
-      return raw.trim() === '' ? raw : Number(raw);
-    case 'list':
-      // Trimmed, because `?slots=a, b ` is what a hand-written URL carries;
-      // empty means no box. The names themselves are the resolver's to judge.
-      return raw
-        .split(',')
-        .map((part) => part.trim())
-        .filter((part) => part.length > 0);
-    case 'enum':
-    case 'locale':
-    case 'string':
-    case 'endpoint':
-    case 'switch':
-      return raw;
-  }
 }
 
 /**

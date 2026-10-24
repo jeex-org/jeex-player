@@ -57,6 +57,7 @@ type Calls = {
   tour: string[];
   modes: string[];
   locales: string[];
+  temperatures: Array<number | null>;
   rooms: string[];
   furniture: boolean[];
   scenes: unknown[];
@@ -75,6 +76,7 @@ type Fired = {
   progress: (progress: TourProgress) => void;
   state: (state: string) => void;
   ended: () => void;
+  lightTemperature: (change: { temperature: number | null; source: 'host' | 'panel' }) => void;
 };
 
 /** The viewer window the bridge installs itself on. */
@@ -109,6 +111,7 @@ function fakeHandle(
     tour: [],
     modes: [],
     locales: [],
+    temperatures: [],
     rooms: [],
     furniture: [],
     scenes: [],
@@ -160,6 +163,7 @@ function fakeHandle(
     },
     setFurnitureVisible: (visible: boolean) => calls.furniture.push(visible),
     setLocale: (locale: string) => calls.locales.push(locale),
+    setLightTemperature: (temperature: number | null) => calls.temperatures.push(temperature),
     resize: () => undefined,
     capture: {
       // No renderer here: a fake capture records the request it was handed and
@@ -200,6 +204,7 @@ function fakeHandle(
       progress: fireOne('tour:progress'),
       state: fireOne('tour:state'),
       ended: fireOne('tour:ended'),
+      lightTemperature: fireOne('lightTemperature'),
     },
   };
 }
@@ -466,8 +471,17 @@ describe('the methods', () => {
     sendCommand('focusRoom', { roomId: DEMO.room.kitchen });
     sendCommand('setFurnitureVisible', { visible: false });
     sendCommand('setLocale', { locale: 'ru' });
+    sendCommand('setLightTemperature', { temperature: 3000 });
+    sendCommand('setLightTemperature', { temperature: null });
+    sendCommand('setLightTemperature', { temperature: 3050 });
     sendCommand('loadScene', { url: '/scenes/b.json' });
     await settled();
+    expect(calls.temperatures).toEqual([3000, null]);
+    expect(
+      replies()
+        .filter((reply) => !reply.ok)
+        .map((reply) => reply.error?.code),
+    ).toEqual(['bad-params']);
     expect(calls.modes).toEqual(['walk']);
     expect(calls.rooms).toEqual([DEMO.room.kitchen]);
     expect(calls.furniture).toEqual([false]);
@@ -697,7 +711,18 @@ describe('the events', () => {
     fire.progress({ fraction: 0.25 } as TourProgress);
     fire.state('playing');
     fire.ended();
-    expect(events().map((entry) => entry.event)).toEqual(['ready', 'error', 'scene', 'mode', 'progress', 'state', 'ended']);
+    fire.lightTemperature({ temperature: 6500, source: 'host' });
+    expect(events().map((entry) => entry.event)).toEqual([
+      'ready',
+      'error',
+      'scene',
+      'mode',
+      'progress',
+      'state',
+      'ended',
+      'lightTemperature',
+    ]);
+    expect(events().at(-1)!.payload).toEqual({ temperature: 6500, source: 'host' });
   });
 
   test('an error event carries the code and the message, never the cause', () => {

@@ -8,6 +8,7 @@
  * and every object is built with them.
  */
 
+export { colourTemperatureRgb, isLightTemperature } from './colour-temperature.js';
 export { createLightingContext } from './lighting-context.js';
 export type { ApartmentRig, LightingContext, LightingRig, LightingRigKind } from './lighting-context.js';
 export { LightingError, LIGHTING_ERROR_CODES } from './lighting-error.js';

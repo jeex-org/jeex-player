@@ -28,9 +28,16 @@ import type { FullscreenController } from './fullscreen-controller.js';
 import { SelectionPanel, type PanelRequest } from './selection-panel.js';
 import { TourBar } from './tour-bar.js';
 import { ViewerChrome, type ChromeCommands, type ChromeFlags, type FullscreenButtonFlags } from './viewer-chrome.js';
+import { SettingsPanel } from './settings-panel.js';
 
 /** The slice of `ViewerOptions` the chrome is laid out from. */
-export type ChromeOptions = { chrome: ChromeFlags; fullscreenButton: FullscreenButtonFlags; readonly: boolean };
+export type ChromeOptions = {
+  chrome: ChromeFlags;
+  fullscreenButton: FullscreenButtonFlags;
+  readonly: boolean;
+  /** The settings button (`settings-panel.ts`); the value it shows comes from `setLightTemperature`. */
+  settings: { show: boolean };
+};
 
 export type { PanelItem, PanelRequest } from './selection-panel.js';
 export { swatch } from './selection-panel.js';
@@ -78,6 +85,8 @@ export class ViewerUI implements DirectorChrome {
   private readonly chrome: ViewerChrome;
   private readonly panel: SelectionPanel;
   private readonly tourBar: TourBar;
+  /** The settings button and its panel; nothing of it exists until the host enables it. */
+  private readonly settings: SettingsPanel;
   /** The producer's mark a project's manifest may require (`project-mark.ts`). */
   private readonly mark: ProjectMark;
   /** The mode the camera director last switched to; the tour chrome shows only in `tour`. */
@@ -103,6 +112,18 @@ export class ViewerUI implements DirectorChrome {
       viewport: options.shell,
       onInteraction: () => this.chrome.wake(),
       onClose: options.onPanelClose,
+      signal: options.signal,
+    });
+    this.settings = new SettingsPanel({
+      roots: options.roots,
+      messages: options.messages,
+      onChange: (temperature) => options.commands.setLightTemperature(temperature),
+      // One panel at a time, and the bar it hangs off stays awake while it is open.
+      onOpen: () => {
+        this.closePanel();
+        this.chrome.setPinned(true);
+      },
+      onClose: () => this.chrome.setPinned(false),
       signal: options.signal,
     });
     this.tourBar = new TourBar({
@@ -139,6 +160,7 @@ export class ViewerUI implements DirectorChrome {
   /** Releases the auto-hide timer; every listener dies with the shell. */
   dispose(): void {
     this.chrome.dispose();
+    this.settings.dispose();
     this.mark.set(null);
   }
 
@@ -155,6 +177,7 @@ export class ViewerUI implements DirectorChrome {
   retranslate(messages: Messages): void {
     this.chrome.retranslate(messages);
     this.tourBar.retranslate(messages);
+    this.settings.retranslate(messages);
   }
 
   // ---- Shell states -------------------------------------------------------
@@ -202,6 +225,11 @@ export class ViewerUI implements DirectorChrome {
     this.setChrome(options.chrome);
     this.chrome.setFullscreenButton(options.fullscreenButton);
     this.chrome.setReadonly(options.readonly);
+    this.settings.setEnabled(options.settings.show);
+  }
+  /** The light temperature changed (a host, or the panel itself): the panel shows it. */
+  setLightTemperature(temperature: number | null): void {
+    this.settings.setValue(temperature);
   }
   setModeButtons(mode: ViewerMode): void {
     this.chrome.setModeButtons(mode);
@@ -249,6 +277,7 @@ export class ViewerUI implements DirectorChrome {
   // ---- Panel --------------------------------------------------------------
 
   openPanel(request: PanelRequest): void {
+    this.settings.close(false);
     this.panel.open(request);
     this.usage?.('panel');
   }
@@ -287,6 +316,8 @@ export class ViewerUI implements DirectorChrome {
    * other one on the page.
    */
   private dismiss(event: Event): void {
+    // The settings panel listens for presses outside it on the whole page itself (`settings-panel.ts`).
+    if (event.type === 'keydown' && this.settings.dismissKey(event as KeyboardEvent)) return;
     if (!this.panel.isOpen()) return;
     if (event.type === 'keydown') {
       if ((event as KeyboardEvent).key === 'Escape') this.closePanel();

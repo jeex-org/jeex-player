@@ -19,6 +19,7 @@
 import * as THREE from 'three';
 import { setUniformState, type UniformState, type WalkUniforms } from './box-probe-patch.js';
 import { WALK_LIGHTING_TUNING as T } from './walk-lighting-tuning.js';
+import { tagArtificialLight } from '../../assets/artificial-light.js';
 
 /** The apartment rig's lights that ignore walls, by the names the lighting context gives them. */
 const WALL_BLIND_LIGHTS = ['jeex-lighting-sky', 'jeex-lighting-fill'] as const;
@@ -30,8 +31,11 @@ export type WalkRigDeps = {
 };
 
 export class WalkRig {
-  /** The walk's ambient floor: on the scene for good, at zero outside `walk`, so adding it changes no program once. */
-  readonly ambient = new THREE.AmbientLight(0xffffff, 0);
+  /**
+   * The walk's ambient floor: on the scene for good, at zero outside `walk`, so adding it changes no program once.
+   * Artificial light: a colour temperature tints it (`render/light-temperature.ts`).
+   */
+  readonly ambient = tagArtificialLight(new THREE.AmbientLight(0xffffff, 0));
   private readonly deps: WalkRigDeps;
   private current: UniformState = 'editing';
   /** What `editing` puts back, per light: read when the light first leaves the editing look. */

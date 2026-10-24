@@ -25,22 +25,19 @@ import {
   commandMessage,
   isJeexMessage,
   type CaptureStillRequest,
-  type CapturePanoramaRequest,
   type CommandMethod,
-  type EmbedEventMap,
   type ErrorCode,
   type EventName,
   type JeexReply,
-  type Locale,
   type SceneData,
   type TourProgress,
-  type TourSpeed,
   type ViewerMode,
-  type Provenance,
   type ViewerState,
-  type ViewerSelectionTarget,
 } from './protocol.js';
 import { MAX_SCENE_BYTES, inlineDocumentBytes } from '../shared/limits.js';
+import type { EmbedCapture, EmbedReady, EmbedSceneSource, JeexEmbed } from './host-handle.js';
+
+export type { EmbedCapture, EmbedExportGlbOptions, EmbedExportUsdzOptions, JeexEmbed } from './host-handle.js';
 
 /** How long a command waits for its REPLY, once the frame has been sent it, ms. */
 export const REPLY_TIMEOUT_MS = 5000;
@@ -66,24 +63,6 @@ export const QUEUE_TIMEOUT_MS = 20_000;
  * `host.test.ts`.
  */
 export type EmbedLogEntry = { level: 'warn' | 'error'; code: string; message: string; detail?: unknown };
-
-/**
- * Structurally identical to `ExportGlbOptions` (`app/export-gltf.ts`), and
- * DELIBERATELY not imported from it, for the same reason as `EmbedLogEntry`:
- * `host.ts` may import no viewer code, or a page that embeds by iframe would
- * download the viewer it was avoiding. The two shapes are checked against
- * each other by `host.test.ts`.
- */
-export type EmbedExportGlbOptions = {
-  includeFurniture?: boolean;
-  state?: 'current' | 'default';
-  embedDocument?: boolean;
-};
-
-/** Structurally identical to `ExportUsdzOptions` (`app/export-usdz.ts`), for the same reason as `EmbedExportGlbOptions`. */
-export type EmbedExportUsdzOptions = {
-  includeFurniture?: boolean;
-};
 
 /** Where the host handle's own warnings go; `EmbedOptions.onLog` replaces it. */
 type EmbedLogSink = (entry: EmbedLogEntry) => void;
@@ -190,17 +169,6 @@ type EmbedOptions = {
 } & Record<string, unknown>;
 
 /**
- * One artefact as it crosses the frame boundary: the PNG bytes and the
- * provenance sidecar, both structured-cloned. A host turns the bytes into
- * whatever it needs (`new Blob([png], { type: 'image/png' })`, an upload, a
- * `File`) — the helper does not decide that for it.
- */
-export type EmbedCapture = { png: ArrayBuffer; provenance: Provenance };
-
-/** What the frame reports when its first scene is on screen. */
-type EmbedReady = EmbedEventMap['ready'];
-
-/**
  * The `ready` payload, proved by hand.
  *
  * The host helper carries no Zod — one `zod/mini` is 4.39 KB gzip and this
@@ -223,9 +191,6 @@ function readyPayload(payload: unknown): EmbedReady | null {
   return typeof (payload as { sceneId?: unknown }).sceneId === 'string' ? (payload as EmbedReady) : null;
 }
 
-/** Where the scene comes from, as a host may name it across a frame boundary. */
-type EmbedSceneSource = { url: string } | { document: unknown };
-
 /**
  * Viewer ids in use on THIS page, so two frames cannot answer to one name.
  *
@@ -245,85 +210,6 @@ function freshViewerId(): string {
   while (claimedIds.has(`${DEFAULT_VIEWER_ID}-${index}`)) index += 1;
   return `${DEFAULT_VIEWER_ID}-${index}`;
 }
-
-/**
- * The host's handle on an embedded viewer. Every call is a round trip, so
- * everything returns a promise — including the ones the in-page `ViewerHandle`
- * answers synchronously.
- */
-export type JeexEmbed = {
-  readonly iframe: HTMLIFrameElement;
-  /** The id this frame answers to; generated when the host named none. */
-  readonly viewerId: string;
-  /** Resolves when the frame's first scene is on screen. */
-  ready: Promise<EmbedReady>;
-  play(): Promise<void>;
-  pause(): Promise<void>;
-  toggle(): Promise<void>;
-  stop(): Promise<void>;
-  seek(fraction: number): Promise<void>;
-  seekDistance(metres: number): Promise<void>;
-  seekTime(seconds: number): Promise<void>;
-  /** The tour's speed setting; `progress` events carry it back. */
-  setTourSpeed(speed: TourSpeed): Promise<void>;
-  /** The tour's position, or `null` while the scene carries no clip. */
-  progress(): Promise<TourProgress | null>;
-  loadScene(source: EmbedSceneSource): Promise<void>;
-  setMode(mode: ViewerMode): Promise<void>;
-  getMode(): Promise<ViewerMode>;
-  focusRoom(roomId: string): Promise<boolean>;
-  /**
-   * Mode, tour position, furniture, locale, scene and revision in ONE round
-   * trip. Across a frame boundary the alternative is six messages whose answers
-   * can disagree about the moment they describe.
-   */
-  getState(): Promise<ViewerState>;
-  /**
-   * A deep copy of the frame's committed document, or `null` before its first
-   * scene is built. Answered before `ready`, like `dispose` — a host may ask
-   * what is on screen before there is anything.
-   */
-  getScene(): Promise<SceneData | null>;
-  setFurnitureVisible(visible: boolean): Promise<void>;
-  setLocale(locale: Locale): Promise<void>;
-  /** Highlights one wall, opening, room or asset in the frame, or clears it with `null`. */
-  setSelection(target: ViewerSelectionTarget | null): Promise<void>;
-  /** Re-measures the frame's container, for a host whose own layout just changed. */
-  resize(): Promise<void>;
-  /**
-   * One still of the frame's scene, with its provenance. Rejects `not-ready`
-   * until the frame's first scene is on screen — the queue in front of every
-   * command already waits for that.
-   */
-  captureStill(request: CaptureStillRequest): Promise<EmbedCapture>;
-  /** One equirectangular 360 of one room, with its provenance. */
-  capturePanorama(request: CapturePanoramaRequest): Promise<EmbedCapture>;
-  /**
-   * The staged picture and the unaltered original of the same shot, which is
-   * what disclosure rules for virtually staged photos ask for. Two `captureStill`
-   * round trips, composed here rather than in the frame.
-   */
-  capturePair(request: Omit<CaptureStillRequest, 'state'>): Promise<{ current: EmbedCapture; default: EmbedCapture }>;
-  /**
-   * The committed document as a GLB, with the element metadata table riding
-   * along as `EXT_structural_metadata` / `EXT_mesh_features`
-   * (`app/export-gltf.ts`). Crosses the frame boundary as an `ArrayBuffer` —
-   * wrap it in a `Blob` (`type: 'model/gltf-binary'`) to hand it to a
-   * download link or `URL.createObjectURL`. Rejects with `not-ready` before
-   * the frame's first scene.
-   */
-  exportGlb(options?: EmbedExportGlbOptions): Promise<ArrayBuffer>;
-  /**
-   * The committed document as a USDZ, for iOS Quick Look (`app/export-usdz.ts`).
-   * Crosses the frame boundary as an `ArrayBuffer`, the same shape `exportGlb`
-   * uses. Rejects with `not-ready` before the frame's first scene.
-   */
-  exportUsdz(options?: EmbedExportUsdzOptions): Promise<ArrayBuffer>;
-  /** Subscribes to one frame event; returns the unsubscribe, like `TourControls`. */
-  on<K extends EventName>(event: K, callback: (payload: EmbedEventMap[K]) => void): () => void;
-  /** Tells the frame to tear down, then removes it and stops listening. */
-  dispose(): void;
-};
 
 /** A command sent and not yet answered. */
 type Pending = { resolve: (value: unknown) => void; reject: (error: Error) => void; timer: ReturnType<typeof setTimeout> };
@@ -651,6 +537,7 @@ export function embedViewer(container: HTMLElement, options: EmbedOptions): Jeex
     getScene: () => send('getScene') as Promise<SceneData | null>,
     setFurnitureVisible: (visible) => nothing('setFurnitureVisible', { visible }),
     setLocale: (locale) => nothing('setLocale', { locale }),
+    setLightTemperature: (temperature) => nothing('setLightTemperature', { temperature }),
     setSelection: (target) => nothing('setSelection', { target }),
     resize: () => nothing('resize'),
     captureStill,

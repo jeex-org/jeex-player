@@ -148,4 +148,12 @@ export const RU: Record<MessageKey, string> = {
   'viewer.label': 'Просмотр квартиры JEEX',
   'canvas.label': 'Интерактивная 3D-сцена квартиры',
   'canvas.fallbackLabel': 'Презентационное превью сцены квартиры',
+  'settings.label': 'Настройки',
+  'settings.title': 'Настройки просмотра',
+  'settings.temperature': 'Температура света',
+  'settings.original': 'Исходная',
+  'settings.temperatureValue': '{kelvin} К · {tone}',
+  'settings.warm': 'тёплая',
+  'settings.neutral': 'нейтральная',
+  'settings.cool': 'холодная',
 };

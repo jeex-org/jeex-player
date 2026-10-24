@@ -172,6 +172,7 @@ export function installFrameBridge(handle: ViewerHandle, options: FrameBridgeOpt
     handle.on('scene', (info) => emit('scene', info)),
     handle.on('mode', (mode) => emit('mode', mode)),
     handle.on('select', (selection) => emit('select', selection)),
+    handle.on('lightTemperature', (change) => emit('lightTemperature', change)),
     handle.tour.on('progress', (progress) => emit('progress', progress)),
     handle.tour.on('state', (state) => emit('state', { state })),
     handle.tour.on('ended', () => emit('ended', {})),
@@ -233,6 +234,9 @@ export function installFrameBridge(handle: ViewerHandle, options: FrameBridgeOpt
         return undefined;
       case 'setLocale':
         handle.setLocale(command.params.locale);
+        return undefined;
+      case 'setLightTemperature':
+        handle.setLightTemperature(command.params.temperature);
         return undefined;
       case 'setSelection':
         handle.setSelection(command.params.target);

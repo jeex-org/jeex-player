@@ -53,7 +53,7 @@ describe('constants', () => {
     expect(LAZY_CHUNK_PREFIX).toBe('lazy-');
     // The walk and tour chain: its last measured size plus 1 KB.
     expect(LAZY_LIMITS).toEqual({
-      'lazy-jeex-viewer-walk-post': 62_682 + 1024,
+      'lazy-jeex-viewer-walk-post': 63_734 + 1024,
       // The KTX2 loader chunk and the transcoder's JS wrapper: measured plus 1 KB.
       'lazy-jeex-viewer-KTX2Loader': 25_052 + 1024,
       'lazy-jeex-viewer-basis-transcoder-': 15_259 + 1024,
@@ -78,7 +78,7 @@ describe('constants', () => {
   });
 
   test('the lighting entry keeps a budget of its own: no three.js fits in it', () => {
-    expect(LIGHTING_BUDGET_FAIL_BYTES).toBe(11_743 + 1024);
+    expect(LIGHTING_BUDGET_FAIL_BYTES).toBe(12_085 + 1024);
     expect(limitFor('jeex-viewer-lighting.js')).toBe(LIGHTING_BUDGET_FAIL_BYTES);
   });
 });
