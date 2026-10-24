@@ -11,12 +11,13 @@
 #
 #  - `component` runs the Vitest browser level split across eight runners
 #    (`--shard=<i>/8`). On a hosted runner (4 vCPUs, no GPU, SwiftShader) the
-#    whole tier costs about 20 minutes in one job, against about 6 minutes on
-#    a 16-thread developer machine, and the software rasteriser is the
-#    bottleneck: more Vitest workers on the same 4 vCPUs do not shorten the
-#    run, they only slow every test against its own timeout. Eight runners
-#    with one worker each keep every test near its developer-machine pace.
-#    `tests/component-shards.ts` balances the shards by measured cost.
+#    whole tier costs about 82 minutes of test time (4931 s over the eight
+#    jobs of 2026-10-24), against about 6 minutes on a 16-thread developer
+#    machine, and the software rasteriser is the bottleneck: more Vitest
+#    workers on the same 4 vCPUs do not shorten the run, they only slow every
+#    test against its own timeout. `tests/component-shards.ts` balances the
+#    shards by the per-file costs measured in those jobs; the heaviest file
+#    (`viewer-api.test.ts`, 664 s) is a shard of its own.
 #  - `component-coverage` merges the eight shards' blob reports, coverage
 #    included, into the `coverage-component/lcov.info` one local run writes,
 #    and runs the DOM-layer floors on it: a floor checked per shard would
@@ -28,7 +29,9 @@
 #    round trip waits for it.
 #
 # Screenshot comparisons in the e2e level run only locally; with `CI` set they
-# are skipped, because the baselines are rendered on the maintainers' machines.
+# are skipped, because the baselines are rendered on the maintainers' machines,
+# and a test that only prepares and compares a picture (`screenshotOnly()` in
+# `tests/e2e/support.ts`) is skipped whole.
 name: Browser tests
 
 on:
@@ -68,9 +71,9 @@ jobs:
       #
       # The ceiling replaces the watchdog's 10-minute default
       # (`scripts/run-component-tests.ts`), which is sized for the whole tier
-      # on a developer machine. With two workers the four shards took 6 to 10
-      # minutes on the runner; eight shards with one worker each should take
-      # about as long, and 15 leaves room for a slow runner.
+      # on a developer machine. With the measured costs the heaviest shard is
+      # predicted at 664 s of tests (the others about 618 s); 15 minutes leaves
+      # room for the browser start and a slow runner.
       - name: component tests (Vitest browser mode) shard ${{ matrix.shard }}/8
         env:
           JEEX_COMPONENT_TIMEOUT_MS: '900000'
@@ -133,10 +136,9 @@ jobs:
       # `tests/e2e/time-scale.ts`). Measured on three hardware threads (about
       # a hosted runner's pace) over one quarter of the suite: two workers and
       # the plain budgets failed 15 of 21 specs on the runner; one worker and
-      # three times the budgets passed 20 of 21 in 23 minutes. The specs that
-      # still failed on the runner after that activate the control bar's
-      # buttons from the keyboard instead of racing its idle timer with
-      # clicks. With eight shards the jobs took 5 to 26 minutes on the runner,
+      # three times the budgets passed 20 of 21 in 23 minutes. Specs that
+      # press a control-bar button by keyboard first wait for the bar to
+      # collapse and reveal it by keyboard, instead of racing its idle timer. With eight shards the jobs took 5 to 26 minutes on the runner,
       # inside the 30-minute job limit.
       - name: e2e tests (Playwright) shard ${{ matrix.shard }}/8
         env:
