@@ -436,6 +436,12 @@ as described under [Versioning](#versioning).
 
 ### Fixed
 
+- **The 2D plan keeps a heartbeat on a slow device.** Behind the flat plan
+  the 3D scene is drawn only every half second, to keep the way back to 3D
+  warm. The interval now counts from the end of a draw, so a device whose
+  draw takes longer than half a second no longer redraws the hidden scene on
+  every frame.
+
 - A lightmap on a baked surface is no longer divided by the walk's interior
   sun factor in walk and tour: it is indirect light, like the room grid, and
   takes only the baked-interior gain of the mode.
