@@ -17,7 +17,9 @@
 import * as THREE from 'three';
 import { afterEach, describe, expect, test } from 'vitest';
 import { CATALOGUE_REGISTRIES } from '../../src/assets/catalogue-registries.js';
-import { captureCommands, type CaptureCommands } from '../../src/app/capture-commands.js';
+import { captureCommands, type CaptureCommands, type CaptureDeps } from '../../src/app/capture-commands.js';
+import { whiteBalanceMatrix } from '../../src/render/white-balance.js';
+import type { PostProcessor } from '../../src/render/post-processor.js';
 import { DEFAULT_VIEWER_OPTIONS } from '../../src/app/viewer-options.js';
 import { InlineSceneRepository, mountViewer } from '../../src/app/viewer-api.js';
 import type { ViewerHandle } from '../../src/app/viewer-handle.js';
@@ -62,7 +64,7 @@ function openRuntime(): RenderRuntime {
  * does for a real mount: without that, a `'current'` capture is a picture of
  * an empty sky and every assertion about it passes by accident.
  */
-function commandsFor(runtime: RenderRuntime, model: SceneModel, ready = true): CaptureCommands {
+function commandsFor(runtime: RenderRuntime, model: SceneModel, ready = true, extra: Partial<CaptureDeps> = {}): CaptureCommands {
   const builder = new SceneBuilder(model.scene, model.plan);
   builders.push(builder);
   runtime.scene.add(builder.build().root);
@@ -74,6 +76,7 @@ function commandsFor(runtime: RenderRuntime, model: SceneModel, ready = true): C
     messages: () => createMessages('en'),
     shellState: () => 'dollhouse',
     ready: () => ready,
+    ...extra,
   });
 }
 
@@ -237,6 +240,21 @@ describe('capture.panorama', () => {
     expect(image.height).toBe(128);
     expect(provenance.kind).toBe('panorama');
     expect(provenance.roomId).toBe(L_SHAPE.room.a);
+  });
+
+  test('with the walk chain, its white balance is applied in the display pass; without it the picture is unbalanced', async () => {
+    const runtime = openRuntime();
+    const model = loadModel();
+    const strong = whiteBalanceMatrix([1, 0.5, 0.25], 1);
+    const chain = (whiteBalance?: readonly number[]) => ({ whiteBalance }) as unknown as PostProcessor;
+    const shot = async (extra: Partial<CaptureDeps>) =>
+      meanColour(await decode((await commandsFor(runtime, model, true, extra).panorama({ width: 64, roomId: L_SHAPE.room.a })).blob));
+    const plain = await shot({});
+    const identityChain = await shot({ postChain: async () => chain([1, 0, 0, 0, 1, 0, 0, 0, 1]) });
+    const balanced = await shot({ postChain: async () => chain(strong) });
+    identityChain.forEach((v, i) => expect(Math.abs(v - plain[i]!)).toBeLessThanOrEqual(1));
+    // A strong cooling matrix: blue gains on red against the unbalanced picture.
+    expect(balanced[2]! / balanced[0]!).toBeGreaterThan((plain[2]! / plain[0]!) * 1.1);
   });
 
   test('a room the scene does not have is refused', async () => {
