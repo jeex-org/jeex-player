@@ -23,7 +23,8 @@
  */
 
 import { ASSET_FINISHES } from '../materials/asset-finish-catalogue.js';
-import { FLOOR_FINISHES, WALL_FINISHES } from '../materials/finish-catalogue.js';
+import { FRAME_FINISHES } from '../materials/frame-finishes.js';
+import { FLOOR_FINISHES, RETIRED_FINISHES, WALL_FINISHES } from '../materials/finish-catalogue.js';
 import { listCatalogueObjects } from './asset-catalogue.js';
 import { DOOR_VARIANTS, ENTRY_DOOR_VARIANTS, WINDOW_VARIANTS } from './opening-variants.js';
 
@@ -34,7 +35,7 @@ export type CatalogueSlugTable = Readonly<Record<string, string>>;
 export type CatalogueIdBySlug = {
   readonly archetype: CatalogueSlugTable;
   readonly variant: CatalogueSlugTable;
-  /** Floor, wall and furniture finishes together. */
+  /** Floor, wall and furniture finishes together, with the retired room finishes under their historical slugs, and the frame finishes. */
   readonly finish: CatalogueSlugTable;
   readonly openingVariant: CatalogueSlugTable;
 };
@@ -51,6 +52,35 @@ const objects = listCatalogueObjects();
 export const CATALOGUE_ID_BY_SLUG: CatalogueIdBySlug = Object.freeze({
   archetype: tableOf(objects),
   variant: tableOf(objects.flatMap((object) => object.variants)),
-  finish: tableOf([...FLOOR_FINISHES, ...WALL_FINISHES, ...ASSET_FINISHES]),
+  finish: tableOf([...FLOOR_FINISHES, ...WALL_FINISHES, ...RETIRED_FINISHES, ...ASSET_FINISHES, ...FRAME_FINISHES]),
   openingVariant: tableOf([...WINDOW_VARIANTS, ...DOOR_VARIANTS, ...ENTRY_DOOR_VARIANTS]),
 });
+
+/** A frozen, null-prototype `id -> value` table over `entries`. */
+function idTable<T>(entries: readonly T[], key: (entry: T) => string, value: (entry: T) => string): Readonly<Record<string, string>> {
+  const table: Record<string, string> = Object.create(null) as Record<string, string>;
+  for (const entry of entries) table[key(entry)] = value(entry);
+  return Object.freeze(table);
+}
+
+/**
+ * The retired bundled room finishes, retired id -> the id it reads as. A
+ * document may keep a retired id forever; a host's picker shows the target
+ * as chosen and never offers the retired id. Derived from `RETIRED_FINISHES`.
+ */
+export const FINISH_ALIASES: Readonly<Record<string, string>> = idTable(
+  RETIRED_FINISHES,
+  (retired) => retired.id,
+  (retired) => retired.target,
+);
+
+/**
+ * Every bundled room finish (floors and walls), id -> the name the viewer's
+ * picker shows. Retired ids are not listed: resolve them through
+ * `FINISH_ALIASES` first.
+ */
+export const FINISH_NAMES: Readonly<Record<string, string>> = idTable(
+  [...FLOOR_FINISHES, ...WALL_FINISHES],
+  (finish) => finish.id,
+  (finish) => finish.name,
+);

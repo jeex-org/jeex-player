@@ -31,7 +31,7 @@ const { room: ROOM, asset: ASSET, opening: OPENING, preset: PRESET } = DEMO;
  */
 const PRESET_IDS = [PRESET.oakSand, PRESET.chalkAsh, PRESET.walnutTerracotta, PRESET.sageGraphite] as const;
 
-const PRESET_NAMES: Quad = ['Oak and sand', 'Chalk and ash', 'Walnut and terracotta', 'Sage and graphite'];
+const PRESET_NAMES: Quad = ['Oak and sand', 'Chalk and herringbone', 'Walnut and terracotta', 'Sage and mocha'];
 
 /**
  * `[floor, wall]` the panel draws each preview swatch from. By convention it is
@@ -39,8 +39,8 @@ const PRESET_NAMES: Quad = ['Oak and sand', 'Chalk and ash', 'Walnut and terraco
  */
 const PRESET_SWATCHES: Array<[string, string]> = [
   [FINISH.oak, FINISH.sand],
-  [FINISH.ash, FINISH.white],
-  [FINISH.walnut, FINISH.wallpaper_cream],
+  [FINISH.herringbone, FINISH.white],
+  [FINISH.walnut, FINISH.white],
   [FINISH.chevron, FINISH.sage],
 ];
 
@@ -49,25 +49,25 @@ type Quad = readonly [string, string, string, string];
 
 /** Floors. The loggia keeps its outdoor ceramic; the bathroom and the WC follow the palette. */
 const PRESET_FLOORS: Record<string, Quad> = {
-  [ROOM.kitchen]: [FINISH.oak, FINISH.ash, FINISH.walnut, FINISH.chevron],
-  [ROOM.living]: [FINISH.oak, FINISH.ash, FINISH.walnut, FINISH.chevron],
-  [ROOM.guestRoom]: [FINISH.oak, FINISH.ash, FINISH.walnut, FINISH.chevron],
-  [ROOM.study]: [FINISH.oak, FINISH.ash, FINISH.walnut, FINISH.chevron],
-  [ROOM.bedroom]: [FINISH.oak, FINISH.ash, FINISH.walnut, FINISH.chevron],
-  [ROOM.hall]: [FINISH.oak, FINISH.ash, FINISH.walnut, FINISH.chevron],
+  [ROOM.kitchen]: [FINISH.oak, FINISH.herringbone, FINISH.walnut, FINISH.chevron],
+  [ROOM.living]: [FINISH.oak, FINISH.herringbone, FINISH.walnut, FINISH.chevron],
+  [ROOM.guestRoom]: [FINISH.oak, FINISH.herringbone, FINISH.walnut, FINISH.chevron],
+  [ROOM.study]: [FINISH.oak, FINISH.herringbone, FINISH.walnut, FINISH.chevron],
+  [ROOM.bedroom]: [FINISH.oak, FINISH.herringbone, FINISH.walnut, FINISH.chevron],
+  [ROOM.hall]: [FINISH.oak, FINISH.herringbone, FINISH.walnut, FINISH.chevron],
   [ROOM.bathroom]: [FINISH.stone, FINISH.ceramic_light, FINISH.stone, FINISH.terrazzo],
   [ROOM.wc]: [FINISH.stone, FINISH.ceramic_light, FINISH.stone, FINISH.terrazzo],
 };
 
 /** Walls, every room. The sleeping rooms take the warmer/greener half of each palette. */
 const PRESET_WALLS: Record<string, Quad> = {
-  [ROOM.kitchen]: [FINISH.sand, FINISH.white, FINISH.wallpaper_cream, FINISH.sage],
-  [ROOM.living]: [FINISH.sand, FINISH.white, FINISH.wallpaper_cream, FINISH.sage],
-  [ROOM.loggia]: [FINISH.sand, FINISH.white, FINISH.wallpaper_cream, FINISH.sage],
-  [ROOM.hall]: [FINISH.sand, FINISH.white, FINISH.wallpaper_cream, FINISH.sage],
-  [ROOM.guestRoom]: [FINISH.sand, FINISH.white, FINISH.terra, FINISH.wallpaper_sage],
-  [ROOM.study]: [FINISH.sand, FINISH.white, FINISH.terra, FINISH.wallpaper_sage],
-  [ROOM.bedroom]: [FINISH.sand, FINISH.white, FINISH.terra, FINISH.wallpaper_sage],
+  [ROOM.kitchen]: [FINISH.sand, FINISH.white, FINISH.white, FINISH.sage],
+  [ROOM.living]: [FINISH.sand, FINISH.white, FINISH.white, FINISH.sage],
+  [ROOM.loggia]: [FINISH.sand, FINISH.white, FINISH.white, FINISH.sage],
+  [ROOM.hall]: [FINISH.sand, FINISH.white, FINISH.white, FINISH.sage],
+  [ROOM.guestRoom]: [FINISH.sand, FINISH.white, FINISH.terra, FINISH.venetian],
+  [ROOM.study]: [FINISH.sand, FINISH.white, FINISH.terra, FINISH.venetian],
+  [ROOM.bedroom]: [FINISH.sand, FINISH.white, FINISH.terra, FINISH.venetian],
   [ROOM.bathroom]: [FINISH.sand, FINISH.tiles_white, FINISH.tiles_white, FINISH.graphite],
   [ROOM.wc]: [FINISH.sand, FINISH.tiles_white, FINISH.tiles_white, FINISH.graphite],
 };

@@ -34,6 +34,7 @@
  */
 
 import { FLOOR_FINISHES, WALL_FINISHES, finishSwatchDataURL, type Finish } from '../materials/finishes.js';
+import { bundledAliasTarget } from '../materials/finish-catalogue.js';
 import { builtinSwatchFor } from '../materials/builtin-folder.js';
 import { activeVariantFor, variantsForPlacement, type AssetVariant, type VariantBank } from '../assets/asset-variants.js';
 import type { VariantAccess } from '../assets/asset-types.js';
@@ -46,6 +47,7 @@ import type { DemoAsset, FaceKey, FinishSurface, MirrorAxis, MirrorFacts, Openin
 import type { FinishApply, ProjectMaterial } from '../materials/finish-types.js';
 import { allowedMirrorAxes, mirroredAxes } from '../scene/mirror.js';
 import type { MessageKey, Messages } from './messages.js';
+import { FALLBACK_SWATCH_COLOUR, paletteSwatchDataURL } from './palette-swatch.js';
 
 /** A surface the finish panel can paint. */
 export type FinishTarget = {
@@ -142,7 +144,8 @@ export type SelectionDescription = {
   /**
    * The option to mark as chosen — exactly what the built-in panel puts its
    * active ring on, defaulting included. A finish is the document's own answer
-   * and is `null` when the surface names none; a furniture or opening variant
+   * and is `null` when the surface names none (a retired bundled id is shown
+   * as its target, and the scope operations still carry the stored id); a furniture or opening variant
    * falls back to the archetype's standard one, so `current === null` there
    * means only "this selection offers nothing", never "the document is silent".
    */
@@ -198,40 +201,8 @@ export type SelectionCore = {
   readonly scope?: SelectionScope | undefined;
 };
 
-/** Colour of the chip when a catalogue entry names no usable colour at all. */
-const FALLBACK_SWATCH_COLOUR = '#b0a294';
-
 /** The two-tone stand-in for a variant whose bank entry carries no swatch. */
 const FALLBACK_VARIANT_PALETTE: readonly string[] = ['#d8cfc0', FALLBACK_SWATCH_COLOUR];
-
-/**
- * Only a literal CSS hex colour reaches a generated SVG; anything else is
- * dropped. The lengths are spelled out rather than `{3,8}`: `#12345` and
- * `#1234567` are not colours, and an invalid `fill` falls back to black — a
- * solid black band instead of the palette, which is worse than the default
- * chip. The filter is also what keeps markup out of the SVG, so it only ever
- * gets tighter.
- */
-const HEX_COLOUR = /^#(?:[0-9a-f]{3}|[0-9a-f]{4}|[0-9a-f]{6}|[0-9a-f]{8})$/i;
-
-/**
- * The palette as a text-free image: vertical bands, one per colour.
- *
- * It exists because `SelectionOption.preview` is a URL, not a CSS value: a host
- * card has nowhere to put `linear-gradient(...)`, and an empty string would
- * make "there is a picture" a lie. Built as SVG rather than on a canvas so it
- * works with no `document` at all — under Bun, and in a viewer whose WebGL
- * context is gone.
- */
-export function paletteSwatchDataURL(colours: readonly string[]): string {
-  const usable = colours.filter((colour) => HEX_COLOUR.test(colour)).slice(0, 3);
-  const palette = usable.length > 0 ? usable : [FALLBACK_SWATCH_COLOUR];
-  const band = 12 / palette.length;
-  const bands = palette
-    .map((colour, index) => `<rect x="${(index * band).toFixed(4)}" y="0" width="${band.toFixed(4)}" height="12" fill="${colour}"/>`)
-    .join('');
-  return `data:image/svg+xml,${encodeURIComponent(`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 12 12">${bands}</svg>`)}`;
-}
 
 /**
  * Human name of a furniture placement: the catalogue name of the archetype it
@@ -473,7 +444,8 @@ export function finishCore(scene: SceneData, target: FinishTarget, messages: Mes
   if (target.surface === 'wall' && !target.roomId && !target.face) return null;
   const finishes = target.surface === 'floor' ? FLOOR_FINISHES : WALL_FINISHES;
   const ownerName = finishOwnerName(scene, target, messages);
-  const current = finishCurrentOf(scene, target);
+  const stored = finishCurrentOf(scene, target);
+  const current = shownFinishOf(stored, bank);
   // The guards above leave a floor with its room and a wall with its face or room.
   const face = target.surface === 'wall' ? target.face : undefined;
   const subject = face ? { id: face.wallId, label: ownerName, face } : { id: target.roomId ?? '', label: ownerName };
@@ -501,8 +473,19 @@ export function finishCore(scene: SceneData, target: FinishTarget, messages: Mes
         return action ? [finishOptionCore(finish, action.op)] : [];
       }),
     ],
-    scope: current ? finishScope(target, current, messages, libraryChoiceOf(bank?.materials, current)) : undefined,
+    // The scope spreads what the surface STORES: a retired id stays as written.
+    scope: stored ? finishScope(target, stored, messages, libraryChoiceOf(bank?.materials, stored)) : undefined,
   };
+}
+
+/**
+ * The option a stored finish id is shown as: a retired bundled id
+ * (`RETIRED_FINISHES`) shows its target, unless the project ships a material
+ * under the retired id itself, which is then a real option of its own.
+ */
+function shownFinishOf(stored: string | null, bank?: VariantBank): string | null {
+  if (stored === null || bank?.materials?.some((material) => material.id === stored) === true) return stored;
+  return bundledAliasTarget(stored) ?? stored;
 }
 
 /**

@@ -62,11 +62,14 @@ export const HOST_BUDGET_FAIL_BYTES = 4 * 1024;
  * scene schemas — a good deal of the scene model, but still no `three` and no
  * DOM.
  *
- * The gate is set from a measured size of `jeex-viewer-ops.js` (81,035 gzip
- * bytes, 79.1 KB, from `measureBundle('dist-lib')` right after
+ * The gate is set from a measured size of `jeex-viewer-ops.js` (82,556 gzip
+ * bytes, 80.6 KB, from `measureBundle('dist-lib')` right after
  * `bun run build:lib`) plus 1 KB. Most of the entry is the scene model and its
  * `zod/mini` schemas; the bundled bank's fixed UUID v7 literals (random hex
- * that gzip cannot fold) are a large share. The last raise, from 79,666
+ * that gzip cannot fold) are a large share. The last raise, from 81,994
+ * bytes measured on the main branch, is the contemporary room-finish set
+ * (eleven new finish ids and rows, the three retired aliases) and the two
+ * host tables `FINISH_ALIASES` and `FINISH_NAMES`, 562 bytes in all. The raise before it, from 79,666
  * bytes, is the sun orientation's `site` field (80,286 bytes with it) and
  * the `set_site` operation (about 0.7 KB: its op schema, applier and preset
  * rule), which a host judges and applies server-side. The raise before it,
@@ -77,7 +80,7 @@ export const HOST_BUDGET_FAIL_BYTES = 4 * 1024;
  * `npm pack` time; the fix is to re-measure and update this comment, never to
  * raise the number from memory.
  */
-export const OPS_BUDGET_FAIL_BYTES = 81_035 + 1024;
+export const OPS_BUDGET_FAIL_BYTES = 82_556 + 1024;
 
 /**
  * Hard limit for the `jeex-viewer/lighting` entry, gzip bytes. It carries the
@@ -187,14 +190,15 @@ export const LAZY_WASM_LIMITS: Readonly<Record<string, number>> = { 'lazy-jeex-v
 /**
  * Hard limit for the bundled finishes' maps a build ships in `finish-maps/`,
  * bytes on disk (WebP does not gzip). Set from the measured folder plus 5 %:
- * 9,406,636 bytes of maps for ten library versions (nine floor and wall
- * scans and the wall and ceiling plaster) at 256, 512 and 768 px, measured
- * 2026-10-24 right after `scripts/finish-maps-fetch.ts` bound every finish but
- * the two striped wallpapers, plus `SOURCES.md`. Most of it is the
- * ARM packs, which the library ships lossless. A re-fetch that binds more
- * finishes re-measures and updates this comment; never raise it from memory.
+ * 29,277,554 bytes (29,273,942 bytes of maps for 24 library versions, the
+ * floor and wall scans of the contemporary set and the ceiling plaster, at
+ * 256, 512 and 768 px, plus 3,612 bytes of `SOURCES.md`), measured
+ * 2026-10-24 right after `scripts/finish-maps-fetch.ts --update` brought the
+ * folder to the approved contemporary set. Most of it is the ARM packs,
+ * which the library ships lossless. A re-fetch that binds more finishes
+ * re-measures and updates this comment; never raise it from memory.
  */
-export const FINISH_MAPS_BUDGET_BYTES = Math.round(9_406_636 * 1.05);
+export const FINISH_MAPS_BUDGET_BYTES = Math.round(29_277_554 * 1.05);
 
 /** Every file under `dir`, recursively, with its size. */
 function filesUnder(dir: string): { path: string; bytes: number }[] {

@@ -60,11 +60,32 @@ describe('resolveRoomFinish', () => {
     expect(drawn?.kind === 'library' && drawn.draw.builtin).toBeUndefined();
   });
 
-  test('a kept bundled finish still resolves to the legacy Finish it always drew', () => {
+  test("a retired bundled finish draws its target's current binding under its own id", () => {
     expect(BUILTIN_FINISHES.has(FINISH.wallpaper_cream)).toBe(false);
+    const white = BUILTIN_FINISHES.get(FINISH.white)!;
     expect(resolveRoomFinish(FINISH.wallpaper_cream, undefined, findFinish)).toEqual({
+      kind: 'library',
+      draw: { id: FINISH.wallpaper_cream, material: white.material, colour: white.colour!, rotation: white.rotation, builtin: true },
+    });
+    const oak = BUILTIN_FINISHES.get(FINISH.oak)!;
+    expect(resolveRoomFinish(FINISH.ash, [], findFinish)).toEqual({
+      kind: 'library',
+      draw: { id: FINISH.ash, material: oak.material, rotation: oak.rotation, builtin: true },
+    });
+  });
+
+  test('a project material under the retired id wins; one under the target id only does not reach the retired id', () => {
+    const own: ProjectMaterial[] = [{ ...GENERATOR_FLOOR, id: FINISH.wallpaper_cream }];
+    const ownLegacy = (id: string) => findFinish(id, own) ?? findFinish(id);
+    expect(resolveRoomFinish(FINISH.wallpaper_cream, own, ownLegacy)).toEqual({
       kind: 'legacy',
-      finish: findFinish(FINISH.wallpaper_cream)!,
+      finish: ownLegacy(FINISH.wallpaper_cream)!,
+    });
+    const target: ProjectMaterial[] = [{ ...NATURAL_SCAN, id: FINISH.white }];
+    const drawn = resolveRoomFinish(FINISH.wallpaper_cream, target, findFinish);
+    expect(drawn?.kind === 'library' && { builtin: drawn.draw.builtin, material: drawn.draw.material }).toEqual({
+      builtin: true,
+      material: BUILTIN_FINISHES.get(FINISH.white)!.material,
     });
   });
 

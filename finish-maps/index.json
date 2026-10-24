@@ -4,122 +4,214 @@
     {
       "finish": "01a12fdf-158e-7748-adfe-d397dde469ba",
       "slug": "oak",
+      "name": "Natural oak",
       "variant": "01a16d1f-9f8e-70d4-9a46-57fd0246c272",
       "version": "01a16d1f-9f8e-70d4-9a46-57febe3c2191"
     },
     {
       "finish": "01a12fdf-158f-702d-8070-693ed21d3b05",
       "slug": "walnut",
+      "name": "Walnut",
       "variant": "01a16d21-6413-763c-b044-4682247bf7f9",
       "version": "01a16d21-6413-763c-b044-46831700a81f"
     },
     {
-      "finish": "01a12fdf-1590-7754-92f4-5912a4ff24a2",
-      "slug": "ash",
-      "variant": "01a16d1f-f16c-700b-b7eb-7872b27daabf",
-      "version": "01a16d21-a2ce-728e-8f8f-1d365801542f"
-    },
-    {
       "finish": "01a12fdf-1591-7e42-b45b-22367fa2faec",
       "slug": "teak",
+      "name": "Honey oak",
       "variant": "01a16d20-20f0-7061-a81e-014b7ba857d3",
       "version": "01a16d20-20f0-7061-a81e-014c1f488682"
     },
     {
       "finish": "01a12fdf-1592-7088-8910-32f02da0d875",
       "slug": "chevron",
+      "name": "Chevron oak",
       "variant": "01a16d20-3f1d-7759-9aa0-48f87c67f18b",
       "version": "01a16d21-a2d8-7401-9191-e2c7ef2e6834"
     },
     {
+      "finish": "01a16edb-fb93-7729-93ff-3b4ea71ae797",
+      "slug": "herringbone",
+      "name": "Herringbone oak",
+      "variant": "01a16edd-bed9-76f3-abc4-1416bdcdbedd",
+      "version": "01a16edd-bed9-76f3-abc4-1417005b2b52"
+    },
+    {
+      "finish": "01a16edb-fb93-7729-93ff-3b4f73d7f368",
+      "slug": "herringbone_dark",
+      "name": "Dark oak herringbone",
+      "variant": "01a16edd-bfe8-7549-a32c-adb5949e2015",
+      "version": "01a16edd-bfe8-7549-a32c-adb6bea37c9a"
+    },
+    {
       "finish": "01a12fdf-1593-72d2-a5f9-a56d9c522980",
       "slug": "terrazzo",
-      "variant": "01a16d82-a7b9-72c4-96ad-aa89e16a9476",
-      "version": "01a16d82-a7b9-72c4-96ad-aa8ae418c06f",
-      "colour": "#a7b5a6"
+      "name": "White terrazzo",
+      "variant": "01a16edd-c42d-74d3-ae0b-ef0081fcc03e",
+      "version": "01a16edd-c42d-74d3-ae0b-ef01cb3841da"
     },
     {
       "finish": "01a12fdf-1594-715c-a2ec-7257f0ac0434",
       "slug": "limestone",
-      "variant": "01a16dc2-d870-773e-be4f-b43b2f99f4cf",
-      "version": "01a16dc2-d870-773e-be4f-b43c258bdbf3"
+      "name": "Cream limestone",
+      "variant": "01a16edd-c6f5-717f-ab06-1a7fa3f0a9a0",
+      "version": "01a16edd-c6f5-717f-ab06-1a807ea38b3d",
+      "colour": "#d4cab8"
     },
     {
       "finish": "01a12fdf-1595-71e8-be84-9227216ac42d",
       "slug": "ceramic_light",
-      "variant": "01a16dc2-da93-70de-8f65-109f6270c8dd",
-      "version": "01a16dc2-da93-70de-8f65-10a0c04bd988",
-      "colour": "#e9e5dc"
+      "name": "Warm stone porcelain",
+      "variant": "01a16edd-c8c1-72e8-b680-50a4638b09a5",
+      "version": "01a16edd-c8c1-72e8-b680-50a5a458b45d",
+      "colour": "#b5ac9e"
     },
     {
       "finish": "01a12fdf-1596-7992-9061-a9a730fd7840",
       "slug": "ceramic_graphite",
-      "variant": "01a16dc2-da93-70de-8f65-109f6270c8dd",
-      "version": "01a16dc2-da93-70de-8f65-10a0c04bd988",
-      "colour": "#4c4c4a"
-    },
-    {
-      "finish": "01a12fdf-1597-7e0c-8b3e-f091fb6af634",
-      "slug": "sand",
-      "variant": "01a1689e-3512-757a-8276-36198fb4d666",
-      "version": "01a1689e-c2d9-7246-a313-fcd4f0df5a93",
-      "colour": "#b0a294"
+      "name": "Graphite porcelain",
+      "variant": "01a16edd-ca51-77c3-b6e4-216c679077ee",
+      "version": "01a16edd-ca51-77c3-b6e4-216df60b2371",
+      "colour": "#5e5b56"
     },
     {
       "finish": "01a12fdf-1598-7b82-807b-83d8a5effde3",
       "slug": "white",
-      "variant": "01a1689e-3512-757a-8276-36198fb4d666",
-      "version": "01a1689e-c2d9-7246-a313-fcd4f0df5a93",
-      "colour": "#eae4d6"
+      "name": "Warm white",
+      "variant": "01a16edd-cfd9-7142-9875-89a66890048b",
+      "version": "01a16edd-cfd9-7142-9875-89a7cb31b32f",
+      "colour": "#ece6da"
+    },
+    {
+      "finish": "01a16edb-fb92-7387-b95c-f3449aacc0d6",
+      "slug": "pure_white",
+      "name": "Pure white",
+      "variant": "01a16edd-d59c-767d-b4da-41d770c5dbd4",
+      "version": "01a16edd-d59c-767d-b4da-41d8b76d8ca6",
+      "colour": "#f3f3f1"
+    },
+    {
+      "finish": "01a12fdf-1597-7e0c-8b3e-f091fb6af634",
+      "slug": "sand",
+      "name": "Oat limewash",
+      "variant": "01a16edd-d81b-74a7-8797-b4d030345ebc",
+      "version": "01a16edd-d81b-74a7-8797-b4d15856ba5d",
+      "colour": "#d3c6b2"
     },
     {
       "finish": "01a12fdf-1599-7b1d-99dd-48f13cb98f0a",
       "slug": "sage",
-      "variant": "01a1689e-3512-757a-8276-36198fb4d666",
-      "version": "01a1689e-c2d9-7246-a313-fcd4f0df5a93",
-      "colour": "#a8b5a4"
+      "name": "Olive limewash",
+      "variant": "01a16edd-d81b-74a7-8797-b4d030345ebc",
+      "version": "01a16edd-d81b-74a7-8797-b4d15856ba5d",
+      "colour": "#8e9474"
     },
     {
       "finish": "01a12fdf-159a-7c53-a64b-b1a9506f20b7",
       "slug": "terracotta",
-      "variant": "01a1689e-3512-757a-8276-36198fb4d666",
-      "version": "01a1689e-c2d9-7246-a313-fcd4f0df5a93",
-      "colour": "#c08a70"
+      "name": "Clay limewash",
+      "variant": "01a16edd-da7b-73ad-b6a5-f7b2a3108954",
+      "version": "01a16edd-da7b-73ad-b6a5-f7b38baf87b8",
+      "colour": "#b88470"
     },
     {
       "finish": "01a12fdf-159b-71b5-8b10-01d372c4c14b",
       "slug": "graphite",
-      "variant": "01a1689e-3512-757a-8276-36198fb4d666",
-      "version": "01a1689e-c2d9-7246-a313-fcd4f0df5a93",
-      "colour": "#6a6862"
+      "name": "Mocha",
+      "variant": "01a16edd-dfe6-70f2-9218-708c1ee7283f",
+      "version": "01a16edd-dfe6-70f2-9218-708d0d819cda",
+      "colour": "#6b5d53"
     },
     {
-      "finish": "01a12fdf-159c-78e6-97c2-8b635635ce85",
-      "slug": "stripes_cream",
-      "kept": true,
-      "why": "keep"
+      "finish": "01a16edb-fb93-7729-93ff-3b46ec778305",
+      "slug": "ink",
+      "name": "Ink blue",
+      "variant": "01a16edd-dfe6-70f2-9218-708c1ee7283f",
+      "version": "01a16edd-dfe6-70f2-9218-708d0d819cda",
+      "colour": "#3a4a5e"
     },
     {
-      "finish": "01a12fdf-159d-770d-b5ab-64b41de36f30",
-      "slug": "stripes_sage",
-      "kept": true,
-      "why": "keep"
+      "finish": "01a16edb-fb93-7729-93ff-3b47d1496fa3",
+      "slug": "venetian",
+      "name": "Polished lime plaster",
+      "variant": "01a16edd-e289-7225-b956-b39228796437",
+      "version": "01a16edd-e289-7225-b956-b39335031614",
+      "colour": "#d6cdbf"
+    },
+    {
+      "finish": "01a16edb-fb93-7729-93ff-3b48a65a96fd",
+      "slug": "microcement",
+      "name": "Sand microcement",
+      "variant": "01a16edd-e64e-75a9-b68b-6d5601b86db9",
+      "version": "01a16edd-e64e-75a9-b68b-6d57e2586ae6",
+      "colour": "#c8b9a3"
+    },
+    {
+      "finish": "01a16edb-fb93-7729-93ff-3b49fff2b2de",
+      "slug": "microcement_grey",
+      "name": "Warm grey microcement",
+      "variant": "01a16edd-e8c3-7741-825c-d903f24420b1",
+      "version": "01a16edd-e8c3-7741-825c-d904624388d2"
+    },
+    {
+      "finish": "01a16edb-fb93-7729-93ff-3b4a562bba6d",
+      "slug": "travertine",
+      "name": "Honed travertine",
+      "variant": "01a16edd-ec69-7756-b177-e3556eedeab0",
+      "version": "01a16edd-ec69-7756-b177-e356d4cb2fbb"
+    },
+    {
+      "finish": "01a16edb-fb93-7729-93ff-3b4b552be9f0",
+      "slug": "marble",
+      "name": "White marble",
+      "variant": "01a16edd-f0ee-7162-8435-93db98907120",
+      "version": "01a16edd-f0ee-7162-8435-93dc56ff5230"
+    },
+    {
+      "finish": "01a16edb-fb93-7729-93ff-3b4cf444d9bf",
+      "slug": "porcelain_grey",
+      "name": "Stone porcelain 60x60",
+      "variant": "01a16edd-f1fc-72e8-a70d-eef006f206c2",
+      "version": "01a16edd-f1fc-72e8-a70d-eef162738ce5"
+    },
+    {
+      "finish": "01a16edb-fb93-7729-93ff-3b4d4290edb5",
+      "slug": "zellige",
+      "name": "Teal zellige",
+      "variant": "01a16edd-f638-75ba-9bac-909b27e11126",
+      "version": "01a16edd-f638-75ba-9bac-909c5b2f0cd2"
     },
     {
       "finish": "01a12fdf-159e-7413-8248-0060d7df7693",
       "slug": "tiles_white",
-      "variant": "01a16dc2-dcee-730b-ae62-81c69daba3df",
-      "version": "01a16dc2-dcee-730b-ae62-81c7651f02ed",
-      "colour": "#e6e2d8"
+      "name": "Stacked white tile",
+      "variant": "01a16edd-fbf5-75c4-b533-2f6f14b233d2",
+      "version": "01a16edd-fbf5-75c4-b533-2f70c67c28fe"
+    },
+    {
+      "finish": "01a12fdf-159c-78e6-97c2-8b635635ce85",
+      "slug": "stripes_cream",
+      "alias": "01a12fdf-1598-7b82-807b-83d8a5effde3"
+    },
+    {
+      "finish": "01a12fdf-159d-770d-b5ab-64b41de36f30",
+      "slug": "stripes_sage",
+      "alias": "01a12fdf-1599-7b1d-99dd-48f13cb98f0a"
+    },
+    {
+      "finish": "01a12fdf-1590-7754-92f4-5912a4ff24a2",
+      "slug": "ash",
+      "alias": "01a12fdf-158e-7748-adfe-d397dde469ba"
     }
   ],
   "defaults": {
     "ceiling": {
       "finish": "01a12fdf-15aa-7d0e-97e3-bb2102d2e0bb",
       "slug": "plaster_white",
-      "variant": "01a1689e-3512-757a-8276-36198fb4d666",
-      "version": "01a1689e-c2d9-7246-a313-fcd4f0df5a93",
-      "colour": "#eee9df"
+      "name": "Lime plaster white",
+      "variant": "01a16ede-b329-70bf-8fe1-72444158b9e0",
+      "version": "01a16ede-b329-70bf-8fe1-72452c06aa9e",
+      "colour": "#f1ece2"
     }
   },
   "versions": [
@@ -298,93 +390,6 @@
       }
     },
     {
-      "version": "01a16d21-a2ce-728e-8f8f-1d365801542f",
-      "variant": "01a16d1f-f16c-700b-b7eb-7872b27daabf",
-      "name": "Wood Floor 039",
-      "kind": "scan",
-      "facts": {
-        "tileM": [
-          1.9,
-          1.9
-        ],
-        "grain": "along_v",
-        "suitability": "plank_floor",
-        "normalStrength": 1,
-        "colourMode": "natural",
-        "averageColour": "#e1c59c",
-        "pbr": {}
-      },
-      "maps": {
-        "albedo": {
-          "colourSpace": "srgb",
-          "files": {
-            "256": {
-              "path": "tex/01a16d21-a2ce-728e-8f8f-1d365801542f/albedo.256.webp",
-              "bytes": 4888,
-              "sha256": "5393067c9a1bccca9e819bf233abc2b357ee66420d96050fd7a4e51a9caa7a5b"
-            },
-            "512": {
-              "path": "tex/01a16d21-a2ce-728e-8f8f-1d365801542f/albedo.512.webp",
-              "bytes": 22856,
-              "sha256": "01a46b139e602dfedf083dd598d60d3f4d0213e9803b6c8895c4b48fbf885631"
-            },
-            "768": {
-              "path": "tex/01a16d21-a2ce-728e-8f8f-1d365801542f/albedo.768.webp",
-              "bytes": 54330,
-              "sha256": "dd27095904d580acd8695f85646356ecab22be6078981fe57fc89d7f3bcd7036"
-            }
-          }
-        },
-        "normal": {
-          "colourSpace": "linear",
-          "convention": "opengl",
-          "files": {
-            "256": {
-              "path": "tex/01a16d21-a2ce-728e-8f8f-1d365801542f/normal.256.webp",
-              "bytes": 27794,
-              "sha256": "9db972f63d33fd776c3b0c4907d1f57aca71aa8169d18cc0974d817bc2c1a966"
-            },
-            "512": {
-              "path": "tex/01a16d21-a2ce-728e-8f8f-1d365801542f/normal.512.webp",
-              "bytes": 149656,
-              "sha256": "bd08865fc2507c6c1c580772b98d409fe86de3718441a5669b94e0187a01c5e9"
-            },
-            "768": {
-              "path": "tex/01a16d21-a2ce-728e-8f8f-1d365801542f/normal.768.webp",
-              "bytes": 418620,
-              "sha256": "ea468475a000fc5a593f5769a83b046c9c3c980e4a9b1a63ff51afede8c965b8"
-            }
-          }
-        },
-        "arm": {
-          "colourSpace": "linear",
-          "files": {
-            "256": {
-              "path": "tex/01a16d21-a2ce-728e-8f8f-1d365801542f/arm.256.webp",
-              "bytes": 16318,
-              "sha256": "5f6dc55cc826bedb4af9a72b9cadb0b6862957d99a8f65a03082d100e95e22fc"
-            },
-            "512": {
-              "path": "tex/01a16d21-a2ce-728e-8f8f-1d365801542f/arm.512.webp",
-              "bytes": 59320,
-              "sha256": "9f430d991eab82fe5c0d0dfa222ec41e1796bfea7066e6cc59366173d195e4f6"
-            },
-            "768": {
-              "path": "tex/01a16d21-a2ce-728e-8f8f-1d365801542f/arm.768.webp",
-              "bytes": 130634,
-              "sha256": "0ac87a612467dea74c1104cc0e544e180e37bfc546b123cad5a5e6065e1a3a84"
-            }
-          }
-        }
-      },
-      "source": {
-        "provider": "ambientcg",
-        "sourceName": "WoodFloor039",
-        "sourcePage": "https://ambientcg.com/a/WoodFloor039",
-        "licence": "CC0-1.0"
-      }
-    },
-    {
       "version": "01a16d20-20f0-7061-a81e-014c1f488682",
       "variant": "01a16d20-20f0-7061-a81e-014b7ba857d3",
       "name": "Wooden Floor 01",
@@ -559,49 +564,40 @@
       }
     },
     {
-      "version": "01a16d82-a7b9-72c4-96ad-aa8ae418c06f",
-      "variant": "01a16d82-a7b9-72c4-96ad-aa89e16a9476",
-      "name": "Terrazzo 001, terrazzo",
+      "version": "01a16edd-bed9-76f3-abc4-1417005b2b52",
+      "variant": "01a16edd-bed9-76f3-abc4-1416bdcdbedd",
+      "name": "Wood Floor 053, herringbone",
       "kind": "scan",
       "facts": {
         "tileM": [
-          1,
-          1
+          2,
+          2
         ],
-        "grain": "none",
-        "suitability": "continuous",
+        "grain": "unknown",
+        "suitability": "plank_floor",
         "normalStrength": 1,
-        "colourMode": "tintable",
-        "tint": {
-          "recipe": "luma-mid@1",
-          "suggestedColours": [
-            {
-              "name": "natural",
-              "hex": "#c3bfc1"
-            }
-          ]
-        },
-        "averageColour": "#808080",
+        "colourMode": "natural",
+        "averageColour": "#9a7a5e",
         "pbr": {}
       },
       "maps": {
-        "albedoTint": {
+        "albedo": {
           "colourSpace": "srgb",
           "files": {
             "256": {
-              "path": "tex/01a16d82-a7b9-72c4-96ad-aa8ae418c06f/albedoTint.256.webp",
-              "bytes": 20966,
-              "sha256": "176f783cb055e11b2f7a58ef8338b934d6be543698ed1474cbaecb1abd08ff06"
+              "path": "tex/01a16edd-bed9-76f3-abc4-1417005b2b52/albedo.256.webp",
+              "bytes": 8944,
+              "sha256": "623d0f33eb84ea70d50b1fb09d561155f20197408977634a77f78cabb75f2779"
             },
             "512": {
-              "path": "tex/01a16d82-a7b9-72c4-96ad-aa8ae418c06f/albedoTint.512.webp",
-              "bytes": 73706,
-              "sha256": "5e41b4652111811ab6d9419806a69d9edfbab7d48dc312206ae5c43e7897a4df"
+              "path": "tex/01a16edd-bed9-76f3-abc4-1417005b2b52/albedo.512.webp",
+              "bytes": 33230,
+              "sha256": "27d2e40f611d546e2f43bab29ee69ed95cae03559e121d7fb7aed77706d8fa14"
             },
             "768": {
-              "path": "tex/01a16d82-a7b9-72c4-96ad-aa8ae418c06f/albedoTint.768.webp",
-              "bytes": 153744,
-              "sha256": "5e1ad2cb17c408244a2286aec2775a37dea211f3cfba1758c7b741b432388c36"
+              "path": "tex/01a16edd-bed9-76f3-abc4-1417005b2b52/albedo.768.webp",
+              "bytes": 73934,
+              "sha256": "7b3ad7de3285a664b2fb0eaa207c01d98d3cecd9cb8069d694630a65d59b8869"
             }
           }
         },
@@ -610,19 +606,19 @@
           "convention": "opengl",
           "files": {
             "256": {
-              "path": "tex/01a16d82-a7b9-72c4-96ad-aa8ae418c06f/normal.256.webp",
-              "bytes": 39544,
-              "sha256": "e08af04d53506f6050178d75d6a7283013af61c288a5ed0b8bd30cb12174121d"
+              "path": "tex/01a16edd-bed9-76f3-abc4-1417005b2b52/normal.256.webp",
+              "bytes": 23488,
+              "sha256": "23581f85e8009abbe73bc3a94a7b022880869b23f966ba24ee8f256c2f2c5a9f"
             },
             "512": {
-              "path": "tex/01a16d82-a7b9-72c4-96ad-aa8ae418c06f/normal.512.webp",
-              "bytes": 207574,
-              "sha256": "5c699587fa62921794b914dd4f462ff6176fef1f6c1810799602245ef65a65ad"
+              "path": "tex/01a16edd-bed9-76f3-abc4-1417005b2b52/normal.512.webp",
+              "bytes": 87114,
+              "sha256": "424e88dc3885e9b2299793335a91a793a5b29dbc4512efc5aa76c60ca544db05"
             },
             "768": {
-              "path": "tex/01a16d82-a7b9-72c4-96ad-aa8ae418c06f/normal.768.webp",
-              "bytes": 536128,
-              "sha256": "0a972b7186832f30af73a6dc045c3a1ad23ffb0382c6eb430568d12fcd9dd48f"
+              "path": "tex/01a16edd-bed9-76f3-abc4-1417005b2b52/normal.768.webp",
+              "bytes": 298328,
+              "sha256": "c7e8d34a7b2e8aeee3dae1548910ed1843d09866d94dcab082a06c4dacd3ab02"
             }
           }
         },
@@ -630,33 +626,211 @@
           "colourSpace": "linear",
           "files": {
             "256": {
-              "path": "tex/01a16d82-a7b9-72c4-96ad-aa8ae418c06f/arm.256.webp",
-              "bytes": 29554,
-              "sha256": "54e0d6c1bf29014aa92726ff2b73ec8b13702b078de740c3bea973fd5e267941"
+              "path": "tex/01a16edd-bed9-76f3-abc4-1417005b2b52/arm.256.webp",
+              "bytes": 24130,
+              "sha256": "9a220e1ea30541616a5886f572bae4f2424fe8e2ecbc6fa6b070625e142c6dc8"
             },
             "512": {
-              "path": "tex/01a16d82-a7b9-72c4-96ad-aa8ae418c06f/arm.512.webp",
-              "bytes": 107148,
-              "sha256": "4b4c88f408996c9b8fafd287d46d55eae95e1c7039930d670d1edfee9f102043"
+              "path": "tex/01a16edd-bed9-76f3-abc4-1417005b2b52/arm.512.webp",
+              "bytes": 89192,
+              "sha256": "7b0b4ad6accfa7dce653983dc04b8eda2142427953ebc29ed96d72c98644aaea"
             },
             "768": {
-              "path": "tex/01a16d82-a7b9-72c4-96ad-aa8ae418c06f/arm.768.webp",
-              "bytes": 230366,
-              "sha256": "91bfc1a2c32674203ceec161cb846eaf7dab9791c894b381c294347abea00a99"
+              "path": "tex/01a16edd-bed9-76f3-abc4-1417005b2b52/arm.768.webp",
+              "bytes": 192616,
+              "sha256": "e5e50db44a0070e64dc7878df44a8dff30805c177dec15871e2ee4c2d18b6db4"
             }
           }
         }
       },
       "source": {
         "provider": "ambientcg",
-        "sourceName": "Terrazzo001",
-        "sourcePage": "https://ambientcg.com/a/Terrazzo001",
+        "sourceName": "WoodFloor053",
+        "sourcePage": "https://ambientcg.com/a/WoodFloor053",
         "licence": "CC0-1.0"
       }
     },
     {
-      "version": "01a16dc2-d870-773e-be4f-b43c258bdbf3",
-      "variant": "01a16dc2-d870-773e-be4f-b43b2f99f4cf",
+      "version": "01a16edd-bfe8-7549-a32c-adb6bea37c9a",
+      "variant": "01a16edd-bfe8-7549-a32c-adb5949e2015",
+      "name": "Wood Floor 014, herringbone dark",
+      "kind": "scan",
+      "facts": {
+        "tileM": [
+          1.4,
+          1.4
+        ],
+        "grain": "unknown",
+        "suitability": "plank_floor",
+        "normalStrength": 1,
+        "colourMode": "natural",
+        "averageColour": "#513b2a",
+        "pbr": {}
+      },
+      "maps": {
+        "albedo": {
+          "colourSpace": "srgb",
+          "files": {
+            "256": {
+              "path": "tex/01a16edd-bfe8-7549-a32c-adb6bea37c9a/albedo.256.webp",
+              "bytes": 8384,
+              "sha256": "7ddad32049fe93e5afa665fd8eeb52b0b93e319dd8ba69ef30938f8cca636b14"
+            },
+            "512": {
+              "path": "tex/01a16edd-bfe8-7549-a32c-adb6bea37c9a/albedo.512.webp",
+              "bytes": 34586,
+              "sha256": "3a00c9a6b2bda5bbbcfc4f652f8a7ee0d51141d29010f88a3b70e9d5fb4f0dfb"
+            },
+            "768": {
+              "path": "tex/01a16edd-bfe8-7549-a32c-adb6bea37c9a/albedo.768.webp",
+              "bytes": 78496,
+              "sha256": "fcdb466d9d590fdc7d5db2ba48f738e23a08ff07112792bee90bd7b9b73e4813"
+            }
+          }
+        },
+        "normal": {
+          "colourSpace": "linear",
+          "convention": "opengl",
+          "files": {
+            "256": {
+              "path": "tex/01a16edd-bfe8-7549-a32c-adb6bea37c9a/normal.256.webp",
+              "bytes": 39464,
+              "sha256": "ff9cae2ffb37ec0ec14395c62f00b5e9b9a099c540fe4122ae9e0c1f6946fe39"
+            },
+            "512": {
+              "path": "tex/01a16edd-bfe8-7549-a32c-adb6bea37c9a/normal.512.webp",
+              "bytes": 151356,
+              "sha256": "f00f5865dd7e3eeb1b2d411b392ca4a65e222e845116329d817b7c656cf68939"
+            },
+            "768": {
+              "path": "tex/01a16edd-bfe8-7549-a32c-adb6bea37c9a/normal.768.webp",
+              "bytes": 387550,
+              "sha256": "c9b3e324dcdfd79aec104c891ef7ebd6de3fc64e0c48b0ac329bc2a10a5911b9"
+            }
+          }
+        },
+        "arm": {
+          "colourSpace": "linear",
+          "files": {
+            "256": {
+              "path": "tex/01a16edd-bfe8-7549-a32c-adb6bea37c9a/arm.256.webp",
+              "bytes": 17412,
+              "sha256": "3e1b98079ae59b216cd48a5e30ed1b59854c2106aeda46f48de4f01f98e09a61"
+            },
+            "512": {
+              "path": "tex/01a16edd-bfe8-7549-a32c-adb6bea37c9a/arm.512.webp",
+              "bytes": 56964,
+              "sha256": "18f53cac2068b4d0f3fbb74d220ed652e4202cd681068f81adcc4fed079bbbb4"
+            },
+            "768": {
+              "path": "tex/01a16edd-bfe8-7549-a32c-adb6bea37c9a/arm.768.webp",
+              "bytes": 118426,
+              "sha256": "019013d51ff73c6db365793620a538d5af3532a760501591039e32bcf9880097"
+            }
+          }
+        }
+      },
+      "source": {
+        "provider": "ambientcg",
+        "sourceName": "WoodFloor014",
+        "sourcePage": "https://ambientcg.com/a/WoodFloor014",
+        "licence": "CC0-1.0"
+      }
+    },
+    {
+      "version": "01a16edd-c42d-74d3-ae0b-ef01cb3841da",
+      "variant": "01a16edd-c42d-74d3-ae0b-ef0081fcc03e",
+      "name": "Terrazzo 005, terrazzo",
+      "kind": "scan",
+      "facts": {
+        "tileM": [
+          2,
+          2
+        ],
+        "grain": "none",
+        "suitability": "continuous",
+        "normalStrength": 1,
+        "colourMode": "natural",
+        "averageColour": "#ccc6c2",
+        "pbr": {
+          "roughness": 1,
+          "clearcoat": 0.4,
+          "clearcoatRoughness": 0.1
+        }
+      },
+      "maps": {
+        "albedo": {
+          "colourSpace": "srgb",
+          "files": {
+            "256": {
+              "path": "tex/01a16edd-c42d-74d3-ae0b-ef01cb3841da/albedo.256.webp",
+              "bytes": 32986,
+              "sha256": "05d2dc542b278cdad6344062c053bb52bc7d4cfca2e761c3bb5e7c5ebb013508"
+            },
+            "512": {
+              "path": "tex/01a16edd-c42d-74d3-ae0b-ef01cb3841da/albedo.512.webp",
+              "bytes": 113744,
+              "sha256": "084bca569cc1a7966f457e0aeecefd0aad109df430a3af9f94f94137d5a0a961"
+            },
+            "768": {
+              "path": "tex/01a16edd-c42d-74d3-ae0b-ef01cb3841da/albedo.768.webp",
+              "bytes": 243118,
+              "sha256": "bc52677fde77eeea2686db87100c893ec70b6bd24956142b69a6fd976ce272eb"
+            }
+          }
+        },
+        "normal": {
+          "colourSpace": "linear",
+          "convention": "opengl",
+          "files": {
+            "256": {
+              "path": "tex/01a16edd-c42d-74d3-ae0b-ef01cb3841da/normal.256.webp",
+              "bytes": 41556,
+              "sha256": "f35916a20f7f01f060692b9d0a39b7858933ad06231531e75db328cf123a58a7"
+            },
+            "512": {
+              "path": "tex/01a16edd-c42d-74d3-ae0b-ef01cb3841da/normal.512.webp",
+              "bytes": 212984,
+              "sha256": "fbf4a6206b5cc86617989fd081f39879c0f06f564248dd4378d55920e688f7bd"
+            },
+            "768": {
+              "path": "tex/01a16edd-c42d-74d3-ae0b-ef01cb3841da/normal.768.webp",
+              "bytes": 547334,
+              "sha256": "98a3f7656c6bdfeee95c00b504f076e177dc0c255d5e607ea321652c6d3ac6d1"
+            }
+          }
+        },
+        "arm": {
+          "colourSpace": "linear",
+          "files": {
+            "256": {
+              "path": "tex/01a16edd-c42d-74d3-ae0b-ef01cb3841da/arm.256.webp",
+              "bytes": 29018,
+              "sha256": "f56d43e5eb345a83f3c1ce59b452a37e5da7c090de458d0add5f056de4655948"
+            },
+            "512": {
+              "path": "tex/01a16edd-c42d-74d3-ae0b-ef01cb3841da/arm.512.webp",
+              "bytes": 105336,
+              "sha256": "ecc8d8342cfdf645064cc07158702d3cac712e47ee03046a08b00ee6edf6b257"
+            },
+            "768": {
+              "path": "tex/01a16edd-c42d-74d3-ae0b-ef01cb3841da/arm.768.webp",
+              "bytes": 228608,
+              "sha256": "a073af3a11295971310b02e39f893c8a30ca591cfc5301c30138e821100bf573"
+            }
+          }
+        }
+      },
+      "source": {
+        "provider": "ambientcg",
+        "sourceName": "Terrazzo005",
+        "sourcePage": "https://ambientcg.com/a/Terrazzo005",
+        "licence": "CC0-1.0"
+      }
+    },
+    {
+      "version": "01a16edd-c6f5-717f-ab06-1a807ea38b3d",
+      "variant": "01a16edd-c6f5-717f-ab06-1a7fa3f0a9a0",
       "name": "Tiles 143, limestone",
       "kind": "scan",
       "facts": {
@@ -667,28 +841,39 @@
         "grain": "unknown",
         "suitability": "continuous",
         "normalStrength": 1,
-        "colourMode": "natural",
-        "averageColour": "#dab58e",
-        "pbr": {}
+        "colourMode": "tintable",
+        "tint": {
+          "recipe": "luma-mid@1",
+          "suggestedColours": [
+            {
+              "name": "natural",
+              "hex": "#dab58e"
+            }
+          ]
+        },
+        "averageColour": "#808080",
+        "pbr": {
+          "roughness": 0.8952479638105189
+        }
       },
       "maps": {
-        "albedo": {
+        "albedoTint": {
           "colourSpace": "srgb",
           "files": {
             "256": {
-              "path": "tex/01a16dc2-d870-773e-be4f-b43c258bdbf3/albedo.256.webp",
-              "bytes": 11720,
-              "sha256": "151b5f9b9c946ac09e32d2ef222d8669295d55cd9b8756de249b609e43f30ef0"
+              "path": "tex/01a16edd-c6f5-717f-ab06-1a807ea38b3d/albedoTint.256.webp",
+              "bytes": 18292,
+              "sha256": "4e0e0b1ab2957c73702d7cb0aa47fbb5beb470f95c9338932ba21af5c513bcf1"
             },
             "512": {
-              "path": "tex/01a16dc2-d870-773e-be4f-b43c258bdbf3/albedo.512.webp",
-              "bytes": 45648,
-              "sha256": "d4ca121b958c709198afd5a7370cfadc6737dd8a7f15ad8ac8d877e041f41289"
+              "path": "tex/01a16edd-c6f5-717f-ab06-1a807ea38b3d/albedoTint.512.webp",
+              "bytes": 69518,
+              "sha256": "4ec6e97e26b0fac738643991a68541f752c4c4fc30e28faf3b1573366dee491d"
             },
             "768": {
-              "path": "tex/01a16dc2-d870-773e-be4f-b43c258bdbf3/albedo.768.webp",
-              "bytes": 102986,
-              "sha256": "cba425e032e5961437989c0a525aaff5afa25d4160fae71e66ef8e18b3212d4b"
+              "path": "tex/01a16edd-c6f5-717f-ab06-1a807ea38b3d/albedoTint.768.webp",
+              "bytes": 155632,
+              "sha256": "072a68acb42243da6de2a57cf1f4236c9293bcab14befce731540ae5093d3f18"
             }
           }
         },
@@ -697,17 +882,17 @@
           "convention": "opengl",
           "files": {
             "256": {
-              "path": "tex/01a16dc2-d870-773e-be4f-b43c258bdbf3/normal.256.webp",
+              "path": "tex/01a16edd-c6f5-717f-ab06-1a807ea38b3d/normal.256.webp",
               "bytes": 17888,
               "sha256": "49d286b4415ac58262ac75cb1e854c86b1243ef206434c0b542531f8547b2c94"
             },
             "512": {
-              "path": "tex/01a16dc2-d870-773e-be4f-b43c258bdbf3/normal.512.webp",
+              "path": "tex/01a16edd-c6f5-717f-ab06-1a807ea38b3d/normal.512.webp",
               "bytes": 78780,
               "sha256": "77af2e26a6d993d3c655a5a8040c4f748bdae9d30e94119e5d333593f23bc359"
             },
             "768": {
-              "path": "tex/01a16dc2-d870-773e-be4f-b43c258bdbf3/normal.768.webp",
+              "path": "tex/01a16edd-c6f5-717f-ab06-1a807ea38b3d/normal.768.webp",
               "bytes": 188328,
               "sha256": "9916f9317e4f500893b74398dde92300b2f015bf4714a8ff4d3eaefae6251e83"
             }
@@ -717,17 +902,17 @@
           "colourSpace": "linear",
           "files": {
             "256": {
-              "path": "tex/01a16dc2-d870-773e-be4f-b43c258bdbf3/arm.256.webp",
+              "path": "tex/01a16edd-c6f5-717f-ab06-1a807ea38b3d/arm.256.webp",
               "bytes": 26046,
               "sha256": "2b1447b8c3c93d5e4157630b520c2901ce143826839427aac3656ad2df1c6da0"
             },
             "512": {
-              "path": "tex/01a16dc2-d870-773e-be4f-b43c258bdbf3/arm.512.webp",
+              "path": "tex/01a16edd-c6f5-717f-ab06-1a807ea38b3d/arm.512.webp",
               "bytes": 102680,
               "sha256": "382e424e2d65341dd7f4a2699e80e070c8032dd07a54fd2893b70e0a1577ab17"
             },
             "768": {
-              "path": "tex/01a16dc2-d870-773e-be4f-b43c258bdbf3/arm.768.webp",
+              "path": "tex/01a16edd-c6f5-717f-ab06-1a807ea38b3d/arm.768.webp",
               "bytes": 238218,
               "sha256": "a1d19c345794febf0f88b19c13144ebeded6b6a31ac3b8751e072951f432d7be"
             }
@@ -742,14 +927,406 @@
       }
     },
     {
-      "version": "01a16dc2-da93-70de-8f65-10a0c04bd988",
-      "variant": "01a16dc2-da93-70de-8f65-109f6270c8dd",
-      "name": "Tiles 105, ceramic light / ceramic graphite",
+      "version": "01a16edd-c8c1-72e8-b680-50a5a458b45d",
+      "variant": "01a16edd-c8c1-72e8-b680-50a4638b09a5",
+      "name": "Tiles 038, ceramic light",
       "kind": "scan",
       "facts": {
         "tileM": [
-          5,
-          5
+          3.6,
+          1.8
+        ],
+        "grain": "unknown",
+        "suitability": "continuous",
+        "normalStrength": 3,
+        "colourMode": "tintable",
+        "tint": {
+          "recipe": "luma-mid@1",
+          "suggestedColours": [
+            {
+              "name": "natural",
+              "hex": "#b7b5b3"
+            }
+          ]
+        },
+        "averageColour": "#808080",
+        "pbr": {
+          "roughness": 0.53613655119349
+        }
+      },
+      "maps": {
+        "albedoTint": {
+          "colourSpace": "srgb",
+          "files": {
+            "256": {
+              "path": "tex/01a16edd-c8c1-72e8-b680-50a5a458b45d/albedoTint.256.webp",
+              "bytes": 8708,
+              "sha256": "4cb4d224f8ce30f88be7135e2160dbbc4c1ec8ccc77dbd7962cca796b7f7204d"
+            },
+            "512": {
+              "path": "tex/01a16edd-c8c1-72e8-b680-50a5a458b45d/albedoTint.512.webp",
+              "bytes": 42730,
+              "sha256": "6ac2f5c9671e6466da2100a5cc85de7cfff446b6d67b5281c12eb5971eee60ff"
+            },
+            "768": {
+              "path": "tex/01a16edd-c8c1-72e8-b680-50a5a458b45d/albedoTint.768.webp",
+              "bytes": 110074,
+              "sha256": "09beac999ef187f741a7853f8a3bacaba0a6cf65f26b0711e46ce1c70b0cdb95"
+            }
+          }
+        },
+        "normal": {
+          "colourSpace": "linear",
+          "convention": "opengl",
+          "files": {
+            "256": {
+              "path": "tex/01a16edd-c8c1-72e8-b680-50a5a458b45d/normal.256.webp",
+              "bytes": 33144,
+              "sha256": "9ec67bcff0943730c230c9b083d7ae06cf115837aafed057512abec652ced53f"
+            },
+            "512": {
+              "path": "tex/01a16edd-c8c1-72e8-b680-50a5a458b45d/normal.512.webp",
+              "bytes": 172234,
+              "sha256": "f7245de1b1c485f198d2d21ad38ab4ce21b65eca07a096693386dae19c5b7cfc"
+            },
+            "768": {
+              "path": "tex/01a16edd-c8c1-72e8-b680-50a5a458b45d/normal.768.webp",
+              "bytes": 446926,
+              "sha256": "d1c77a9dc97501b0274ab3c2a3d8bd90a2a26b18f30144a3eaf4a20b8a58aba6"
+            }
+          }
+        },
+        "arm": {
+          "colourSpace": "linear",
+          "files": {
+            "256": {
+              "path": "tex/01a16edd-c8c1-72e8-b680-50a5a458b45d/arm.256.webp",
+              "bytes": 14600,
+              "sha256": "558fa8527d2e45fc828ad38ab555f7f8ad20c1a17604a4b5b36077829740614f"
+            },
+            "512": {
+              "path": "tex/01a16edd-c8c1-72e8-b680-50a5a458b45d/arm.512.webp",
+              "bytes": 56410,
+              "sha256": "62459f0e31c42b71c088dc20a414570119329f9c083362130e66716e1b08e770"
+            },
+            "768": {
+              "path": "tex/01a16edd-c8c1-72e8-b680-50a5a458b45d/arm.768.webp",
+              "bytes": 131784,
+              "sha256": "9532a5ca6938b807821b948bef81a04730204a8c59d61caea1fd3450fc16f818"
+            }
+          }
+        }
+      },
+      "source": {
+        "provider": "ambientcg",
+        "sourceName": "Tiles038",
+        "sourcePage": "https://ambientcg.com/a/Tiles038",
+        "licence": "CC0-1.0"
+      }
+    },
+    {
+      "version": "01a16edd-ca51-77c3-b6e4-216df60b2371",
+      "variant": "01a16edd-ca51-77c3-b6e4-216c679077ee",
+      "name": "Tiles 038, ceramic graphite",
+      "kind": "scan",
+      "facts": {
+        "tileM": [
+          3.6,
+          1.8
+        ],
+        "grain": "unknown",
+        "suitability": "continuous",
+        "normalStrength": 1.5,
+        "colourMode": "tintable",
+        "tint": {
+          "recipe": "luma-mid@1",
+          "suggestedColours": [
+            {
+              "name": "natural",
+              "hex": "#b7b5b3"
+            }
+          ]
+        },
+        "averageColour": "#808080",
+        "pbr": {
+          "roughness": 0.6254926430590717
+        }
+      },
+      "maps": {
+        "albedoTint": {
+          "colourSpace": "srgb",
+          "files": {
+            "256": {
+              "path": "tex/01a16edd-ca51-77c3-b6e4-216df60b2371/albedoTint.256.webp",
+              "bytes": 8708,
+              "sha256": "4cb4d224f8ce30f88be7135e2160dbbc4c1ec8ccc77dbd7962cca796b7f7204d"
+            },
+            "512": {
+              "path": "tex/01a16edd-ca51-77c3-b6e4-216df60b2371/albedoTint.512.webp",
+              "bytes": 42730,
+              "sha256": "6ac2f5c9671e6466da2100a5cc85de7cfff446b6d67b5281c12eb5971eee60ff"
+            },
+            "768": {
+              "path": "tex/01a16edd-ca51-77c3-b6e4-216df60b2371/albedoTint.768.webp",
+              "bytes": 110074,
+              "sha256": "09beac999ef187f741a7853f8a3bacaba0a6cf65f26b0711e46ce1c70b0cdb95"
+            }
+          }
+        },
+        "normal": {
+          "colourSpace": "linear",
+          "convention": "opengl",
+          "files": {
+            "256": {
+              "path": "tex/01a16edd-ca51-77c3-b6e4-216df60b2371/normal.256.webp",
+              "bytes": 33144,
+              "sha256": "9ec67bcff0943730c230c9b083d7ae06cf115837aafed057512abec652ced53f"
+            },
+            "512": {
+              "path": "tex/01a16edd-ca51-77c3-b6e4-216df60b2371/normal.512.webp",
+              "bytes": 172234,
+              "sha256": "f7245de1b1c485f198d2d21ad38ab4ce21b65eca07a096693386dae19c5b7cfc"
+            },
+            "768": {
+              "path": "tex/01a16edd-ca51-77c3-b6e4-216df60b2371/normal.768.webp",
+              "bytes": 446926,
+              "sha256": "d1c77a9dc97501b0274ab3c2a3d8bd90a2a26b18f30144a3eaf4a20b8a58aba6"
+            }
+          }
+        },
+        "arm": {
+          "colourSpace": "linear",
+          "files": {
+            "256": {
+              "path": "tex/01a16edd-ca51-77c3-b6e4-216df60b2371/arm.256.webp",
+              "bytes": 14600,
+              "sha256": "558fa8527d2e45fc828ad38ab555f7f8ad20c1a17604a4b5b36077829740614f"
+            },
+            "512": {
+              "path": "tex/01a16edd-ca51-77c3-b6e4-216df60b2371/arm.512.webp",
+              "bytes": 56410,
+              "sha256": "62459f0e31c42b71c088dc20a414570119329f9c083362130e66716e1b08e770"
+            },
+            "768": {
+              "path": "tex/01a16edd-ca51-77c3-b6e4-216df60b2371/arm.768.webp",
+              "bytes": 131784,
+              "sha256": "9532a5ca6938b807821b948bef81a04730204a8c59d61caea1fd3450fc16f818"
+            }
+          }
+        }
+      },
+      "source": {
+        "provider": "ambientcg",
+        "sourceName": "Tiles038",
+        "sourcePage": "https://ambientcg.com/a/Tiles038",
+        "licence": "CC0-1.0"
+      }
+    },
+    {
+      "version": "01a16edd-cfd9-7142-9875-89a7cb31b32f",
+      "variant": "01a16edd-cfd9-7142-9875-89a66890048b",
+      "name": "Plaster 002, white",
+      "kind": "scan",
+      "facts": {
+        "tileM": [
+          2,
+          2
+        ],
+        "grain": "unknown",
+        "suitability": "continuous",
+        "normalStrength": 1.5,
+        "colourMode": "tintable",
+        "tint": {
+          "recipe": "luma-mid@1",
+          "suggestedColours": [
+            {
+              "name": "natural",
+              "hex": "#d9d6d2"
+            }
+          ]
+        },
+        "averageColour": "#808080",
+        "pbr": {
+          "roughness": 1
+        }
+      },
+      "maps": {
+        "albedoTint": {
+          "colourSpace": "srgb",
+          "files": {
+            "256": {
+              "path": "tex/01a16edd-cfd9-7142-9875-89a7cb31b32f/albedoTint.256.webp",
+              "bytes": 12904,
+              "sha256": "cfe3682d4ff98d073a644dd4eed99a7068a2db6bd22a403007eb559b3f92e82c"
+            },
+            "512": {
+              "path": "tex/01a16edd-cfd9-7142-9875-89a7cb31b32f/albedoTint.512.webp",
+              "bytes": 67826,
+              "sha256": "b28ed04216c3c280863d7c8544ac9447072b2d491eff74d0a92204055a2ce7ac"
+            },
+            "768": {
+              "path": "tex/01a16edd-cfd9-7142-9875-89a7cb31b32f/albedoTint.768.webp",
+              "bytes": 174762,
+              "sha256": "2553ee987b5c041f426b890ed4721a40dd6f4c3486ab4009652ad23c5d71c36d"
+            }
+          }
+        },
+        "normal": {
+          "colourSpace": "linear",
+          "convention": "opengl",
+          "files": {
+            "256": {
+              "path": "tex/01a16edd-cfd9-7142-9875-89a7cb31b32f/normal.256.webp",
+              "bytes": 71032,
+              "sha256": "15abad86a9845fe0f97fc08163d9381b848cf965ea751744dc5a5646b9eff6e5"
+            },
+            "512": {
+              "path": "tex/01a16edd-cfd9-7142-9875-89a7cb31b32f/normal.512.webp",
+              "bytes": 353604,
+              "sha256": "2c3c8de69f5b8f48b9139080564799c6556b77e97f483b0e59201f0a934b62ad"
+            },
+            "768": {
+              "path": "tex/01a16edd-cfd9-7142-9875-89a7cb31b32f/normal.768.webp",
+              "bytes": 903260,
+              "sha256": "062947ea4b59689f8ac9c843c0d727547ee1a8a102ea5be935180eea188f18a1"
+            }
+          }
+        },
+        "arm": {
+          "colourSpace": "linear",
+          "files": {
+            "256": {
+              "path": "tex/01a16edd-cfd9-7142-9875-89a7cb31b32f/arm.256.webp",
+              "bytes": 17246,
+              "sha256": "2cc2afae6d00cb9198af81e19414a929da78bbe4901d42723e700c5c8183692d"
+            },
+            "512": {
+              "path": "tex/01a16edd-cfd9-7142-9875-89a7cb31b32f/arm.512.webp",
+              "bytes": 63206,
+              "sha256": "5b583e27cd817011671f5035daed454952d41c33ffe122a642bda226f511f153"
+            },
+            "768": {
+              "path": "tex/01a16edd-cfd9-7142-9875-89a7cb31b32f/arm.768.webp",
+              "bytes": 133316,
+              "sha256": "01dedd0a579361ffea29c3957b9979902b188b70a7f2cb37ad8af077ce4c3160"
+            }
+          }
+        }
+      },
+      "source": {
+        "provider": "ambientcg",
+        "sourceName": "Plaster002",
+        "sourcePage": "https://ambientcg.com/a/Plaster002",
+        "licence": "CC0-1.0"
+      }
+    },
+    {
+      "version": "01a16edd-d59c-767d-b4da-41d8b76d8ca6",
+      "variant": "01a16edd-d59c-767d-b4da-41d770c5dbd4",
+      "name": "Plaster 002, pure white",
+      "kind": "scan",
+      "facts": {
+        "tileM": [
+          2,
+          2
+        ],
+        "grain": "unknown",
+        "suitability": "continuous",
+        "normalStrength": 1.5,
+        "colourMode": "tintable",
+        "tint": {
+          "recipe": "luma-mid@1",
+          "suggestedColours": [
+            {
+              "name": "natural",
+              "hex": "#d9d6d2"
+            }
+          ]
+        },
+        "averageColour": "#808080",
+        "pbr": {
+          "roughness": 1
+        }
+      },
+      "maps": {
+        "albedoTint": {
+          "colourSpace": "srgb",
+          "files": {
+            "256": {
+              "path": "tex/01a16edd-d59c-767d-b4da-41d8b76d8ca6/albedoTint.256.webp",
+              "bytes": 12904,
+              "sha256": "cfe3682d4ff98d073a644dd4eed99a7068a2db6bd22a403007eb559b3f92e82c"
+            },
+            "512": {
+              "path": "tex/01a16edd-d59c-767d-b4da-41d8b76d8ca6/albedoTint.512.webp",
+              "bytes": 67826,
+              "sha256": "b28ed04216c3c280863d7c8544ac9447072b2d491eff74d0a92204055a2ce7ac"
+            },
+            "768": {
+              "path": "tex/01a16edd-d59c-767d-b4da-41d8b76d8ca6/albedoTint.768.webp",
+              "bytes": 174762,
+              "sha256": "2553ee987b5c041f426b890ed4721a40dd6f4c3486ab4009652ad23c5d71c36d"
+            }
+          }
+        },
+        "normal": {
+          "colourSpace": "linear",
+          "convention": "opengl",
+          "files": {
+            "256": {
+              "path": "tex/01a16edd-d59c-767d-b4da-41d8b76d8ca6/normal.256.webp",
+              "bytes": 71032,
+              "sha256": "15abad86a9845fe0f97fc08163d9381b848cf965ea751744dc5a5646b9eff6e5"
+            },
+            "512": {
+              "path": "tex/01a16edd-d59c-767d-b4da-41d8b76d8ca6/normal.512.webp",
+              "bytes": 353604,
+              "sha256": "2c3c8de69f5b8f48b9139080564799c6556b77e97f483b0e59201f0a934b62ad"
+            },
+            "768": {
+              "path": "tex/01a16edd-d59c-767d-b4da-41d8b76d8ca6/normal.768.webp",
+              "bytes": 903260,
+              "sha256": "062947ea4b59689f8ac9c843c0d727547ee1a8a102ea5be935180eea188f18a1"
+            }
+          }
+        },
+        "arm": {
+          "colourSpace": "linear",
+          "files": {
+            "256": {
+              "path": "tex/01a16edd-d59c-767d-b4da-41d8b76d8ca6/arm.256.webp",
+              "bytes": 15754,
+              "sha256": "42b29ff879f2c5cd2be2a71b0d596c73d0d011514a438b21fbbc37f06512387a"
+            },
+            "512": {
+              "path": "tex/01a16edd-d59c-767d-b4da-41d8b76d8ca6/arm.512.webp",
+              "bytes": 58442,
+              "sha256": "555a839d795c4e8c26c140fb44c5abc818949145a78dcaebfbcefcaf69de894c"
+            },
+            "768": {
+              "path": "tex/01a16edd-d59c-767d-b4da-41d8b76d8ca6/arm.768.webp",
+              "bytes": 123970,
+              "sha256": "21c061e9dfe7a37f4dbee84746613e7890fb672f8377eb42e7782804dc6ad9df"
+            }
+          }
+        }
+      },
+      "source": {
+        "provider": "ambientcg",
+        "sourceName": "Plaster002",
+        "sourcePage": "https://ambientcg.com/a/Plaster002",
+        "licence": "CC0-1.0"
+      }
+    },
+    {
+      "version": "01a16edd-d81b-74a7-8797-b4d15856ba5d",
+      "variant": "01a16edd-d81b-74a7-8797-b4d030345ebc",
+      "name": "Plaster 005, sand / sage",
+      "kind": "scan",
+      "facts": {
+        "tileM": [
+          2,
+          2
         ],
         "grain": "unknown",
         "suitability": "continuous",
@@ -760,107 +1337,7 @@
           "suggestedColours": [
             {
               "name": "natural",
-              "hex": "#f9f9f9"
-            }
-          ]
-        },
-        "averageColour": "#808080",
-        "pbr": {
-          "roughness": 1,
-          "clearcoat": 0.6,
-          "clearcoatRoughness": 0.1
-        }
-      },
-      "maps": {
-        "albedoTint": {
-          "colourSpace": "srgb",
-          "files": {
-            "256": {
-              "path": "tex/01a16dc2-da93-70de-8f65-10a0c04bd988/albedoTint.256.webp",
-              "bytes": 1180,
-              "sha256": "483e7564cac4e83addb7f5d88dd63aab68cbeeaa82411ad2cabeed60e059ade8"
-            },
-            "512": {
-              "path": "tex/01a16dc2-da93-70de-8f65-10a0c04bd988/albedoTint.512.webp",
-              "bytes": 3316,
-              "sha256": "4f2fe818c683bfc3b9d3950edc63ac083559fdd26cb7b11dced1fc9b5d8361fe"
-            },
-            "768": {
-              "path": "tex/01a16dc2-da93-70de-8f65-10a0c04bd988/albedoTint.768.webp",
-              "bytes": 7184,
-              "sha256": "214fd0883d39c639d775bc853fa8a12103284d0214cd38f39c45e247f88a07ca"
-            }
-          }
-        },
-        "normal": {
-          "colourSpace": "linear",
-          "convention": "opengl",
-          "files": {
-            "256": {
-              "path": "tex/01a16dc2-da93-70de-8f65-10a0c04bd988/normal.256.webp",
-              "bytes": 25642,
-              "sha256": "39964522f5436cdc363f204450ae61db71897590903674a04039d60541318123"
-            },
-            "512": {
-              "path": "tex/01a16dc2-da93-70de-8f65-10a0c04bd988/normal.512.webp",
-              "bytes": 81762,
-              "sha256": "f961a8aba7c5fcd95b2108fdd3992dd9d40b9039a232f7a2cbbcf1e6f4f78344"
-            },
-            "768": {
-              "path": "tex/01a16dc2-da93-70de-8f65-10a0c04bd988/normal.768.webp",
-              "bytes": 149004,
-              "sha256": "1ef8f9ac2b03338c2488169cd50ed8ea3081dcfba40e9feb178385b350a83d2d"
-            }
-          }
-        },
-        "arm": {
-          "colourSpace": "linear",
-          "files": {
-            "256": {
-              "path": "tex/01a16dc2-da93-70de-8f65-10a0c04bd988/arm.256.webp",
-              "bytes": 11058,
-              "sha256": "0a2ee12dbe76170b8b21164c2637a5b5aef538872ba3b50271e3782eec216b54"
-            },
-            "512": {
-              "path": "tex/01a16dc2-da93-70de-8f65-10a0c04bd988/arm.512.webp",
-              "bytes": 36266,
-              "sha256": "b3723465561b00353ffb66c28a6d0afe78d2e55ea242f2229e03eac7284be87a"
-            },
-            "768": {
-              "path": "tex/01a16dc2-da93-70de-8f65-10a0c04bd988/arm.768.webp",
-              "bytes": 73648,
-              "sha256": "cba0102ee35852f3329dd1a1f5bd31f39653b4b7c2539f0091bfd981cf2cc47d"
-            }
-          }
-        }
-      },
-      "source": {
-        "provider": "ambientcg",
-        "sourceName": "Tiles105",
-        "sourcePage": "https://ambientcg.com/a/Tiles105",
-        "licence": "CC0-1.0"
-      }
-    },
-    {
-      "version": "01a1689e-c2d9-7246-a313-fcd4f0df5a93",
-      "variant": "01a1689e-3512-757a-8276-36198fb4d666",
-      "name": "Beige Wall 001",
-      "kind": "scan",
-      "facts": {
-        "tileM": [
-          3,
-          3
-        ],
-        "grain": "none",
-        "suitability": "continuous",
-        "normalStrength": 1,
-        "colourMode": "tintable",
-        "tint": {
-          "recipe": "luma-mid@1",
-          "suggestedColours": [
-            {
-              "name": "natural",
-              "hex": "#9a8d7a"
+              "hex": "#a7a5a2"
             }
           ]
         },
@@ -872,19 +1349,19 @@
           "colourSpace": "srgb",
           "files": {
             "256": {
-              "path": "tex/01a1689e-c2d9-7246-a313-fcd4f0df5a93/albedoTint.256.webp",
-              "bytes": 282,
-              "sha256": "027755fbbe1c5a5d31e845f071a2fd809c63c173465dd51a18cb01f0a24252df"
+              "path": "tex/01a16edd-d81b-74a7-8797-b4d15856ba5d/albedoTint.256.webp",
+              "bytes": 12152,
+              "sha256": "6f1de3dc105a936b1e3f5bbd77ccb09cd57d1963af66c5426694ad0792feb5f5"
             },
             "512": {
-              "path": "tex/01a1689e-c2d9-7246-a313-fcd4f0df5a93/albedoTint.512.webp",
-              "bytes": 940,
-              "sha256": "4491c788d38b65d4e62d46d8791ebd80231b7ebc69a590803a1110d0db00cfc1"
+              "path": "tex/01a16edd-d81b-74a7-8797-b4d15856ba5d/albedoTint.512.webp",
+              "bytes": 49636,
+              "sha256": "3657eec3532710e32e41bbf5e62669774c80478a60300b1509f0a8f82a56b5e0"
             },
             "768": {
-              "path": "tex/01a1689e-c2d9-7246-a313-fcd4f0df5a93/albedoTint.768.webp",
-              "bytes": 2510,
-              "sha256": "6174349349301682962142f4cafb443f81f0e2b04da6eea4a70533ff81eaea6e"
+              "path": "tex/01a16edd-d81b-74a7-8797-b4d15856ba5d/albedoTint.768.webp",
+              "bytes": 120142,
+              "sha256": "2703ccbc7f6ef0e554c84ff76615ca1a6e2ca3561f2b06162cd599051510c0fd"
             }
           }
         },
@@ -893,19 +1370,19 @@
           "convention": "opengl",
           "files": {
             "256": {
-              "path": "tex/01a1689e-c2d9-7246-a313-fcd4f0df5a93/normal.256.webp",
-              "bytes": 37716,
-              "sha256": "05f7144430c82283fd517314357d33ad55c00843491ca78daaaeaeabaa407d73"
+              "path": "tex/01a16edd-d81b-74a7-8797-b4d15856ba5d/normal.256.webp",
+              "bytes": 86654,
+              "sha256": "f5fb1cbef64fc24acec8b37991588727c88474647e7ffbad2df523a0221f17ad"
             },
             "512": {
-              "path": "tex/01a1689e-c2d9-7246-a313-fcd4f0df5a93/normal.512.webp",
-              "bytes": 215700,
-              "sha256": "7610440e4b1aa21ec35a484423055395fe04c0aefac4d36efc487f733f12642e"
+              "path": "tex/01a16edd-d81b-74a7-8797-b4d15856ba5d/normal.512.webp",
+              "bytes": 417894,
+              "sha256": "4f327a5c3e33b08d9558b76ddb886637774ecadf8c4114c3599f198c8cb17364"
             },
             "768": {
-              "path": "tex/01a1689e-c2d9-7246-a313-fcd4f0df5a93/normal.768.webp",
-              "bytes": 587798,
-              "sha256": "ef921c7dbdaebefd1f35e6215d956a67f5783c9e4bd3d20923eb96977b332234"
+              "path": "tex/01a16edd-d81b-74a7-8797-b4d15856ba5d/normal.768.webp",
+              "bytes": 1046862,
+              "sha256": "1734f6449510c54b3ba66760cf5cca2f28a12b4aac268543d60ceee7f52def1e"
             }
           }
         },
@@ -913,39 +1390,39 @@
           "colourSpace": "linear",
           "files": {
             "256": {
-              "path": "tex/01a1689e-c2d9-7246-a313-fcd4f0df5a93/arm.256.webp",
-              "bytes": 34530,
-              "sha256": "d193bd658ebd6ec142d3eff3720a45a8a1cd2bb5cefc4c704ee1703fc0f99b1e"
+              "path": "tex/01a16edd-d81b-74a7-8797-b4d15856ba5d/arm.256.webp",
+              "bytes": 27926,
+              "sha256": "410a1bbbb1a428763040169d399cf1272015ca92a7f7303cae5ef77199055026"
             },
             "512": {
-              "path": "tex/01a1689e-c2d9-7246-a313-fcd4f0df5a93/arm.512.webp",
-              "bytes": 158196,
-              "sha256": "e6c98d7297171ab3a832c93f650091ba0050303abc7098586813a79032b39a92"
+              "path": "tex/01a16edd-d81b-74a7-8797-b4d15856ba5d/arm.512.webp",
+              "bytes": 118436,
+              "sha256": "3f3db814374930d562ab79a722c6a3c9f2fbfaa41bb124abc218057affa824cc"
             },
             "768": {
-              "path": "tex/01a1689e-c2d9-7246-a313-fcd4f0df5a93/arm.768.webp",
-              "bytes": 395504,
-              "sha256": "d2fb61eba19e0ab2045e1a97a97142af33337290c5ce92101917413c2a220f2e"
+              "path": "tex/01a16edd-d81b-74a7-8797-b4d15856ba5d/arm.768.webp",
+              "bytes": 268696,
+              "sha256": "b98b2fbc8e944e019df37eef4fb9b66661da9bbd1df26512ba26a0873f5d3a50"
             }
           }
         }
       },
       "source": {
-        "provider": "polyhaven",
-        "sourceName": "beige_wall_001",
-        "sourcePage": "https://polyhaven.com/a/beige_wall_001",
+        "provider": "ambientcg",
+        "sourceName": "Plaster005",
+        "sourcePage": "https://ambientcg.com/a/Plaster005",
         "licence": "CC0-1.0"
       }
     },
     {
-      "version": "01a16dc2-dcee-730b-ae62-81c7651f02ed",
-      "variant": "01a16dc2-dcee-730b-ae62-81c69daba3df",
-      "name": "Tiles 133 A, tiles white",
+      "version": "01a16edd-da7b-73ad-b6a5-f7b38baf87b8",
+      "variant": "01a16edd-da7b-73ad-b6a5-f7b2a3108954",
+      "name": "Plaster 006, terracotta",
       "kind": "scan",
       "facts": {
         "tileM": [
-          3.6,
-          3.6
+          2,
+          2
         ],
         "grain": "unknown",
         "suitability": "continuous",
@@ -956,35 +1433,31 @@
           "suggestedColours": [
             {
               "name": "natural",
-              "hex": "#d2dfe1"
+              "hex": "#a9a8a4"
             }
           ]
         },
         "averageColour": "#808080",
-        "pbr": {
-          "roughness": 1,
-          "clearcoat": 0.6,
-          "clearcoatRoughness": 0.1
-        }
+        "pbr": {}
       },
       "maps": {
         "albedoTint": {
           "colourSpace": "srgb",
           "files": {
             "256": {
-              "path": "tex/01a16dc2-dcee-730b-ae62-81c7651f02ed/albedoTint.256.webp",
-              "bytes": 3938,
-              "sha256": "b80d04d443422f5ef53de615ac6a0107a50e1f32fa230b27a727076df4c67144"
+              "path": "tex/01a16edd-da7b-73ad-b6a5-f7b38baf87b8/albedoTint.256.webp",
+              "bytes": 12680,
+              "sha256": "def69b80b6cb1d5d1285412505e29344da4ce3a352dcc1fe433c1f47a64ee10a"
             },
             "512": {
-              "path": "tex/01a16dc2-dcee-730b-ae62-81c7651f02ed/albedoTint.512.webp",
-              "bytes": 10312,
-              "sha256": "8bea73e9b0d582974809b01ee43977523e5a1dffcb3c45415cc26d2b8a3ea7dd"
+              "path": "tex/01a16edd-da7b-73ad-b6a5-f7b38baf87b8/albedoTint.512.webp",
+              "bytes": 50086,
+              "sha256": "136936378d6a5fab97551ef3a7db7f7ab67a61b5f330ff640d16c5c0ba8137ca"
             },
             "768": {
-              "path": "tex/01a16dc2-dcee-730b-ae62-81c7651f02ed/albedoTint.768.webp",
-              "bytes": 19256,
-              "sha256": "16448928a5aa1327953b6be77d842dcf7c9dbce899c40b1bf827b966a253b6a2"
+              "path": "tex/01a16edd-da7b-73ad-b6a5-f7b38baf87b8/albedoTint.768.webp",
+              "bytes": 118472,
+              "sha256": "3211796aac82dfa62a1258ee59b53eaf60130aca060cdb1c1ee1f5b9a140676a"
             }
           }
         },
@@ -993,19 +1466,19 @@
           "convention": "opengl",
           "files": {
             "256": {
-              "path": "tex/01a16dc2-dcee-730b-ae62-81c7651f02ed/normal.256.webp",
-              "bytes": 47812,
-              "sha256": "8d1022ad41a3e2f419488af2e9214c7656b47c6cd5511eb68e996a3f1d475da2"
+              "path": "tex/01a16edd-da7b-73ad-b6a5-f7b38baf87b8/normal.256.webp",
+              "bytes": 86578,
+              "sha256": "1e30236cc59c70533515760ddcdf41230a227e8b324df48f079bc29046cba7a9"
             },
             "512": {
-              "path": "tex/01a16dc2-dcee-730b-ae62-81c7651f02ed/normal.512.webp",
-              "bytes": 167430,
-              "sha256": "cabdef20f5f59f66ec6ebef301b13a16ec947c5f9c20caeb7eed014cdfb795f3"
+              "path": "tex/01a16edd-da7b-73ad-b6a5-f7b38baf87b8/normal.512.webp",
+              "bytes": 417246,
+              "sha256": "163dec554189ab082ae25f703cda7b80b2940c8660a4eb5093fe1d7a6ea011d7"
             },
             "768": {
-              "path": "tex/01a16dc2-dcee-730b-ae62-81c7651f02ed/normal.768.webp",
-              "bytes": 356086,
-              "sha256": "2def5e01ea8688258e59f23cb6e9b3460382f694a96f565cc6071070a96f7fbc"
+              "path": "tex/01a16edd-da7b-73ad-b6a5-f7b38baf87b8/normal.768.webp",
+              "bytes": 1039524,
+              "sha256": "f428c745b901880b9bf3d67dea46ac8cd88ccac8483b51b9edcd7fba96105d51"
             }
           }
         },
@@ -1013,27 +1486,957 @@
           "colourSpace": "linear",
           "files": {
             "256": {
-              "path": "tex/01a16dc2-dcee-730b-ae62-81c7651f02ed/arm.256.webp",
-              "bytes": 30490,
-              "sha256": "461e65ec90777c0d8ad470cabe11d477d0096cf2b1aed9a695c503333b9a2110"
+              "path": "tex/01a16edd-da7b-73ad-b6a5-f7b38baf87b8/arm.256.webp",
+              "bytes": 28970,
+              "sha256": "caac6505ad32372935fb20efddd99ab6b8de9fc5483a143452126b8e669a46e9"
             },
             "512": {
-              "path": "tex/01a16dc2-dcee-730b-ae62-81c7651f02ed/arm.512.webp",
-              "bytes": 109536,
-              "sha256": "8d75196da03c3340dafdc34cca452155fa71ffaba52d5bb32fa0aa73edb1f51b"
+              "path": "tex/01a16edd-da7b-73ad-b6a5-f7b38baf87b8/arm.512.webp",
+              "bytes": 122172,
+              "sha256": "aff89ac5212fe90ac508678a36bdc0f682a761ec7ee0802894b706c1410f7525"
             },
             "768": {
-              "path": "tex/01a16dc2-dcee-730b-ae62-81c7651f02ed/arm.768.webp",
-              "bytes": 240388,
-              "sha256": "52ee0165d4340f204c8add980926bb3d9bbcb87f5461c04ffee84d8b09594569"
+              "path": "tex/01a16edd-da7b-73ad-b6a5-f7b38baf87b8/arm.768.webp",
+              "bytes": 275540,
+              "sha256": "5dcecd8580826405400322498f16ab5d18a3323c7f9eda82816eddbdf0ca697a"
             }
           }
         }
       },
       "source": {
         "provider": "ambientcg",
-        "sourceName": "Tiles133A",
-        "sourcePage": "https://ambientcg.com/a/Tiles133A",
+        "sourceName": "Plaster006",
+        "sourcePage": "https://ambientcg.com/a/Plaster006",
+        "licence": "CC0-1.0"
+      }
+    },
+    {
+      "version": "01a16edd-dfe6-70f2-9218-708d0d819cda",
+      "variant": "01a16edd-dfe6-70f2-9218-708c1ee7283f",
+      "name": "Plaster 001, graphite / ink",
+      "kind": "scan",
+      "facts": {
+        "tileM": [
+          2,
+          2
+        ],
+        "grain": "unknown",
+        "suitability": "continuous",
+        "normalStrength": 1.5,
+        "colourMode": "tintable",
+        "tint": {
+          "recipe": "luma-mid@1",
+          "suggestedColours": [
+            {
+              "name": "natural",
+              "hex": "#d7d3d0"
+            }
+          ]
+        },
+        "averageColour": "#808080",
+        "pbr": {
+          "roughness": 1
+        }
+      },
+      "maps": {
+        "albedoTint": {
+          "colourSpace": "srgb",
+          "files": {
+            "256": {
+              "path": "tex/01a16edd-dfe6-70f2-9218-708d0d819cda/albedoTint.256.webp",
+              "bytes": 6874,
+              "sha256": "fe268db1847994d0eeda2874abc22417b94aa4ff4210df109e8e000b3f5683c9"
+            },
+            "512": {
+              "path": "tex/01a16edd-dfe6-70f2-9218-708d0d819cda/albedoTint.512.webp",
+              "bytes": 36158,
+              "sha256": "d70aa4f24de2f4da1ac346901101ebcb762944359ad3974038d4ceba22ceceb6"
+            },
+            "768": {
+              "path": "tex/01a16edd-dfe6-70f2-9218-708d0d819cda/albedoTint.768.webp",
+              "bytes": 101484,
+              "sha256": "5ecfb12ed0f73dbfafa9b5315b6f359b9f09ee5ad9543f6aaac784ff8db1de23"
+            }
+          }
+        },
+        "normal": {
+          "colourSpace": "linear",
+          "convention": "opengl",
+          "files": {
+            "256": {
+              "path": "tex/01a16edd-dfe6-70f2-9218-708d0d819cda/normal.256.webp",
+              "bytes": 74984,
+              "sha256": "973a05d5188191da7dd879ad498dc7bbd9ef65116b81877c4c2c5cd309f80b0f"
+            },
+            "512": {
+              "path": "tex/01a16edd-dfe6-70f2-9218-708d0d819cda/normal.512.webp",
+              "bytes": 377346,
+              "sha256": "7bff13e0ff7d3b9a1cb819e2e809b9579917ae6926ccb6c947417cfcb70a1b7d"
+            },
+            "768": {
+              "path": "tex/01a16edd-dfe6-70f2-9218-708d0d819cda/normal.768.webp",
+              "bytes": 973112,
+              "sha256": "b570c5f2ef9e4a8eaadfb27f37745646057563c510bfe011c1f54411f81a6fd5"
+            }
+          }
+        },
+        "arm": {
+          "colourSpace": "linear",
+          "files": {
+            "256": {
+              "path": "tex/01a16edd-dfe6-70f2-9218-708d0d819cda/arm.256.webp",
+              "bytes": 16258,
+              "sha256": "017e6b67e2dc3134ca821ef46bb15ff1ad0a2cd6a62dae0e841a90942338ebe0"
+            },
+            "512": {
+              "path": "tex/01a16edd-dfe6-70f2-9218-708d0d819cda/arm.512.webp",
+              "bytes": 60206,
+              "sha256": "a0b3327cc935a73f71ffeba79b9d7e6608bff6150a146c20f7d0d84bbdaaf1e7"
+            },
+            "768": {
+              "path": "tex/01a16edd-dfe6-70f2-9218-708d0d819cda/arm.768.webp",
+              "bytes": 128828,
+              "sha256": "a92d5e93a445f7d7e54ed5380e4718b82618ea177714cd6ff715ee8986a438b1"
+            }
+          }
+        }
+      },
+      "source": {
+        "provider": "ambientcg",
+        "sourceName": "Plaster001",
+        "sourcePage": "https://ambientcg.com/a/Plaster001",
+        "licence": "CC0-1.0"
+      }
+    },
+    {
+      "version": "01a16edd-e289-7225-b956-b39335031614",
+      "variant": "01a16edd-e289-7225-b956-b39228796437",
+      "name": "Painted Plaster 012, venetian",
+      "kind": "scan",
+      "facts": {
+        "tileM": [
+          2,
+          2
+        ],
+        "grain": "none",
+        "suitability": "continuous",
+        "normalStrength": 1.2,
+        "colourMode": "tintable",
+        "tint": {
+          "recipe": "luma-mid@1",
+          "suggestedColours": [
+            {
+              "name": "natural",
+              "hex": "#7a7961"
+            }
+          ]
+        },
+        "averageColour": "#808080",
+        "pbr": {
+          "roughness": 0.5515038713464375,
+          "clearcoat": 0.4,
+          "clearcoatRoughness": 0.15
+        }
+      },
+      "maps": {
+        "albedoTint": {
+          "colourSpace": "srgb",
+          "files": {
+            "256": {
+              "path": "tex/01a16edd-e289-7225-b956-b39335031614/albedoTint.256.webp",
+              "bytes": 13882,
+              "sha256": "54d050b7c2d755e26510c5fc23dd3cb13356ccf0a94b0460d18c8c5da0b56530"
+            },
+            "512": {
+              "path": "tex/01a16edd-e289-7225-b956-b39335031614/albedoTint.512.webp",
+              "bytes": 57336,
+              "sha256": "bcfadf848abde5f3d0c027874ecb2a7cb1cff960e7072cbb9417563be6042020"
+            },
+            "768": {
+              "path": "tex/01a16edd-e289-7225-b956-b39335031614/albedoTint.768.webp",
+              "bytes": 140346,
+              "sha256": "b310f27293adf22c110e7e2ae944ab31af07a60915d91cccd081624dccfc44ac"
+            }
+          }
+        },
+        "normal": {
+          "colourSpace": "linear",
+          "convention": "opengl",
+          "files": {
+            "256": {
+              "path": "tex/01a16edd-e289-7225-b956-b39335031614/normal.256.webp",
+              "bytes": 81006,
+              "sha256": "d28af00d49574754c99585d6fccf3b1d690d5afc7122e614fd31f5693738e05d"
+            },
+            "512": {
+              "path": "tex/01a16edd-e289-7225-b956-b39335031614/normal.512.webp",
+              "bytes": 381252,
+              "sha256": "1752adb7288b0878379365613c90bf7450e990480faa54e3b50e2eafb1e1ba77"
+            },
+            "768": {
+              "path": "tex/01a16edd-e289-7225-b956-b39335031614/normal.768.webp",
+              "bytes": 943574,
+              "sha256": "87d60fd9f9c0f85b570657053081ff14e2f77fc0d5051085af59bf0961eedf15"
+            }
+          }
+        },
+        "arm": {
+          "colourSpace": "linear",
+          "files": {
+            "256": {
+              "path": "tex/01a16edd-e289-7225-b956-b39335031614/arm.256.webp",
+              "bytes": 31034,
+              "sha256": "9be9ba939caec200cd2421cd1300406834aae748e0c215cdd26dda3e8174aa8f"
+            },
+            "512": {
+              "path": "tex/01a16edd-e289-7225-b956-b39335031614/arm.512.webp",
+              "bytes": 119558,
+              "sha256": "6323771d7e67d396856c7b9e2ba42d367d5dd2ef904c96639f96d382eb50b06b"
+            },
+            "768": {
+              "path": "tex/01a16edd-e289-7225-b956-b39335031614/arm.768.webp",
+              "bytes": 258690,
+              "sha256": "7a63109a287ff79dde6dd114641deda625102b4c32b90100ce3c82430d468c42"
+            }
+          }
+        }
+      },
+      "source": {
+        "provider": "ambientcg",
+        "sourceName": "PaintedPlaster012",
+        "sourcePage": "https://ambientcg.com/a/PaintedPlaster012",
+        "licence": "CC0-1.0"
+      }
+    },
+    {
+      "version": "01a16edd-e64e-75a9-b68b-6d57e2586ae6",
+      "variant": "01a16edd-e64e-75a9-b68b-6d5601b86db9",
+      "name": "Concrete 034, microcement",
+      "kind": "scan",
+      "facts": {
+        "tileM": [
+          1.1,
+          0.55
+        ],
+        "grain": "unknown",
+        "suitability": "continuous",
+        "normalStrength": 1,
+        "colourMode": "tintable",
+        "tint": {
+          "recipe": "luma-mid@1",
+          "suggestedColours": [
+            {
+              "name": "natural",
+              "hex": "#b8b8b8"
+            }
+          ]
+        },
+        "averageColour": "#808080",
+        "pbr": {
+          "roughness": 1
+        }
+      },
+      "maps": {
+        "albedoTint": {
+          "colourSpace": "srgb",
+          "files": {
+            "256": {
+              "path": "tex/01a16edd-e64e-75a9-b68b-6d57e2586ae6/albedoTint.256.webp",
+              "bytes": 5598,
+              "sha256": "8d00845b01f91f2e9ded024ce6a2ab0c595e18ee8a3a8df067059f7cb6f37325"
+            },
+            "512": {
+              "path": "tex/01a16edd-e64e-75a9-b68b-6d57e2586ae6/albedoTint.512.webp",
+              "bytes": 22672,
+              "sha256": "05876f6092923ddb09eca650775f50048d78c406fae8209394ae17b7c3842a5b"
+            },
+            "768": {
+              "path": "tex/01a16edd-e64e-75a9-b68b-6d57e2586ae6/albedoTint.768.webp",
+              "bytes": 56372,
+              "sha256": "5a33a8e2fed9fa9c7e3dd1346e8590b7cb88fab404bfd2040b87f4accb85941d"
+            }
+          }
+        },
+        "normal": {
+          "colourSpace": "linear",
+          "convention": "opengl",
+          "files": {
+            "256": {
+              "path": "tex/01a16edd-e64e-75a9-b68b-6d57e2586ae6/normal.256.webp",
+              "bytes": 36406,
+              "sha256": "9bb1312da60ee0916bf930d88e38cd48793d891a8b18916842d2d8a4af0ffd81"
+            },
+            "512": {
+              "path": "tex/01a16edd-e64e-75a9-b68b-6d57e2586ae6/normal.512.webp",
+              "bytes": 153832,
+              "sha256": "6899e30f536f8fb8cf531a21e28e6fc4ce9dd4cb667ea6f42306cc0618da6f53"
+            },
+            "768": {
+              "path": "tex/01a16edd-e64e-75a9-b68b-6d57e2586ae6/normal.768.webp",
+              "bytes": 364002,
+              "sha256": "3f93f2bcf99f24d8f4247f9798ac23d2dee75eae1b73b4bc2de15834b15fb98a"
+            }
+          }
+        },
+        "arm": {
+          "colourSpace": "linear",
+          "files": {
+            "256": {
+              "path": "tex/01a16edd-e64e-75a9-b68b-6d57e2586ae6/arm.256.webp",
+              "bytes": 12738,
+              "sha256": "55d1280d3c776fdfc7f8d78baf294bce63021dbb9f586c1d947ae8110fa4657a"
+            },
+            "512": {
+              "path": "tex/01a16edd-e64e-75a9-b68b-6d57e2586ae6/arm.512.webp",
+              "bytes": 43774,
+              "sha256": "2cfc3f67ea6f2040eaa739e706e81af3a0e6a22392031a5576567b986d49e7fb"
+            },
+            "768": {
+              "path": "tex/01a16edd-e64e-75a9-b68b-6d57e2586ae6/arm.768.webp",
+              "bytes": 91958,
+              "sha256": "0016fb1f788fec7548c58d8fad1ee42311a5ce64ac77498d2e74f307bb7ce2a8"
+            }
+          }
+        }
+      },
+      "source": {
+        "provider": "ambientcg",
+        "sourceName": "Concrete034",
+        "sourcePage": "https://ambientcg.com/a/Concrete034",
+        "licence": "CC0-1.0"
+      }
+    },
+    {
+      "version": "01a16edd-e8c3-7741-825c-d904624388d2",
+      "variant": "01a16edd-e8c3-7741-825c-d903f24420b1",
+      "name": "Concrete 034, microcement grey",
+      "kind": "scan",
+      "facts": {
+        "tileM": [
+          1.1,
+          0.55
+        ],
+        "grain": "unknown",
+        "suitability": "continuous",
+        "normalStrength": 1,
+        "colourMode": "natural",
+        "averageColour": "#b8b8b8",
+        "pbr": {
+          "roughness": 1
+        }
+      },
+      "maps": {
+        "albedo": {
+          "colourSpace": "srgb",
+          "files": {
+            "256": {
+              "path": "tex/01a16edd-e8c3-7741-825c-d904624388d2/albedo.256.webp",
+              "bytes": 2430,
+              "sha256": "b991b70c330b5de4768a1bc84aac90832955abf81cb0c62f3e07542930b6a1d8"
+            },
+            "512": {
+              "path": "tex/01a16edd-e8c3-7741-825c-d904624388d2/albedo.512.webp",
+              "bytes": 9514,
+              "sha256": "5776ba340c1c672e6b1c7c9e5374f581c5e45cf9c321c244840920b1a5020259"
+            },
+            "768": {
+              "path": "tex/01a16edd-e8c3-7741-825c-d904624388d2/albedo.768.webp",
+              "bytes": 23770,
+              "sha256": "a9312e59c997eb8ecdf91d27bf11f4705dd8155a47727385bc34a8250d3b9833"
+            }
+          }
+        },
+        "normal": {
+          "colourSpace": "linear",
+          "convention": "opengl",
+          "files": {
+            "256": {
+              "path": "tex/01a16edd-e8c3-7741-825c-d904624388d2/normal.256.webp",
+              "bytes": 36406,
+              "sha256": "9bb1312da60ee0916bf930d88e38cd48793d891a8b18916842d2d8a4af0ffd81"
+            },
+            "512": {
+              "path": "tex/01a16edd-e8c3-7741-825c-d904624388d2/normal.512.webp",
+              "bytes": 153832,
+              "sha256": "6899e30f536f8fb8cf531a21e28e6fc4ce9dd4cb667ea6f42306cc0618da6f53"
+            },
+            "768": {
+              "path": "tex/01a16edd-e8c3-7741-825c-d904624388d2/normal.768.webp",
+              "bytes": 364002,
+              "sha256": "3f93f2bcf99f24d8f4247f9798ac23d2dee75eae1b73b4bc2de15834b15fb98a"
+            }
+          }
+        },
+        "arm": {
+          "colourSpace": "linear",
+          "files": {
+            "256": {
+              "path": "tex/01a16edd-e8c3-7741-825c-d904624388d2/arm.256.webp",
+              "bytes": 12738,
+              "sha256": "55d1280d3c776fdfc7f8d78baf294bce63021dbb9f586c1d947ae8110fa4657a"
+            },
+            "512": {
+              "path": "tex/01a16edd-e8c3-7741-825c-d904624388d2/arm.512.webp",
+              "bytes": 43774,
+              "sha256": "2cfc3f67ea6f2040eaa739e706e81af3a0e6a22392031a5576567b986d49e7fb"
+            },
+            "768": {
+              "path": "tex/01a16edd-e8c3-7741-825c-d904624388d2/arm.768.webp",
+              "bytes": 91958,
+              "sha256": "0016fb1f788fec7548c58d8fad1ee42311a5ce64ac77498d2e74f307bb7ce2a8"
+            }
+          }
+        }
+      },
+      "source": {
+        "provider": "ambientcg",
+        "sourceName": "Concrete034",
+        "sourcePage": "https://ambientcg.com/a/Concrete034",
+        "licence": "CC0-1.0"
+      }
+    },
+    {
+      "version": "01a16edd-ec69-7756-b177-e356d4cb2fbb",
+      "variant": "01a16edd-ec69-7756-b177-e3556eedeab0",
+      "name": "Travertine 009, travertine",
+      "kind": "scan",
+      "facts": {
+        "tileM": [
+          1.2,
+          1.2
+        ],
+        "grain": "unknown",
+        "suitability": "continuous",
+        "normalStrength": 1,
+        "colourMode": "natural",
+        "averageColour": "#dfccac",
+        "pbr": {
+          "roughness": 1
+        }
+      },
+      "maps": {
+        "albedo": {
+          "colourSpace": "srgb",
+          "files": {
+            "256": {
+              "path": "tex/01a16edd-ec69-7756-b177-e356d4cb2fbb/albedo.256.webp",
+              "bytes": 7426,
+              "sha256": "eee4ebaff0e731e5c5b05b6ce30ab8a225a6297927cbe716b7be1a5781d713c4"
+            },
+            "512": {
+              "path": "tex/01a16edd-ec69-7756-b177-e356d4cb2fbb/albedo.512.webp",
+              "bytes": 28126,
+              "sha256": "5166382c50ec4ad005a8ee63484a07d64102d605948ac10dd653e6f965f26928"
+            },
+            "768": {
+              "path": "tex/01a16edd-ec69-7756-b177-e356d4cb2fbb/albedo.768.webp",
+              "bytes": 65984,
+              "sha256": "2a5bc9172a918d4633c1c697aefde15aaa074cb08a0944ae181ae13ba0fea2ae"
+            }
+          }
+        },
+        "normal": {
+          "colourSpace": "linear",
+          "convention": "opengl",
+          "files": {
+            "256": {
+              "path": "tex/01a16edd-ec69-7756-b177-e356d4cb2fbb/normal.256.webp",
+              "bytes": 14398,
+              "sha256": "4bef60667c21916c5644cd7d33f7489c5e074d640c16ef302495b9c6dc79dc14"
+            },
+            "512": {
+              "path": "tex/01a16edd-ec69-7756-b177-e356d4cb2fbb/normal.512.webp",
+              "bytes": 58520,
+              "sha256": "ab6dea696458e60404c58e6c4c076e1219b475a22182ce0a6c929a0f53f0b068"
+            },
+            "768": {
+              "path": "tex/01a16edd-ec69-7756-b177-e356d4cb2fbb/normal.768.webp",
+              "bytes": 130234,
+              "sha256": "4254aa4647e5f6956945e7ca39cb5e7b86cb1d8710d1f9e830545be9d7b59e1f"
+            }
+          }
+        },
+        "arm": {
+          "colourSpace": "linear",
+          "files": {
+            "256": {
+              "path": "tex/01a16edd-ec69-7756-b177-e356d4cb2fbb/arm.256.webp",
+              "bytes": 14970,
+              "sha256": "93e32aa857605d9080cdf8a27a19f1679d3545962d74ea580b04c4795532d8ca"
+            },
+            "512": {
+              "path": "tex/01a16edd-ec69-7756-b177-e356d4cb2fbb/arm.512.webp",
+              "bytes": 51060,
+              "sha256": "c9d0dfcf8f82fe68c4f8d222e444ed023d26ae607913d98830f04b840e356fdf"
+            },
+            "768": {
+              "path": "tex/01a16edd-ec69-7756-b177-e356d4cb2fbb/arm.768.webp",
+              "bytes": 115412,
+              "sha256": "0af34dca4d4e5c998fb1023def60592fd1b386906b2a43c68e72231d93838113"
+            }
+          }
+        }
+      },
+      "source": {
+        "provider": "ambientcg",
+        "sourceName": "Travertine009",
+        "sourcePage": "https://ambientcg.com/a/Travertine009",
+        "licence": "CC0-1.0"
+      }
+    },
+    {
+      "version": "01a16edd-f0ee-7162-8435-93dc56ff5230",
+      "variant": "01a16edd-f0ee-7162-8435-93db98907120",
+      "name": "Marble 021, marble",
+      "kind": "scan",
+      "facts": {
+        "tileM": [
+          2,
+          2
+        ],
+        "grain": "none",
+        "suitability": "continuous",
+        "normalStrength": 1,
+        "colourMode": "natural",
+        "averageColour": "#f4f2f1",
+        "pbr": {
+          "roughness": 1
+        }
+      },
+      "maps": {
+        "albedo": {
+          "colourSpace": "srgb",
+          "files": {
+            "256": {
+              "path": "tex/01a16edd-f0ee-7162-8435-93dc56ff5230/albedo.256.webp",
+              "bytes": 8168,
+              "sha256": "ee38defc8b9e2515ba5466ec011c99107e88c1ba45c11d0e5555d786d1b14870"
+            },
+            "512": {
+              "path": "tex/01a16edd-f0ee-7162-8435-93dc56ff5230/albedo.512.webp",
+              "bytes": 33900,
+              "sha256": "da4743abb3cee0207fb2589f7f6a90c284fb31279c3674576fb8b63a61458ab5"
+            },
+            "768": {
+              "path": "tex/01a16edd-f0ee-7162-8435-93dc56ff5230/albedo.768.webp",
+              "bytes": 79416,
+              "sha256": "5882fe0565fa091a3504fe4448f07decd0999f75c37273ce02a53f55acfb86da"
+            }
+          }
+        },
+        "normal": {
+          "colourSpace": "linear",
+          "convention": "opengl",
+          "files": {
+            "256": {
+              "path": "tex/01a16edd-f0ee-7162-8435-93dc56ff5230/normal.256.webp",
+              "bytes": 15926,
+              "sha256": "9a332747517c92da30fb18afb52dda5218e5656615d6969457da81679f3ba650"
+            },
+            "512": {
+              "path": "tex/01a16edd-f0ee-7162-8435-93dc56ff5230/normal.512.webp",
+              "bytes": 62464,
+              "sha256": "227505c5ac8975d3b25da23045cb672b0b4a611b6539f244879569562e4b8052"
+            },
+            "768": {
+              "path": "tex/01a16edd-f0ee-7162-8435-93dc56ff5230/normal.768.webp",
+              "bytes": 144208,
+              "sha256": "ce98e1a0f285e088a70900b0e3d7dfa4a7db1f67a3152de2ee8034418c175e67"
+            }
+          }
+        },
+        "arm": {
+          "colourSpace": "linear",
+          "files": {
+            "256": {
+              "path": "tex/01a16edd-f0ee-7162-8435-93dc56ff5230/arm.256.webp",
+              "bytes": 19492,
+              "sha256": "690e1238446c0649d0f9cd36101c024aa84dd0f458b97fff1775de3bc96009c4"
+            },
+            "512": {
+              "path": "tex/01a16edd-f0ee-7162-8435-93dc56ff5230/arm.512.webp",
+              "bytes": 72286,
+              "sha256": "8a3a784c34b84e6bcf56a9285ca1862d6dcbe949be7a61f88390e1d075b6f162"
+            },
+            "768": {
+              "path": "tex/01a16edd-f0ee-7162-8435-93dc56ff5230/arm.768.webp",
+              "bytes": 154838,
+              "sha256": "928774ea90e4a4fadb323d876b6c9af4d2870b37eb7c93d62344c795040fe121"
+            }
+          }
+        }
+      },
+      "source": {
+        "provider": "ambientcg",
+        "sourceName": "Marble021",
+        "sourcePage": "https://ambientcg.com/a/Marble021",
+        "licence": "CC0-1.0"
+      }
+    },
+    {
+      "version": "01a16edd-f1fc-72e8-a70d-eef162738ce5",
+      "variant": "01a16edd-f1fc-72e8-a70d-eef006f206c2",
+      "name": "Tiles 038, porcelain grey",
+      "kind": "scan",
+      "facts": {
+        "tileM": [
+          3.6,
+          1.8
+        ],
+        "grain": "unknown",
+        "suitability": "continuous",
+        "normalStrength": 1,
+        "colourMode": "natural",
+        "averageColour": "#b7b5b3",
+        "pbr": {
+          "roughness": 0.8042048267902351
+        }
+      },
+      "maps": {
+        "albedo": {
+          "colourSpace": "srgb",
+          "files": {
+            "256": {
+              "path": "tex/01a16edd-f1fc-72e8-a70d-eef162738ce5/albedo.256.webp",
+              "bytes": 4824,
+              "sha256": "6dec69d6279f0906896770d2e376b56b6bbfa3a1a11df3a7edd25c4088b4cff7"
+            },
+            "512": {
+              "path": "tex/01a16edd-f1fc-72e8-a70d-eef162738ce5/albedo.512.webp",
+              "bytes": 27600,
+              "sha256": "98790c91d285b34c2a5fdbe2c3fecf2e762745510d9b12f34ed878a8c08d6030"
+            },
+            "768": {
+              "path": "tex/01a16edd-f1fc-72e8-a70d-eef162738ce5/albedo.768.webp",
+              "bytes": 77686,
+              "sha256": "35c3e1e7ef7f6cc76d2987daf1e073c61e047d6bb1c9b8ec69fad49bb064bf0b"
+            }
+          }
+        },
+        "normal": {
+          "colourSpace": "linear",
+          "convention": "opengl",
+          "files": {
+            "256": {
+              "path": "tex/01a16edd-f1fc-72e8-a70d-eef162738ce5/normal.256.webp",
+              "bytes": 33144,
+              "sha256": "9ec67bcff0943730c230c9b083d7ae06cf115837aafed057512abec652ced53f"
+            },
+            "512": {
+              "path": "tex/01a16edd-f1fc-72e8-a70d-eef162738ce5/normal.512.webp",
+              "bytes": 172234,
+              "sha256": "f7245de1b1c485f198d2d21ad38ab4ce21b65eca07a096693386dae19c5b7cfc"
+            },
+            "768": {
+              "path": "tex/01a16edd-f1fc-72e8-a70d-eef162738ce5/normal.768.webp",
+              "bytes": 446926,
+              "sha256": "d1c77a9dc97501b0274ab3c2a3d8bd90a2a26b18f30144a3eaf4a20b8a58aba6"
+            }
+          }
+        },
+        "arm": {
+          "colourSpace": "linear",
+          "files": {
+            "256": {
+              "path": "tex/01a16edd-f1fc-72e8-a70d-eef162738ce5/arm.256.webp",
+              "bytes": 14600,
+              "sha256": "558fa8527d2e45fc828ad38ab555f7f8ad20c1a17604a4b5b36077829740614f"
+            },
+            "512": {
+              "path": "tex/01a16edd-f1fc-72e8-a70d-eef162738ce5/arm.512.webp",
+              "bytes": 56410,
+              "sha256": "62459f0e31c42b71c088dc20a414570119329f9c083362130e66716e1b08e770"
+            },
+            "768": {
+              "path": "tex/01a16edd-f1fc-72e8-a70d-eef162738ce5/arm.768.webp",
+              "bytes": 131784,
+              "sha256": "9532a5ca6938b807821b948bef81a04730204a8c59d61caea1fd3450fc16f818"
+            }
+          }
+        }
+      },
+      "source": {
+        "provider": "ambientcg",
+        "sourceName": "Tiles038",
+        "sourcePage": "https://ambientcg.com/a/Tiles038",
+        "licence": "CC0-1.0"
+      }
+    },
+    {
+      "version": "01a16edd-f638-75ba-9bac-909c5b2f0cd2",
+      "variant": "01a16edd-f638-75ba-9bac-909b27e11126",
+      "name": "Tiles 029, zellige",
+      "kind": "scan",
+      "facts": {
+        "tileM": [
+          1,
+          1
+        ],
+        "grain": "unknown",
+        "suitability": "continuous",
+        "normalStrength": 1,
+        "colourMode": "natural",
+        "averageColour": "#234f59",
+        "pbr": {
+          "roughness": 1,
+          "clearcoat": 1,
+          "clearcoatRoughness": 0.08
+        }
+      },
+      "maps": {
+        "albedo": {
+          "colourSpace": "srgb",
+          "files": {
+            "256": {
+              "path": "tex/01a16edd-f638-75ba-9bac-909c5b2f0cd2/albedo.256.webp",
+              "bytes": 5332,
+              "sha256": "4a56073ef48fb04f24f0fef992c8d027e37013db74fb8456ae54343a347b8b9e"
+            },
+            "512": {
+              "path": "tex/01a16edd-f638-75ba-9bac-909c5b2f0cd2/albedo.512.webp",
+              "bytes": 9436,
+              "sha256": "d5d0ee0af79363531a498ac256274dd0ab11fafd4c31962b11caaa50605ed385"
+            },
+            "768": {
+              "path": "tex/01a16edd-f638-75ba-9bac-909c5b2f0cd2/albedo.768.webp",
+              "bytes": 15624,
+              "sha256": "b6de10fca11d032f5760e288bff4613d255ca997ac4ee738144eb4f92ab57cbd"
+            }
+          }
+        },
+        "normal": {
+          "colourSpace": "linear",
+          "convention": "opengl",
+          "files": {
+            "256": {
+              "path": "tex/01a16edd-f638-75ba-9bac-909c5b2f0cd2/normal.256.webp",
+              "bytes": 22722,
+              "sha256": "b4ddf389cf4061208a3699eaf31684aaf190ca0453eb5ebf233775209244cade"
+            },
+            "512": {
+              "path": "tex/01a16edd-f638-75ba-9bac-909c5b2f0cd2/normal.512.webp",
+              "bytes": 103282,
+              "sha256": "19b0b769dd05624779189f1317e453e882a5254e4bcc4c8d9ba3311eb5c75bd8"
+            },
+            "768": {
+              "path": "tex/01a16edd-f638-75ba-9bac-909c5b2f0cd2/normal.768.webp",
+              "bytes": 262058,
+              "sha256": "de108650787713fd4fa21240208c6bfcbc9dd30ca8641cb0b94e9bfd42f104ab"
+            }
+          }
+        },
+        "arm": {
+          "colourSpace": "linear",
+          "files": {
+            "256": {
+              "path": "tex/01a16edd-f638-75ba-9bac-909c5b2f0cd2/arm.256.webp",
+              "bytes": 22234,
+              "sha256": "66a6d937e05185bfadce727c5739c41ce7131c6ffd417ecf7ea5c9b276cb9099"
+            },
+            "512": {
+              "path": "tex/01a16edd-f638-75ba-9bac-909c5b2f0cd2/arm.512.webp",
+              "bytes": 78500,
+              "sha256": "da27c80d4addff90eb9da1200401fedff4f25e42a737a670704d1c7e1c2f8210"
+            },
+            "768": {
+              "path": "tex/01a16edd-f638-75ba-9bac-909c5b2f0cd2/arm.768.webp",
+              "bytes": 166370,
+              "sha256": "5585893c95fed5472b69bdc4708d0288622953f08bd25acb8bfb7df8c91ced8d"
+            }
+          }
+        }
+      },
+      "source": {
+        "provider": "ambientcg",
+        "sourceName": "Tiles029",
+        "sourcePage": "https://ambientcg.com/a/Tiles029",
+        "licence": "CC0-1.0"
+      }
+    },
+    {
+      "version": "01a16edd-fbf5-75c4-b533-2f70c67c28fe",
+      "variant": "01a16edd-fbf5-75c4-b533-2f6f14b233d2",
+      "name": "Long White Tiles, tiles white",
+      "kind": "scan",
+      "facts": {
+        "tileM": [
+          1.27,
+          1.27
+        ],
+        "grain": "unknown",
+        "suitability": "continuous",
+        "normalStrength": 1,
+        "colourMode": "natural",
+        "averageColour": "#cfc8ba",
+        "pbr": {
+          "roughness": 1,
+          "clearcoat": 1,
+          "clearcoatRoughness": 0.08
+        }
+      },
+      "maps": {
+        "albedo": {
+          "colourSpace": "srgb",
+          "files": {
+            "256": {
+              "path": "tex/01a16edd-fbf5-75c4-b533-2f70c67c28fe/albedo.256.webp",
+              "bytes": 11182,
+              "sha256": "007d3d8f710b317968557fb4c16046b72d0a3748092c171f4ce077122482d973"
+            },
+            "512": {
+              "path": "tex/01a16edd-fbf5-75c4-b533-2f70c67c28fe/albedo.512.webp",
+              "bytes": 31012,
+              "sha256": "59f92c641977f67a2ab0c9251c760ec4b740187727175ec1a904e59d2ba42843"
+            },
+            "768": {
+              "path": "tex/01a16edd-fbf5-75c4-b533-2f70c67c28fe/albedo.768.webp",
+              "bytes": 59788,
+              "sha256": "34f30495c918588cbccc04ecbf2352f360b7bff2a331e6334559fbc750f024b9"
+            }
+          }
+        },
+        "normal": {
+          "colourSpace": "linear",
+          "convention": "opengl",
+          "files": {
+            "256": {
+              "path": "tex/01a16edd-fbf5-75c4-b533-2f70c67c28fe/normal.256.webp",
+              "bytes": 67480,
+              "sha256": "09ba3d96550caa35c841e5b3e036d6b81ae9267917a274022b6520471f013d74"
+            },
+            "512": {
+              "path": "tex/01a16edd-fbf5-75c4-b533-2f70c67c28fe/normal.512.webp",
+              "bytes": 206748,
+              "sha256": "cab6a5f459bf91b636833784f4bb5e2e291c2ffb67843057f69ca5cab5d77b36"
+            },
+            "768": {
+              "path": "tex/01a16edd-fbf5-75c4-b533-2f70c67c28fe/normal.768.webp",
+              "bytes": 506836,
+              "sha256": "d9cd37b3bfac575a505624e2ab75bf2edd99140d5a43e6cae3702d5de55d1707"
+            }
+          }
+        },
+        "arm": {
+          "colourSpace": "linear",
+          "files": {
+            "256": {
+              "path": "tex/01a16edd-fbf5-75c4-b533-2f70c67c28fe/arm.256.webp",
+              "bytes": 68188,
+              "sha256": "bd7c48e5d893659879a327eb7acef3117595b471d0a1d4432a8f9d420de010b0"
+            },
+            "512": {
+              "path": "tex/01a16edd-fbf5-75c4-b533-2f70c67c28fe/arm.512.webp",
+              "bytes": 160912,
+              "sha256": "09648f9c6d9ea15c6ac89b5bff0acc160d102edc1c9db64961d46fda9af4ee34"
+            },
+            "768": {
+              "path": "tex/01a16edd-fbf5-75c4-b533-2f70c67c28fe/arm.768.webp",
+              "bytes": 369112,
+              "sha256": "33a7651b233de09e603f9072b7c8a86ae7852d3eb10d3f817d8175a9d7a5e727"
+            }
+          }
+        }
+      },
+      "source": {
+        "provider": "polyhaven",
+        "sourceName": "long_white_tiles",
+        "sourcePage": "https://polyhaven.com/a/long_white_tiles",
+        "licence": "CC0-1.0"
+      }
+    },
+    {
+      "version": "01a16ede-b329-70bf-8fe1-72452c06aa9e",
+      "variant": "01a16ede-b329-70bf-8fe1-72444158b9e0",
+      "name": "Plaster 005, plaster white",
+      "kind": "scan",
+      "facts": {
+        "tileM": [
+          2,
+          2
+        ],
+        "grain": "unknown",
+        "suitability": "continuous",
+        "normalStrength": 1,
+        "colourMode": "tintable",
+        "tint": {
+          "recipe": "luma-mid@1",
+          "suggestedColours": [
+            {
+              "name": "natural",
+              "hex": "#a7a5a2"
+            }
+          ]
+        },
+        "averageColour": "#808080",
+        "pbr": {}
+      },
+      "maps": {
+        "albedoTint": {
+          "colourSpace": "srgb",
+          "files": {
+            "256": {
+              "path": "tex/01a16ede-b329-70bf-8fe1-72452c06aa9e/albedoTint.256.webp",
+              "bytes": 12152,
+              "sha256": "6f1de3dc105a936b1e3f5bbd77ccb09cd57d1963af66c5426694ad0792feb5f5"
+            },
+            "512": {
+              "path": "tex/01a16ede-b329-70bf-8fe1-72452c06aa9e/albedoTint.512.webp",
+              "bytes": 49636,
+              "sha256": "3657eec3532710e32e41bbf5e62669774c80478a60300b1509f0a8f82a56b5e0"
+            },
+            "768": {
+              "path": "tex/01a16ede-b329-70bf-8fe1-72452c06aa9e/albedoTint.768.webp",
+              "bytes": 120142,
+              "sha256": "2703ccbc7f6ef0e554c84ff76615ca1a6e2ca3561f2b06162cd599051510c0fd"
+            }
+          }
+        },
+        "normal": {
+          "colourSpace": "linear",
+          "convention": "opengl",
+          "files": {
+            "256": {
+              "path": "tex/01a16ede-b329-70bf-8fe1-72452c06aa9e/normal.256.webp",
+              "bytes": 86654,
+              "sha256": "f5fb1cbef64fc24acec8b37991588727c88474647e7ffbad2df523a0221f17ad"
+            },
+            "512": {
+              "path": "tex/01a16ede-b329-70bf-8fe1-72452c06aa9e/normal.512.webp",
+              "bytes": 417894,
+              "sha256": "4f327a5c3e33b08d9558b76ddb886637774ecadf8c4114c3599f198c8cb17364"
+            },
+            "768": {
+              "path": "tex/01a16ede-b329-70bf-8fe1-72452c06aa9e/normal.768.webp",
+              "bytes": 1046862,
+              "sha256": "1734f6449510c54b3ba66760cf5cca2f28a12b4aac268543d60ceee7f52def1e"
+            }
+          }
+        },
+        "arm": {
+          "colourSpace": "linear",
+          "files": {
+            "256": {
+              "path": "tex/01a16ede-b329-70bf-8fe1-72452c06aa9e/arm.256.webp",
+              "bytes": 27926,
+              "sha256": "410a1bbbb1a428763040169d399cf1272015ca92a7f7303cae5ef77199055026"
+            },
+            "512": {
+              "path": "tex/01a16ede-b329-70bf-8fe1-72452c06aa9e/arm.512.webp",
+              "bytes": 118436,
+              "sha256": "3f3db814374930d562ab79a722c6a3c9f2fbfaa41bb124abc218057affa824cc"
+            },
+            "768": {
+              "path": "tex/01a16ede-b329-70bf-8fe1-72452c06aa9e/arm.768.webp",
+              "bytes": 268696,
+              "sha256": "b98b2fbc8e944e019df37eef4fb9b66661da9bbd1df26512ba26a0873f5d3a50"
+            }
+          }
+        }
+      },
+      "source": {
+        "provider": "ambientcg",
+        "sourceName": "Plaster005",
+        "sourcePage": "https://ambientcg.com/a/Plaster005",
         "licence": "CC0-1.0"
       }
     }

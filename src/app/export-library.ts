@@ -10,8 +10,9 @@
  * matrix is baked into a copy of each surface's texture coordinates and the
  * views are reset to identity. Then:
  *
- * 1. one view per image and colour space, so each image (and each normal map
- *    the GLB writer turns) is written once;
+ * 1. one view per image content and colour space, so each image (and each
+ *    normal map the GLB writer turns) is written once, also when two library
+ *    versions ship the same map;
  * 2. a separate roughness map and the metalness map packed once per pair into
  *    one image (G roughness, B metalness, as three's writer packs per
  *    material), filling both slots;
@@ -88,6 +89,44 @@ function pixelsOf(texture: THREE.Texture, width?: number, height?: number): Imag
   const context = canvas.getContext('2d', { willReadFrequently: true })!;
   context.drawImage(image, 0, 0, canvas.width, canvas.height);
   return context.getImageData(0, 0, canvas.width, canvas.height);
+}
+
+/**
+ * A key per image content: two textures whose stored pixels are equal get the
+ * same key, whatever their source (two library versions may ship the same
+ * map). A compressed texture, whose pixels a canvas cannot read, is keyed by
+ * its source. A hash picks the candidates; equal keys need equal bytes.
+ */
+function contentKeys(): (texture: THREE.Texture) => string {
+  const bySource = new Map<string, string>();
+  const byHash = new Map<string, Array<{ readonly data: Uint8ClampedArray; readonly key: string }>>();
+  return (texture) => {
+    const known = bySource.get(texture.source.uuid);
+    if (known !== undefined) return known;
+    if (texture instanceof THREE.CompressedTexture) return texture.source.uuid;
+    const { data, width, height } = pixelsOf(texture);
+    const hash = `${width}x${height}:${fnv1a(data)}`;
+    const bucket = byHash.get(hash) ?? [];
+    byHash.set(hash, bucket);
+    const same = bucket.find((entry) => equalBytes(entry.data, data));
+    const key = same?.key ?? `${hash}:${bucket.length}`;
+    if (same === undefined) bucket.push({ data, key });
+    bySource.set(texture.source.uuid, key);
+    return key;
+  };
+}
+
+/** FNV-1a over `bytes`, as eight hex digits. */
+function fnv1a(bytes: Uint8ClampedArray): string {
+  let hash = 0x811c9dc5;
+  for (const byte of bytes) hash = Math.imul(hash ^ byte, 0x01000193);
+  return (hash >>> 0).toString(16).padStart(8, '0');
+}
+
+function equalBytes(a: Uint8ClampedArray, b: Uint8ClampedArray): boolean {
+  if (a.length !== b.length) return false;
+  for (let index = 0; index < a.length; index += 1) if (a[index] !== b[index]) return false;
+  return true;
 }
 
 /** A repeat-wrapped texture over `data`, sampled like the view it derives from. */
@@ -180,9 +219,12 @@ export function prepareLibraryMaps(graph: THREE.Object3D, options: LibraryMapsOp
     mesh.geometry = geometry;
   }
 
-  // 3. Only now: identity transforms, one view per image and colour space.
+  // 3. Only now: identity transforms, one view per image and colour space;
+  //    images are told apart by their pixels, since two library versions may
+  //    ship the same map.
   const canonical = new Map<string, THREE.Texture>();
-  const keyOf = (texture: THREE.Texture): string => `${texture.source.uuid}|${texture.colorSpace}`;
+  const contentKey = contentKeys();
+  const keyOf = (texture: THREE.Texture): string => `${contentKey(texture)}|${texture.colorSpace}`;
   for (const material of matrices.keys()) {
     for (const slot of SLOTS) {
       const texture = material[slot];

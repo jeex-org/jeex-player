@@ -5,7 +5,9 @@
  * `finishes[]` binds each bundled floor and wall finish (by its catalogue id)
  * to a library variant and the version pinned for it, or marks it `kept`: no
  * library material is chosen yet and the finish keeps its generated look.
- * `defaults.ceiling` does the same for the ceiling every room wears when it
+ * An alias entry names the finish a retired id reads as (`alias`); it has no
+ * version and no files. `defaults.ceiling` does the same as a bound or kept
+ * entry for the ceiling every room wears when it
  * names none. `versions[]` holds each pinned version once: its facts, the
  * maps by role, and for every file its logical path, byte size and SHA-256.
  * Ids are opaque UUIDs given by the library; nothing here is minted.
@@ -92,6 +94,7 @@ const version = z.strictObject({
 const bound = z.strictObject({
   finish: uuid,
   slug: z.string(),
+  name: z.optional(z.string().check(z.minLength(1))),
   variant: uuid,
   version: uuid,
   colour: z.optional(hex),
@@ -100,24 +103,29 @@ const bound = z.strictObject({
 
 const kept = z.strictObject({ finish: uuid, slug: z.string(), kept: z.literal(true), why: z.enum(['keep', 'pending']) });
 
-const entry = z.union([bound, kept]);
+/** A retired finish that reads as another bundled finish: it carries no material of its own. */
+const alias = z.strictObject({ finish: uuid, slug: z.string(), alias: uuid });
+
+const entry = z.union([bound, kept, alias]);
 
 export const finishMapsIndexSchema = z.strictObject({
   format: z.literal(1),
   finishes: z.array(entry),
-  defaults: z.strictObject({ ceiling: entry }),
+  defaults: z.strictObject({ ceiling: z.union([bound, kept]) }),
   versions: z.array(version),
 });
 
 export type FinishMapsIndex = z.infer<typeof finishMapsIndexSchema>;
 export type FinishMapsVersion = FinishMapsIndex['versions'][number];
 export type FinishMapsEntry = z.infer<typeof entry>;
+export type FinishMapsCeiling = FinishMapsIndex['defaults']['ceiling'];
 
 /**
  * The library's room-finish mapping, the script's input: one row per bundled
  * finish with its library variant (`material`) and the pinned version's facts
  * as the store projects them for a manifest, or `keep` / `pending` when no
- * material is chosen yet. Only the fields the script reads are judged; the
+ * material is chosen yet, or `alias` naming the finish a retired id reads as.
+ * Only the fields the script reads are judged; the
  * rest (reasons, pending notes) passes through.
  */
 const mappingFacts = z.looseObject({
@@ -144,6 +152,7 @@ const mappingRow = z.union([
   z.looseObject({
     finish: uuid,
     slug: z.string(),
+    name: z.optional(z.string().check(z.minLength(1))),
     material: uuid,
     colour: z.optional(hex),
     rotation: z.optional(z.number()),
@@ -151,7 +160,11 @@ const mappingRow = z.union([
   }),
   z.looseObject({ finish: uuid, slug: z.string(), keep: z.literal(true) }),
   z.looseObject({ finish: uuid, slug: z.string(), pending: z.looseObject({}) }),
+  z.looseObject({ finish: uuid, slug: z.string(), alias: uuid }),
 ]);
+
+/** The fields that say what a mapping row is; a row names exactly one of them. */
+export const MAPPING_ROW_MODES = ['material', 'keep', 'pending', 'alias'] as const;
 
 export const finishMappingSchema = z.looseObject({
   version: z.literal(1),
