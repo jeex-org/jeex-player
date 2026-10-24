@@ -47,7 +47,7 @@ import type { RoomBox, RoomProbe } from './room-volumes.js';
 import { WALK_LIGHTING_TUNING as T } from './walk-lighting-tuning.js';
 
 /** The patch's transform: one program variant, whatever the state; the version changes with the shader text. */
-export const WALK_TRANSFORM = Object.freeze({ id: WALK_TRANSFORM_ID, version: 4 });
+export const WALK_TRANSFORM = Object.freeze({ id: WALK_TRANSFORM_ID, version: 5 });
 /** Edge of an atlas tile: the PMREM layout of a 128 px cube (and of the studio environment). */
 export const TILE = Object.freeze({ width: 384, height: 512 });
 /** The largest mip of a probe's cube-UV layout: `log2(TILE.height) - 2`, as three derives `CUBEUV_MAX_MIP`. */
