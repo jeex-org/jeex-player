@@ -7,11 +7,15 @@ The viewer's general settings panel: the button beside the control bar that a ho
 
 ### Requirement: Settings button
 
-The viewer SHALL show a settings button only when the host enables it (mount option `settings.show`, attribute `settings`, query parameter `settings`; off by default). The button SHALL sit as an extension attached to the control bar's chosen side (`settings.side`, see «Settings side»): by default the bar's end, next to «Interior style». The bar SHALL stay centred on its existing controls, so no existing control moves; on narrow viewers (600 px of viewer width or less) the button SHALL sit directly under the bar's chosen side, inside the viewer (the bar is at the top).
+The viewer SHALL show a settings button only when the host enables it (mount option `settings.show`, attribute `settings`, query parameter `settings`; off by default).
 
 #### Scenario: Hidden by default
 - **WHEN** a viewer mounts without `settings`
 - **THEN** no settings button exists and the control bar is pixel-identical to the previous release
+
+### Requirement: Settings button placement
+
+The button SHALL sit as an extension attached to the control bar's chosen side (`settings.side`, see «Settings side»): by default the bar's end, next to «Interior style». The bar SHALL stay centred on its existing controls, so no existing control moves; on narrow viewers (600 px of viewer width or less) the button SHALL sit directly under the bar's chosen side, inside the viewer (the bar is at the top).
 
 #### Scenario: Narrow viewer
 - **WHEN** the viewer is 600 px wide or narrower
