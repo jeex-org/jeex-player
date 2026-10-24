@@ -29,6 +29,7 @@ import type { ViewerOptions } from './viewer-options.js';
 import type { ViewerSelection, ViewerSelectionTarget } from './selection.js';
 import type { SelectionDescription } from '../ui/selection-options.js';
 import { assetMoveWiring } from './asset-move-wiring.js';
+import { LightTemperatureControl } from './light-temperature-control.js';
 import type { AssetMoveControl } from '../edit/asset-move-session.js';
 
 type HandleCommandsDeps = {
@@ -53,6 +54,8 @@ type HandleCommandsDeps = {
 export type HandleCommands = {
   /** The context's boxes, straight through: nothing here decides anything about them. */
   readonly slots: ViewerSlots;
+  /** The colour temperature of the artificial light: the host's `setLightTemperature`, the panel, new roots (`light-temperature-control.ts`). */
+  readonly lightTemperature: LightTemperatureControl;
   setMode(mode: ViewerMode): void;
   getMode(): ViewerMode;
   getFurnitureVisible(): boolean;
@@ -170,8 +173,20 @@ export function handleCommands(deps: HandleCommandsDeps): HandleCommands {
     deps.events.emit('mode', mode);
   }
 
+  const lightTemperature = new LightTemperatureControl({
+    initial: deps.options.lighting.temperature,
+    scene: () => deps.stage()?.runtime.scene,
+    invalidate: () => deps.stage()?.runtime.demand.invalidate(),
+    relit: () => deps.stage()?.walkLighting.relit(),
+    emit: (change) => deps.events.emit('lightTemperature', change),
+    reflect: (value) => deps.ui.setLightTemperature(value),
+  });
+  // The panel opens on the mount option; every later change reaches it through `reflect`.
+  deps.ui.setLightTemperature(lightTemperature.value);
+
   const commands: HandleCommands = {
     slots: deps.context.slots,
+    lightTemperature,
 
     setMode(mode) {
       switchMode(mode, true);
@@ -199,6 +214,7 @@ export function handleCommands(deps: HandleCommandsDeps): HandleCommands {
         model: () => deps.mount().model,
         walkCamera: () => deps.stage()?.director?.walkCamera() ?? { index: null, count: 0 },
         checkpoints: () => ({ lookThrough: deps.stage()?.pilot.id ?? null, placing: deps.stage()?.overlay.placing() ?? false }),
+        lightTemperature: () => lightTemperature.value,
       });
     },
 

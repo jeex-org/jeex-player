@@ -16,6 +16,8 @@
  * Pure module: no `three`, no DOM.
  */
 
+import { TEMPERATURE_RANGE } from './temperature-range.js';
+
 /** Appearance version of the standard; raised with every intentional change of the look. */
 export const LIGHTING_STANDARD_VERSION = 1;
 
@@ -176,6 +178,15 @@ export const LIGHTING_STANDARD = deepFreeze({
     },
     fill: { colour: '#bed7de', intensity: 0.4, position: [-14, 8, 14] as Triple },
   },
+  /**
+   * The colour temperature of the interior's artificial light, kelvin: the
+   * range a host or the settings panel may choose from, in whole steps. The
+   * default `null` is «Original»: no conversion, every light keeps the colour
+   * it was built with. Converting a temperature to a colour is
+   * `colour-temperature.ts`; choosing one changes no rig value above, so the
+   * appearance version does not depend on it.
+   */
+  temperature: TEMPERATURE_RANGE,
 });
 
 export type LightingStandard = typeof LIGHTING_STANDARD;

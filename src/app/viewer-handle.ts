@@ -63,6 +63,11 @@ export type ViewerState = {
    * `checkpointLookThrough` and `checkpointPlacing` events announce each change.
    */
   checkpoints: { lookThrough: string | null; placing: boolean };
+  /**
+   * The colour temperature of the interior's artificial light, kelvin, or
+   * `null` for «Original». The `lightTemperature` event announces each change.
+   */
+  lightTemperature: number | null;
 };
 
 /**
@@ -216,6 +221,14 @@ export type ViewerHandle = {
    */
   stepCamera(to: 'next' | 'previous' | 'first' | 'last' | number): boolean;
   setFurnitureVisible(visible: boolean): void;
+  /**
+   * The colour temperature of the interior's artificial light (the lamps and
+   * the walk's ambient floor): kelvin from 2700 to 6500 in steps of 100, or
+   * `null` for «Original». Daylight never changes. Throws a `ViewerLibError`
+   * with code `bad-params` (path `lightTemperature`) for any other value and
+   * keeps the current one; an unchanged value raises no event.
+   */
+  setLightTemperature(temperature: number | null): void;
   /** Re-translates the chrome in place; the scene is not rebuilt. */
   setLocale(locale: Locale): void;
   /**

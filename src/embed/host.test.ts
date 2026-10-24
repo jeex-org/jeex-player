@@ -470,6 +470,7 @@ describe('commands and replies', () => {
     void embed.getScene().catch(() => undefined);
     void embed.setFurnitureVisible(false).catch(() => undefined);
     void embed.setLocale('ru').catch(() => undefined);
+    void embed.setLightTemperature(2700).catch(() => undefined);
     void embed.resize().catch(() => undefined);
     void embed.exportGlb({ includeFurniture: false }).catch(() => undefined);
     void embed.exportUsdz({ includeFurniture: false }).catch(() => undefined);
@@ -494,6 +495,7 @@ describe('commands and replies', () => {
       'getScene',
       'setFurnitureVisible',
       'setLocale',
+      'setLightTemperature',
       'resize',
       'exportGlb',
       'exportUsdz',
@@ -501,6 +503,9 @@ describe('commands and replies', () => {
       'captureStill',
       'capturePanorama',
     ]);
+    expect(iframe.contentWindow.commands.find((command) => command.method === 'setLightTemperature')?.params).toEqual({
+      temperature: 2700,
+    });
     expect(iframe.contentWindow.commands.find((command) => command.method === 'exportGlb')?.params).toEqual({
       includeFurniture: false,
     });

@@ -147,4 +147,12 @@ export const SR_LATN: Record<MessageKey, string> = {
   'viewer.label': 'Prikaz stana JEEX',
   'canvas.label': 'Interaktivna 3D scena stana',
   'canvas.fallbackLabel': 'Prezentacioni pregled scene stana',
+  'settings.label': 'Podešavanja',
+  'settings.title': 'Podešavanja prikaza',
+  'settings.temperature': 'Temperatura svetla',
+  'settings.original': 'Originalno',
+  'settings.temperatureValue': '{kelvin} K · {tone}',
+  'settings.warm': 'toplo',
+  'settings.neutral': 'neutralno',
+  'settings.cool': 'hladno',
 };

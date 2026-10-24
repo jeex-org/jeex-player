@@ -169,6 +169,15 @@ export const EN = {
   'viewer.label': 'JEEX apartment viewer',
   'canvas.label': 'Interactive 3D apartment scene',
   'canvas.fallbackLabel': 'Presentation preview of the apartment scene',
+
+  'settings.label': 'Settings',
+  'settings.title': 'Viewer settings',
+  'settings.temperature': 'Light temperature',
+  'settings.original': 'Original',
+  'settings.temperatureValue': '{kelvin} K · {tone}',
+  'settings.warm': 'warm',
+  'settings.neutral': 'neutral',
+  'settings.cool': 'cool',
 } as const;
 
 export type MessageKey = keyof typeof EN;

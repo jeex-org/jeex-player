@@ -123,6 +123,8 @@ export type CaptureDeps = {
    * ask for it.
    */
   postChain?: (() => Promise<PostProcessor | null>) | undefined;
+  /** Puts the current colour temperature on the artificial lights of the offscreen «as is» build. */
+  artificialLights?: ((root: THREE.Object3D) => void) | undefined;
 };
 
 /** What `stageCaptureDeps` reads of the stage (`viewer-stage.ts`), named structurally: the stage reaches this module through its own imports. */
@@ -215,6 +217,7 @@ export function captureCommands(deps: CaptureDeps): CaptureCommands {
       const built = builder.build();
       shellLike(deps.shellState(), offscreen, built.root, eye);
       scene.add(built.root);
+      deps.artificialLights?.(built.root);
       // The same orientation, ceiling slabs and fitting policy as the live
       // view, over this build's own geometry.
       sun = prepareSunShadow(built.root, offscreen.scene, offscreen.plan, rig);

@@ -113,6 +113,7 @@ export function mountViewerAs(embedding: Embedding, container: HTMLElement, opti
     focusRoom: (roomId) => app.handle.focusRoom(roomId),
     stepCamera: (to) => app.handle.stepCamera(to),
     setFurnitureVisible: (visible) => app.handle.setFurnitureVisible(visible),
+    setLightTemperature: (temperature) => app.handle.lightTemperature.set(temperature, 'host'),
     setLocale: (locale) => app.handle.setLocale(locale),
     setSelection: (target) => app.handle.setSelection(target),
     describeSelection: (target) => app.handle.describeSelection(target),

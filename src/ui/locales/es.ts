@@ -137,4 +137,12 @@ export const ES: Record<MessageKey, string> = {
   'viewer.label': 'Visor de apartamentos JEEX',
   'canvas.label': 'Escena 3D interactiva del apartamento',
   'canvas.fallbackLabel': 'Vista previa de presentación de la escena del apartamento',
+  'settings.label': 'Ajustes',
+  'settings.title': 'Ajustes del visor',
+  'settings.temperature': 'Temperatura de la luz',
+  'settings.original': 'Original',
+  'settings.temperatureValue': '{kelvin} K · {tone}',
+  'settings.warm': 'cálida',
+  'settings.neutral': 'neutra',
+  'settings.cool': 'fría',
 };

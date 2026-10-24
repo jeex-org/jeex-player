@@ -49,6 +49,8 @@
 import { z } from 'zod/mini';
 import { isLocale } from '../ui/messages.js';
 import { isTelemetryEndpoint } from '../telemetry/telemetry.schema.js';
+import { isLightTemperature } from '../lighting/colour-temperature.js';
+import { TEMPERATURE_RANGE } from '../lighting/temperature-range.js';
 
 /**
  * How one option is declared, resolved and reached from the two adapters.
@@ -58,7 +60,7 @@ import { isTelemetryEndpoint } from '../telemetry/telemetry.schema.js';
  * language this build never shipped, and a schema built once at module load
  * would refuse it.
  */
-export type OptionKind = 'enum' | 'flag' | 'fraction' | 'pixels' | 'string' | 'locale' | 'list' | 'endpoint' | 'switch';
+export type OptionKind = 'enum' | 'flag' | 'fraction' | 'pixels' | 'string' | 'locale' | 'list' | 'endpoint' | 'switch' | 'temperature';
 
 export type OptionSpec = {
   kind: OptionKind;
@@ -79,6 +81,17 @@ export type OptionSpec = {
   /** `data-<attr>` HTML attribute name (kebab-case; `optionsFromDataset` camelCases it). */
   attr: string;
 };
+
+const TEMPERATURE_ERROR = `must be null or a whole multiple of ${TEMPERATURE_RANGE.step} from ${TEMPERATURE_RANGE.min} to ${TEMPERATURE_RANGE.max}`;
+
+/**
+ * A whole step of kelvin inside the lighting standard's range, or `null` for
+ * «Original»: the one schema the option, the options object and the iframe
+ * command and event share. Its message is what an iframe host is told.
+ */
+export const lightTemperatureSchema = z.nullable(
+  z.number({ error: TEMPERATURE_ERROR }).check(z.refine((value) => isLightTemperature(value), { error: TEMPERATURE_ERROR })),
+);
 
 /**
  * One schema per `OptionKind`, built fresh from the row.
@@ -113,6 +126,8 @@ function buildSchema(spec: OptionSpec) {
     case 'endpoint':
       // The telemetry endpoint override: judged by telemetry's own check.
       return z.string().check(z.refine((value) => isTelemetryEndpoint(value)));
+    case 'temperature':
+      return lightTemperatureSchema;
   }
 }
 
@@ -222,4 +237,6 @@ export const viewerOptionsSchema = z.object({
   edits: z.enum(EDITS_VALUES),
   debug: z.boolean(),
   analytics: z.object({ mode: z.enum(['on', 'off']), endpoint: z.optional(z.string()) }),
+  settings: z.object({ show: z.boolean() }),
+  lighting: z.object({ temperature: lightTemperatureSchema }),
 });

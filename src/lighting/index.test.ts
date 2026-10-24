@@ -14,8 +14,10 @@ test('the lighting entry exports exactly the documented values', () => {
     'LIGHTING_STANDARD',
     'LIGHTING_STANDARD_VERSION',
     'LightingError',
+    'colourTemperatureRgb',
     'createLightingContext',
     'fitShadowFrustum',
+    'isLightTemperature',
     'sunDirection',
   ]);
 });

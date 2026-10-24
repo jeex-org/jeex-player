@@ -25,6 +25,7 @@ function build(): { shell: Shell; ui: ViewerUI } {
     toggleFullscreen: noop,
     toggleFurniture: noop,
     openInteriors: noop,
+    setLightTemperature: noop,
     tourSeek: noop,
     tourPlay: noop,
     tourPause: noop,

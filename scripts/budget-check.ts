@@ -82,14 +82,15 @@ export const OPS_BUDGET_FAIL_BYTES = 81_035 + 1024;
  * code and the `zod/mini` schema of the rig options — the last of which is
  * most of the bytes.
  *
- * The gate is the last measured size of `jeex-viewer-lighting.js` (11,743
- * gzip bytes, 11.5 KB, from `measureBundle('dist-lib')` right after
- * `bun run build:lib`, once the entry gained the sun direction, the shadow
- * frustum fit and the controllable apartment rig; 9,750 before) plus 1 KB. A
+ * The gate is the last measured size of `jeex-viewer-lighting.js` (12,085
+ * gzip bytes, 11.8 KB, from `measureBundle('dist-lib')` right after
+ * `bun run build:lib`, once the entry gained the colour temperature; 11,743
+ * after the sun direction, the shadow frustum fit and the controllable
+ * apartment rig, 9,750 before) plus 1 KB. A
  * three.js that slipped into the entry would be two orders of magnitude over
  * it; `scripts/lighting-entry-check.ts` is the gate that says so by name.
  */
-export const LIGHTING_BUDGET_FAIL_BYTES = 11_743 + 1024;
+export const LIGHTING_BUDGET_FAIL_BYTES = 12_085 + 1024;
 
 /**
  * The custom-element entry (`vite.lib.config.ts`) and the hard limit for it
@@ -99,12 +100,15 @@ export const LIGHTING_BUDGET_FAIL_BYTES = 11_743 + 1024;
  * dynamic import), and this is the number that catches it being pulled back
  * into the element's static graph.
  *
- * The gate is the measured size (39,297 gzip bytes: the entry, the element's
+ * The gate is the measured size (41,360 gzip bytes: the entry, the element's
  * own chunk and the option reader it shares with the other entries, from
- * `measureBundle('dist-lib')` right after `bun run build:lib`) plus 1 KB.
+ * `measureBundle('dist-lib')` right after `bun run build:lib`, once the light
+ * temperature joined the options: its rows, the settings strings of the seven
+ * catalogues the option reader carries, the live attribute and the pending
+ * handle's setter; 39,297 before) plus 1 KB.
  */
 export const ELEMENT_ENTRY = 'jeex-viewer-element.js';
-export const ELEMENT_BOOT_FAIL_BYTES = 39_297 + 1024;
+export const ELEMENT_BOOT_FAIL_BYTES = 41_360 + 1024;
 /** A three.js chunk's name (`jeex-viewer-three.core-<hash>.js`); none may be in the element's static graph. */
 const THREE_CHUNK = /^jeex-viewer-three\./;
 
@@ -138,15 +142,17 @@ export const LAZY_CHUNK_FAIL_BYTES = 256 * 1024;
  * (`src/render/walk-post.ts`: three's composer, GTAO, SMAA with its two
  * embedded lookup images, the output pass), loaded on the first entry into
  * walk or tour rather than at boot, and the walk room lighting with three's
- * light-probe grid (`src/render/walk-lighting/`).
- * The limit is the last measured size of the ES build's chunk (62,682 gzip
+ * light-probe grid (`src/render/walk-lighting/`), with the light temperature's
+ * room re-capture and the walk sun scale.
+ * The limit is the last measured size of the ES build's chunk (63,734 gzip
  * bytes, from `measureBundle('dist-lib')` right after `bun run build:lib`; the
- * demo build's is 60,559; 50,773 before the room lighting) plus 1 KB, so a
+ * demo build's is 61,505; 62,682 before the light temperature, 50,773 before
+ * the room lighting) plus 1 KB, so a
  * second effect added to the chain is noticed here. The IIFE build cannot split
  * code and carries the chain inline, inside the 700 KB boot budget.
  */
 export const LAZY_LIMITS: Readonly<Record<string, number>> = {
-  'lazy-jeex-viewer-walk-post': 62_682 + 1024,
+  'lazy-jeex-viewer-walk-post': 63_734 + 1024,
   // three's KTX2 loader with its container parser and Zstd decoder
   // (`src/materials/ktx2.ts`), loaded by the first KTX2 asset: 25,052 gzip
   // bytes in the ES build (24,175 in the demo build) from `measureBundle`

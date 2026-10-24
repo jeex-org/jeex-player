@@ -74,6 +74,7 @@ describe('resolveMethod', () => {
       'getScene',
       'setFurnitureVisible',
       'setLocale',
+      'setLightTemperature',
       'resize',
       'exportGlb',
       'exportUsdz',

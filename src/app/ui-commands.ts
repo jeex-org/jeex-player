@@ -18,8 +18,8 @@ import type { CameraDirector } from '../camera/camera-director.js';
 import type { Messages } from '../ui/messages.js';
 import type { SceneMount } from './scene-mount.js';
 import type { TourControls } from '../camera/tour-controls.js';
-import type { ViewerMode } from '../scene/types.js';
 import type { FullscreenController } from '../ui/fullscreen-controller.js';
+import type { HandleCommands } from './handle-commands.js';
 
 type UiCommandDeps = {
   /** Read lazily, like everything else: the field is assigned in the body. */
@@ -28,10 +28,12 @@ type UiCommandDeps = {
   tour: TourControls;
   messages: () => Messages;
   director: () => CameraDirector | undefined;
-  /** The composition root's own mode switch: it also re-hints and re-labels. */
-  setMode: (mode: ViewerMode) => void;
-  setFurnitureVisible: (visible: boolean) => void;
-  furnitureVisible: () => boolean;
+  /**
+   * The host commands, read lazily: the mode switch (which also re-hints and
+   * re-labels), the furniture switch and the light temperature are the same
+   * ones a host drives, so the bar and the panel go through them too.
+   */
+  handle: () => HandleCommands;
   /** Fullscreen was asked for and the browser has no API for it. */
   onFullscreenUnavailable: (message: string) => void;
   /** Hears the visitor entering fullscreen (`shared/usage.ts`). */
@@ -41,7 +43,7 @@ type UiCommandDeps = {
 /** The command bag `ViewerUI` is built with. */
 export function uiCommands(deps: UiCommandDeps): ViewerCommands {
   return {
-    setMode: (mode) => deps.setMode(mode),
+    setMode: (mode) => deps.handle().setMode(mode),
     toggleTour: () => deps.director()?.toggleTour(),
     resetCamera: () => deps.director()?.reset(),
     toggleFullscreen: async () => {
@@ -49,7 +51,8 @@ export function uiCommands(deps: UiCommandDeps): ViewerCommands {
       if (!(await shell.toggle())) deps.onFullscreenUnavailable(deps.messages().t('hint.fullscreenUnavailable'));
       else if (shell.isFullscreen()) deps.usage?.('fullscreen');
     },
-    toggleFurniture: () => deps.setFurnitureVisible(!deps.furnitureVisible()),
+    toggleFurniture: () => deps.handle().setFurnitureVisible(!deps.handle().getFurnitureVisible()),
+    setLightTemperature: (temperature) => deps.handle().lightTemperature.set(temperature, 'panel'),
     tourSeek: (fraction) => deps.tour.seek(fraction),
     tourPlay: () => deps.tour.play(),
     tourPause: () => deps.tour.pause(),
