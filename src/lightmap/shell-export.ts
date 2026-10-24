@@ -13,6 +13,10 @@
  * owns the file, supplies `mintId`; the player mints nothing. A minted id
  * must be a UUID v7 and new to this export.
  *
+ * The finishes are a required option: the caller names the ones the live
+ * view paints with (`SHIPPED_FINISHES`, or `projectFinishes` of the project's
+ * materials, the live project view's own composition).
+ *
  * Internal module: the bake tool imports it from source in a browser. It is
  * not part of the package's exports.
  */
@@ -23,6 +27,7 @@ import { OpeningBuilder } from '../geometry/opening-builder.js';
 import { ShellBuilder } from '../geometry/shell-builder.js';
 import { rebaseShellOrigins } from '../geometry/shell-origins.js';
 import type { ProjectMaterial } from '../materials/finish-types.js';
+import type { ProjectFinishes } from '../materials/project-finishes.js';
 import { solvePlan } from '../plan/plan-solver.js';
 import { isUuidV7, type SceneData } from '../scene/types.js';
 import { ViewerLibError } from '../shared/errors.js';
@@ -30,14 +35,29 @@ import { writeGlb, type GlbMaterial, type GlbMesh } from './glb-write.js';
 import { shellEntries, type ShellEntry } from './shell-contract.js';
 import { canonicalJson, shellInputsHash } from './shell-inputs.js';
 
+/** The bundled finishes, for a scene the live view paints without a project. */
+export const SHIPPED_FINISHES = Object.freeze({ shipped: true } as const);
+
 export type ShellExportOptions = {
   /** Mints one UUID v7 per mesh; the caller owns the ids. */
   readonly mintId: () => string;
-  /** The project's finish lookup, as the live view is given it. */
-  readonly findFinish?: FinishLookup | undefined;
-  /** The project's materials, as the live view is given them. */
-  readonly projectMaterials?: readonly ProjectMaterial[] | undefined;
+  /**
+   * The finishes the live view paints the scene with: `SHIPPED_FINISHES`, or
+   * `projectFinishes(manifest.library.materials)` for a project. Required, so
+   * an export never falls back to finishes the live view does not use.
+   */
+  readonly finishes: typeof SHIPPED_FINISHES | ProjectFinishes;
 };
+
+function finishOptions(finishes: ShellExportOptions['finishes'] | undefined): {
+  findFinish?: FinishLookup;
+  projectMaterials?: readonly ProjectMaterial[];
+} {
+  if (finishes === SHIPPED_FINISHES) return {};
+  if (finishes !== null && typeof finishes === 'object' && 'findFinish' in finishes && typeof finishes.findFinish === 'function')
+    return { findFinish: finishes.findFinish, projectMaterials: finishes.projectMaterials };
+  throw new ViewerLibError('bad-params', 'shell export: name the finishes the live view paints with (SHIPPED_FINISHES or projectFinishes)');
+}
 
 export type ShellExport = {
   /** The GLB bytes. */
@@ -91,8 +111,9 @@ function glbMaterialOf(entry: ShellEntry): GlbMaterial {
 
 /** Builds the shell of `scene` and writes it as a shell file. */
 export async function exportShellForBake(scene: SceneData, options: ShellExportOptions): Promise<ShellExport> {
+  const { findFinish, projectMaterials } = finishOptions(options.finishes);
   const plan = solvePlan(scene);
-  const ctx = createBuilderContext(scene, plan, options.findFinish, options.projectMaterials, null);
+  const ctx = createBuilderContext(scene, plan, findFinish, projectMaterials, null);
   const shellBuilder = new ShellBuilder(ctx);
   const openingBuilder = new OpeningBuilder(ctx);
   const shell = new THREE.Group();
@@ -121,7 +142,7 @@ export async function exportShellForBake(scene: SceneData, options: ShellExportO
       return { name, ...worldAttributes(entry.mesh), material, extras: { jeex: entry.extras } };
     });
 
-    const hash = await shellInputsHash(scene, options.projectMaterials);
+    const hash = await shellInputsHash(scene, projectMaterials);
     const glb = writeGlb({ assetExtras: { jeex: { format: 1, sceneId: scene.id, shellInputsHash: hash } }, meshes, materials });
     return { glb, shellInputsHash: hash, names: [...names] };
   } finally {

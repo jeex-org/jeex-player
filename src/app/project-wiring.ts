@@ -27,7 +27,7 @@ import { registriesFromLibrary, type SceneRegistries } from '../scene/registries
 import { ProjectRepository } from '../scene/project-repository.js';
 import { SceneModel } from '../scene/scene-model.js';
 import type { SceneRepository, SceneSource } from '../scene/scene-repository.js';
-import { findFinish } from '../materials/finish-catalogue.js';
+import { projectFinishes } from '../materials/project-finishes.js';
 import type { SceneBuilderOptions } from '../geometry/scene-builder.js';
 import type { Logger } from '../shared/logger.js';
 
@@ -143,7 +143,7 @@ export function projectContext(info: ProjectInfo, log: Logger): LoadedProjectCon
       // exporter carried into `library.materials`, and a
       // room painted grey because of that is a worse answer than the finish
       // the document asked for.
-      findFinish: (id) => findFinish(id, materials) ?? findFinish(id),
+      findFinish: projectFinishes(materials).findFinish,
       // A project folder is static content on some other origin.
       credentials: 'omit',
       log,

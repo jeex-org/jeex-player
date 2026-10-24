@@ -7,6 +7,8 @@
  * Pure module: no `three`, no DOM.
  */
 
+import type { BAKE_LIGHTS_RECIPE, BAKE_SKY_HEMISPHERE_RECIPE } from './bake-lights.schema.js';
+
 type Vec3 = readonly [number, number, number];
 
 /**
@@ -80,6 +82,14 @@ export type LightBake = {
    * in W/m² on a surface facing it.
    */
   readonly sun: { readonly direction: Vec3; readonly color: Vec3; readonly strength: number };
+  /** The lights an apartment bake took (`bake-lights.ts`); absent for a calibration room. */
+  readonly lights?:
+    | {
+        readonly recipe: typeof BAKE_LIGHTS_RECIPE;
+        readonly standardVersion: number;
+        readonly skyRecipe: typeof BAKE_SKY_HEMISPHERE_RECIPE;
+      }
+    | undefined;
   readonly sky?: Readonly<Record<string, unknown>> | undefined;
   readonly calibration?: Readonly<Record<string, unknown>> | undefined;
   readonly pages: readonly LightBakePage[];

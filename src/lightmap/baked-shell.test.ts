@@ -25,7 +25,7 @@ import { isBakedSurface } from '../render/baked-surface.js';
 import { bindLightBake } from './lightmap-binding.js';
 import { applyBakedShell, liveShellEntries, verifiedShellFile } from './baked-shell.js';
 import { adoptShippedShell, parseShellFile } from './shell-adopt.js';
-import { exportShellForBake } from './shell-export.js';
+import { exportShellForBake, SHIPPED_FINISHES } from './shell-export.js';
 import { shellInputsHash } from './shell-inputs.js';
 import CALIBRATION from '../../tests/fixtures/lightmap-calibration/sidecar.json' with { type: 'json' };
 
@@ -35,7 +35,7 @@ const minter = (prefix: string): (() => string) => {
   return () => `${prefix}-0000-7000-8000-${(n++).toString(16).padStart(12, '0')}`;
 };
 
-const exported = await exportShellForBake(apartmentScene, { mintId: minter('01a1b000') });
+const exported = await exportShellForBake(apartmentScene, { mintId: minter('01a1b000'), finishes: SHIPPED_FINISHES });
 const unwrapped: Unwrapped = await standInUnwrap(exported.glb, PAGE);
 const liveHash = await shellInputsHash(apartmentScene);
 
@@ -231,9 +231,11 @@ describe('verifiedShellFile', () => {
     }
   });
 
-  test('refuses a sidecar without shellInputsHash, for another scene, or disagreeing with the file', async () => {
+  test('refuses a sidecar without shellInputsHash or lights, for another scene, or disagreeing with the file', async () => {
     const { shellInputsHash: _omitted, ...without } = await sidecarFor(unwrapped);
     expect((await refusal(verifiedShellFile(without as LightBake, bytes, apartmentScene, liveHash))).message).toContain('scene inputs');
+    const { lights: _unsaid, ...unlit } = await sidecarFor(unwrapped);
+    expect((await refusal(verifiedShellFile(unlit as LightBake, bytes, apartmentScene, liveHash))).message).toContain('which lights');
     const foreign = await sidecarFor(unwrapped, { sceneId: '01a1d000-0000-7000-8000-000000000000' });
     expect((await refusal(verifiedShellFile(foreign, bytes, apartmentScene, liveHash))).message).toContain('another scene');
     const other = `sha256:${'0'.repeat(64)}`;

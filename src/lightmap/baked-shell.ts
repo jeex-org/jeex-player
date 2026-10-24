@@ -75,8 +75,9 @@ export function liveShellEntries(
 
 /**
  * Refuses a judged sidecar made for another scene, or for another revision of
- * the live shell (`liveHash`), or that does not say which; run before the
- * shell file is fetched.
+ * the live shell (`liveHash`), or that does not say which, or that does not
+ * say which lights it took (`bake-lights.ts`); run before the shell file is
+ * fetched.
  */
 export function verifiedSidecar(bake: LightBake, scene: SceneData, liveHash: string): void {
   if (bake.sceneId !== scene.id)
@@ -85,6 +86,7 @@ export function verifiedSidecar(bake: LightBake, scene: SceneData, liveHash: str
     });
   if (bake.shellInputsHash === undefined)
     throw new LightBakeError('shell', `light bake ${bake.bakeId} does not say which scene inputs its shell was built from`);
+  if (bake.lights === undefined) throw new LightBakeError('shell', `light bake ${bake.bakeId} does not say which lights it took`);
   if (bake.shellInputsHash !== liveHash)
     throw new LightBakeError('shell', `light bake ${bake.bakeId} was made for another revision of the shell`, {
       detail: { expected: liveHash, actual: bake.shellInputsHash },
