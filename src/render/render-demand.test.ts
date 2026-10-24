@@ -94,6 +94,21 @@ describe('RenderDemand', () => {
     });
   });
 
+  test('a draw with another camera object draws once more on the next tick, then rests', () => {
+    // The first picture after the render camera changes is not the steady one (measured: the
+    // top view's first frame differed from the next, identical-input frame in 7 runs of 10).
+    const live = camera();
+    const top = new THREE.OrthographicCamera(-5, 5, 5, -5, 0.1, 100);
+    const demand = displayed(live, 'orbit');
+    const drawn: boolean[] = [];
+    for (let tick = 0; tick < 4; tick += 1) {
+      const draws = demand.shouldDraw(top, 'plan3d');
+      drawn.push(draws);
+      if (draws) demand.commit(top);
+    }
+    expect(drawn).toEqual([true, true, false, false]);
+  });
+
   test('a mode switch at the same pose draws, between any two modes', () => {
     const live = camera();
     expect(displayed(live, 'walk').shouldDraw(live, 'tour')).toBe(true);
