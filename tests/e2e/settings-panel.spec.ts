@@ -10,7 +10,7 @@
  * unreachable button.
  */
 
-import { expect, test, type Locator } from '@playwright/test';
+import { expect, test, type Locator, type Page } from '@playwright/test';
 import { expectNoNewA11yViolations, waitForBoot, waitForChromeIdle } from './support.js';
 
 type Box = { x: number; y: number; width: number; height: number };
@@ -19,6 +19,21 @@ async function box(locator: Locator): Promise<Box> {
   const rect = await locator.boundingBox();
   expect(rect).not.toBeNull();
   return rect!;
+}
+
+/**
+ * Brings the control bar back the way a keyboard user does: the bar has
+ * collapsed on its idle timer (and is `inert`, so its buttons take no focus),
+ * the reveal control takes the focus and Enter. A focus inside the viewer
+ * keeps the bar awake until a panel closes, so the settings button can be
+ * focused next. Every machine takes this path: the specs wait for the
+ * collapse first instead of racing the 4.2 s timer against the boot.
+ */
+async function revealBarByKeyboard(page: Page): Promise<void> {
+  await waitForChromeIdle(page);
+  await page.locator('[data-jeex="reveal-controls"]').focus();
+  await page.keyboard.press('Enter');
+  await expect(page.locator('[data-jeex="control-bar"]')).toHaveAttribute('data-collapsed', 'false');
 }
 
 /** The plate attached to the bar's start (beside it, or under it in a narrow viewer) and inside the viewer. */
@@ -38,10 +53,11 @@ test('demo page: the panel opens by keyboard, steps the temperature, closes on E
 }, testInfo) => {
   await page.goto('/');
   await waitForBoot(page, 'window.__appReady === true');
-  await waitForChromeIdle(page);
+  await revealBarByKeyboard(page);
   const button = page.locator('[data-jeex="settings-button"]');
   await expect(button).toBeVisible();
   await button.focus();
+  await expect(button).toBeFocused();
   await page.keyboard.press('Enter');
   const panel = page.locator('[data-jeex="settings-panel"]');
   await expect(panel).toBeVisible();
@@ -63,11 +79,12 @@ test("demo page with `?settingsSide=start`: the button on the bar's start, opene
 }, testInfo) => {
   await page.goto('/?settingsSide=start');
   await waitForBoot(page, 'window.__appReady === true');
-  await waitForChromeIdle(page);
+  await revealBarByKeyboard(page);
   const button = page.locator('[data-jeex="settings-button"]');
   await expect(button).toBeVisible();
   await expectOnStart(page.locator('body'));
   await button.focus();
+  await expect(button).toBeFocused();
   await page.keyboard.press('Enter');
   const panel = page.locator('[data-jeex="settings-panel"]');
   await expect(panel).toBeVisible();
