@@ -2,7 +2,7 @@
 
 ## Reviewer
 
-An independent second agent that did not write the artifacts, read-only, one round (Sol round). Verdict of the round: go with changes. All seven findings were accepted and the artifacts amended; no re-review round was needed.
+An independent second agent that did not write the artifacts, read-only, one round. Verdict of the round: go with changes. All seven findings were accepted and the artifacts amended; no re-review round was needed.
 
 ## Findings
 
@@ -14,7 +14,7 @@ An independent second agent that did not write the artifacts, read-only, one rou
 6. room-lighting delta and tasks (gloss proof): the 2.5× threshold must be scoped to the demo living-room fixture with recorded pose, resolution, floor mask and linear specular luminance; the window proof must use the same black, non-metal, map-free floor; GPU measurements must assert a hardware renderer. Verdict: fixed.
 7. post-processing delta: «the chain has no other pass» contradicted the existing chain; the mirror's direct-path brightness comparison needs the identity white balance. Verdict: fixed. The scenario reads «the white balance adds no pass and no render target»; «Mirrors under the chain» and «Captures in walk and tour» are carried as MODIFIED requirements.
 
-8. Walk emissive cap (shades blown out in walk): added by jeex-common after the Sol round; spec requirement «Emissive surfaces in walk and tour», design decision 6, tasks group 6.
+8. Walk emissive cap (shades blown out in walk): added to the change after the review round; spec requirement «Emissive surfaces in walk and tour», design decision 6, tasks group 6.
 
 ## Verdict
 
