@@ -70,9 +70,18 @@ export const WALK_POST_TUNING = Object.freeze({
   /**
    * The camera white balance: a partial adaptation from `source`, the
    * measured linear colour of the neutral surfaces, towards the display
-   * white, by `degree` (`white-balance.ts`). Not yet calibrated: identity.
+   * white, by `degree` (`white-balance.ts`). Measured 2026-10-24 on the demo
+   * apartment's living-room ceiling at the walk start (the default sun preset
+   * and lamps, the room lighting live), in scene-linear colour (the live
+   * scene rendered into a float target: no tone mapping, no exposure), on an
+   * NVIDIA GPU: linear (0.2049, 0.1527, 0.0982), red over blue 2.086; the
+   * living walls in view carry the sand finish and are not neutral, so the
+   * ceiling alone is the source (normalised to red). The degree puts the
+   * ceiling at red over blue 1.45, the middle of the warm-white band 1.3-1.6,
+   * with red > green > blue (0.184, 0.156, 0.127): warm white, not peach.
+   * `tests/component/walk-glossy.test.ts` repeats the measurement.
    */
-  whiteBalance: Object.freeze({ source: Object.freeze([1, 1, 1] as const), degree: 0 }),
+  whiteBalance: Object.freeze({ source: Object.freeze([1, 0.7452, 0.4795] as const), degree: 0.465 }),
 });
 
 /** The tuned white balance the chain applies by default. */
