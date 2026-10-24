@@ -19,7 +19,11 @@ import type { HdriEntry } from '../lighting/hdri-entry.js';
 /** URL schemes an HDRI file may be fetched from. */
 const URL_SCHEMES: ReadonlySet<string> = new Set(['http:', 'https:', 'blob:']);
 
+/** The published JSON Schema's `pattern` on the raw string: case and surrounding space as given. */
+const SCHEME_PATTERN = /^(https?|blob):/;
+
 function isFetchableUrl(value: string): boolean {
+  if (!SCHEME_PATTERN.test(value)) return false;
   try {
     return URL_SCHEMES.has(new URL(value).protocol);
   } catch {
