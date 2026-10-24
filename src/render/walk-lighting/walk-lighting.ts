@@ -18,7 +18,11 @@
  *
  * Refresh: an edit re-bakes only the named rooms' grids and re-captures only
  * the named rooms' probes, synchronously within one frame, so a half-written
- * grid is never on screen; anything wider starts the bake over.
+ * grid is never on screen; anything wider starts the bake over. Handed the
+ * document on screen, a refresh first moves the probe points to where the
+ * current furniture puts them (every room whose point moved is re-captured
+ * too, and its boxes project from the new point); rooms that no longer give
+ * the loaded boxes reload the document.
  *
  * Relight: a new colour of the artificial light re-captures every room's
  * probe in place, one room per live frame; the grids stay, since their bake
@@ -28,7 +32,7 @@
 import { ViewerLibError } from '../../shared/errors.js';
 import * as THREE from 'three';
 import { LIGHTING_STANDARD } from '../../lighting/lighting-standard.js';
-import { roomVolumes, type RoomVolumes, type VolumeInput } from './room-volumes.js';
+import { roomVolumes, type RoomBox, type RoomVolumes, type Vec3, type VolumeInput } from './room-volumes.js';
 import { createExteriorGrid, RoomGrid } from './room-grid.js';
 import { GridBake } from './grid-bake.js';
 import { ProbeAtlas, RoomProbes } from './room-probes.js';
@@ -47,6 +51,15 @@ export type WalkDocument = { volumes: VolumeInput; furniture: THREE.Object3D | n
 export type RefreshScope = { all: boolean; grids: readonly string[]; probes: readonly string[] };
 /** `empty`: the plan has no closed room, nothing is baked and the view keeps the direct look. */
 export type WalkLightingPhase = 'baking' | 'probes' | 'live' | 'empty';
+
+/** A probe point that moves less than this has not moved, metres. */
+const MOVED_M = 1e-3;
+
+/** Whether two box lists are the same rooms in the same order with the same projection boxes. */
+function sameBoxes(a: readonly RoomBox[], b: readonly RoomBox[]): boolean {
+  const same = (p: Vec3, q: Vec3): boolean => Math.abs(p.x - q.x) < 1e-9 && Math.abs(p.y - q.y) < 1e-9 && Math.abs(p.z - q.z) < 1e-9;
+  return a.length === b.length && a.every((box, i) => box.roomId === b[i]!.roomId && same(box.projection.min, b[i]!.projection.min) && same(box.projection.max, b[i]!.projection.max));
+}
 
 /** Measured cost of the last full bake, and the GPU memory the lighting holds. */
 export type WalkLightingStats = {
@@ -189,18 +202,50 @@ export class WalkLighting {
     return this.current === 'live' && this.probes !== null && !this.probes.done;
   }
 
-  /** Refreshes what an edit touched; a scope this cannot narrow, or an edit before the bake ends, starts over. */
-  refresh(scope: RefreshScope): void {
+  /**
+   * Refreshes what an edit touched; a scope this cannot narrow, or an edit
+   * before the bake ends, starts over. `doc`, the document on screen now,
+   * moves the probe points with the furniture first.
+   */
+  refresh(scope: RefreshScope, doc: WalkDocument | null = null): void {
     if (!this.volumes || !this.probes) return;
+    const moved = doc ? this.follow(doc) : [];
+    if (moved === null) {
+      this.load(doc!);
+      return;
+    }
     if (scope.all || this.current !== 'live') {
       this.restart();
       return;
     }
     const targets = this.grids.filter((grid) => scope.grids.includes(grid.roomId));
     if (targets.length > 0) this.gridBake(targets).step();
-    this.probes.recapture([...scope.grids, ...scope.probes]);
+    this.probes.recapture([...scope.grids, ...scope.probes, ...moved]);
     while (!this.probes.step());
     this.show(true);
+  }
+
+  /**
+   * Moves the probe points to where `doc`'s furniture puts them and rewrites
+   * every box's projection centre; answers the rooms whose point moved, or
+   * `null` when `doc`'s rooms give other boxes than the loaded ones.
+   */
+  private follow(doc: WalkDocument): string[] | null {
+    const volumes = this.volumes!;
+    const result = roomVolumes(doc.volumes);
+    if (!result.ok || !sameBoxes(result.volumes.boxes, volumes.boxes)) return null;
+    this.furniture = doc.furniture;
+    const moved: string[] = [];
+    result.volumes.probes.forEach((next, i) => {
+      const probe = volumes.probes[i]!;
+      const { x, y, z } = probe.position;
+      if (Math.hypot(next.position.x - x, next.position.y - y, next.position.z - z) <= MOVED_M) return;
+      // In place: the room probes read the same objects at capture time.
+      probe.position = next.position;
+      moved.push(probe.roomId);
+    });
+    if (moved.length > 0) setRoomBoxes(this.uniforms, volumes.boxes, volumes.probes, atlasLayout(volumes.probes.length));
+    return moved;
   }
 
   /** The last full bake's measurement; `null` before the first is done. */
