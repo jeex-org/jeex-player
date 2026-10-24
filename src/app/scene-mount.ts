@@ -46,6 +46,7 @@ import type { LibraryTextures } from '../geometry/library-surface.js';
 import { createProjectTextures, type TextureEnv } from './project-textures.js';
 import { createBuiltinTextures } from './builtin-textures.js';
 import { builtinFolder } from '../materials/builtin-folder.js';
+import { forExport, type ExportSurfaces } from './export-surfaces.js';
 import { lightBakeWiring, type LightBakeWiring } from '../lightmap/light-bake-wiring.js';
 import { debugLightBake } from '../shared/debug-flags.js';
 import { defaultLogger, type Logger } from '../shared/logger.js';
@@ -377,6 +378,21 @@ export class SceneMount {
     if (this.textures !== null && this.textures.key === project.key) return this.textures.textures;
     const env = this.deps.textureEnv?.() ?? null;
     return env === null ? null : { ...createProjectTextures(project.info.baseUrl, env), attached: () => this.invalidate() };
+  }
+
+  /**
+   * What an export of the mounted document draws its room surfaces with
+   * (`export-surfaces.ts`); `null` before the first mount.
+   */
+  exportSurfaces(): ExportSurfaces | null {
+    if (this.last === null) return null;
+    const options = this.last.options;
+    return {
+      surfaceMaterials: options?.projectMaterials,
+      findFinish: options?.findFinish,
+      textures: forExport(options?.textures),
+      builtinTextures: forExport(this.builtin),
+    };
   }
 
   /** The viewer's source for the bundled finishes, made on first ask; `null` without a context. */

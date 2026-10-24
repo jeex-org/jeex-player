@@ -17,6 +17,9 @@ import { validateBytes } from 'gltf-validator';
 import { exportGlb, type ExportDeps } from '../../src/app/export-gltf.js';
 import { metadataFindings, readScalars, readStringColumn, type GltfJson } from './glb-conformance.js';
 import { demoScene } from './support.js';
+import { TextureSource } from '../../src/materials/texture-source.js';
+import { builtinFolder } from '../../src/materials/builtin-folder.js';
+import { createLogger } from '../../src/shared/logger.js';
 
 type ValidatorMessage = { code: string; message: string; severity: number; pointer?: string };
 type ValidatorReport = {
@@ -27,6 +30,8 @@ type ValidatorReport = {
 const JUDGED_WARNINGS: Record<string, string> = {
   KHR_MATERIALS_EMISSIVE_STRENGTH_ZERO_FACTOR:
     'three writes the emissive strength of a material whose emissive colour is black; it has no effect on how the file renders',
+  MESH_PRIMITIVE_GENERATED_TANGENT_SPACE:
+    'library surfaces carry a normal map and no TANGENT attribute, as the live view draws them; they are planar walls, floors and ceilings with an affine texture mapping, where every tangent-space generator gives the same frame',
 };
 
 /**
@@ -44,9 +49,18 @@ const ERROR = 0;
 const WARNING = 1;
 const INFORMATION = 2;
 
+/**
+ * The demo apartment as a mounted viewer exports it: its bundled finishes drawn
+ * with their maps from the player's own folder, at the mid device size.
+ */
 function deps(): ExportDeps {
   const scene = demoScene();
-  return { getScene: () => scene, getState: () => ({ sceneId: scene.id, rev: 1 }) };
+  const builtin = new TextureSource({ baseUrl: builtinFolder(), log: createLogger(() => undefined), maxAnisotropy: 1 });
+  return {
+    getScene: () => scene,
+    getState: () => ({ sceneId: scene.id, rev: 1 }),
+    getSurfaces: () => ({ textures: null, builtinTextures: { source: builtin, device: 'mid', compressed: false } }),
+  };
 }
 
 /** The JSON and BIN chunks of a GLB, as a reader sees them. */
@@ -97,6 +111,11 @@ function meshesOf(json: GltfJson, nodeIndex: number, root = true): number[] {
 describe('exportGlb conformance', () => {
   test('the demo apartment GLB passes the glTF Validator and the strict metadata reader, and every element primitive resolves to its row', async () => {
     const buffer = await (await exportGlb(deps())).arrayBuffer();
+    const { json: textured } = chunks(buffer);
+    // The bundled scans travel with their maps: images are written, and every one is a PNG.
+    const images = (textured as { images?: Array<{ mimeType?: string }> }).images ?? [];
+    expect.soft(images.length).toBeGreaterThan(0);
+    expect.soft(images.filter((image) => image.mimeType !== 'image/png')).toEqual([]);
     const report = (await validateBytes(new Uint8Array(buffer), { maxIssues: 0, writeTimestamp: false, format: 'glb' })) as ValidatorReport;
 
     // `expect.soft` throughout: one run names every breach, not only the first.

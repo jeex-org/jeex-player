@@ -85,6 +85,12 @@ export type SceneBuilderOptions = {
   resolveFinish?: FinishIdResolver | undefined;
   /** The project's `library.materials`: furniture finishes AND, through `findFinish`, room surfaces. */
   projectMaterials?: readonly ProjectMaterial[] | undefined;
+  /**
+   * The project materials ROOM SURFACES resolve from, in place of
+   * `projectMaterials`, which furniture keeps reading; the export draws the
+   * room surfaces the live view draws and leaves furniture as it was.
+   */
+  surfaceMaterials?: readonly ProjectMaterial[] | undefined;
   /** Room-surface finish lookup; the bundled catalogue when absent (`builder-context.ts`). */
   findFinish?: ((id: string) => Finish | null) | undefined;
   /** Where library materials on room surfaces take their maps from; flat colours only when absent. */
@@ -182,7 +188,7 @@ export class SceneBuilder {
       scene,
       plan,
       options.findFinish,
-      options.projectMaterials,
+      options.surfaceMaterials ?? options.projectMaterials,
       options.textures ?? null,
       options.builtinTextures ?? null,
     );
@@ -606,7 +612,7 @@ export class SceneBuilder {
       this.scene,
       this.plan,
       this.options.findFinish,
-      this.options.projectMaterials,
+      this.options.surfaceMaterials ?? this.options.projectMaterials,
       this.options.textures ?? null,
       this.options.builtinTextures ?? null,
     );

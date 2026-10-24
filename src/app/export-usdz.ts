@@ -43,7 +43,12 @@ export async function exportUsdz(deps: ExportDeps, options: ExportUsdzOptions = 
   const scene = deps.getScene();
   if (!scene) throw notReady('exportUsdz');
 
-  const { graph, dispose } = prepareExport(scene, { includeFurniture: resolved.includeFurniture, state: 'current' });
+  const { graph, dispose } = await prepareExport(
+    scene,
+    { includeFurniture: resolved.includeFurniture, state: 'current' },
+    deps.getSurfaces?.(),
+    { turnNormalGreen: true },
+  );
   try {
     const { USDZExporter } = await import('three/addons/exporters/USDZExporter.js');
     const exporter = new USDZExporter();

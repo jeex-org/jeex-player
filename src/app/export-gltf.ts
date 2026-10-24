@@ -28,13 +28,15 @@
  */
 
 import * as THREE from 'three';
-import { SceneBuilder, FURNITURE_GROUP_NAME } from '../geometry/scene-builder.js';
+import { SceneBuilder, FURNITURE_GROUP_NAME, type SceneBuilderOptions } from '../geometry/scene-builder.js';
+import { prepareLibraryMaps, type LibraryMapsOptions } from './export-library.js';
 import { solvePlan } from '../plan/plan-solver.js';
 import { metadataTable, structuralMetadataExtension, type ElementRow } from '../scene/metadata-table.js';
 import { exportGraphWithRows } from '../render/export-graph.js';
 import type { SceneData } from '../scene/types.js';
 import { ViewerLibError } from '../shared/errors.js';
 import type { ExportGlbOptions, ExportSceneState } from './export-types.js';
+import type { ExportSurfaces } from './export-surfaces.js';
 
 // Re-exported so every existing `from './export-gltf.js'` import (`viewer-api.ts`,
 // `embed/frame-bridge.ts`) keeps working; the type itself lives in
@@ -48,6 +50,12 @@ export type ExportDeps = {
   getScene: () => SceneData | null;
   /** `sceneId`/`rev` in one read (`ViewerHandle.getState`); the rest of the state is not this module's business. */
   getState: () => ExportSceneState;
+  /**
+   * What the mounted viewer draws room surfaces with (`export-surfaces.ts`):
+   * its project materials and its own texture sources. Absent or `null`, every
+   * library surface is exported flat in its first-frame colour.
+   */
+  getSurfaces?: (() => ExportSurfaces | null) | undefined;
 };
 
 const DEFAULT_OPTIONS: Required<ExportGlbOptions> = { includeFurniture: true, state: 'current', embedDocument: true };
@@ -66,28 +74,63 @@ function effectiveScene(scene: SceneData, state: 'current' | 'default'): SceneDa
 }
 
 /**
- * Builds a throwaway export graph from `scene`: solves the plan, builds the
- * procedural scene fresh, optionally drops the furniture group, and tags the
- * result with the element metadata table.
- *
- * The returned `dispose` releases the throwaway builder's OWN geometries and
- * materials only (`SceneBuilder.dispose`) — never anything the live viewer
- * might also be holding, because this builder is not it (module header).
- * Callers must call `dispose()` only AFTER every consumer of `graph` (an
- * exporter's `parseAsync`) has finished reading it.
+ * The builder options an export draws room surfaces with: the mounted
+ * viewer's project materials, finish lookup and texture sources
+ * (`export-surfaces.ts`), or nothing (every library surface flat).
  */
-function prepareExport(
+function surfaceOptions(surfaces: ExportSurfaces | null | undefined): SceneBuilderOptions {
+  if (!surfaces) return {};
+  return {
+    ...(surfaces.surfaceMaterials !== undefined && { surfaceMaterials: surfaces.surfaceMaterials }),
+    ...(surfaces.findFinish !== undefined && { findFinish: surfaces.findFinish }),
+    ...(surfaces.textures !== null && { textures: surfaces.textures }),
+    ...(surfaces.builtinTextures !== null && { builtinTextures: surfaces.builtinTextures }),
+  };
+}
+
+/**
+ * Builds a throwaway export graph from `scene`: solves the plan, builds the
+ * procedural scene fresh with the room-surface context `surfaces` names,
+ * waits until every library map has attached or given up, optionally drops
+ * the furniture group, tags the result with the element metadata table, and
+ * makes its library surfaces writable (`export-library.ts`).
+ *
+ * The returned `dispose` releases the throwaway builder's OWN geometries,
+ * materials and texture views (`SceneBuilder.dispose`) and what the library
+ * preparation made — never anything the live viewer might also be holding,
+ * because this builder is not it (module header). Callers must call
+ * `dispose()` only AFTER every consumer of `graph` (an exporter's
+ * `parseAsync`) has finished reading it.
+ */
+async function prepareExport(
   scene: SceneData,
   options: Pick<Required<ExportGlbOptions>, 'includeFurniture' | 'state'>,
-): { graph: THREE.Object3D; rows: readonly ElementRow[]; meshRows: ReadonlyMap<THREE.Mesh, number>; dispose: () => void } {
+  surfaces?: ExportSurfaces | null,
+  maps: LibraryMapsOptions = {},
+): Promise<{ graph: THREE.Object3D; rows: readonly ElementRow[]; meshRows: ReadonlyMap<THREE.Mesh, number>; dispose: () => void }> {
   const document = effectiveScene(scene, options.state);
   const plan = solvePlan(document);
-  const builder = new SceneBuilder(document, plan);
-  const { root } = builder.build();
-  if (!options.includeFurniture) root.getObjectByName(FURNITURE_GROUP_NAME)?.removeFromParent();
-  const rows = metadataTable(document, plan);
-  const { graph, meshRows } = exportGraphWithRows(root, rows);
-  return { graph, rows, meshRows, dispose: () => builder.dispose() };
+  const builder = new SceneBuilder(document, plan, surfaceOptions(surfaces));
+  try {
+    const { root } = builder.build();
+    await builder.mapsSettled();
+    if (!options.includeFurniture) root.getObjectByName(FURNITURE_GROUP_NAME)?.removeFromParent();
+    const rows = metadataTable(document, plan);
+    const { graph, meshRows } = exportGraphWithRows(root, rows);
+    const disposeMaps = prepareLibraryMaps(graph, maps);
+    return {
+      graph,
+      rows,
+      meshRows,
+      dispose: () => {
+        disposeMaps();
+        builder.dispose();
+      },
+    };
+  } catch (error) {
+    builder.dispose();
+    throw error;
+  }
 }
 
 /** The feature id attribute, as `GLTFExporter` names it: a custom attribute starting with `_` is upper-cased and kept. */
@@ -378,7 +421,7 @@ export async function exportGlb(deps: ExportDeps, options: ExportGlbOptions = {}
   if (!scene) throw notReady('exportGlb');
   const { sceneId, rev } = deps.getState();
 
-  const { graph, rows, meshRows, dispose } = prepareExport(scene, resolved);
+  const { graph, rows, meshRows, dispose } = await prepareExport(scene, resolved, deps.getSurfaces?.());
   const disposeFeatureIds = addFeatureIds(meshRows);
   try {
     const { GLTFExporter } = await import('three/addons/exporters/GLTFExporter.js');

@@ -80,6 +80,14 @@ export function mountViewerAs(embedding: Embedding, container: HTMLElement, opti
     if (error instanceof ViewerDisposedError) return;
     createLogger(app.options.onLog).error('mount-failed', 'viewer mount failed', error);
   });
+  // What both exports read: the two public reads, plus the room-surface context
+  // of the mounted document (its project materials and texture sources), which
+  // stays internal (`export-surfaces.ts`).
+  const exportDeps = {
+    getScene: () => app.handle.getScene(),
+    getState: () => app.handle.getState(),
+    getSurfaces: () => app.handle.exportSurfaces(),
+  };
   const handle: ViewerHandle = {
     element: app.element,
     options: app.options,
@@ -96,18 +104,14 @@ export function mountViewerAs(embedding: Embedding, container: HTMLElement, opti
     // `export-gltf.ts` (and the `GLTFExporter` it imports in turn) is reached
     // only through this dynamic import, never a static one: a host that never
     // calls `exportGlb` never downloads the exporter or its own orchestration
-    // code (`scripts/budget-check.ts`'s boot-vs-lazy split). `deps` is exactly the two ALREADY-PUBLIC reads `ExportDeps`
-    // asks for — nothing about the composition root leaks out because of this.
+    // code (`scripts/budget-check.ts`'s boot-vs-lazy split). `exportDeps` is the two ALREADY-PUBLIC reads plus the
+    // internal room-surface context — nothing about the composition root leaks out because of this.
     exportGlb: (exportOptions?: ExportGlbOptions) =>
-      import('./export-gltf.js').then((module) =>
-        module.exportGlb({ getScene: () => app.handle.getScene(), getState: () => app.handle.getState() }, exportOptions),
-      ),
+      import('./export-gltf.js').then((module) => module.exportGlb(exportDeps, exportOptions)),
     // Same lazy-import shape as `exportGlb`, and the same reason: a host that
     // never calls `exportUsdz` never downloads `USDZExporter` or its own chunk.
     exportUsdz: (exportOptions?: ExportUsdzOptions) =>
-      import('./export-usdz.js').then((module) =>
-        module.exportUsdz({ getScene: () => app.handle.getScene(), getState: () => app.handle.getState() }, exportOptions),
-      ),
+      import('./export-usdz.js').then((module) => module.exportUsdz(exportDeps, exportOptions)),
     getFurnitureVisible: () => app.handle.getFurnitureVisible(),
     getLocale: () => app.handle.getLocale(),
     focusRoom: (roomId) => app.handle.focusRoom(roomId),

@@ -27,6 +27,12 @@ export type LibraryTextures = {
   readonly source: TextureSource;
   readonly device: TextureDeviceClass;
   readonly attached?: (() => void) | undefined;
+  /**
+   * `false` for a handle that takes no compressed maps (the export: its
+   * writers cannot read a compressed texture back): a KTX2 material asks for
+   * nothing and stays flat. Absent, every format is loaded.
+   */
+  readonly compressed?: false | undefined;
 };
 
 /** The listed sizes of a material's maps (every map lists the same set). */
@@ -61,6 +67,7 @@ export class LibrarySurface {
     const { material: library } = this.draw;
     const size = textureSizeFor(textures.device, listedSizes(this.draw));
     if (size === null || library.facts.tileM === null) return;
+    if (textures.compressed === false && libraryMapFormat(library) === 'ktx2') return;
     const roles = Object.keys(library.maps) as LibraryMapRole[];
     const views: { [role in LibraryMapRole]?: THREE.Texture } = {};
     await Promise.all(

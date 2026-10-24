@@ -44,6 +44,9 @@ import { LAMP_PROJECT_FIXTURE as LAMPS } from '../../tests/fixtures/project/fixt
 import type { BakeTarget, LightBakeWiring } from '../lightmap/light-bake-wiring.js';
 import { FINISH } from '../materials/finish-ids.js';
 import { isApplyOk } from '../scene/scene-model.js';
+import type { TextureEnv } from './project-textures.js';
+import { LIBRARY_MATERIALS } from '../fixtures/library-materials.js';
+import { findFinish } from '../materials/finish-catalogue.js';
 
 const SOFA = L_SHAPE.asset.sofa;
 const TABLE = L_SHAPE.asset.table;
@@ -98,7 +101,12 @@ type Rig = {
   invalidations: () => number;
 };
 
-function rig(sunRig?: ApartmentRig, artificialLights?: (root: THREE.Object3D) => void, lightBake?: LightBakeWiring): Rig {
+function rig(
+  sunRig?: ApartmentRig,
+  artificialLights?: (root: THREE.Object3D) => void,
+  lightBake?: LightBakeWiring,
+  textureEnv?: TextureEnv,
+): Rig {
   const scene = new THREE.Scene();
   const downloads: string[] = [];
   const seeded: SceneModel[] = [];
@@ -137,6 +145,7 @@ function rig(sunRig?: ApartmentRig, artificialLights?: (root: THREE.Object3D) =>
       throw new Error(error.message);
     },
     ...(lightBake && { lightBake }),
+    ...(textureEnv && { textureEnv: () => textureEnv, builtinFolder: 'https://player.test/finish-maps/' }),
   });
   const modelSource = (request: { url: string }): Promise<ModelOutcome> => {
     downloads.push(request.url);
@@ -648,5 +657,35 @@ describe('the light bake follows the mounted document', () => {
     expect(drops.every((event) => event.attached)).toBe(true);
     expect(bake.events.filter((event) => event.call === 'mounted')).toHaveLength(2);
     expect(bake.targets[1]!.document).toBe(bake.targets[0]!.document);
+  });
+});
+
+describe('what an export of the mounted document draws its room surfaces with', () => {
+  test('nothing before the first mount', () => {
+    expect(rig().mount.exportSurfaces()).toBeNull();
+  });
+
+  test("the mounted project's materials and finish lookup, its texture source and the bundled one, without the redraw hook and refusing compressed maps", () => {
+    const env: TextureEnv = { device: 'mid', maxAnisotropy: 1, log: QUIET };
+    const subject = rig(undefined, undefined, undefined, env);
+    const loaded = subject.load(lShapePlan);
+    const lookup = (id: string) => findFinish(id, LIBRARY_MATERIALS) ?? findFinish(id);
+    const project = loaded.project!;
+    const withMaterials = {
+      ...loaded,
+      project: { ...project, builderOptions: { ...project.builderOptions, projectMaterials: LIBRARY_MATERIALS, findFinish: lookup } },
+    };
+    subject.mount.mountDocument(withMaterials);
+    const surfaces = subject.mount.exportSurfaces();
+    expect(surfaces).not.toBeNull();
+    expect(surfaces!.surfaceMaterials).toBe(LIBRARY_MATERIALS);
+    expect(surfaces!.findFinish).toBe(lookup);
+    for (const textures of [surfaces!.textures, surfaces!.builtinTextures]) {
+      expect(textures).not.toBeNull();
+      expect(textures!.device).toBe('mid');
+      expect(textures!.compressed).toBe(false);
+      expect(textures!.attached).toBeUndefined();
+    }
+    expect(surfaces!.textures!.source).not.toBe(surfaces!.builtinTextures!.source);
   });
 });
