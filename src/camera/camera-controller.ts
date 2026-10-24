@@ -335,10 +335,20 @@ export class CameraController {
    * in one call (`orbit.snapTo`) instead of tweening to it over `duration`.
    */
   flyTo(position: THREE.Vector3, target: THREE.Vector3, duration = ORBIT.flyDurationS): void {
+    if (this.motionInstant) {
+      this.snapOrbit(position, target);
+      return;
+    }
     this.walk.cancelTravel();
     this.mode = 'orbit';
-    if (this.motionInstant) this.orbit.snapTo(position, target);
-    else this.orbit.flyTo(position, target, duration);
+    this.orbit.flyTo(position, target, duration);
+  }
+
+  /** `flyTo` landing at once whatever the motion setting: the orbit stands at the pose (within its radius and pitch limits). */
+  snapOrbit(position: THREE.Vector3, target: THREE.Vector3): void {
+    this.walk.cancelTravel();
+    this.mode = 'orbit';
+    this.orbit.snapTo(position, target);
   }
 
   /** Flies to a room's authored camera; `false` for a room that has none. */

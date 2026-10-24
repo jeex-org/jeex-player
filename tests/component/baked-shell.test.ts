@@ -9,7 +9,7 @@
  */
 
 import * as THREE from 'three';
-import { afterEach, describe, expect, test } from 'vitest';
+import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest';
 import { apartmentScene } from '../../src/demo/scene-data.js';
 import { SceneBuilder } from '../../src/geometry/scene-builder.js';
 import { solvePlan } from '../../src/plan/plan-solver.js';
@@ -127,6 +127,62 @@ describe('applyBakedShell', () => {
     });
     const outcome = await applyBakedShell({ ...(await standInBake(moved)), root });
     expect(outcome.applied ? 'applied' : outcome.error.message).toContain('UV1 leaves the chart rect');
+    expect(state(root)).toEqual(before);
+  });
+
+  /** Every level image decoded since the test began; a closed `ImageBitmap` reports a width of 0. */
+  let decoded: ImageBitmap[] = [];
+  beforeEach(() => {
+    decoded = [];
+    const decode = globalThis.createImageBitmap.bind(globalThis);
+    vi.spyOn(globalThis, 'createImageBitmap').mockImplementation(async (...args: Parameters<typeof createImageBitmap>) => {
+      const image = await decode(...args);
+      decoded.push(image);
+      return image;
+    });
+  });
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  test('a shell that changed while the files loaded is refused, the pages released and the shell left as it is now', async () => {
+    const root = new SceneBuilder(apartmentScene, solvePlan(apartmentScene)).build().root;
+    const served = await standInBake();
+    const moved = liveShellEntries(root, apartmentScene)[0]!.mesh;
+    let pages = 0;
+    const outcome = await applyBakedShell({
+      ...served,
+      root,
+      fetchBytes: async (url) => {
+        const blob = await served.fetchBytes(url);
+        // A level file: the scene loses a shell mesh while the atlas is still on its way.
+        if (url.pathname.endsWith('.webp') && pages++ === 0) moved.removeFromParent();
+        return blob;
+      },
+    });
+    expect(outcome.applied ? 'applied' : outcome.error.message).toContain('the live shell changed while the light bake was loading');
+    expect(decoded.length).toBeGreaterThan(0);
+    expect(decoded.filter((image) => image.width !== 0)).toHaveLength(0);
+    expect(liveShellEntries(root, apartmentScene).every(({ mesh }) => mesh.geometry.getAttribute('uv1') === undefined)).toBe(true);
+  });
+
+  test('an attempt aborted while its files loaded changes nothing', async () => {
+    const root = new SceneBuilder(apartmentScene, solvePlan(apartmentScene)).build().root;
+    const before = state(root);
+    const served = await standInBake();
+    const controller = new AbortController();
+    const outcome = await applyBakedShell({
+      ...served,
+      root,
+      signal: controller.signal,
+      fetchBytes: async (url) => {
+        if (url.pathname.endsWith('.webp')) controller.abort();
+        return served.fetchBytes(url);
+      },
+    });
+    expect(outcome.applied ? 'applied' : outcome.error.message).toContain('no longer wanted');
+    expect(decoded.length).toBeGreaterThan(0);
+    expect(decoded.filter((image) => image.width !== 0)).toHaveLength(0);
     expect(state(root)).toEqual(before);
   });
 });

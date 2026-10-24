@@ -44,6 +44,9 @@ import { prepareSunShadow, type SunShadow } from '../render/sun-shadow.js';
 import type { ApartmentRig } from '../lighting/lighting-context.js';
 import type { LibraryTextures } from '../geometry/library-surface.js';
 import { createProjectTextures, type TextureEnv } from './project-textures.js';
+import { lightBakeWiring, type LightBakeWiring } from '../lightmap/light-bake-wiring.js';
+import { debugLightBake } from '../shared/debug-flags.js';
+import { defaultLogger, type Logger } from '../shared/logger.js';
 
 // What the composition root reads the texture environment of its renderer with, through the one door it already uses.
 export { textureEnvOf } from './project-textures.js';
@@ -106,6 +109,14 @@ type SceneMountDeps = {
    * commit that swapped an asset (`render/light-temperature.ts`).
    */
   artificialLights?: ((root: THREE.Object3D) => void) | undefined;
+  /** Where a refused light bake is reported. */
+  log?: Logger | undefined;
+  /**
+   * When an offline light bake is applied to the mounted document and when
+   * it is dropped (`lightmap/light-bake-wiring.ts`); by default over the
+   * page's `__JEEX_DEBUG_LIGHT_BAKE__`, which is off unless a page sets it.
+   */
+  lightBake?: LightBakeWiring | undefined;
 };
 
 /** What the last `mount` was called with: everything a context restore must replay. */
@@ -156,8 +167,26 @@ export class SceneMount {
   /** `facts` as the layout linter, the free-space probe and the drag tool read it. */
   private layoutFacts: LayoutCatalogue = shippedFacts;
 
+  /** True inside `release`, which drops the bake with nothing left to redraw. */
+  private releasing = false;
+  /** The light bake of the mounted document, if any (`light-bake-wiring.ts`). */
+  readonly lightBake: LightBakeWiring;
+
   constructor(deps: SceneMountDeps) {
     this.deps = deps;
+    this.lightBake =
+      deps.lightBake ??
+      lightBakeWiring({
+        source: () => debugLightBake(),
+        log: deps.log ?? defaultLogger,
+        // The shell's geometry objects changed: the cached sun shadow refits, walk and tour draw.
+        // Not while the document is released: the stage (and the rig the sun draws with) may be gone.
+        changed: () => {
+          if (this.releasing) return;
+          this.sun?.refit();
+          this.invalidate();
+        },
+      });
   }
 
   get model(): SceneModel | undefined {
@@ -264,6 +293,9 @@ export class SceneMount {
     // The geometry facade repaints itself from the model; the editor owns the
     // rest of a commit (pick registries, auras, swap animations, rebuilds).
     this.teardown.push(
+      // Before the builder's own subscription: a revision drops the light bake
+      // BEFORE anything repaints, so the repaint finds the live materials.
+      model.onRevision((_rev, touched) => this.lightBake.revision(touched)),
       builder.bindModel(model, (failed) => this.handleDrift(failed)),
       model.onRevision((_rev, touched) => {
         editor.applyRevision(touched);
@@ -292,6 +324,17 @@ export class SceneMount {
     this.deps.onDocument(model);
     this.scheduleTextures(options.textures);
     this.scheduleUpgrade(builder, model);
+    // Settled once the first model pass has swapped in every body (with its
+    // lamps) and every library map of the shell has attached.
+    const settled = Promise.all([this.upgradePass, builder.mapsSettled()]);
+    this.lightBake.mounted({
+      document: model,
+      scene: model.scene,
+      root: built.root,
+      projectMaterials: options.projectMaterials,
+      findFinish: options.findFinish,
+      settled,
+    });
     return built;
   }
 
@@ -432,6 +475,7 @@ export class SceneMount {
   rebuild(): BuildResult | null {
     const builder = this.currentBuilder;
     if (!builder || !this.root || !this.currentModel) return null;
+    this.lightBake.drop();
     this.detach();
     const built = builder.rebuildAll();
     this.adopt(built);
@@ -444,6 +488,13 @@ export class SceneMount {
    * `keepTextures` keeps the texture source for a remount of the same document.
    */
   release(keepTextures = false): void {
+    // First: the bake restores the shell geometry it swapped while that shell is still whole.
+    this.releasing = true;
+    try {
+      this.lightBake.drop();
+    } finally {
+      this.releasing = false;
+    }
     for (const off of this.teardown.splice(0)) off();
     // Before the builder is disposed: a pass in flight must stop writing into
     // a graph whose caches are about to be freed.

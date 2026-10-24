@@ -13,7 +13,11 @@
  *    and the bindings must name exactly the file's meshes that have UV1 (a
  *    lit mesh left unbound would show live light inside a baked room);
  * 3. only then are the atlas pages fetched;
- * 4. the file must describe the live shell mesh for mesh
+ * 4. the live shell is read again (the files took a while, and the scene
+ *    may have changed under them): it must be the shell the bake was
+ *    checked against, mesh for mesh, and a caller's `signal` must not have
+ *    aborted;
+ * 5. the file must describe the live shell mesh for mesh
  *    (`shell-adopt.ts`), and every binding must fit (`lightmap-binding.ts`).
  * A refusal at any step leaves the live shell exactly as it was built, with
  * its live lighting, and is answered as `{ applied: false, error }`: the
@@ -40,7 +44,7 @@ import type { FetchBytes } from './lightmap-page.js';
 import { bindLightBake, type BoundLightBake } from './lightmap-binding.js';
 import { adoptShippedShell, parseShellFile, type ShippedShell } from './shell-adopt.js';
 import { shellEntries, type ShellEntry } from './shell-contract.js';
-import { shellInputsHash } from './shell-inputs.js';
+import { canonicalJson, shellInputsHash } from './shell-inputs.js';
 
 /** The name of the group `scene-builder.ts` builds the shell into. */
 const SHELL_GROUP = 'parametric-shell';
@@ -55,6 +59,8 @@ export type BakedShellOptions = {
   readonly projectMaterials?: readonly ProjectMaterial[] | undefined;
   readonly findFinish?: FinishLookup | undefined;
   readonly fetchBytes?: FetchBytes | undefined;
+  /** Aborted when the caller no longer wants the bake (`light-bake-wiring.ts`): refused before the shell changes. */
+  readonly signal?: AbortSignal | undefined;
 };
 
 export type BakedShellOutcome =
@@ -130,6 +136,16 @@ export async function verifiedShellFile(bake: LightBake, bytes: ArrayBuffer, sce
   return shipped;
 }
 
+/** What adoption compares of a shell entry: the mesh object and both contracts. */
+const entryKey = (entry: ShellEntry): string => canonicalJson({ extras: entry.extras, material: entry.material });
+
+/** Refuses when the live shell is no longer the one read before the files were fetched. */
+function sameShell(before: readonly ShellEntry[], after: readonly ShellEntry[]): void {
+  const same =
+    before.length === after.length && before.every((entry, i) => entry.mesh === after[i]!.mesh && entryKey(entry) === entryKey(after[i]!));
+  if (!same) throw new LightBakeError('shell', 'the live shell changed while the light bake was loading');
+}
+
 /** Loads the apartment's light bake and applies it, or leaves the live shell as it is. */
 export async function applyBakedShell(options: BakedShellOptions): Promise<BakedShellOutcome> {
   const { scene, root } = options;
@@ -145,6 +161,13 @@ export async function applyBakedShell(options: BakedShellOptions): Promise<Baked
     });
     const file = shipped as ShippedShell | null;
     if (!file) throw new LightBakeError('shell', 'the shell file was not checked');
+    try {
+      if (options.signal?.aborted) throw new LightBakeError('shell', 'the light bake was no longer wanted when its files arrived');
+      sameShell(entries, liveShellEntries(root, scene, options));
+    } catch (error) {
+      loaded.dispose();
+      throw error;
+    }
     let adopted: ReturnType<typeof adoptShippedShell>;
     try {
       adopted = adoptShippedShell(entries, file);

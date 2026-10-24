@@ -47,6 +47,26 @@ const materialOf = (root: THREE.Object3D, name: string): THREE.MeshStandardMater
   meshNamed(root, name).material as THREE.MeshStandardMaterial;
 
 describe('bindLightBake', () => {
+  test("decodes with the sidecar's own RGBM range, not the calibration's", async () => {
+    const root = await shell();
+    const bake = sidecar();
+    const ranged: LightBake = { ...bake, contract: { ...bake.contract, encoding: { ...bake.contract.encoding, range: 1 } } };
+    const texture = page();
+    bindLightBake(root, ranged, [texture]);
+    const clone = materialOf(root, CALIBRATION_NODES.floor);
+    expect(rgbmRangeOf(clone)).toBe(1);
+    expect(clone.lightMap).toBe(texture);
+    const shader = {
+      fragmentShader: THREE.ShaderLib.physical.fragmentShader,
+      vertexShader: '',
+      uniforms: {},
+    } as unknown as THREE.WebGLProgramParametersWithUniforms;
+    clone.onBeforeCompile(shader, undefined as never);
+    expect(shader.fragmentShader).toContain('#define JEEX_RGBM_RANGE 1.000000');
+    expect(shader.fragmentShader).not.toContain('JEEX_RGBM_RANGE 8');
+    expect(clone.customProgramCacheKey()).toMatch(/\|jeex-lightmap-rgbm-r1@1$/);
+  });
+
   test('binds every lightmapped mesh with a decoded, marked clone on UV channel 1, leaving the block alone', async () => {
     const root = await shell();
     const block = materialOf(root, CALIBRATION_NODES.block);

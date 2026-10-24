@@ -531,3 +531,17 @@ describe('the walk collides with a baked project’s own furniture', () => {
     expect(walkerBeside().canWalkTo(sofa.position.x, sofa.position.z)).toBe(true);
   });
 });
+
+describe('snapOrbit', () => {
+  test('stands the orbit at the pose in the same call, with motion on, and keeps it on the next frames', () => {
+    const { controller, camera } = cameraHarness();
+    controller.setMode('walk');
+    const target = new THREE.Vector3(4, 0.5, 3);
+    controller.snapOrbit(new THREE.Vector3(9, 7, 11), target);
+    expect(controller.getMode()).toBe('orbit');
+    expectPosition(camera, 9, 7, 11, 5);
+    for (let i = 0; i < 30; i += 1) controller.update(FRAME);
+    expectPosition(camera, 9, 7, 11, 5);
+    expect(controller.getPose().target.distanceTo(target)).toBeLessThan(1e-6);
+  });
+});

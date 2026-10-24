@@ -60,6 +60,7 @@ export const COMPONENT_FILE_COST_S: Readonly<Record<string, number>> = {
   'lamp-lights.test.ts': 2,
   'library-material.test.ts': 2,
   'library-panel.test.ts': 4,
+  'light-bake-hook.test.ts': 20,
   'light-temperature.test.ts': 120,
   'lighting-calibration.test.ts': 1,
   'lightmap-calibration.test.ts': 2,

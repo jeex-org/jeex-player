@@ -417,6 +417,25 @@ describe('the walk chain stays out of the boot graph', () => {
 });
 
 /**
+ * The offline light bake is not part of any boot graph: `lightmap/light-bake-wiring.ts`
+ * (on the boot graph through the scene mount) names `baked-shell.ts` only in a type
+ * import and a dynamic `import()`, so the builds emit it as a `lazy-` chunk that only
+ * a page naming a bake downloads.
+ */
+describe('the light bake stays out of the boot graph', () => {
+  test('no boot entry statically reaches lightmap/baked-shell', () => {
+    for (const entry of ['embed/index', 'embed/element-entry', 'embed/iife-entry', 'main']) {
+      expect({ entry, reaches: reach(entry).modules.has('lightmap/baked-shell') }).toEqual({ entry, reaches: false });
+    }
+  });
+
+  test('the wiring is on the boot graph and loads the bake dynamically', () => {
+    expect(reach('embed/index').modules.has('lightmap/light-bake-wiring')).toBe(true);
+    expect(stripComments(sourceOf('lightmap/light-bake-wiring'))).toContain("import('./baked-shell.js')");
+  });
+});
+
+/**
  * The library ships no apartment.
  *
  * `src/embed/index.ts` is what `import … from 'jeex-viewer'` gets, and the
