@@ -22,7 +22,7 @@ import { atlasLayout, createWalkUniforms, installWalkPatch, setRoomBoxes } from 
 import { WALK_LIGHTING_TUNING as T } from '../../src/render/walk-lighting/walk-lighting-tuning.js';
 import { createLightingContext } from '../../src/lighting/lighting-context.js';
 import { LIGHTING_STANDARD } from '../../src/lighting/lighting-standard.js';
-import type { RoomBox } from '../../src/render/walk-lighting/room-volumes.js';
+import type { FurnitureBox, RoomBox, Vec3 } from '../../src/render/walk-lighting/room-volumes.js';
 import type { SceneOp } from '../../src/scene/types.js';
 import { RenderDemand } from '../../src/render/render-demand.js';
 import { closeContainers, demoScene, nextFrame, openContainer, until } from './support.js';
@@ -198,6 +198,7 @@ type Debug = {
   mode: () => string | undefined;
   walkLighting: () => { state: string; stats: unknown };
   applyOps: (ops: SceneOp[]) => { rev?: number; error?: unknown };
+  renderDemand: () => { ticks: number; draws: number };
 };
 
 function debug(): Debug {
@@ -483,9 +484,9 @@ describe('room lighting on the demo apartment', { timeout: MOUNT_TIMEOUT_MS }, (
   test('an edit in walk re-captures only its room’s probe, after the debounce', async () => {
     const refreshed = original(WalkLighting.prototype, 'refresh');
     let calledAt = 0;
-    const refresh = vi.spyOn(WalkLighting.prototype, 'refresh').mockImplementation(function (this: WalkLighting, scope) {
+    const refresh = vi.spyOn(WalkLighting.prototype, 'refresh').mockImplementation(function (this: WalkLighting, ...args) {
       calledAt = performance.now();
-      refreshed.call(this, scope);
+      refreshed.apply(this, args);
     });
     const editedAt = performance.now();
     const asset = demoScene().assets.find((item) => item.room === ROOM.living)!;
@@ -499,7 +500,70 @@ describe('room lighting on the demo apartment', { timeout: MOUNT_TIMEOUT_MS }, (
     expect(refresh).toHaveBeenCalledTimes(1);
     expect(refresh.mock.calls[0]![0]).toEqual({ all: false, grids: [], probes: [ROOM.living] });
   });
+
+  test('a floor lamp moved next to the living probe moves the probe; the refresh draws once and the view rests', async () => {
+    const internals = lighting as unknown as {
+      volumes: { probes: Array<{ roomId: string; position: Vec3 }>; boxes: RoomBox[] };
+      uniforms: { jeexProbe: { value: THREE.Vector3[] } };
+    };
+    const probe = { ...internals.volumes.probes.find((p) => p.roomId === ROOM.living)!.position };
+    const lamp = livingFloorLamp(lighting.scene);
+    const asset = demoScene().assets.find((item) => item.id === lamp.userData['assetId'])!;
+    const lampBox = (): THREE.Box3 => new THREE.Box3().setFromObject(lamp);
+    const centre = lampBox().getCenter(new THREE.Vector3());
+    // Move the lamp so its centre in plan is 0.1 m from the probe point.
+    const to = { x: asset.position.x + (probe.x + 0.1 - centre.x), y: asset.position.y, z: asset.position.z + (probe.z - centre.z) };
+    const captures: THREE.Vector3[] = [];
+    const fromScene = original(THREE.PMREMGenerator.prototype, 'fromScene');
+    const spy = vi.spyOn(THREE.PMREMGenerator.prototype, 'fromScene').mockImplementation(function (this: THREE.PMREMGenerator, ...args) {
+      const position = args[4]?.position;
+      if (position) captures.push(position.clone());
+      return fromScene.apply(this, args);
+    });
+    const refresh = original(WalkLighting.prototype, 'refresh');
+    let drawsAtRefresh = -1;
+    const refreshed = vi.spyOn(WalkLighting.prototype, 'refresh').mockImplementation(function (this: WalkLighting, ...args) {
+      drawsAtRefresh = debug().renderDemand().draws;
+      refresh.apply(this, args);
+    });
+    expect(debug().applyOps([{ op: 'move_object', assetId: asset.id, position: to }]).error).toBeUndefined();
+    await until(() => refreshed.mock.calls.length > 0, 'the refresh after the debounce', 60_000);
+    spy.mockRestore();
+    refreshed.mockRestore();
+    const box = lampBox();
+    const after = internals.volumes.probes.find((p) => p.roomId === ROOM.living)!.position;
+    record('livingProbeAfterLampMove', { before: probe, after, captures: captures.map((v) => v.toArray()), lamp: [box.min.toArray(), box.max.toArray()] });
+    // Captured at the new point, clear of the lamp's new box.
+    expect(box.distanceToPoint(new THREE.Vector3(after.x, after.y, after.z))).toBeGreaterThanOrEqual(T.probeClearanceM - 1e-6);
+    expect(captures.some((at) => at.distanceTo(new THREE.Vector3(after.x, after.y, after.z)) < 1e-6)).toBe(true);
+    for (const at of captures) expect(box.distanceToPoint(at)).toBeGreaterThan(0.2);
+    // Every living box projects from it.
+    internals.volumes.boxes.forEach((roomBox, i) => {
+      if (roomBox.roomId === ROOM.living) expect(internals.uniforms.jeexProbe.value[i]!.toArray()).toEqual([after.x, after.y, after.z]);
+    });
+    // The refresh is drawn, then the view rests.
+    await until(() => debug().renderDemand().draws > drawsAtRefresh, 'a draw after the refresh', 10_000);
+    for (let i = 0; i < 3; i += 1) await nextFrame();
+    const settled = debug().renderDemand().draws;
+    for (let i = 0; i < 30; i += 1) await nextFrame();
+    expect(debug().renderDemand().draws).toBe(settled);
+  });
 });
+
+/** The demo living room's floor lamp: the furniture item there with a point light whose bounds reach 1.4 m. */
+function livingFloorLamp(scene: THREE.Scene): THREE.Object3D {
+  const living = new Set(demoScene().assets.filter((a) => a.room === ROOM.living).map((a) => a.id));
+  let found: THREE.Object3D | null = null;
+  scene.traverse((object) => {
+    const id = object.userData['assetId'] as string | undefined;
+    if (found || id === undefined || !living.has(id)) return;
+    let light = false;
+    object.traverse((child) => (light ||= (child as THREE.PointLight).isPointLight === true));
+    if (light && new THREE.Box3().setFromObject(object).max.y >= 1.4) found = object;
+  });
+  if (!found) throw new Error('no floor lamp in the demo living room');
+  return found;
+}
 
 /* ----------------------------------------------------- reflections, measured */
 
@@ -760,5 +824,119 @@ describe('reflections from the room probes', { timeout: MOUNT_TIMEOUT_MS }, () =
     expect(inside).toBeGreaterThan(0.5);
     expect(beyond).toBeGreaterThan(inside * 0.5);
     world.dispose();
+  });
+});
+
+/* ------------------------------------------- probe placement after furniture edits */
+
+describe('probe placement follows furniture edits', { timeout: MOUNT_TIMEOUT_MS }, () => {
+  const A: Box = { x0: 0, x1: 4, z0: 0, z1: 4 };
+  const B: Box = { x0: 4, x1: 8, z0: 0, z1: 4 };
+  /** A floor lamp's bounds centred at (x, z) in plan, its shade reaching the probe height. */
+  const lampAt = (x: number, z: number): FurnitureBox => ({ minX: x - 0.2, maxX: x + 0.2, minY: 0, maxY: 1.7, minZ: z - 0.2, maxZ: z + 0.2 });
+  const distance = (p: THREE.Vector3, b: FurnitureBox): number =>
+    new THREE.Box3(new THREE.Vector3(b.minX, b.minY, b.minZ), new THREE.Vector3(b.maxX, b.maxY, b.maxZ)).distanceToPoint(p);
+
+  function world(rooms: Box[]) {
+    const gl = renderer(64);
+    const context = createLightingContext(THREE, gl);
+    const scene = new THREE.Scene();
+    context.createApartmentRig().attach(scene);
+    for (const b of rooms) room(scene, b);
+    let furniture: FurnitureBox[] = [];
+    let polygons = rooms.map((b) => square(b));
+    const doc = () => ({
+      volumes: {
+        rooms: polygons.map((polygon, i) => ({ roomId: ['a', 'b'][i]!, polygon, halfWall: 0.05 })),
+        ceilingHeight: HEIGHT_M,
+        doors: [],
+        furniture,
+      },
+      furniture: null,
+    });
+    const lighting = new WalkLighting(gl, scene);
+    const captures: THREE.Vector3[] = [];
+    const fromScene = original(THREE.PMREMGenerator.prototype, 'fromScene');
+    const spy = vi.spyOn(THREE.PMREMGenerator.prototype, 'fromScene').mockImplementation(function (this: THREE.PMREMGenerator, ...args) {
+      const position = args[4]?.position;
+      if (position) captures.push(position.clone());
+      return fromScene.apply(this, args);
+    });
+    const live = (): void => {
+      for (let frame = 0; frame < 2000 && lighting.phase !== 'live'; frame += 1) lighting.frame(true);
+      expect(lighting.phase).toBe('live');
+    };
+    const dispose = (): void => {
+      spy.mockRestore();
+      lighting.dispose();
+      context.dispose();
+      gl.dispose();
+      gl.forceContextLoss();
+    };
+    return {
+      lighting,
+      doc,
+      captures,
+      live,
+      dispose,
+      setFurniture: (next: FurnitureBox[]) => (furniture = next),
+      setPolygons: (next: typeof polygons) => (polygons = next),
+    };
+  }
+
+  test('a lamp moved next to a probe re-captures it at a clear point, and every box of the room projects from it', () => {
+    const w = world([A]);
+    w.lighting.load(w.doc());
+    w.live();
+    w.captures.length = 0;
+    const lamp = lampAt(2.1, 2);
+    w.setFurniture([lamp]);
+    w.lighting.refresh({ all: false, grids: [], probes: ['a'] }, w.doc());
+    expect(w.captures).toHaveLength(1);
+    expect(distance(w.captures[0]!, lamp)).toBeGreaterThanOrEqual(T.probeClearanceM);
+    const uniforms = (w.lighting as unknown as { uniforms: { jeexProbe: { value: THREE.Vector3[] } } }).uniforms;
+    expect(uniforms.jeexProbe.value[0]!.distanceTo(w.captures[0]!)).toBeLessThan(1e-6);
+    w.dispose();
+  });
+
+  test('an edit that moves another room’s probe point re-captures that room too', () => {
+    const w = world([A, B]);
+    w.lighting.load(w.doc());
+    w.live();
+    w.captures.length = 0;
+    const lamp = lampAt(6, 2);
+    w.setFurniture([lamp]);
+    w.lighting.refresh({ all: false, grids: [], probes: ['a'] }, w.doc());
+    expect(w.captures).toHaveLength(2);
+    expect(w.captures.some((at) => at.x > 4 && distance(at, lamp) >= T.probeClearanceM)).toBe(true);
+    w.dispose();
+  });
+
+  test('an edit during the initial bake restarts it with the current points', () => {
+    const w = world([A]);
+    w.lighting.load(w.doc());
+    w.lighting.frame(true);
+    expect(w.lighting.phase).toBe('baking');
+    const lamp = lampAt(2, 2);
+    w.setFurniture([lamp]);
+    w.lighting.refresh({ all: false, grids: [], probes: ['a'] }, w.doc());
+    w.captures.length = 0;
+    w.live();
+    expect(w.captures).toHaveLength(1);
+    expect(distance(w.captures[0]!, lamp)).toBeGreaterThanOrEqual(T.probeClearanceM);
+    w.dispose();
+  });
+
+  test('a refresh whose rooms give other projection boxes reloads the document', () => {
+    const w = world([A]);
+    w.lighting.load(w.doc());
+    w.live();
+    const load = vi.spyOn(w.lighting, 'load');
+    w.setPolygons([square({ x0: 0, x1: 5, z0: 0, z1: 4 })]);
+    const next = w.doc();
+    w.lighting.refresh({ all: false, grids: [], probes: ['a'] }, next);
+    expect(load).toHaveBeenCalledWith(next);
+    load.mockRestore();
+    w.dispose();
   });
 });
