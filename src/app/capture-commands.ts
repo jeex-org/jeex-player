@@ -119,8 +119,8 @@ export type CaptureDeps = {
    * The live walk and tour chain a still or a video frame renders through,
    * waiting for it to load; `null` outside walk and tour or when it cannot be
    * had, and the capture takes the direct path (`app/walk-post-controller.ts`).
-   * Optional: a mount built without one captures directly. Panoramas never
-   * ask for it.
+   * Optional: a mount built without one captures directly. Panoramas ask
+   * for it only for its white balance, and keep their direct path.
    */
   postChain?: (() => Promise<PostProcessor | null>) | undefined;
   /** Puts the current colour temperature on the artificial lights of the offscreen «as is» build. */
@@ -269,8 +269,10 @@ export function captureCommands(deps: CaptureDeps): CaptureCommands {
       const { runtime, model } = engaged();
       const state = request.state ?? 'current';
       const position = eyePoint(model, request.roomId);
+      // The walk chain's white balance, when there is a chain: the panorama keeps its direct path otherwise.
+      const whiteBalance = (await deps.postChain?.())?.whiteBalance ?? null;
       const shot = await inState(state, runtime, model, position, (root) =>
-        capturePanorama(runtime.renderer, root, { width: request.width, position }),
+        capturePanorama(runtime.renderer, root, { width: request.width, position, whiteBalance }),
       );
       return artefact(shot, model, 'panorama', state, request.caption, { roomId: request.roomId });
     },

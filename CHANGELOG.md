@@ -9,6 +9,14 @@ as described under [Versioning](#versioning).
 
 ### Changed
 
+- **Reflection probes keep clear of furniture.** A room's reflection probe
+  stays at least 0.5 m from every piece of furniture in 3D where the room
+  allows (a low sofa does not push it away, a floor lamp's shade or a tall
+  shelf does; a crowded room takes its clearest point), so a glossy floor
+  reflects the room and its window instead of a lamp shade. Moving furniture
+  in walk moves the probe when the furniture now stands in its way, and that
+  room is captured again from its new point.
+
 - **A sheen without a colour is visible.** A library material that states
   `sheen` and no `sheenColour` draws its sheen in its tint (the finish
   colour, else its first suggested colour), or in white when it has no tint,
@@ -53,6 +61,16 @@ as described under [Versioning](#versioning).
   their library colour (they wrote the generated texture before).
 
 ### Added
+
+- **Walk camera white balance.** Walk and tour pictures, and stills, video
+  frames and panoramas taken in them, get a fixed partial white balance
+  towards the display white in the output pass, measured on the demo
+  apartment's neutral surfaces: a room under warm lamps reads warm white
+  instead of peach. It keeps the luminance of every colour and never touches
+  the light the rooms are captured with; editing modes are unchanged.
+- **Walk emissive cap.** In walk and tour an emissive glow (a lamp shade)
+  is capped at 0.3 in its brightest channel before tone mapping, chroma kept,
+  so shades read lit instead of blown out; the editing modes keep their glow.
 
 - **Sheen roughness on library materials.** A library material's `pbr` may
   state `sheenRoughness`, a fraction in [0, 1], drawn as the physical
@@ -471,6 +489,13 @@ as described under [Versioning](#versioning).
   `assetLibrary`) and are absent for the built-in bank.
 
 ### Fixed
+
+- **A windowless room no longer turns black on software rendering.** A
+  room's reflection probe that saw a bump-mapped surface on the edge of a
+  capture cube face (where a software rasteriser's screen derivatives vanish)
+  took a NaN from three.js's bump perturbation and spread it over the whole
+  probe; the walk shading now keeps the surface normal where the perturbed
+  one vanishes.
 
 - **The 2D plan keeps a heartbeat on a slow device.** Behind the flat plan
   the 3D scene is drawn only every half second, to keep the way back to 3D

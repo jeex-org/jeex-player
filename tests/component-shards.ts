@@ -64,6 +64,7 @@ export const COMPONENT_FILE_COST_S: Readonly<Record<string, number>> = {
   'host-slots.test.ts': 27,
   'ktx2.test.ts': 1,
   'lamp-lights.test.ts': 3,
+  'lamp-shade-emissive.test.ts': 200,
   'library-material.test.ts': 1,
   'library-panel.test.ts': 12,
   'light-bake-hook.test.ts': 22,
@@ -101,6 +102,8 @@ export const COMPONENT_FILE_COST_S: Readonly<Record<string, number>> = {
   'viewer-edits.test.ts': 91,
   'viewer-shell.test.ts': 1,
   'viewer-ui.test.ts': 1,
+  // Skipped on the software rasteriser it is measured on: GPU measurements only.
+  'walk-glossy.test.ts': 1,
   'walk-keys.test.ts': 37,
   'walk-lighting.test.ts': 276,
   'walk-post.test.ts': 46,

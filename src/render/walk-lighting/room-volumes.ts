@@ -28,6 +28,8 @@ type Vec2 = { readonly x: number; readonly z: number };
 export type Vec3 = { x: number; y: number; z: number };
 export type Box = { min: Vec3; max: Vec3 };
 export type Rect = { minX: number; maxX: number; minZ: number; maxZ: number };
+/** A furniture item's bounds: its plan rectangle and its height span, metres. */
+export type FurnitureBox = Rect & { minY: number; maxY: number };
 
 /**
  * One room as the volumes see it: its polygon, half the thickness of its
@@ -42,8 +44,8 @@ export type VolumeInput = {
   rooms: readonly VolumeRoom[];
   ceilingHeight: number;
   doors: readonly VolumeDoor[];
-  /** Furniture footprints in plan, which a probe point steps off. */
-  furniture: readonly Rect[];
+  /** Furniture bounds, which a probe point keeps its clearance from. */
+  furniture: readonly FurnitureBox[];
 };
 
 export type RoomBox = {
@@ -193,25 +195,52 @@ export function rectilinearBoxes(polygon: readonly Vec2[]): Rect[] {
   return boxes;
 }
 
+/** Euclidean distance from `p` to `box`, zero inside it. */
+function boxDistance(p: Vec3, box: FurnitureBox): number {
+  return Math.hypot(
+    Math.max(box.minX - p.x, 0, p.x - box.maxX),
+    Math.max(box.minY - p.y, 0, p.y - box.maxY),
+    Math.max(box.minZ - p.z, 0, p.z - box.maxZ),
+  );
+}
+
+type Candidate = { point: Vec2; score: number; qualifies: boolean; clearance: number };
+
+/** Whether candidate `a` beats `b`; an exact tie keeps `b`, the earlier one in the lattice. */
+function beats(a: Candidate, b: Candidate): boolean {
+  if (a.qualifies !== b.qualifies) return a.qualifies;
+  if (!a.qualifies && a.clearance !== b.clearance) return a.clearance > b.clearance;
+  return a.score > b.score;
+}
+
 /**
- * The room's reflection probe: the interior point farthest from the room's
- * edges, at the probe height, preferring points outside every furniture
- * footprint.
+ * The room's reflection probe point, at the probe height, chosen among the
+ * bounded lattice candidates inside the room. A candidate qualifies when
+ * every furniture box is at least `probeClearanceM` away in 3D (so a low
+ * sofa does not push the probe, while a lamp shade or a tall shelf does);
+ * among qualifying candidates the highest score wins: the distance to the
+ * room's edges, pulled slightly towards the room's middle. Without one, the
+ * highest `min(furniture clearance, edge distance)` wins, then the score. An
+ * exact tie keeps the earlier candidate in the lattice's fixed order.
  */
-export function probePoint(polygon: readonly Vec2[], furniture: readonly Rect[]): Vec3 {
+export function probePoint(polygon: readonly Vec2[], furniture: readonly FurnitureBox[]): Vec3 {
   const minX = Math.min(...polygon.map((p) => p.x));
   const maxX = Math.max(...polygon.map((p) => p.x));
   const minZ = Math.min(...polygon.map((p) => p.z));
   const maxZ = Math.max(...polygon.map((p) => p.z));
-  let best: { point: Vec2; score: number; free: boolean } | null = null;
+  let best: Candidate | null = null;
   // A bounded lattice: the step widens with the room, so any room and any finite coordinates end.
   for (const point of searchLattice(minX, maxX, minZ, maxZ, PROBE_SEARCH_STEP_M)) {
     const { x, z } = point;
     if (!inside(point, polygon)) continue;
-    const free = !furniture.some((r) => x > r.minX && x < r.maxX && z > r.minZ && z < r.maxZ);
+    const at = { x, y: T.probeHeightM, z };
+    let furnitureClearance = Number.POSITIVE_INFINITY;
+    for (const item of furniture) furnitureClearance = Math.min(furnitureClearance, boxDistance(at, item));
+    const edge = edgeDistance(point, polygon);
     // Ties (a long room's centre line) go to the point nearest the middle of the room.
-    const score = edgeDistance(point, polygon) - 1e-3 * Math.hypot(x - (minX + maxX) / 2, z - (minZ + maxZ) / 2);
-    if (!best || (free && !best.free) || (free === best.free && score > best.score)) best = { point, score, free };
+    const score = edge - 1e-3 * Math.hypot(x - (minX + maxX) / 2, z - (minZ + maxZ) / 2);
+    const candidate = { point, score, qualifies: furnitureClearance >= T.probeClearanceM, clearance: Math.min(furnitureClearance, edge) };
+    if (!best || beats(candidate, best)) best = candidate;
   }
   const point = best?.point ?? polygon[0] ?? { x: 0, z: 0 };
   return { x: point.x, y: T.probeHeightM, z: point.z };

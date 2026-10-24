@@ -10,6 +10,8 @@ class FakeLighting implements WalkLightingHandle<Doc> {
   frames: boolean[] = [];
   loads: Doc[] = [];
   refreshes: LightingScope[] = [];
+  /** The document each refresh was handed. */
+  refreshDocs: Array<Doc | null> = [];
   /** Probes still to re-capture after a relight, one per eligible live frame. */
   pendingProbes = 0;
   relights = 0;
@@ -36,8 +38,9 @@ class FakeLighting implements WalkLightingHandle<Doc> {
     this.relights += 1;
     this.pendingProbes = 3;
   }
-  refresh(scope: LightingScope): void {
+  refresh(scope: LightingScope, doc: Doc | null): void {
     this.refreshes.push(scope);
+    this.refreshDocs.push(doc);
   }
   stats = null;
   dispose(): void {
@@ -140,6 +143,18 @@ describe('WalkLightingController', () => {
     controller.update('walk');
     controller.update('walk');
     expect(built[0]!.refreshes).toEqual([{ all: false, grids: ['bath'], probes: ['living'] }]);
+  });
+
+  test('a refresh hands the lighting the document on screen now, for the current furniture', async () => {
+    const { controller, built, finishBuild, tick, setDoc } = setup({ bakeFrames: 1 });
+    controller.update('walk');
+    await finishBuild();
+    controller.update('walk');
+    controller.edited({ all: false, grids: [], probes: ['living'] });
+    setDoc({ id: 7 });
+    tick(1000);
+    controller.update('walk');
+    expect(built[0]!.refreshDocs).toEqual([{ id: 7 }]);
   });
 
   test('an edit made in orbit refreshes nothing until the next entry into walk', async () => {
