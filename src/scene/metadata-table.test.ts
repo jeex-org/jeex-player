@@ -151,47 +151,117 @@ describe('metadataTable', () => {
   });
 });
 
+type ClassProperty = { type: string; required?: boolean; noData?: string };
+type TableProperty = { values: number; stringOffsets: number; stringOffsetType: string };
+type Written = {
+  extension: {
+    schema: { id: string; version: string; classes: { jeexElement: { properties: Record<string, ClassProperty> } } };
+    propertyTables?: Array<{ name: string; class: string; count: number; properties: Record<string, TableProperty> }>;
+  };
+  blocks: Uint8Array[];
+};
+
+const COLUMNS = [
+  'guid',
+  'ifcGuid',
+  'class',
+  'id',
+  'roomId',
+  'wallId',
+  'side',
+  'openingType',
+  'assetId',
+  'libraryId',
+  'variantId',
+  'finish',
+];
+
+/** A STRING column read back the way the extension says: UINT32 offsets into UTF-8 values, `noData` read as absent. */
+function decode(written: Written, firstBufferView: number, name: string): Array<string | undefined> {
+  const table = written.extension.propertyTables![0]!;
+  const stored = table.properties[name]!;
+  const values = written.blocks[stored.values - firstBufferView]!;
+  const offsetBytes = written.blocks[stored.stringOffsets - firstBufferView]!;
+  const offsets = new DataView(offsetBytes.buffer, offsetBytes.byteOffset, offsetBytes.byteLength);
+  const noData = written.extension.schema.classes.jeexElement.properties[name]!.noData;
+  return Array.from({ length: table.count }, (_, row) => {
+    const text = new TextDecoder().decode(values.subarray(offsets.getUint32(row * 4, true), offsets.getUint32(row * 4 + 4, true)));
+    return noData !== undefined && text === noData ? undefined : text;
+  });
+}
+
 describe('structuralMetadataExtension', () => {
-  test('one class jeexElement and one property table sized to the rows', () => {
+  test('one class jeexElement, schema version 2, and one property table sized to the rows', () => {
     const rows = metadataTable(lShapePlan, plan);
-    const extension = structuralMetadataExtension(rows) as {
-      schema: { classes: { jeexElement: unknown } };
-      propertyTables: Array<{ count: number }>;
-    };
-    expect(extension.schema.classes.jeexElement).toBeTruthy();
-    expect(extension.propertyTables[0]?.count).toBe(rows.length);
+    const { extension } = structuralMetadataExtension(rows, 0) as Written;
+    expect(extension.schema.id).toBe('jeexViewerElementSchema');
+    expect(extension.schema.version).toBe('2');
+    expect(extension.propertyTables?.[0]).toMatchObject({ name: 'jeexElements', class: 'jeexElement', count: rows.length });
   });
 
-  test('the face columns are wallId and side; there is no faceId column', () => {
-    const extension = structuralMetadataExtension(metadataTable(lShapePlan, plan)) as {
-      schema: { classes: { jeexElement: { properties: Record<string, unknown> } } };
-      propertyTables: Array<{ properties: Record<string, unknown> }>;
-    };
-    const declared = Object.keys(extension.schema.classes.jeexElement.properties);
-    expect(declared).toContain('side');
-    expect(declared).not.toContain('faceId');
-    expect(Object.keys(extension.propertyTables[0]!.properties)).toEqual(declared);
-  });
-
-  test('the id columns are optional and null exactly at the wall-face rows', () => {
-    const rows = metadataTable(lShapePlan, plan);
-    const extension = structuralMetadataExtension(rows) as {
-      schema: { classes: { jeexElement: { properties: Record<string, { required?: boolean }> } } };
-      propertyTables: Array<{ properties: Record<string, Array<string | null>> }>;
-    };
+  test('class is required with no noData; every other property is optional with noData ""; there is no faceId', () => {
+    const { extension } = structuralMetadataExtension(metadataTable(lShapePlan, plan), 0) as Written;
     const declared = extension.schema.classes.jeexElement.properties;
-    const columns = extension.propertyTables[0]!.properties;
-    for (const key of ['guid', 'ifcGuid', 'id']) {
-      expect({ key, required: declared[key]?.required }).toEqual({ key, required: false });
-      rows.forEach((row, index) => {
-        expect({ key, index, isNull: columns[key]![index] === null }).toEqual({ key, index, isNull: row.class === 'wallFace' });
-      });
-    }
-    expect(declared['class']?.required).toBeUndefined();
+    expect(Object.keys(declared)).toEqual(COLUMNS);
+    expect(declared['class']).toEqual({ type: 'STRING', required: true });
+    for (const name of COLUMNS.filter((column) => column !== 'class'))
+      expect({ name, ...declared[name] }).toEqual({ name, type: 'STRING', required: false, noData: '' });
   });
 
-  test('an empty table still produces a valid shape', () => {
-    const extension = structuralMetadataExtension([]) as { propertyTables: Array<{ count: number }> };
-    expect(extension.propertyTables[0]?.count).toBe(0);
+  test('every column decodes from its binary blocks back to the rows; a wall face has no id', () => {
+    const rows = metadataTable(lShapePlan, plan);
+    const written = structuralMetadataExtension(rows, 7) as Written;
+    const table = written.extension.propertyTables![0]!;
+    for (const name of COLUMNS) {
+      const expected = rows.map((row) => (row as Partial<Record<string, string>>)[name]);
+      if (expected.every((cell) => cell === undefined)) {
+        expect({ name, written: name in table.properties }).toEqual({ name, written: false });
+        continue;
+      }
+      expect({ name, cells: decode(written, 7, name) }).toEqual({ name, cells: expected });
+    }
+    rows.forEach((row, index) => {
+      if (row.class === 'wallFace') expect(decode(written, 7, 'id')[index]).toBeUndefined();
+    });
+  });
+
+  test('each property is a values block and exactly count + 1 UINT32 offsets, numbered from the first bufferView given', () => {
+    const rows = metadataTable(lShapePlan, plan);
+    const written = structuralMetadataExtension(rows, 7) as Written;
+    const properties = Object.values(written.extension.propertyTables![0]!.properties);
+    expect(properties.flatMap((property) => [property.values, property.stringOffsets])).toEqual(
+      written.blocks.map((_, index) => 7 + index),
+    );
+    for (const property of properties) {
+      expect(property.stringOffsetType).toBe('UINT32');
+      const offsets = written.blocks[property.stringOffsets - 7]!;
+      expect(offsets.byteLength).toBe((rows.length + 1) * 4);
+      const last = new DataView(offsets.buffer, offsets.byteOffset).getUint32(rows.length * 4, true);
+      expect(last).toBe(written.blocks[property.values - 7]!.byteLength);
+    }
+  });
+
+  test('string offsets count UTF-8 bytes, not characters', () => {
+    const id = L_SHAPE.wall.wE;
+    const rows: ElementRow[] = [{ guid: id, ifcGuid: ifcGuid(id), class: 'wall', id, finish: 'oak-\u00E9' }];
+    const written = structuralMetadataExtension(rows, 0) as Written;
+    const finish = written.extension.propertyTables![0]!.properties['finish']!;
+    expect(written.blocks[finish.values]!.byteLength).toBe(6);
+    expect(decode(written, 0, 'finish')).toEqual(['oak-\u00E9']);
+  });
+
+  test('an optional column with no value in any row is left out of the table but stays declared', () => {
+    const rows: ElementRow[] = [{ guid: L_SHAPE.wall.wE, ifcGuid: ifcGuid(L_SHAPE.wall.wE), class: 'wall', id: L_SHAPE.wall.wE }];
+    const written = structuralMetadataExtension(rows, 0) as Written;
+    expect(Object.keys(written.extension.propertyTables![0]!.properties)).toEqual(['guid', 'ifcGuid', 'class', 'id']);
+    expect(Object.keys(written.extension.schema.classes.jeexElement.properties)).toEqual(COLUMNS);
+    expect(written.blocks.every((block) => block.byteLength > 0)).toBe(true);
+  });
+
+  test('a document with no element gets the schema and no property table', () => {
+    const written = structuralMetadataExtension([], 0) as Written;
+    expect(written.extension.schema.version).toBe('2');
+    expect(written.extension.propertyTables).toBeUndefined();
+    expect(written.blocks).toEqual([]);
   });
 });

@@ -1,8 +1,11 @@
 /**
  * Turns a built scene root into a graph an exporter can hand straight to
- * `GLTFExporter`/`USDZExporter`: JSON-safe `userData`, an `EXT_mesh_features`
- * pointer into the element metadata table on every mesh a row names, and none
- * of the raycast-only helpers a live viewer needs but an export does not.
+ * `GLTFExporter`/`USDZExporter`: JSON-safe `userData`, none of the
+ * raycast-only helpers a live viewer needs but an export does not, and (from
+ * `exportGraphWithRows`) which cloned mesh belongs to which row of the element
+ * metadata table. The graph itself carries no glTF extension: feature ids
+ * belong on mesh primitives, and the GLB export (`app/export-gltf.ts`) writes
+ * them there from that map.
  *
  * Invariant: THE CALLER DISPOSES NOTHING. `THREE.Mesh.copy` shares `geometry`
  * and `material` by reference (three's own contract, `Object3D.js`), and this
@@ -39,6 +42,7 @@ function isPickProxy(object: THREE.Object3D): boolean {
 
 type RowIndex = {
   readonly byFace: FaceMap<number>;
+  readonly byRoomId: ReadonlyMap<string, number>;
   readonly byOpeningId: ReadonlyMap<string, number>;
   readonly byAssetId: ReadonlyMap<string, number>;
 };
@@ -48,6 +52,9 @@ function rowIndexFor(userData: Record<string, unknown>, index: RowIndex): number
   if (surface === 'wall') {
     const face = userData['face'];
     if (isFaceKey(face)) return index.byFace.get(face);
+  } else if (surface === 'floor' || userData['isCeiling'] === true) {
+    const roomId = userData['roomId'];
+    if (typeof roomId === 'string') return index.byRoomId.get(roomId);
   } else if (surface === 'opening') {
     const openingId = userData['openingId'];
     if (typeof openingId === 'string') return index.byOpeningId.get(openingId);
@@ -62,13 +69,8 @@ function rowIndexFor(userData: Record<string, unknown>, index: RowIndex): number
   return undefined;
 }
 
-/** `{ featureIds: [{ constant: rowIndex }] }` — one constant feature id per node, no attribute or texture needed. */
-function meshFeaturesExtension(rowIndex: number): Record<string, unknown> {
-  return { EXT_mesh_features: { featureIds: [{ featureCount: 1, propertyTable: 0, nullFeatureId: -1, constant: rowIndex }] } };
-}
-
-/** One node: cloned, sanitised, tagged — children handled by the caller. */
-function cloneNode(source: THREE.Object3D, index: RowIndex): THREE.Object3D {
+/** One node: cloned and sanitised — children handled by the caller. */
+function cloneNode(source: THREE.Object3D): THREE.Object3D {
   // `false`: this call clones ONE node; children are added by the caller so
   // each of them goes through this same filtering and tagging pass.
   const clone = source.clone(false);
@@ -95,9 +97,6 @@ function cloneNode(source: THREE.Object3D, index: RowIndex): THREE.Object3D {
   // builds `visible = false` by default is forced back on here.
   if (userData['isCeiling'] === true) clone.visible = true;
 
-  const rowIndex = rowIndexFor(userData, index);
-  if (rowIndex !== undefined) userData['gltfExtensions'] = meshFeaturesExtension(rowIndex);
-
   return clone;
 }
 
@@ -111,34 +110,56 @@ function isShadowOnly(object: THREE.Object3D): boolean {
   return object.userData['shadowOnly'] === true;
 }
 
-/** Recursively clones `source`, dropping pick-proxy helpers and shadow-only casters, and tagging every node a row names. */
-function cloneTree(source: THREE.Object3D, index: RowIndex): THREE.Object3D {
-  const clone = cloneNode(source, index);
+/**
+ * Recursively clones `source`, dropping pick-proxy helpers and shadow-only
+ * casters, and records in `meshRows` the row of every cloned mesh that
+ * belongs to an element: the row named by the nearest node at or above it
+ * (`inherited` is the row of the nearest named ancestor, if any). The
+ * opening and furniture tags sit on group nodes, so their meshes take the
+ * group's row.
+ */
+function cloneTree(source: THREE.Object3D, index: RowIndex, meshRows: Map<THREE.Mesh, number>, inherited?: number): THREE.Object3D {
+  const clone = cloneNode(source);
+  const rowIndex = rowIndexFor(clone.userData as Record<string, unknown>, index) ?? inherited;
+  if (rowIndex !== undefined && clone instanceof THREE.Mesh) meshRows.set(clone, rowIndex);
   for (const child of source.children) {
     if (isPickProxy(child) || isShadowOnly(child)) continue;
-    clone.add(cloneTree(child, index));
+    clone.add(cloneTree(child, index, meshRows, rowIndex));
   }
   return clone;
 }
 
 /**
  * A deep clone of `root`, ready for `GLTFExporter`/`USDZExporter`: JSON-safe
- * `userData`, `userData.gltfExtensions.EXT_mesh_features` on every mesh a row
- * in `rows` names (picked up by `GLTFExporter`'s own `includeCustomExtensions`
- * handling), pick-proxy helpers removed, the ceiling shown regardless of the
- * live dollhouse state. The caller disposes nothing: every geometry and
+ * `userData`, pick-proxy helpers removed, the ceiling shown regardless of the
+ * live dollhouse state, plus `meshRows`: the index into `rows` of every cloned
+ * mesh that belongs to an element (a wall face, a room's floor or ceiling, an
+ * opening, a furniture placement). `wall` rows are reached through their face
+ * rows and own no mesh. The caller disposes nothing: every geometry and
  * material in the returned graph is the SAME instance the live graph holds.
  */
-export function exportGraph(root: THREE.Object3D, rows: readonly ElementRow[]): THREE.Object3D {
+export function exportGraphWithRows(
+  root: THREE.Object3D,
+  rows: readonly ElementRow[],
+): { graph: THREE.Object3D; meshRows: ReadonlyMap<THREE.Mesh, number> } {
   const byFace = new FaceMap<number>();
+  const byRoomId = new Map<string, number>();
   const byOpeningId = new Map<string, number>();
   const byAssetId = new Map<string, number>();
   rows.forEach((row, rowIndex) => {
     // A face row has no id; it is addressed by its wall, side and room.
     if (row.class === 'wallFace') {
       byFace.set(faceKey(row.roomId ?? null, row.wallId, row.side), rowIndex);
-    } else if (row.class === 'opening') byOpeningId.set(row.id, rowIndex);
+    } else if (row.class === 'room') byRoomId.set(row.id, rowIndex);
+    else if (row.class === 'opening') byOpeningId.set(row.id, rowIndex);
     else if (row.class === 'furniture') byAssetId.set(row.id, rowIndex);
   });
-  return cloneTree(root, { byFace, byOpeningId, byAssetId });
+  const meshRows = new Map<THREE.Mesh, number>();
+  const graph = cloneTree(root, { byFace, byRoomId, byOpeningId, byAssetId }, meshRows);
+  return { graph, meshRows };
+}
+
+/** `exportGraphWithRows`'s graph alone, for an exporter that writes no feature ids (USDZ). */
+export function exportGraph(root: THREE.Object3D, rows: readonly ElementRow[]): THREE.Object3D {
+  return exportGraphWithRows(root, rows).graph;
 }

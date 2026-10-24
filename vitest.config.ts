@@ -42,6 +42,8 @@ export default defineConfig({
       'three/addons/exporters/USDZExporter.js',
       // Lazily imported by `materials/ktx2.ts` on the first KTX2 asset, for the same reason.
       'three/addons/loaders/KTX2Loader.js',
+      // The Khronos glTF Validator (a CommonJS bundle), imported by the export conformance test.
+      'gltf-validator',
     ],
   },
   test: {

@@ -64,13 +64,30 @@ as described under [Versioning](#versioning).
 
 ### Changed
 
+- **Breaking for readers of `exportGlb` feature ids and its property table:
+  both now follow `EXT_mesh_features` and `EXT_structural_metadata`.** Feature
+  ids moved from nodes (`constant`, `nullFeatureId: -1`) to mesh primitives:
+  every primitive of a wall-face, floor, ceiling, opening or furniture mesh
+  carries `{ featureIds: [{ featureCount: 1, attribute: 0, propertyTable: 0 }] }`
+  and a `_FEATURE_ID_0` `FLOAT` vertex attribute holding its row index. Floors
+  and ceilings now point at their room row, and every mesh inside an opening or
+  a furniture placement points at that element's row. The `jeexElements` table
+  is binary: each property is UTF-8 `values` plus `UINT32` `stringOffsets`
+  bufferViews on 8-byte boundaries, a missing cell is `""` (declared as
+  `noData`) instead of `null`, `class` is `required: true`, an optional property
+  that no row has is left out of the table, and `schema.version` is `"2"`. A
+  document with no element gets the schema without a property table. Both GLB
+  chunks are padded to 8 bytes. Rows, their order and their values are
+  unchanged, and re-export stays byte-for-byte identical. The Khronos glTF
+  Validator reports no errors on the export.
 - **Breaking for readers of `exportGlb` metadata: a wall face is addressed,
   not identified.** In the `EXT_structural_metadata` table `jeexElements`, a
   `wallFace` row no longer carries a GUID the viewer derived from its room,
-  wall and side: its `guid`, `ifcGuid` and `id` are `null`, and the class
-  declares those three properties `required: false`. Find a face by `wallId`
-  and `side` (one face per wall side); `roomId` still names the room it is seen
-  from and is `null` on the facade. Face rows are now ordered by `wallId`, then
+  wall and side: its `guid`, `ifcGuid` and `id` are empty (`noData`, see the
+  property table entry above), and the class declares those three properties
+  `required: false`. Find a face by `wallId` and `side` (one face per wall
+  side); `roomId` still names the room it is seen from and is empty on the
+  facade. Face rows are now ordered by `wallId`, then
   `side`, so wall meshes point at different row indexes than before;
   wall, room, opening and furniture rows keep their UUIDs and their order. The
   scene document and its schema do not change.

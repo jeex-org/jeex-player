@@ -4,7 +4,7 @@ import { SceneBuilder } from '../geometry/scene-builder.js';
 import { solvePlan } from '../plan/plan-solver.js';
 import { lShapePlan } from '../fixtures/plan-l-shape.js';
 import { metadataTable } from '../scene/metadata-table.js';
-import { exportGraph } from './export-graph.js';
+import { exportGraph, exportGraphWithRows } from './export-graph.js';
 import { buildCeilingCasters } from '../geometry/ceiling-casters.js';
 import { faceKey, isFaceKey, sameFace, type FaceKey } from '../scene/types.js';
 
@@ -40,13 +40,28 @@ function realMeshCount(object: THREE.Object3D): number {
   return count;
 }
 
-function withExtension(object: THREE.Object3D): THREE.Object3D[] {
-  const found: THREE.Object3D[] = [];
+/** The nearest node at or above `object` (in the clone) that names an element, or `null`. */
+function owner(object: THREE.Object3D): THREE.Object3D | null {
+  for (let node: THREE.Object3D | null = object; node; node = node.parent) {
+    const data = node.userData as Record<string, unknown>;
+    if (
+      data['surface'] === 'wall' ||
+      data['surface'] === 'floor' ||
+      data['isCeiling'] === true ||
+      (data['surface'] === 'opening' && typeof data['openingId'] === 'string') ||
+      typeof data['assetId'] === 'string'
+    )
+      return node;
+  }
+  return null;
+}
+
+function meshesOf(object: THREE.Object3D): THREE.Mesh[] {
+  const meshes: THREE.Mesh[] = [];
   object.traverse((child) => {
-    const extensions = (child.userData as { gltfExtensions?: { EXT_mesh_features?: unknown } })['gltfExtensions'];
-    if (extensions?.EXT_mesh_features) found.push(child);
+    if (child instanceof THREE.Mesh) meshes.push(child);
   });
-  return found;
+  return meshes;
 }
 
 describe('exportGraph', () => {
@@ -93,57 +108,104 @@ describe('exportGraph', () => {
     }
   });
 
-  test('a wall-face mesh points at the row that spells out the same face', () => {
+  test('no node of the clone carries a glTF extension: feature ids belong on primitives, which the GLB export writes', () => {
+    const { root, builder } = buildFixture();
+    try {
+      const clone = exportGraph(root, metadataTable(lShapePlan, solvePlan(lShapePlan)));
+      const tagged: string[] = [];
+      clone.traverse((object) => {
+        if (object.userData['gltfExtensions'] !== undefined) tagged.push(object.name || object.type);
+      });
+      expect(tagged).toEqual([]);
+    } finally {
+      builder.dispose();
+    }
+  });
+
+  test('a wall-face mesh maps to the row that spells out the same face', () => {
     const { root, builder } = buildFixture();
     try {
       const plan = solvePlan(lShapePlan);
       const rows = metadataTable(lShapePlan, plan);
-      const clone = exportGraph(root, rows);
+      const { graph, meshRows } = exportGraphWithRows(root, rows);
       let faces = 0;
-      clone.traverse((object) => {
-        if (object.userData['surface'] !== 'wall') return;
+      for (const mesh of meshesOf(graph)) {
+        if (mesh.userData['surface'] !== 'wall') continue;
         faces += 1;
-        const face = object.userData['face'] as FaceKey;
-        const extensions = object.userData['gltfExtensions'] as { EXT_mesh_features: { featureIds: Array<{ constant: number }> } };
-        const row = rows[extensions.EXT_mesh_features.featureIds[0]!.constant]!;
-        if (row.class !== 'wallFace') throw new Error(`a wall mesh points at a ${row.class} row`);
-        expect(sameFace(faceKey(row.roomId ?? null, row.wallId, row.side), face)).toBe(true);
-      });
+        const row = rows[meshRows.get(mesh) ?? -1];
+        if (row?.class !== 'wallFace') throw new Error(`a wall mesh maps to ${row?.class ?? 'no'} row`);
+        expect(sameFace(faceKey(row.roomId ?? null, row.wallId, row.side), mesh.userData['face'] as FaceKey)).toBe(true);
+      }
       expect(faces).toBe(plan.faces.size);
     } finally {
       builder.dispose();
     }
   });
 
-  test('furniture keeps its roomId as a string when the placement names one', () => {
+  test('floor and ceiling meshes map to the row of their room', () => {
     const { root, builder } = buildFixture();
     try {
-      const plan = solvePlan(lShapePlan);
-      const rows = metadataTable(lShapePlan, plan);
-      const clone = exportGraph(root, rows);
-      const withAsset = withExtension(clone).filter((object) => typeof object.userData['assetId'] === 'string');
-      expect(withAsset.length).toBeGreaterThan(0);
+      const rows = metadataTable(lShapePlan, solvePlan(lShapePlan));
+      const { graph, meshRows } = exportGraphWithRows(root, rows);
+      const seen = { floor: 0, ceiling: 0 };
+      for (const mesh of meshesOf(graph)) {
+        const kind = mesh.userData['surface'] === 'floor' ? 'floor' : mesh.userData['isCeiling'] === true ? 'ceiling' : null;
+        if (!kind) continue;
+        seen[kind] += 1;
+        const row = rows[meshRows.get(mesh) ?? -1];
+        expect({ kind, class: row?.class, id: row?.class === 'wallFace' ? undefined : row?.id }).toEqual({
+          kind,
+          class: 'room',
+          id: mesh.userData['roomId'],
+        });
+      }
+      expect(seen.floor).toBeGreaterThan(0);
+      expect(seen.ceiling).toBeGreaterThan(0);
     } finally {
       builder.dispose();
     }
   });
 
-  test('every node with EXT_mesh_features points at a real row index', () => {
+  test('every mesh inside an opening or a furniture placement maps to that element, through its group', () => {
     const { root, builder } = buildFixture();
     try {
-      const plan = solvePlan(lShapePlan);
-      const rows = metadataTable(lShapePlan, plan);
-      const clone = exportGraph(root, rows);
-      const tagged = withExtension(clone);
-      expect(tagged.length).toBeGreaterThan(0);
-      for (const object of tagged) {
-        const extension = (
-          object.userData as { gltfExtensions: { EXT_mesh_features: { featureIds: Array<{ constant: number; propertyTable: number }> } } }
-        ).gltfExtensions.EXT_mesh_features;
-        const index = extension.featureIds[0]!.constant;
-        expect(extension.featureIds[0]!.propertyTable).toBe(0);
-        expect(rows[index]).toBeTruthy();
+      const rows = metadataTable(lShapePlan, solvePlan(lShapePlan));
+      const { graph, meshRows } = exportGraphWithRows(root, rows);
+      const seen = { opening: 0, furniture: 0 };
+      for (const mesh of meshesOf(graph)) {
+        const group = owner(mesh);
+        if (!group || group === mesh) continue;
+        const data = group.userData as Record<string, unknown>;
+        const expected: { class: 'opening' | 'furniture'; id: unknown } | null =
+          data['surface'] === 'opening'
+            ? { class: 'opening', id: data['openingId'] }
+            : typeof data['assetId'] === 'string'
+              ? { class: 'furniture', id: data['assetId'] }
+              : null;
+        if (!expected) continue;
+        seen[expected.class] += 1;
+        const row = rows[meshRows.get(mesh) ?? -1];
+        const actual: { class: unknown; id: unknown } = { class: row?.class, id: row?.class === 'wallFace' ? undefined : row?.id };
+        expect(actual).toEqual(expected);
       }
+      expect(seen.opening).toBeGreaterThan(0);
+      expect(seen.furniture).toBeGreaterThan(0);
+    } finally {
+      builder.dispose();
+    }
+  });
+
+  test('every mapped mesh is in the graph, and every row but a wall row is reached by a mesh', () => {
+    const { root, builder } = buildFixture();
+    try {
+      const rows = metadataTable(lShapePlan, solvePlan(lShapePlan));
+      const { graph, meshRows } = exportGraphWithRows(root, rows);
+      const inGraph = new Set(meshesOf(graph));
+      for (const mesh of meshRows.keys()) expect(inGraph.has(mesh)).toBe(true);
+      const reached = new Set(meshRows.values());
+      const unreached = rows.flatMap((row, index) => (row.class !== 'wall' && !reached.has(index) ? [`${index} ${row.class}`] : []));
+      expect(unreached).toEqual([]);
+      for (const mesh of inGraph) if (owner(mesh) === null) expect(meshRows.has(mesh)).toBe(false);
     } finally {
       builder.dispose();
     }
