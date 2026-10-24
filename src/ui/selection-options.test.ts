@@ -21,11 +21,11 @@ import {
   furnitureCore,
   openingCore,
   openingLabel,
-  paletteSwatchDataURL,
   type DescribeDeps,
   type SelectionDescription,
 } from './selection-options.js';
 import { createMessages } from './messages.js';
+import { paletteSwatchDataURL } from './palette-swatch.js';
 import { FLOOR_FINISHES, WALL_FINISHES } from '../materials/finishes.js';
 import { variantsForOpening } from '../assets/opening-variants.js';
 import { variantsForPlacement, type VariantBank } from '../assets/asset-variants.js';

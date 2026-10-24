@@ -13,7 +13,7 @@ import { join } from 'node:path';
 import * as THREE from 'three';
 import { finishMapsIndexSchema, type FinishMapsIndex } from './finish-maps-index.schema.js';
 import { FINISH_MAPS_DIR, libraryMaterialOf, listedMaps, tableRecords } from './finish-maps-fetch.js';
-import { FLOOR_FINISHES, WALL_FINISHES } from '../src/materials/finish-catalogue.js';
+import { FLOOR_FINISHES, RETIRED_FINISHES, WALL_FINISHES } from '../src/materials/finish-catalogue.js';
 import { FINISH } from '../src/materials/finish-ids.js';
 import { MAX_TEXTURE_FILE_BYTES } from '../src/shared/limits.js';
 import { projectManifestIssues } from '../src/assets/project-manifest.schema.js';
@@ -68,16 +68,16 @@ describe('finish-maps index', () => {
     expect(projectManifestIssues(manifestAround(materials))).toEqual([]);
   });
 
-  test('every bundled floor and wall finish is listed once, bound or kept, and the ceiling default too', () => {
+  test('every bundled floor and wall finish and every alias is listed once, and the ceiling default too', () => {
     const listed = index.finishes.map((entry) => entry.finish);
     expect(new Set(listed).size).toBe(listed.length);
-    expect([...listed].sort()).toEqual([...FLOOR_FINISHES, ...WALL_FINISHES].map((finish) => finish.id).sort());
+    expect([...listed].sort()).toEqual([...FLOOR_FINISHES, ...WALL_FINISHES, ...RETIRED_FINISHES].map((finish) => finish.id).sort());
     expect(index.defaults.ceiling.finish).toBe(FINISH.plaster_white);
   });
 
   test('a bound finish names a listed version and carries a colour exactly when the material is tintable', () => {
     for (const entry of [...index.finishes, index.defaults.ceiling]) {
-      if ('kept' in entry) continue;
+      if (!('version' in entry)) continue;
       const version = versions.get(entry.version);
       expect(version).toBeDefined();
       expect(entry.colour !== undefined).toBe(version?.facts.colourMode === 'tintable');
@@ -100,7 +100,7 @@ describe('finish-maps index', () => {
 
 describe('runtime table', () => {
   test('binds exactly the bound finishes, and the ceiling default when bound', () => {
-    const bound = index.finishes.filter((entry) => !('kept' in entry)).map((entry) => entry.finish);
+    const bound = index.finishes.filter((entry) => 'version' in entry).map((entry) => entry.finish);
     expect([...BUILTIN_FINISHES.keys()].sort()).toEqual([...bound].sort());
     expect(BUILTIN_DEFAULT_CEILING === null).toBe('kept' in index.defaults.ceiling);
     expect(BUILTIN_FINISHES.has(FINISH.plaster_white)).toBe(false);
@@ -121,47 +121,51 @@ describe('runtime table', () => {
   });
 });
 
-describe('the final binding', () => {
-  test('only the two striped wallpapers stay kept, and nothing is pending', () => {
-    const kept = index.finishes.filter((entry) => 'kept' in entry);
-    expect(kept.map((entry) => entry.finish).sort()).toEqual([FINISH.wallpaper_cream, FINISH.wallpaper_sage].sort());
-    expect(kept.every((entry) => 'kept' in entry && entry.why === 'keep')).toBe(true);
-    expect('kept' in index.defaults.ceiling).toBe(false);
+describe('the contemporary set', () => {
+  test("nothing is kept, and the aliases are exactly the player's retired finishes", () => {
+    expect(index.finishes.filter((entry) => 'kept' in entry)).toEqual([]);
+    const aliases = index.finishes.flatMap((entry) => ('alias' in entry ? [{ id: entry.finish, target: entry.alias }] : []));
+    expect(aliases).toEqual(RETIRED_FINISHES.map(({ id, target }) => ({ id, target })));
   });
 
-  test('terrazzo, the ceramics and the wall tiles draw tinted library scans in their finish colour', () => {
-    for (const [id, colour] of [
-      [FINISH.terrazzo, '#a7b5a6'],
-      [FINISH.ceramic_light, '#e9e5dc'],
-      [FINISH.ceramic_graphite, '#4c4c4a'],
-      [FINISH.tiles_white, '#e6e2d8'],
-    ] as const) {
-      const binding = BUILTIN_FINISHES.get(id);
-      expect(binding?.material.kind).toBe('scan');
-      expect(binding?.material.facts.colourMode).toBe('tintable');
-      expect(binding?.colour).toBe(colour);
-    }
-    expect(BUILTIN_FINISHES.get(FINISH.ceramic_light)?.material).toBe(BUILTIN_FINISHES.get(FINISH.ceramic_graphite)?.material);
+  test('every catalogue row carries the library name of its finish', () => {
+    const names = new Map(
+      index.finishes.flatMap((entry) => ('name' in entry && entry.name !== undefined ? [[entry.finish, entry.name] as const] : [])),
+    );
+    for (const finish of [...FLOOR_FINISHES, ...WALL_FINISHES])
+      expect([finish.id, finish.name]).toEqual([finish.id, names.get(finish.id) ?? '']);
   });
 
-  test('the limestone draws a natural library scan', () => {
-    const binding = BUILTIN_FINISHES.get(FINISH.stone);
-    expect(binding?.material.kind).toBe('scan');
-    expect(binding?.material.facts.colourMode).toBe('natural');
-    expect(binding?.colour).toBeUndefined();
+  test('the eleven new finishes are bound', () => {
+    for (const id of [
+      FINISH.pure_white,
+      FINISH.ink,
+      FINISH.venetian,
+      FINISH.microcement,
+      FINISH.microcement_grey,
+      FINISH.travertine,
+      FINISH.marble,
+      FINISH.porcelain_grey,
+      FINISH.zellige,
+      FINISH.herringbone,
+      FINISH.herringbone_dark,
+    ])
+      expect(BUILTIN_FINISHES.has(id)).toBe(true);
   });
 
-  test('a tiled finish repeats every generated tile module times the tiles its scan holds', () => {
-    for (const [id, tiles, module] of [
-      [FINISH.stone, 6, 0.62],
-      [FINISH.ceramic_light, 8, 0.625],
-      [FINISH.ceramic_graphite, 8, 0.625],
-      [FINISH.tiles_white, 12, 0.3],
-    ] as const) {
-      const tileM = BUILTIN_FINISHES.get(id)?.material.facts.tileM;
-      expect(tileM).not.toBeNull();
-      expect(tileM?.[0]).toBeCloseTo(tiles * module, 6);
-      expect(tileM?.[1]).toBeCloseTo(tiles * module, 6);
-    }
+  test('the glazed zellige carries its clear coat', () => {
+    const { pbr } = BUILTIN_FINISHES.get(FINISH.zellige)!.material.facts;
+    expect({ clearcoat: pbr.clearcoat, clearcoatRoughness: pbr.clearcoatRoughness }).toEqual({ clearcoat: 1, clearcoatRoughness: 0.08 });
+  });
+
+  test('the default ceiling is the lime plaster tinted warm white', () => {
+    expect(BUILTIN_DEFAULT_CEILING?.colour).toBe('#f1ece2');
+    expect(BUILTIN_DEFAULT_CEILING?.material.facts.colourMode).toBe('tintable');
+  });
+
+  test('the porcelain and limestone repeats hold whole tiles', () => {
+    expect(BUILTIN_FINISHES.get(FINISH.ceramic_light)?.material.facts.tileM).toEqual([3.6, 1.8]);
+    expect(BUILTIN_FINISHES.get(FINISH.porcelain_grey)?.material.facts.tileM).toEqual([3.6, 1.8]);
+    expect(BUILTIN_FINISHES.get(FINISH.stone)?.material.facts.tileM).toEqual([3.72, 3.72]);
   });
 });

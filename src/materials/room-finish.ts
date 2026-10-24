@@ -6,7 +6,9 @@
  *
  * A project material of the `library` member is a library draw; so is a
  * bundled finish the built-in table binds (`builtin-library.ts`), unless the
- * project ships a material of any kind under the same id, which wins. The
+ * project ships a material of any kind under the same id, which wins. A
+ * retired bundled id (`RETIRED_FINISHES`) draws its target's binding under
+ * its own id; a project material under the target id does not reach it. The
  * scene validator has already refused a finish object naming anything but a
  * project library material, so a modifier never reaches the legacy path.
  * Pure module: no `three`.
@@ -14,7 +16,7 @@
 
 import { finishMaterialOf } from '../scene/finish-value.js';
 import type { FinishRef } from '../scene/types.js';
-import type { Finish } from './finish-catalogue.js';
+import { bundledAliasTarget, type Finish } from './finish-catalogue.js';
 import type { LibraryMaterial, ProjectMaterial } from './finish-types.js';
 import { BUILTIN_FINISHES } from './builtin-library.js';
 
@@ -52,7 +54,8 @@ export function resolveRoomFinish(
     const rotation = typeof ref === 'string' ? 0 : (ref.rotation ?? 0);
     return { kind: 'library', draw: { id, material: project.library, ...(colour !== undefined && { colour }), rotation } };
   }
-  const builtin = project === undefined ? BUILTIN_FINISHES.get(id) : undefined;
+  // A retired bundled id reads as its target's CURRENT binding; the draw keeps the authored id.
+  const builtin = project === undefined ? BUILTIN_FINISHES.get(bundledAliasTarget(id) ?? id) : undefined;
   if (builtin !== undefined) {
     const { material, colour, rotation } = builtin;
     return { kind: 'library', draw: { id, material, ...(colour !== undefined && { colour }), rotation, builtin: true } };

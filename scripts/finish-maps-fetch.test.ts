@@ -8,7 +8,7 @@ import { afterEach, describe, expect, test } from 'bun:test';
 import { mkdtempSync, readdirSync, readFileSync, rmSync, existsSync, mkdirSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
-import { buildIndex, renderSources, renderTable, writeFolder, type StoreClient } from './finish-maps-fetch.js';
+import { buildIndex, renderSources, renderTable, tableRecords, writeFolder, type StoreClient } from './finish-maps-fetch.js';
 import { finishMapsIndexSchema, type FinishMapsIndex } from './finish-maps-index.schema.js';
 
 const OAK = '01a12fdf-158e-7748-adfe-d397dde469ba';
@@ -192,6 +192,135 @@ describe('buildIndex', () => {
     const doc = mapping() as { rows: { facts?: unknown }[] };
     delete doc.rows[0]!.facts;
     await expect(buildIndex(doc, stubStore().client, null, false)).rejects.toThrow(/mapping/);
+  });
+});
+
+describe('alias rows', () => {
+  const WHITE = '01a12fdf-1598-7b82-807b-83d8a5effde3';
+  const ASH = '01a12fdf-1590-7754-92f4-5912a4ff24a2';
+
+  /** The base mapping plus `extra` rows. */
+  function withRows(...extra: unknown[]): { rows: unknown[]; playerDefaults: unknown[] } {
+    const doc = mapping() as { rows: unknown[]; playerDefaults: unknown[] };
+    doc.rows.push(...extra);
+    return doc;
+  }
+
+  test('an alias row becomes an alias entry and fetches nothing of its own', async () => {
+    const { client, calls } = stubStore();
+    const { index, files } = await buildIndex(withRows({ finish: ASH, slug: 'ash', alias: OAK, reason: 'r' }), client, null, false);
+    expect(index.finishes.at(-1)).toEqual({ finish: ASH, slug: 'ash', alias: OAK });
+    expect(calls.filter((call) => call.url.startsWith('map:'))).toHaveLength(18);
+    expect(files.size).toBe(18);
+    expect(tableRecords(index).finishes.map((record) => record.finish)).not.toContain(ASH);
+  });
+
+  test('a bound row carries the mapping name into its entry', async () => {
+    const doc = mapping() as { rows: Record<string, unknown>[] };
+    doc.rows[0]!['name'] = 'Natural oak';
+    const { index } = await buildIndex(doc, stubStore().client, null, false);
+    expect(index.finishes[0]).toMatchObject({ finish: OAK, name: 'Natural oak' });
+  });
+
+  test('refuses, before any fetch, an alias whose target is missing, pending, an alias or itself', async () => {
+    for (const rows of [
+      [{ finish: ASH, slug: 'ash', alias: WHITE }],
+      [{ finish: ASH, slug: 'ash', alias: TERRAZZO }],
+      [{ finish: ASH, slug: 'ash', alias: ASH }],
+      [
+        { finish: ASH, slug: 'ash', alias: OAK },
+        { finish: WHITE, slug: 'white', alias: ASH },
+      ],
+    ]) {
+      const { client, calls } = stubStore();
+      await expect(buildIndex(withRows(...rows), client, null, false)).rejects.toThrow(/alias/);
+      expect(calls).toEqual([]);
+    }
+  });
+
+  test('refuses a row with two modes, a duplicate finish id and an alias as the ceiling default', async () => {
+    const two = withRows({ finish: ASH, slug: 'ash', alias: OAK, keep: true });
+    await expect(buildIndex(two, stubStore().client, null, false)).rejects.toThrow(/mapping/);
+    const twice = withRows({ finish: OAK, slug: 'oak_again', alias: SAND });
+    await expect(buildIndex(twice, stubStore().client, null, false)).rejects.toThrow(/more than once/);
+    const ceiling = mapping() as { playerDefaults: unknown[] };
+    ceiling.playerDefaults = [{ surface: 'ceiling', finish: CEILING, slug: 'plaster_white', alias: SAND }];
+    await expect(buildIndex(ceiling, stubStore().client, null, false)).rejects.toThrow(/ceiling/);
+  });
+
+  test('refuses two rows that give one version different facts', async () => {
+    const shared = withRows({
+      finish: WHITE,
+      slug: 'white',
+      material: PLASTER_VARIANT,
+      colour: '#ece6da',
+      reason: 'r',
+      facts: { ...plasterFacts(), tileM: [2, 2] },
+    });
+    await expect(buildIndex(shared, stubStore().client, null, false)).rejects.toThrow(/different facts/);
+  });
+
+  test('a finish dropped from the mapping needs the update flag and is printed', async () => {
+    const first = await buildIndex(mapping(), stubStore().client, null, false);
+    const doc = mapping() as { rows: unknown[] };
+    doc.rows.splice(2, 1);
+    await expect(buildIndex(doc, stubStore().client, first.index, false)).rejects.toThrow(/stripes_cream: removed/);
+    const accepted = await buildIndex(doc, stubStore().client, first.index, true);
+    expect(accepted.index.finishes.map((entry) => entry.slug)).not.toContain('stripes_cream');
+  });
+
+  test('a bound or kept entry turning into an alias, and a changed tint, need the update flag and are printed', async () => {
+    const first = await buildIndex(mapping(), stubStore().client, null, false);
+    const doc = mapping() as { rows: Record<string, unknown>[] };
+    doc.rows[2] = { finish: STRIPES, slug: 'stripes_cream', alias: SAND };
+    doc.rows[0] = { finish: OAK, slug: 'oak', alias: SAND };
+    doc.rows[1]!['colour'] = '#d3c6b2';
+    const refused = buildIndex(doc, stubStore().client, first.index, false);
+    await expect(refused).rejects.toThrow(/stripes_cream: kept -> alias/);
+    await expect(buildIndex(doc, stubStore().client, first.index, false)).rejects.toThrow(/oak: bound/);
+    await expect(buildIndex(doc, stubStore().client, first.index, false)).rejects.toThrow(/sand: .*#b0a294.*#d3c6b2/);
+    const accepted = await buildIndex(doc, stubStore().client, first.index, true);
+    expect(accepted.index.finishes[0]).toEqual({ finish: OAK, slug: 'oak', alias: SAND });
+  });
+});
+
+describe('rectangular maps', () => {
+  /** The plank row's facts turned into a 3.6 by 1.8 m tile. */
+  function rectangular(): unknown {
+    const doc = mapping() as { rows: Record<string, unknown>[] };
+    doc.rows[0]!['facts'] = { ...plankFacts, tileM: [3.6, 1.8] };
+    return doc;
+  }
+
+  /** A store that renders every map at `px` by `px / ratio`. */
+  function storeAt(ratio: (versionId: string) => number) {
+    const { client } = stubStore();
+    return {
+      ...client,
+      async mapUrl(versionId: string, role: Parameters<StoreClient['mapUrl']>[1], px: number) {
+        const signed = await client.mapUrl(versionId, role, px);
+        return { ...signed, width: px, height: Math.round(px / ratio(versionId)) };
+      },
+    } satisfies StoreClient;
+  }
+
+  test('accepts the map of a rectangular tile at its longer side', async () => {
+    const store = storeAt((version) => (version === PLANK_VERSION ? 2 : 1));
+    const { index } = await buildIndex(rectangular(), store, null, false);
+    expect(index.versions[0]?.facts.tileM).toEqual([3.6, 1.8]);
+  });
+
+  test('refuses, before any fetch, a tile whose sides are not in a power-of-two ratio', async () => {
+    const doc = mapping() as { rows: Record<string, unknown>[] };
+    doc.rows[0]!['facts'] = { ...plankFacts, tileM: [1.2, 0.9] };
+    const { client, calls } = stubStore();
+    await expect(buildIndex(doc, client, null, false)).rejects.toThrow(/power-of-two/);
+    expect(calls).toEqual([]);
+  });
+
+  test("refuses a map whose shape is not the tile's", async () => {
+    const store = storeAt(() => 1);
+    await expect(buildIndex(rectangular(), store, null, false)).rejects.toThrow(/256x256, not 256x128/);
   });
 });
 

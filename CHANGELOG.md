@@ -9,6 +9,30 @@ as described under [Versioning](#versioning).
 
 ### Changed
 
+- **Contemporary room surfaces.** The bundled finishes move to an approved
+  contemporary set under their ids: Warm white, Oat, Olive and Clay
+  limewash, Mocha (formerly Graphite), Stacked white tile, White terrazzo
+  with a clear coat, Cream limestone, Warm stone and Graphite porcelain (matte
+  60 by 60 cm); Natural oak, Walnut, Honey oak and Chevron oak keep their
+  scans under the library's names. The default ceiling is a lime plaster in
+  warm white. Eleven finishes are new: Pure white, Ink blue, Polished lime
+  plaster, Sand and Warm grey microcement, Honed travertine, White marble,
+  Stone porcelain 60x60 and Teal zellige on walls; Herringbone oak and Dark
+  oak herringbone on floors. `finish-maps/` grows to about 29 MB (fetched
+  only for the finishes on screen, at the device's size). Window and door
+  frames of the four graphite variants keep their grey as their own powder-coated
+  metal finish. The light-bake
+  input hash does not cover bundled finish data: bakes of scenes on a changed
+  finish should be made again.
+- **Retired finishes are aliases.** Cream stripes, Sage stripes and Bleached
+  ash read as Warm white, Olive limewash and Natural oak: documents keep the
+  ids and draw the targets' current looks. The picker shows the target as
+  current and does not offer the retired id; `describeSelection(...).current`
+  reports the target, and its scope actions keep the stored id.
+- **Rectangular maps.** A library map of a rectangular tile may be
+  rectangular: its longer side is the listed size and its shorter side that
+  size over a power of two.
+
 - **Bundled room finishes draw scanned materials.** Natural oak, dark walnut,
   bleached ash, honey teak and the chevron parquet are CC0 wood scans; the
   five plaster paints (warm sand, cotton white, sage green, terracotta,
@@ -25,6 +49,10 @@ as described under [Versioning](#versioning).
   their library colour (they wrote the generated texture before).
 
 ### Added
+
+- `FINISH_ALIASES` and `FINISH_NAMES` in `jeex-viewer/ops`: retired bundled
+  room finish id to the id it reads as, and bundled floor and wall finish id
+  to its picker name.
 
 - **Baked rooms read like live rooms.** `LIGHTING_STANDARD.baked.exposure`
   (`jeex-viewer/lighting`) holds two gains on the lightmap of a baked surface

@@ -50,7 +50,7 @@ describe('resolveFinish', () => {
   });
 
   test('finishColorOf gives a chip colour for every source', () => {
-    expect(finishColorOf(FINISH.sage)).toBe('#a9b6a5');
+    expect(finishColorOf(FINISH.sage)).toBe('#8f9574');
     expect(finishColorOf(FINISH.brass_soft)).toBeTruthy();
     expect(finishColorOf(UNOBTANIUM, LOCAL)).toBe('#ff00ff');
     expect(finishColorOf(NOPE)).toBeNull();

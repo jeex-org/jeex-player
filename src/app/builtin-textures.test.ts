@@ -28,7 +28,7 @@ import { createBuiltinTextures, onceLogger } from './builtin-textures.js';
 import { builtinFolder } from '../materials/builtin-folder.js';
 import type { Dollhouse } from '../geometry/dollhouse.js';
 import type { ViewerUI } from '../ui/viewer-ui.js';
-import { BUILTIN_FINISHES } from '../materials/builtin-library.js';
+import { BUILTIN_DEFAULT_CEILING, BUILTIN_FINISHES } from '../materials/builtin-library.js';
 import { FINISH } from '../materials/finish-ids.js';
 import type { Logger } from '../shared/logger.js';
 
@@ -198,6 +198,7 @@ describe('a bare scene in a viewer', () => {
       OAK,
       BUILTIN_FINISHES.get(FINISH.stone)!.material.versionId,
       BUILTIN_FINISHES.get(FINISH.sand)!.material.versionId,
+      BUILTIN_DEFAULT_CEILING!.material.versionId,
     ]);
     for (const version of versions) expect(onScreen.has(version!)).toBe(true);
   });

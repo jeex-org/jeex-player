@@ -29,6 +29,7 @@ import type { InteriorPreset } from '../scene/scene-ops.js';
 import type { Messages } from './messages.js';
 import {
   finishCore,
+  finishCurrentOf,
   finishFooterKey,
   furnitureCore,
   isFacadeTarget,
@@ -78,6 +79,10 @@ export function finishPanelRequest(args: FinishPanelArgs): PanelRequest | null {
   const core = finishCore(args.scene, args.target, args.messages, args.variants);
   if (!core) return null;
   const { target } = args;
+  // Until a swatch is picked, the footer spreads what the surface STORES: a
+  // retired id is shown as its target but written as itself.
+  const stored = finishCurrentOf(args.scene, target);
+  let picked = false;
   return {
     kind: 'finish',
     title: core.title,
@@ -88,7 +93,8 @@ export function finishPanelRequest(args: FinishPanelArgs): PanelRequest | null {
       // only when a finish is in force, and the panel's button exists either
       // way, so the key is spelled out here for the empty case.
       label: core.scope?.label ?? args.messages.t(finishFooterKey(target)),
-      onClick: ({ activeId, scopeChecked }) => args.onApplyToAll(activeId, scopeChecked),
+      onClick: ({ activeId, scopeChecked }) =>
+        args.onApplyToAll(!picked && activeId !== null && activeId === core.current ? stored : activeId, scopeChecked),
     },
     anchor: args.anchor,
     panelData: {
@@ -96,7 +102,10 @@ export function finishPanelRequest(args: FinishPanelArgs): PanelRequest | null {
       owner: isFacadeTarget(target) ? 'facade' : (target.roomId ?? ''),
       ...(target.face ? { wall: target.face.wallId, side: target.face.side } : {}),
     },
-    onPick: ({ id, scopeChecked }) => args.onPick(id, scopeChecked),
+    onPick: ({ id, scopeChecked }) => {
+      picked = true;
+      args.onPick(id, scopeChecked);
+    },
   };
 }
 
