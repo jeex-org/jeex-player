@@ -547,6 +547,38 @@ describe('the bottom sheet and filled host bottom boxes', { timeout: MOUNT_TIMEO
     });
   }
 
+  /** The sheet's rect relative to the viewer: left, top, right, bottom. */
+  function rect(viewer: ViewerHandle, panel: HTMLElement): number[] {
+    const at = panel.getBoundingClientRect();
+    const box = viewer.element.getBoundingClientRect();
+    return [at.left - box.left, at.top - box.top, at.right - box.left, at.bottom - box.top].map((v) => Math.round(v));
+  }
+
+  test('at 390×844 filling an empty bottom-right box while the sheet is open lifts it clear, emptying the box returns it', async () => {
+    const viewer = await mount(PHONE[0], { settings: { show: true }, slots: ['bottom-right'] }, PHONE[1]);
+    const box = viewer.slots.get('bottom-right');
+    const { panel } = await openSheet(viewer);
+    const rest = [10, 706, 380, 834];
+    expect(rect(viewer, panel)).toEqual(rest);
+    fillSlot(box);
+    await until(() => !intersects(panel.getBoundingClientRect(), box.getBoundingClientRect()), 'the sheet clear of bottom-right');
+    expect(Math.round(box.getBoundingClientRect().top - panel.getBoundingClientRect().bottom)).toBe(8);
+    expect(panel.hidden).toBe(false);
+    box.replaceChildren();
+    await until(() => rect(viewer, panel).join() === rest.join(), 'the sheet back at its place');
+    expect(rect(viewer, panel)).toEqual(rest);
+  });
+
+  test('at 390×844 the open sheet stands clear of a filled bottom-center box the same way', async () => {
+    const viewer = await mount(PHONE[0], { settings: { show: true }, slots: ['bottom-center'] }, PHONE[1]);
+    const box = viewer.slots.get('bottom-center');
+    fillSlot(box);
+    const { panel } = await openSheet(viewer);
+    await until(() => !intersects(panel.getBoundingClientRect(), box.getBoundingClientRect()), 'the sheet clear of bottom-center');
+    expect(insets(viewer, panel).slice(0, 2)).toEqual([10, 10]);
+    expect(Math.round(box.getBoundingClientRect().top - panel.getBoundingClientRect().bottom)).toBe(8);
+  });
+
   test('at 390×844 with no filled bottom box the sheet keeps its place, a claimed empty box included', async () => {
     const plain = await mount(PHONE[0], { settings: { show: true } }, PHONE[1]);
     const { panel } = await openSheet(plain);
