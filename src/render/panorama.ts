@@ -7,8 +7,9 @@
  * `WebGLCubeRenderTarget`, and one full-screen quad turns each output pixel's
  * (longitude, latitude) into a direction and samples the cube along it. The
  * same display pass as a still applies the renderer's tone mapping and the
- * sRGB transfer (`still-capture.ts`), so a panorama and a still of one room
- * are the same picture in two projections.
+ * sRGB transfer (`still-capture.ts`), and in walk and tour the walk chain's
+ * white balance before them, so a panorama and a still of one room are the
+ * same picture in two projections.
  *
  * Seam invariant: the left and right edges of the image are the SAME
  * direction (longitude −π and +π), so nothing may make them disagree — the
@@ -33,6 +34,11 @@ export type PanoramaSpec = {
   position: Vec3;
   /** Edge of one cube face; default `DEFAULT_FACE_PX`. */
   faceSize?: number | undefined;
+  /**
+   * The walk chain's camera white balance (nine numbers, row-major), applied
+   * in the display pass only: the cube faces are rendered unbalanced.
+   */
+  whiteBalance?: readonly number[] | null | undefined;
 };
 
 /**
@@ -88,6 +94,7 @@ export async function capturePanorama(renderer: THREE.WebGLRenderer, root: THREE
       { map: { value: cube.texture } },
       DIRECTION_GLSL,
       'textureCube(map, panoramaDirection(vUv))',
+      spec.whiteBalance ?? null,
     );
     // Synchronous to here: the live frame loop must not draw into a target of
     // this call's between the six faces and the read-back (`still-capture.ts`).

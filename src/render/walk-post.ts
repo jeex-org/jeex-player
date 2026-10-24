@@ -9,8 +9,9 @@
  * Chain: scene pass → GTAO → SMAA → output pass, on half-float composer
  * targets without multisampling. The scene pass renders into a plain target,
  * where three applies no tone mapping and keeps the working (linear) colour
- * space; SMAA expects linear input; the output pass applies the renderer's
- * tone mapping (PBR Neutral), exposure and sRGB encoding once. The renderer's
+ * space; SMAA expects linear input; the output pass applies the camera white
+ * balance (one linear 3x3 matrix, clamped at zero, `white-balance.ts`), then
+ * the renderer's tone mapping (PBR Neutral), exposure and sRGB encoding once. The renderer's
  * own tone mapping setting stays as the lighting standard set it, because the
  * output pass reads it from there.
  *
@@ -37,6 +38,8 @@ import { warmPrograms } from './scene-compile.js';
 import { withScenePass } from '../shared/scene-pass.js';
 import { withOccludersOnly } from './ao-occluders.js';
 import type { PostProcessor } from './post-processor.js';
+import { ViewerLibError } from '../shared/errors.js';
+import { whiteBalanceMatrix, type Mat3 } from './white-balance.js';
 
 // The walk and tour room lighting travels in this chunk: one lazy load for everything walk adds.
 export { WalkLighting } from './walk-lighting/walk-lighting.js';
@@ -64,7 +67,37 @@ export const WALK_POST_TUNING = Object.freeze({
    * across the wall behind it as dark blotches.
    */
   denoise: Object.freeze({ depthPhi: 0.05, normalPhi: 8, lumaPhi: 10, radius: 6, samples: 16 }),
+  /**
+   * The camera white balance: a partial adaptation from `source`, the
+   * measured linear colour of the neutral surfaces, towards the display
+   * white, by `degree` (`white-balance.ts`). Not yet calibrated: identity.
+   */
+  whiteBalance: Object.freeze({ source: Object.freeze([1, 1, 1] as const), degree: 0 }),
 });
+
+/** The tuned white balance the chain applies by default. */
+export const WALK_WHITE_BALANCE: Mat3 = whiteBalanceMatrix(WALK_POST_TUNING.whiteBalance.source, WALK_POST_TUNING.whiteBalance.degree);
+
+/** The line of three r186's `OutputShader` the white balance follows: the linear colour just read. */
+const OUTPUT_READ = 'gl_FragColor = texture2D( tDiffuse, vUv );';
+const OUTPUT_SAMPLER = 'uniform sampler2D tDiffuse;';
+
+/**
+ * Three's output fragment shader with the white balance applied to the colour
+ * it reads, before tone mapping and encoding; refuses a shader without the
+ * anchors, so a three upgrade that changes the shader fails loudly.
+ */
+export function whiteBalancedOutput(fragment: string): string {
+  if (!fragment.includes(OUTPUT_READ) || !fragment.includes(OUTPUT_SAMPLER)) {
+    throw new ViewerLibError('internal', 'the output shader has no anchor for the white balance');
+  }
+  return fragment
+    .replace(OUTPUT_SAMPLER, `${OUTPUT_SAMPLER}\nuniform mat3 jeexWhiteBalance;`)
+    .replace(OUTPUT_READ, `${OUTPUT_READ}\ngl_FragColor.rgb = max( jeexWhiteBalance * gl_FragColor.rgb, vec3( 0.0 ) );`);
+}
+
+/** Options of a chain; the white balance defaults to the tuned one. */
+export type WalkPostOptions = { whiteBalance?: Mat3 | undefined };
 
 /** The scene pass, drawing inside the beauty-pass scope a mirror captures in. */
 class BeautyPass extends RenderPass {
@@ -118,6 +151,8 @@ export class WalkPost implements PostProcessor {
   readonly occlusion: OcclusionPass;
   readonly smaa: SMAAPass;
   readonly output: OutputPass;
+  /** The white balance the output pass applies, row-major. */
+  readonly whiteBalance: Mat3;
   private readonly renderer: THREE.WebGLRenderer;
   /** The composer's size in device pixels now: the live size, or the last capture's until the next live frame. */
   private width: number;
@@ -127,7 +162,7 @@ export class WalkPost implements PostProcessor {
   private liveHeight: number;
   private disposed = false;
 
-  constructor(renderer: THREE.WebGLRenderer, scene: THREE.Scene, camera: THREE.Camera) {
+  constructor(renderer: THREE.WebGLRenderer, scene: THREE.Scene, camera: THREE.Camera, options: WalkPostOptions = {}) {
     this.renderer = renderer;
     const size = renderer.getDrawingBufferSize(new THREE.Vector2());
     this.width = Math.max(1, size.x);
@@ -148,6 +183,10 @@ export class WalkPost implements PostProcessor {
     this.occlusion.updatePdMaterial(WALK_POST_TUNING.denoise);
     this.smaa = new SMAAPass();
     this.output = new OutputPass();
+    this.whiteBalance = options.whiteBalance ?? WALK_WHITE_BALANCE;
+    const material = this.output.material;
+    material.fragmentShader = whiteBalancedOutput(material.fragmentShader);
+    material.uniforms['jeexWhiteBalance'] = { value: new THREE.Matrix3().set(...this.whiteBalance) };
     for (const pass of [this.beauty, this.occlusion, this.smaa, this.output]) this.composer.addPass(pass);
   }
 
@@ -256,8 +295,13 @@ export class WalkPost implements PostProcessor {
  * SMAA textures fail to decode is disposed before the error is passed on, so
  * a failed build leaves nothing allocated.
  */
-export async function createWalkPost(renderer: THREE.WebGLRenderer, scene: THREE.Scene, camera: THREE.Camera): Promise<WalkPost> {
-  const chain = new WalkPost(renderer, scene, camera);
+export async function createWalkPost(
+  renderer: THREE.WebGLRenderer,
+  scene: THREE.Scene,
+  camera: THREE.Camera,
+  options: WalkPostOptions = {},
+): Promise<WalkPost> {
+  const chain = new WalkPost(renderer, scene, camera, options);
   try {
     await chain.ready();
   } catch (error) {
