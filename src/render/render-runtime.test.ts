@@ -304,7 +304,7 @@ describe('drawing switched off (plan2d) keeps the scene warm', () => {
   });
 });
 
-describe('drawing on demand in walk and tour', () => {
+describe('drawing on demand in walk, tour, orbit and plan3d', () => {
   /** A runtime in `mode` with a camera, started and past its first (drawn) frame. */
   function resting(mode = 'walk') {
     let current: string | undefined = mode;
@@ -326,7 +326,7 @@ describe('drawing on demand in walk and tour', () => {
     for (let frame = 0; frame < 60; frame += 1) tick(16);
     expect(hooks).toBe(60);
     expect(stub.renders).toBe(1);
-    expect(runtime.demand.counters()).toEqual({ ticks: 61, draws: 1 });
+    expect(runtime.demand.counters()).toEqual({ ticks: 61, draws: 1, insetDraws: 0 });
     runtime.dispose();
   });
 
@@ -372,11 +372,12 @@ describe('drawing on demand in walk and tour', () => {
     runtime.stop();
     runtime.start();
     tick(16);
+    // Into orbit, which draws on demand too: the switch draws once, then it rests.
     setMode('orbit');
     tick(16);
     tick(16);
-    expect(drawn).toEqual([true, false, true, true, true]);
-    expect(stub.renders).toBe(5);
+    expect(drawn).toEqual([true, false, true, true, false]);
+    expect(stub.renders).toBe(4);
     runtime.dispose();
   });
 
@@ -412,6 +413,29 @@ describe('drawing on demand in walk and tour', () => {
     tick(KEEP_WARM_MS);
     expect(stub.renders).toBe(2);
     for (let frame = 0; frame < 10; frame += 1) tick(16);
+    expect(stub.renders).toBe(2);
+    runtime.dispose();
+  });
+
+  test('a resting orbit and a resting top view keep ticking without drawing', () => {
+    for (const mode of ['orbit', 'plan3d']) {
+      const { runtime, stub, tick } = resting(mode);
+      for (let frame = 0; frame < 60; frame += 1) tick(16);
+      expect(stub.renders).toBe(1);
+      expect(runtime.demand.counters()).toEqual({ ticks: 61, draws: 1, insetDraws: 0 });
+      runtime.demand.invalidate();
+      tick(16);
+      expect(stub.renders).toBe(2);
+      runtime.dispose();
+    }
+  });
+
+  test('the flat plan draws only its heartbeat, at an unchanged camera too', () => {
+    const { runtime, stub, tick } = resting('plan2d');
+    runtime.setRenderEnabled(false);
+    tick(16);
+    expect(stub.renders).toBe(1);
+    tick(KEEP_WARM_MS);
     expect(stub.renders).toBe(2);
     runtime.dispose();
   });

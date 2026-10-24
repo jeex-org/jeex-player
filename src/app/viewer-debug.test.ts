@@ -321,8 +321,8 @@ describe('the getters project the model', () => {
   });
 
   test('renderDemand counts nothing without a stage and the runtime counters with one', () => {
-    expect(installViewerDebug(host()).renderDemand()).toEqual({ ticks: 0, draws: 0 });
-    expect(installViewerDebug(host({ renderDemand: () => ({ ticks: 61, draws: 1 }) })).renderDemand()).toEqual({ ticks: 61, draws: 1 });
+    expect(installViewerDebug(host()).renderDemand()).toEqual({ ticks: 0, draws: 0, insetDraws: 0 });
+    expect(installViewerDebug(host({ renderDemand: () => ({ ticks: 61, draws: 1, insetDraws: 2 }) })).renderDemand()).toEqual({ ticks: 61, draws: 1, insetDraws: 2 });
   });
 
   test('walkPost is off without a stage and the controller state with one', () => {

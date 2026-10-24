@@ -503,7 +503,7 @@ export function installViewerDebug(host: ViewerDebugHost): ViewerDebugApi {
     sunShadow: () => host.sun()?.state() ?? null,
     walkPost: () => host.walkPost() ?? 'off',
     walkLighting: () => host.walkLighting() ?? { state: 'off', stats: null },
-    renderDemand: () => host.renderDemand() ?? { ticks: 0, draws: 0 },
+    renderDemand: () => host.renderDemand() ?? { ticks: 0, draws: 0, insetDraws: 0 },
     lightBake: () => host.lightBake(),
     assetModels: () => {
       const furniture = host.sceneRoot()?.getObjectByName(FURNITURE_GROUP_NAME);

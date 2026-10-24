@@ -1,14 +1,19 @@
 /**
  * Whether a tick of the frame loop draws a new picture: the on-demand gate of
- * `walk` and `tour`.
+ * `walk`, `tour`, `orbit` and `plan3d`.
  *
  * In those modes nothing changes on screen while the camera rests and nothing
  * in the scene moves, so the runtime keeps the last presented picture instead
- * of drawing the same one again through the post-processing chain and the
- * room lighting (a tick with no draw call presents nothing new, and the
- * compositor keeps showing the last frame). The frame hooks still run on
- * every tick; only the display draw is gated. Every other mode draws on every
- * tick, as it always did.
+ * of drawing the same one again (a tick with no draw call presents nothing
+ * new, and the compositor keeps showing the last frame). The frame hooks still
+ * run on every tick; only the display draw is gated. `plan2d` is outside the
+ * gate: the opaque plan drawing covers the scene there, and the runtime holds
+ * it to its keep-warm heartbeat (`KEEP_WARM_MS`) so the way back to a 3D view
+ * does not stall.
+ *
+ * Every visible change that is not a camera move must reach the gate: call
+ * `invalidate()`, or report the change through a frame hook that does. A
+ * change that does neither stays off screen until something else draws.
  *
  * A tick draws when something visible was reported since the last display
  * draw (`invalidate`), or when the camera differs from the one that picture
@@ -23,7 +28,7 @@
  */
 
 /** The modes that draw on demand. */
-const ON_DEMAND_MODES: ReadonlySet<string> = new Set(['walk', 'tour']);
+const ON_DEMAND_MODES: ReadonlySet<string> = new Set(['walk', 'tour', 'orbit', 'plan3d']);
 
 /**
  * Largest change of any world-matrix element that does not count as a move:
@@ -44,8 +49,11 @@ export type DemandCamera = {
 /** The camera a picture was displayed with. */
 type Shown = { camera: DemandCamera; world: number[]; projection: number[]; layers: number; mode: string | undefined };
 
-/** Cumulative counters, for the debug surface: frame-loop ticks and display draws. */
-export type DemandCounters = { readonly ticks: number; readonly draws: number };
+/**
+ * Cumulative counters, for the debug surface: frame-loop ticks, display draws,
+ * and draws of the camera-preview inset (which follow display draws only).
+ */
+export type DemandCounters = { readonly ticks: number; readonly draws: number; readonly insetDraws: number };
 
 export class RenderDemand {
   private dirty = true;
@@ -54,6 +62,7 @@ export class RenderDemand {
   private asked: string | undefined;
   private ticks = 0;
   private draws = 0;
+  private insetDraws = 0;
 
   /** Something visible changed: the next tick draws. */
   invalidate(): void {
@@ -93,8 +102,13 @@ export class RenderDemand {
     };
   }
 
+  /** The camera-preview inset was drawn over the last display draw. */
+  insetDrawn(): void {
+    this.insetDraws += 1;
+  }
+
   counters(): DemandCounters {
-    return { ticks: this.ticks, draws: this.draws };
+    return { ticks: this.ticks, draws: this.draws, insetDraws: this.insetDraws };
   }
 }
 
