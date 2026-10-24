@@ -12,6 +12,7 @@ import { lShapePlan } from '../../src/fixtures/plan-l-shape.js';
 import { metadataTable } from '../../src/scene/metadata-table.js';
 import { solvePlan } from '../../src/plan/plan-solver.js';
 import { closeContainers, openContainer, parkForExport } from './support.js';
+import { readScalars, readStringColumn, type GltfJson } from './glb-conformance.js';
 
 const GLB_MAGIC = 0x46546c67;
 
@@ -41,6 +42,22 @@ async function readGlbJson(blob: Blob): Promise<Record<string, unknown>> {
   const buffer = await blob.arrayBuffer();
   expect(new DataView(buffer).getUint32(4, true)).toBe(2);
   return splitGlb(buffer).json;
+}
+
+/** The row index every vertex of `primitive` carries in `_FEATURE_ID_0`, or `null` when it carries none or more than one. */
+function primitiveRow(
+  json: GltfJson,
+  bin: Uint8Array,
+  primitive: { attributes: Record<string, number>; extensions?: Record<string, unknown> },
+): number | null {
+  const set = (
+    primitive.extensions?.['EXT_mesh_features'] as { featureIds?: Array<{ attribute?: number; propertyTable?: number }> } | undefined
+  )?.featureIds?.[0];
+  if (set?.attribute !== 0 || set.propertyTable !== 0) return null;
+  const accessor = primitive.attributes['_FEATURE_ID_0'];
+  const ids = accessor === undefined ? null : readScalars(json, bin, accessor);
+  const row = ids?.[0];
+  return row !== undefined && ids!.every((id) => id === row) ? row : null;
 }
 
 /** Index of the first differing byte, or `-1` when the two runs agree. */
@@ -121,25 +138,30 @@ describe('exportGlb', () => {
     expect(extras.jeex.rev).toBe(1);
     expect(extras.jeex.document).toBeTruthy();
 
-    const nodes = (json['nodes'] as Array<{ extensions?: { EXT_mesh_features?: { featureIds: Array<{ constant: number }> } } }>) ?? [];
-    const tagged = nodes.filter((node) => node.extensions?.EXT_mesh_features);
+    // Feature ids live on primitives (with a `_FEATURE_ID_0` attribute), never on nodes.
+    const { bin } = splitGlb(await blob.arrayBuffer());
+    const gltf = json as GltfJson;
+    expect((gltf.nodes ?? []).filter((node) => node.extensions?.['EXT_mesh_features'] !== undefined)).toEqual([]);
+    const primitives = (gltf.meshes ?? []).flatMap((mesh) => mesh.primitives);
+    const tagged = primitives.filter((primitive) => primitive.extensions?.['EXT_mesh_features'] !== undefined);
     expect(tagged.length).toBeGreaterThan(0);
-    for (const node of tagged) {
-      const index = node.extensions!.EXT_mesh_features!.featureIds[0]!.constant;
-      expect(rows[index]).toBeTruthy();
+    for (const primitive of tagged) {
+      const row = primitiveRow(gltf, bin, primitive);
+      expect(row === null ? undefined : rows[row]).toBeTruthy();
     }
   });
 
-  test('a wall-face row carries no id: its id cells are null, and every wall mesh resolves to the face row with its address', async () => {
-    const json = await readGlbJson(await exportGlb(fakeDeps()));
-    const table = (
-      (json['extensions'] as Record<string, unknown>)['EXT_structural_metadata'] as {
-        propertyTables: Array<{ count: number; properties: Record<string, Array<string | null>> }>;
-      }
-    ).propertyTables[0]!;
-    const cell = (key: string, index: number): string | null => table.properties[key]![index] ?? null;
+  test('a wall-face row carries no id: its id cells are noData, and every wall mesh resolves to the face row with its address', async () => {
+    const { json: raw, bin } = splitGlb(await (await exportGlb(fakeDeps())).arrayBuffer());
+    const json = raw as GltfJson;
+    const columns = new Map(
+      ['class', 'guid', 'ifcGuid', 'id', 'wallId', 'side', 'roomId'].map((key) => [key, readStringColumn(json, bin, 0, key) ?? []]),
+    );
+    const cell = (key: string, index: number): string | null => columns.get(key)![index] ?? null;
+    const count = columns.get('class')!.length;
+    expect(count).toBeGreaterThan(0);
     let faceRows = 0;
-    for (let index = 0; index < table.count; index += 1) {
+    for (let index = 0; index < count; index += 1) {
       if (cell('class', index) === 'wallFace') {
         faceRows += 1;
         expect([cell('guid', index), cell('ifcGuid', index), cell('id', index)]).toEqual([null, null, null]);
@@ -153,21 +175,21 @@ describe('exportGlb', () => {
     expect(faceRows).toBe(solvePlan(lShapePlan).faces.size);
 
     type FaceExtras = { surface?: string; face?: { room?: string; wallId: string; side: string } };
-    const nodes =
-      (json['nodes'] as Array<{ extras?: FaceExtras; extensions?: { EXT_mesh_features?: { featureIds: Array<{ constant: number }> } } }>) ??
-      [];
-    const wallNodes = nodes.filter((node) => node.extras?.surface === 'wall');
+    const wallNodes = (json.nodes ?? []).filter((node) => (node.extras as FaceExtras | undefined)?.surface === 'wall');
     expect(wallNodes.length).toBe(faceRows);
     for (const node of wallNodes) {
-      expect(node.extensions?.EXT_mesh_features).toBeTruthy();
-      const index = node.extensions!.EXT_mesh_features!.featureIds[0]!.constant;
-      const face = node.extras!.face!;
-      expect([cell('class', index), cell('wallId', index), cell('side', index), cell('roomId', index)]).toEqual([
-        'wallFace',
-        face.wallId,
-        face.side,
-        face.room ?? null,
-      ]);
+      const primitives = json.meshes?.[node.mesh ?? -1]?.primitives ?? [];
+      expect(primitives.length).toBeGreaterThan(0);
+      const face = (node.extras as FaceExtras).face!;
+      for (const primitive of primitives) {
+        const index = primitiveRow(json, bin, primitive) ?? -1;
+        expect([cell('class', index), cell('wallId', index), cell('side', index), cell('roomId', index)]).toEqual([
+          'wallFace',
+          face.wallId,
+          face.side,
+          face.room ?? null,
+        ]);
+      }
     }
   });
 
@@ -218,21 +240,38 @@ describe('exportGlb', () => {
    * what this asserts.
    */
   test('bufferViews are laid out in document order, not in PNG-encode completion order', async () => {
-    const { json } = splitGlb(await (await exportGlb(fakeDeps())).arrayBuffer());
+    const { json, bin } = splitGlb(await (await exportGlb(fakeDeps())).arrayBuffer());
     const views = json['bufferViews'] as Array<{ byteOffset?: number; byteLength: number }>;
     const images = (json['images'] as Array<{ bufferView: number }> | undefined) ?? [];
     expect(images.length).toBeGreaterThan(0);
 
-    // Offsets ascend with the index, with no gap beyond 4-byte alignment.
+    // The exporter's views ascend with the index, with no gap beyond 4-byte
+    // alignment; the property table's views follow them, each on an 8-byte
+    // boundary (EXT_structural_metadata), and the BIN chunk is padded to 8.
+    const metadata = (json['extensions'] as Record<string, unknown>)['EXT_structural_metadata'] as {
+      propertyTables: Array<{ properties: Record<string, { values: number; stringOffsets: number }> }>;
+    };
+    const tableViews = Object.values(metadata.propertyTables[0]!.properties).flatMap((property) => [
+      property.values,
+      property.stringOffsets,
+    ]);
+    expect(tableViews.length).toBeGreaterThan(0);
+    const firstTableView = Math.min(...tableViews);
+    expect(tableViews.toSorted((a, b) => a - b)).toEqual(Array.from({ length: tableViews.length }, (_, k) => firstTableView + k));
+    expect(firstTableView + tableViews.length).toBe(views.length);
     let expected = 0;
     let layout = 'packed in index order';
     for (const [index, view] of views.entries()) {
+      const alignment = index >= firstTableView ? 8 : 4;
+      expected += (alignment - (expected % alignment)) % alignment;
       if ((view.byteOffset ?? 0) !== expected && layout === 'packed in index order') {
         layout = `bufferView ${index} at ${view.byteOffset ?? 0}, expected ${expected}`;
       }
       expected += view.byteLength + ((4 - (view.byteLength % 4)) % 4);
     }
     expect(layout).toBe('packed in index order');
+    expect(bin.byteLength % 8).toBe(0);
+    expect((json['buffers'] as Array<{ byteLength: number }>)[0]!.byteLength).toBe(bin.byteLength);
 
     // Accessors come before images, and each array's own order is preserved.
     const accessorViews = (json['accessors'] as Array<{ bufferView?: number }>).flatMap((accessor) =>

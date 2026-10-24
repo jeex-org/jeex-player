@@ -1,7 +1,9 @@
 /**
  * `exportGlb`: turns the committed document into a GLB with the element
- * metadata table riding along as `EXT_structural_metadata` /
- * `EXT_mesh_features`.
+ * metadata table riding along as `EXT_structural_metadata` (a binary property
+ * table at the root) and `EXT_mesh_features` (a feature id on every primitive
+ * of an element mesh, through a `_FEATURE_ID_0` vertex attribute), both
+ * written against the Cesium vendor extensions' text (draft status).
  *
  * Deliberately independent of the live mounted scene graph: `exportGlb` reads
  * only `ExportDeps.getScene()`/`getState()` — the same `SceneData` and
@@ -29,7 +31,7 @@ import * as THREE from 'three';
 import { SceneBuilder, FURNITURE_GROUP_NAME } from '../geometry/scene-builder.js';
 import { solvePlan } from '../plan/plan-solver.js';
 import { metadataTable, structuralMetadataExtension, type ElementRow } from '../scene/metadata-table.js';
-import { exportGraph } from '../render/export-graph.js';
+import { exportGraphWithRows } from '../render/export-graph.js';
 import type { SceneData } from '../scene/types.js';
 import { ViewerLibError } from '../shared/errors.js';
 import type { ExportGlbOptions, ExportSceneState } from './export-types.js';
@@ -77,15 +79,69 @@ function effectiveScene(scene: SceneData, state: 'current' | 'default'): SceneDa
 function prepareExport(
   scene: SceneData,
   options: Pick<Required<ExportGlbOptions>, 'includeFurniture' | 'state'>,
-): { graph: THREE.Object3D; rows: readonly ElementRow[]; dispose: () => void } {
+): { graph: THREE.Object3D; rows: readonly ElementRow[]; meshRows: ReadonlyMap<THREE.Mesh, number>; dispose: () => void } {
   const document = effectiveScene(scene, options.state);
   const plan = solvePlan(document);
   const builder = new SceneBuilder(document, plan);
   const { root } = builder.build();
   if (!options.includeFurniture) root.getObjectByName(FURNITURE_GROUP_NAME)?.removeFromParent();
   const rows = metadataTable(document, plan);
-  const graph = exportGraph(root, rows);
-  return { graph, rows, dispose: () => builder.dispose() };
+  const { graph, meshRows } = exportGraphWithRows(root, rows);
+  return { graph, rows, meshRows, dispose: () => builder.dispose() };
+}
+
+/** The feature id attribute, as `GLTFExporter` names it: a custom attribute starting with `_` is upper-cased and kept. */
+const FEATURE_ID_ATTRIBUTE = '_feature_id_0';
+
+/**
+ * Gives every element mesh of the export graph its feature id, the way
+ * `EXT_mesh_features` defines one for a whole primitive: a `_FEATURE_ID_0`
+ * vertex attribute holding the row index on every vertex (`FLOAT`: a vertex
+ * attribute is padded to a 4-byte stride anyway, `UNSIGNED_INT` is not valid
+ * for one, and a float is exact to 2^24 rows), and
+ * `{ featureIds: [{ featureCount: 1, attribute: 0, propertyTable: 0 }] }`,
+ * which `GLTFExporter` copies off `geometry.userData.gltfExtensions` onto every
+ * primitive it writes for that geometry.
+ *
+ * The mesh gets a wrapper geometry in place of its own: the same attribute
+ * objects (so the exporter still writes each vertex buffer once), the same
+ * index, groups and draw range, plus the feature attribute. Only the clone
+ * changes; the throwaway builder's geometries are left as they are, and
+ * `exportUsdz` never sees a wrapper. One wrapper per (geometry, row) keeps
+ * meshes that share a geometry deduplicated; one feature attribute per
+ * (row, vertex count) lets equal ones share an accessor. Returns the
+ * wrappers' disposal.
+ */
+function addFeatureIds(meshRows: ReadonlyMap<THREE.Mesh, number>): () => void {
+  const wrappers = new Map<THREE.BufferGeometry, Map<number, THREE.BufferGeometry>>();
+  const featureAttributes = new Map<string, THREE.BufferAttribute>();
+  for (const [mesh, row] of meshRows) {
+    const source = mesh.geometry;
+    const byRow = wrappers.get(source) ?? new Map<number, THREE.BufferGeometry>();
+    wrappers.set(source, byRow);
+    let wrapper = byRow.get(row);
+    if (!wrapper) {
+      wrapper = new THREE.BufferGeometry();
+      for (const [name, attribute] of Object.entries(source.attributes)) wrapper.setAttribute(name, attribute);
+      wrapper.morphAttributes = source.morphAttributes;
+      wrapper.morphTargetsRelative = source.morphTargetsRelative;
+      wrapper.setIndex(source.index);
+      for (const group of source.groups) wrapper.addGroup(group.start, group.count, group.materialIndex);
+      wrapper.setDrawRange(source.drawRange.start, source.drawRange.count);
+      const vertices = source.getAttribute('position').count;
+      const key = `${row}:${vertices}`;
+      const feature = featureAttributes.get(key) ?? new THREE.BufferAttribute(new Float32Array(vertices).fill(row), 1);
+      featureAttributes.set(key, feature);
+      wrapper.setAttribute(FEATURE_ID_ATTRIBUTE, feature);
+      // Nothing else of the source's `userData`: the exporter would write it into every primitive's `extras`.
+      wrapper.userData = { gltfExtensions: { EXT_mesh_features: { featureIds: [{ featureCount: 1, attribute: 0, propertyTable: 0 }] } } };
+      byRow.set(row, wrapper);
+    }
+    mesh.geometry = wrapper;
+  }
+  return () => {
+    for (const byRow of wrappers.values()) for (const wrapper of byRow.values()) wrapper.dispose();
+  };
 }
 
 const GLB_MAGIC = 0x46546c67;
@@ -94,11 +150,15 @@ const CHUNK_PREFIX_BYTES = 8;
 const JSON_CHUNK_TYPE = 0x4e4f534a;
 const BIN_CHUNK_TYPE = 0x004e4942;
 
-/** `buffer`, padded with `fill` to the next 4-byte boundary — the GLB chunk-alignment rule. */
-function padTo4Bytes(buffer: ArrayBuffer, fill: number): ArrayBuffer {
-  const remainder = buffer.byteLength % 4;
+/**
+ * `buffer`, padded with `fill` to the next 8-byte boundary: the GLB rule is 4,
+ * and `EXT_structural_metadata` asks for 8 so binary property values can sit
+ * on 8-byte boundaries.
+ */
+function padTo8Bytes(buffer: ArrayBuffer, fill: number): ArrayBuffer {
+  const remainder = buffer.byteLength % 8;
   if (remainder === 0) return buffer;
-  const out = new Uint8Array(buffer.byteLength + (4 - remainder));
+  const out = new Uint8Array(buffer.byteLength + (8 - remainder));
   out.set(new Uint8Array(buffer));
   out.fill(fill, buffer.byteLength);
   return out.buffer;
@@ -107,6 +167,35 @@ function padTo4Bytes(buffer: ArrayBuffer, fill: number): ArrayBuffer {
 /** `value`, rounded up to the next 4-byte boundary — the glTF bufferView alignment rule. */
 function align4(value: number): number {
   return value + ((4 - (value % 4)) % 4);
+}
+
+/** `value`, rounded up to the next 8-byte boundary — where `EXT_structural_metadata` wants a property's bufferView. */
+function align8(value: number): number {
+  return value + ((8 - (value % 8)) % 8);
+}
+
+/**
+ * `bin` with `blocks` appended, each starting on an 8-byte boundary, and one
+ * bufferView per block appended to `json` in the same order (so block `k`
+ * becomes bufferView `firstIndex + k`, the index the caller already wrote).
+ */
+function appendBlocks(json: Record<string, unknown>, bin: ArrayBuffer | null, blocks: readonly Uint8Array[]): ArrayBuffer | null {
+  if (blocks.length === 0) return bin;
+  const views = (json['bufferViews'] as Array<Record<string, unknown>> | undefined) ?? [];
+  json['bufferViews'] = views;
+  let cursor = bin?.byteLength ?? 0;
+  const placed = blocks.map((block) => {
+    const byteOffset = align8(cursor);
+    cursor = byteOffset + block.byteLength;
+    return byteOffset;
+  });
+  const out = new Uint8Array(cursor);
+  if (bin) out.set(new Uint8Array(bin));
+  blocks.forEach((block, index) => {
+    out.set(block, placed[index]);
+    views.push({ buffer: 0, byteOffset: placed[index]!, byteLength: block.byteLength });
+  });
+  return out.buffer;
 }
 
 /** One place in the glTF JSON that names a `bufferView` by index. */
@@ -210,8 +299,10 @@ function chunk(type: number, data: ArrayBuffer): ArrayBuffer[] {
 }
 
 /**
- * Rewrites the JSON chunk of a GLB produced by `GLTFExporter`, leaving its
- * binary chunk (if any) untouched.
+ * Rewrites a GLB produced by `GLTFExporter`: its bufferViews put into
+ * document order (`canonicaliseBufferViews`), then `mutate`'s changes to the
+ * JSON and the blocks it returns appended to the binary chunk (each on an
+ * 8-byte boundary, `appendBlocks`), both chunks padded to 8 bytes.
  *
  * `GLTFExporter` has no root-level `extensions` hook of its own — its
  * `userData` mechanism (`serializeUserData`) only reaches a node, a material
@@ -219,7 +310,7 @@ function chunk(type: number, data: ArrayBuffer): ArrayBuffer[] {
  * belongs at the document root next to `extensionsUsed`, is added by
  * patching the already-written GLB instead of asking the exporter for it.
  */
-function patchGlbJson(glb: ArrayBuffer, mutate: (json: Record<string, unknown>) => void): ArrayBuffer {
+function patchGlbJson(glb: ArrayBuffer, mutate: (json: Record<string, unknown>) => readonly Uint8Array[]): ArrayBuffer {
   const view = new DataView(glb);
   if (glb.byteLength < GLB_HEADER_BYTES || view.getUint32(0, true) !== GLB_MAGIC) {
     throw new ViewerLibError('internal', 'exportGlb: GLTFExporter did not produce a GLB (bad magic)');
@@ -244,11 +335,18 @@ function patchGlbJson(glb: ArrayBuffer, mutate: (json: Record<string, unknown>) 
   // Before anything is added: put the exporter's race-ordered bufferViews back
   // into document order, so the same document always produces the same bytes.
   if (binChunk) binChunk = canonicaliseBufferViews(json, binChunk);
-  mutate(json);
+  // Then whatever the caller adds: its blocks go after the canonical views, in its order.
+  binChunk = appendBlocks(json, binChunk, mutate(json));
+  if (binChunk) {
+    binChunk = padTo8Bytes(binChunk, 0x00);
+    const buffers = (json['buffers'] as Array<Record<string, unknown>> | undefined) ?? [{}];
+    json['buffers'] = buffers;
+    buffers[0]!['byteLength'] = binChunk.byteLength;
+  }
 
-  const jsonBytes = padTo4Bytes(new TextEncoder().encode(JSON.stringify(json)).buffer, 0x20);
+  const jsonBytes = padTo8Bytes(new TextEncoder().encode(JSON.stringify(json)).buffer, 0x20);
   const parts: ArrayBuffer[] = [...chunk(JSON_CHUNK_TYPE, jsonBytes)];
-  if (binChunk) parts.push(...chunk(BIN_CHUNK_TYPE, padTo4Bytes(binChunk, 0x00)));
+  if (binChunk) parts.push(...chunk(BIN_CHUNK_TYPE, binChunk));
 
   const totalLength = GLB_HEADER_BYTES + parts.reduce((sum, part) => sum + part.byteLength, 0);
   const header = new ArrayBuffer(GLB_HEADER_BYTES);
@@ -280,7 +378,8 @@ export async function exportGlb(deps: ExportDeps, options: ExportGlbOptions = {}
   if (!scene) throw notReady('exportGlb');
   const { sceneId, rev } = deps.getState();
 
-  const { graph, rows, dispose } = prepareExport(scene, resolved);
+  const { graph, rows, meshRows, dispose } = prepareExport(scene, resolved);
+  const disposeFeatureIds = addFeatureIds(meshRows);
   try {
     const { GLTFExporter } = await import('three/addons/exporters/GLTFExporter.js');
     const exporter = new GLTFExporter();
@@ -291,11 +390,12 @@ export async function exportGlb(deps: ExportDeps, options: ExportGlbOptions = {}
     })) as ArrayBuffer;
 
     const patched = patchGlbJson(arrayBuffer, (json) => {
+      const { extension, blocks } = structuralMetadataExtension(rows, ((json['bufferViews'] as unknown[] | undefined) ?? []).length);
       const extensionsUsed = new Set<string>([...((json['extensionsUsed'] as string[] | undefined) ?? []), 'EXT_structural_metadata']);
       json['extensionsUsed'] = [...extensionsUsed];
       json['extensions'] = {
         ...(json['extensions'] as Record<string, unknown> | undefined),
-        EXT_structural_metadata: structuralMetadataExtension(rows),
+        EXT_structural_metadata: extension,
       };
       json['extras'] = {
         ...(json['extras'] as Record<string, unknown> | undefined),
@@ -306,10 +406,12 @@ export async function exportGlb(deps: ExportDeps, options: ExportGlbOptions = {}
           ...(resolved.embedDocument ? { document: scene } : {}),
         },
       };
+      return blocks;
     });
 
     return new Blob([patched], { type: 'model/gltf-binary' });
   } finally {
+    disposeFeatureIds();
     dispose();
   }
 }

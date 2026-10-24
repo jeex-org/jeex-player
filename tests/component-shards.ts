@@ -45,6 +45,7 @@ export const COMPONENT_FILE_COST_S: Readonly<Record<string, number>> = {
   'capture-commands.test.ts': 68,
   'door-hud.test.ts': 1,
   'element.test.ts': 204,
+  'export-glb-conformance.test.ts': 3,
   'export-gltf.test.ts': 7,
   'export-graph.test.ts': 1,
   'export-usdz.test.ts': 22,
