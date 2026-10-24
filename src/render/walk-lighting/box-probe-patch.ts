@@ -29,9 +29,9 @@
  *   retroreflection branches keep the studio environment;
  * - on a baked surface (`JEEX_BAKED_SURFACE`, `render/baked-surface.ts`)
  *   the grid is not sampled, the grid hand-over is off and the environment
- *   diffuse scale is 1; the interior sun factor `jeexSunScale` is declared at
- *   fragment scope and `JEEX_WALK_LIGHTING` defined, so the baked policy can
- *   scale the lightmap by it.
+ *   diffuse scale is 1; its lightmap is indirect light and never takes the
+ *   interior sun factor. The baked policy reads `jeexInRoom` where the
+ *   room is located (`JEEX_MAX_BOXES` defined) to pick its gain.
  *
  * Invariant: with `jeexDiffuse` 1, `jeexSun` 1 and `jeexBoxProbes` 0 the output of a
  * material that is not baked equals the unpatched shader's (pinned in `tests/component/walk-lighting.test.ts`), and
@@ -47,7 +47,7 @@ import type { RoomBox, RoomProbe } from './room-volumes.js';
 import { WALK_LIGHTING_TUNING as T } from './walk-lighting-tuning.js';
 
 /** The patch's transform: one program variant, whatever the state; the version changes with the shader text. */
-export const WALK_TRANSFORM = Object.freeze({ id: WALK_TRANSFORM_ID, version: 2 });
+export const WALK_TRANSFORM = Object.freeze({ id: WALK_TRANSFORM_ID, version: 3 });
 /** Edge of an atlas tile: the PMREM layout of a 128 px cube (and of the studio environment). */
 export const TILE = Object.freeze({ width: 384, height: 512 });
 /** Tiles per atlas column. */
@@ -57,6 +57,7 @@ const ROWS_MAX = 8;
 export const ENGINE_CHUNK_ANCHORS = Object.freeze({
   lights_fragment_begin: [
     'irradiance += getLightProbeGridIrradiance( probeWorldPos, probeWorldNormal );',
+    'DirectionalLight directionalLight;',
     'getDirectionalLightInfo( directionalLight, directLight );',
   ],
   lights_fragment_maps: [
@@ -180,7 +181,6 @@ export function setRoomBoxes(uniforms: WalkUniforms, boxes: readonly RoomBox[], 
 }
 
 const PARS = /* glsl */ `
-#define JEEX_WALK_LIGHTING
 #if defined( USE_ENVMAP ) && defined( ENVMAP_TYPE_CUBE_UV )
 #define JEEX_MAX_BOXES ${T.maxBoxes}
 uniform float jeexDiffuse;
@@ -284,12 +284,18 @@ vec3 jeexRadiance( const in vec3 viewDir, const in vec3 normal, const in float r
  * declared inside it.
  */
 const LOCATE = /* glsl */ `vec3 jeexGridIrradiance = vec3( 0.0 );
-float jeexSunScale = 1.0;
 #if defined( USE_ENVMAP ) && defined( ENVMAP_TYPE_CUBE_UV )
 	jeexLocate( - vViewPosition, normal );
-	jeexSunScale = mix( 1.0, jeexSun, jeexInRoom );
 #endif
 `;
+
+/** The sun factor inside the rooms, declared where the directional loop needs it; 1 without a room lookup. */
+const SUN_SCALE = /* glsl */ `DirectionalLight directionalLight;
+	#if defined( USE_ENVMAP ) && defined( ENVMAP_TYPE_CUBE_UV )
+	float jeexSunScale = mix( 1.0, jeexSun, jeexInRoom );
+	#else
+	float jeexSunScale = 1.0;
+	#endif`;
 
 /** The grid's irradiance kept apart in `jeexGridIrradiance`; a baked surface does not sample the grid. */
 const GRID = /* glsl */ `#ifndef JEEX_BAKED_SURFACE
@@ -322,10 +328,11 @@ const viaProbes = (line: string, probes: string): string => `#if defined( ENVMAP
 
 /** The begin chunk, expanded by the composer: the room located ahead of it, the grid kept apart, the sun scaled. */
 function rewriteBegin(text: string): string {
-  const [grid, directional] = ENGINE_CHUNK_ANCHORS.lights_fragment_begin;
+  const [grid, declare, directional] = ENGINE_CHUNK_ANCHORS.lights_fragment_begin;
   const begin = chunkMarker('lights_fragment_begin', 'begin');
   let out = replaceAnchor(text, begin, LOCATE + begin, WALK_TRANSFORM_ID);
   out = replaceAnchor(out, grid, GRID, WALK_TRANSFORM_ID);
+  out = replaceAnchor(out, declare, SUN_SCALE, WALK_TRANSFORM_ID);
   return replaceAnchor(out, directional, `${directional}\n\t\tdirectLight.color *= jeexSunScale;`, WALK_TRANSFORM_ID);
 }
 

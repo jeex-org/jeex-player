@@ -1,7 +1,16 @@
 import { describe, expect, test } from 'bun:test';
 import * as THREE from 'three';
 import { BAKED_CHUNK_ANCHORS, bakeFragmentShader } from './baked-surface-glsl.js';
-import { addShaderTransform, isBakedSurface, markBakedSurface, setLampBaked, type ShaderTransform } from './baked-surface.js';
+import {
+  addShaderTransform,
+  bakedLightGain,
+  isBakedSurface,
+  markBakedSurface,
+  setBakedLightMode,
+  setLampBaked,
+  type ShaderTransform,
+} from './baked-surface.js';
+import { LIGHTING_STANDARD } from '../lighting/lighting-standard.js';
 import { chunkMarker, expandOwnedChunks, hasShaderTransform } from './shader-compose.js';
 import { patchFragmentShader } from './walk-lighting/box-probe-patch.js';
 
@@ -59,7 +68,8 @@ describe('bakeFragmentShader', () => {
     expect(text).not.toContain('reflectedLight.indirectDiffuse += indirectDiffuse;');
     expect(text).toContain('reflectedLight.indirectDiffuse += diffuse;');
     expect(text).toContain('iblIrradiance += getIBLIrradiance( geometryNormal );');
-    expect(text.indexOf('irradiance *= jeexSunScale;')).toBeGreaterThan(text.indexOf(chunkMarker('lights_fragment_maps', 'end')));
+    expect(text.indexOf('irradiance *= jeexBakedGain;')).toBeGreaterThan(text.indexOf(chunkMarker('lights_fragment_maps', 'end')));
+    expect(text.indexOf('uniform float jeexBakedGain;')).toBeLessThan(text.indexOf('void main()'));
     expect(text.indexOf('#define JEEX_BAKED_SURFACE')).toBeLessThan(text.indexOf('void main()'));
     expect(text).not.toMatch(/#define lightMapIntensity/);
   });
@@ -68,6 +78,55 @@ describe('bakeFragmentShader', () => {
     const both = bakeFragmentShader(patchFragmentShader(THREE.ShaderLib.physical.fragmentShader));
     expect(both).toContain('directLight.color *= jeexSunScale;');
     expect(both).toContain('directLight.color *= jeexDirDirect[ i ];');
+  });
+
+  test('the lightmap is indirect light: never scaled by the walk sun factor, only by the gain of its mode', () => {
+    const both = bakeFragmentShader(patchFragmentShader(THREE.ShaderLib.physical.fragmentShader));
+    // The walk's own sun scale stays the only use of the factor.
+    expect(both.split('jeexSunScale;')).toHaveLength(2);
+    expect(both).not.toContain('irradiance *= jeexSunScale;');
+    // Inside the room boxes the gain of the mode, outside every box the editing gain (a facade keeps the editing look).
+    expect(both.split('irradiance *= mix( jeexBakedEditingGain, jeexBakedGain, jeexInRoom );')).toHaveLength(2);
+    expect(both.indexOf('irradiance *= mix( jeexBakedEditingGain')).toBeGreaterThan(both.indexOf('jeexLocate( - vViewPosition, normal );'));
+  });
+});
+
+describe('the baked-interior gain', () => {
+  const { editing, walk } = LIGHTING_STANDARD.baked.exposure;
+  const camera = new THREE.PerspectiveCamera();
+  let frame = 0;
+  /** Draws `material` once in `scene` as three would, through its draw hook only. */
+  function draw(material: THREE.Material, scene: THREE.Scene): void {
+    const renderer = { info: { render: { frame: (frame += 1) } } } as unknown as THREE.WebGLRenderer;
+    const hook = hookOf(material) as (...args: unknown[]) => void;
+    hook.call(material, renderer, scene, camera, undefined, new THREE.Mesh(), undefined);
+  }
+
+  test('editing until the scene is put in walk, per scene, and back', () => {
+    const scene = new THREE.Scene();
+    const other = new THREE.Scene();
+    expect(bakedLightGain(scene)).toBe(editing);
+    setBakedLightMode(scene, 'walk');
+    expect([bakedLightGain(scene), bakedLightGain(other)]).toEqual([walk, editing]);
+    setBakedLightMode(scene, 'editing');
+    expect(bakedLightGain(scene)).toBe(editing);
+  });
+
+  test('every draw sets the shared uniform from the drawn scene, whatever was drawn before', () => {
+    const material = new THREE.MeshStandardMaterial();
+    markBakedSurface(material);
+    const gain = compile(material).uniforms['jeexBakedGain'] as { value: number };
+    const walking = new THREE.Scene();
+    setBakedLightMode(walking, 'walk');
+    const editingScene = new THREE.Scene();
+    draw(material, walking);
+    expect(gain.value).toBe(walk);
+    draw(material, editingScene);
+    expect(gain.value).toBe(editing);
+    // The same render and camera, another scene: the scene still decides.
+    frame -= 1;
+    draw(material, walking);
+    expect(gain.value).toBe(walk);
   });
 });
 
@@ -95,7 +154,7 @@ describe('marks', () => {
     const before = hookOf(clone);
     markBakedSurface(clone);
     expect(hookOf(clone)).not.toBe(before);
-    expect(hasShaderTransform(clone, 'jeex-baked-surface', 1)).toBe(true);
+    expect(hasShaderTransform(clone, 'jeex-baked-surface', 2)).toBe(true);
   });
 
   test('lamps: baked, then live', () => {

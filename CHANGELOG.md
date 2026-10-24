@@ -9,6 +9,17 @@ as described under [Versioning](#versioning).
 
 ### Added
 
+- **Baked rooms read like live rooms.** `LIGHTING_STANDARD.baked.exposure`
+  (`jeex-viewer/lighting`) holds two gains on the lightmap of a baked surface
+  and on nothing else: `editing` (80) in the editing modes and `walk` (6.4) in
+  walk and tour inside the room boxes, on top of the walk exposure; outside
+  every room box a baked surface keeps the editing gain, so it keeps the
+  editing look like a facade. Metered on the demo flat's first full bake
+  against a target of ±20 %, a baked living room now reads within 1 % of the
+  live look on its walls and within 8 % on its floor, in orbit and in walk;
+  its floor keeps its warm cast, and nothing clips. `LIGHTING_STANDARD_VERSION`
+  stays 1: no existing rig value changed. A later change of either gain raises
+  it.
 - **Lamp lights in baked projects.** A project variant may carry `lights`:
   1 to 4 point lights `{ kind: 'point', position, colour, lumens, cutoff,
   shadow? }` in the variant's model frame. The player builds each as a
@@ -391,6 +402,9 @@ as described under [Versioning](#versioning).
 
 ### Fixed
 
+- A lightmap on a baked surface is no longer divided by the walk's interior
+  sun factor in walk and tour: it is indirect light, like the room grid, and
+  takes only the baked-interior gain of the mode.
 - **Ceiling objects of a baked project hang from the ceiling.** A ceiling
   object's `dims` stand-in and its GLB used to stand UP from the ceiling plane
   (a 1.052 m pendant under a 2.65 m ceiling was drawn from 2.65 to 3.70 m);

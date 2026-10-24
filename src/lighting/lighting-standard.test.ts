@@ -37,6 +37,12 @@ describe('LIGHTING_STANDARD', () => {
     walk(LIGHTING_STANDARD, 'LIGHTING_STANDARD');
   });
 
+  test('the baked-interior gains are positive numbers, one per mode', () => {
+    const { editing, walk } = LIGHTING_STANDARD.baked.exposure;
+    expect(Object.keys(LIGHTING_STANDARD.baked.exposure).sort()).toEqual(['editing', 'walk']);
+    for (const gain of [editing, walk]) expect(Number.isFinite(gain) && gain > 0).toBe(true);
+  });
+
   test('a write at any depth changes nothing', () => {
     const before = JSON.stringify(LIGHTING_STANDARD);
     const write = (run: () => void): void => {
