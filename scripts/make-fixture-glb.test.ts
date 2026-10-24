@@ -9,6 +9,7 @@ import {
   FIXTURE_OUTPUT,
   FIXTURE_SIZE_LIMIT,
   glbJson,
+  LAMP_FIXTURES,
 } from './make-fixture-glb.ts';
 
 const HERE = import.meta.dirname;
@@ -82,4 +83,25 @@ describe('make-fixture-glb, the KHR_texture_basisu variant', () => {
     expect(bytes.byteLength).toBeLessThanOrEqual(FIXTURE_SIZE_LIMIT);
     expect(readFileSync(resolve(HERE, '..', BASISU_FIXTURE_OUTPUT))).toEqual(Buffer.from(bytes));
   });
+});
+
+describe('make-fixture-glb, the lamp bodies', () => {
+  for (const fixture of LAMP_FIXTURES) {
+    const bytes = buildFixtureGlb(undefined, fixture.model);
+    const json = glbJson(bytes);
+    const position = (json['accessors'] as { min: number[]; max: number[] }[])[0]!;
+
+    test(`${fixture.model.node} measures its dims in the model frame and names the lamp slots`, () => {
+      for (const axis of [0, 1, 2]) expect(position.max[axis]! - position.min[axis]!).toBeCloseTo(fixture.dims[axis]!, 6);
+      expect(position.min[1]!).toBeCloseTo(0, 6);
+      expect(position.min[0]!).toBeCloseTo(-position.max[0]!, 6);
+      expect(position.min[2]!).toBeCloseTo(-position.max[2]!, 6);
+      expect((json['materials'] as { name: string }[]).map((material) => material.name)).toEqual(['metal', 'shade']);
+    });
+
+    test(`${fixture.model.node} is small and the committed file`, () => {
+      expect(bytes.byteLength).toBeLessThanOrEqual(FIXTURE_SIZE_LIMIT);
+      expect(Buffer.from(readFileSync(resolve(HERE, '..', fixture.output)))).toEqual(Buffer.from(bytes));
+    });
+  }
 });

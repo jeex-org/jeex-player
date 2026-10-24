@@ -1,0 +1,67 @@
+{
+  "schemaVersion": "2.2",
+  "units": "m",
+  "id": "01a16c4d-7294-7134-bdf2-d33b3ad6419b",
+  "name": "Lamp lights fixture",
+  "ceilingHeight": 2.65,
+  "assetLibrary": "01a16c09-ee6e-778b-9552-c778436584cb",
+  "nodes": [
+    { "id": "01a16c4d-7294-7135-8f07-c70c4e9487d4", "p": { "x": 0, "z": 0 } },
+    { "id": "01a16c4d-7294-7136-b1c7-a829048e2bee", "p": { "x": 4.5, "z": 0 } },
+    { "id": "01a16c4d-7294-7137-8c90-1dc91b7f4f15", "p": { "x": 4.5, "z": 4 } },
+    { "id": "01a16c4d-7294-7138-a427-3f2b8e028d5f", "p": { "x": 0, "z": 4 } }
+  ],
+  "walls": [
+    {
+      "id": "01a16c4d-7294-7139-890e-ffd77c31c8a2",
+      "a": "01a16c4d-7294-7135-8f07-c70c4e9487d4",
+      "b": "01a16c4d-7294-7136-b1c7-a829048e2bee",
+      "thickness": 0.3,
+      "role": "facade"
+    },
+    {
+      "id": "01a16c4d-7294-713a-b5f5-6b996e60f4d1",
+      "a": "01a16c4d-7294-7136-b1c7-a829048e2bee",
+      "b": "01a16c4d-7294-7137-8c90-1dc91b7f4f15",
+      "thickness": 0.3,
+      "role": "facade"
+    },
+    {
+      "id": "01a16c4d-7294-713b-973d-0fa7bcdab2ca",
+      "a": "01a16c4d-7294-7137-8c90-1dc91b7f4f15",
+      "b": "01a16c4d-7294-7138-a427-3f2b8e028d5f",
+      "thickness": 0.3,
+      "role": "facade"
+    },
+    {
+      "id": "01a16c4d-7294-713c-acc0-8878bc259fc2",
+      "a": "01a16c4d-7294-7138-a427-3f2b8e028d5f",
+      "b": "01a16c4d-7294-7135-8f07-c70c4e9487d4",
+      "thickness": 0.3,
+      "role": "facade"
+    }
+  ],
+  "rooms": [{ "id": "01a16c4d-7294-713d-beb1-ae2775cdb5d3", "name": "Living", "anchor": { "x": 2.25, "z": 2 } }],
+  "assets": [
+    {
+      "id": "01a16c4d-7294-713e-a60c-086555d388ec",
+      "type": "01a16c09-ee76-75e7-9634-8e74a70212a9",
+      "asset": "01a16c09-ee76-75e7-9634-8e74a70212a9",
+      "variant": "01a16c09-ee79-7101-bb3d-9aeee94bccf2",
+      "room": "01a16c4d-7294-713d-beb1-ae2775cdb5d3",
+      "position": { "x": 1, "y": 0, "z": 1 },
+      "rotationY": 0
+    },
+    {
+      "id": "01a16c4d-7294-713f-a50a-63ce66df2bdd",
+      "type": "01a16c09-ee7f-7182-8ee4-57a784ebc41d",
+      "asset": "01a16c09-ee7f-7182-8ee4-57a784ebc41d",
+      "variant": "01a16c09-ee82-75aa-b49b-3898b69063f9",
+      "room": "01a16c4d-7294-713d-beb1-ae2775cdb5d3",
+      "position": { "x": 2.5, "y": 0, "z": 2 },
+      "rotationY": 0
+    }
+  ],
+  "presentationCamera": { "position": { "x": 2.25, "y": 1.6, "z": 3.6 }, "target": { "x": 2.25, "y": 1.2, "z": 1 } },
+  "navigation": { "points": [{ "x": 2.25, "y": 0, "z": 3 }] }
+}
