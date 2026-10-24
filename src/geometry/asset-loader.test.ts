@@ -12,6 +12,7 @@ import { apartmentScene } from '../demo/scene-data.js';
 import type { DemoAsset } from '../scene/types.js';
 import type { ModelOutcome, ModelRequest } from './model-source.js';
 import { PROJECT_FIXTURE } from '../../tests/fixtures/project/fixture-ids.js';
+import { HANGING, hangingManifest, modelFrameBox } from '../fixtures/hanging-pendant.js';
 
 /**
  * Loader checks that need Three.js but no canvas: texture generators return
@@ -228,6 +229,76 @@ describe('a project object, which has no builder', () => {
     const result = loader.load({ ...SOFA, id: PLACEMENT.ghost, asset: ARCHETYPE.sofa_3s, library: OTHER_LIBRARY });
     expect(result.degraded).toBe(true);
     expect(result.group.userData['degraded']).toBe('unknown-library');
+    loader.dispose();
+  });
+});
+
+/* ------------------------------------------- ceiling bodies hang (1.052 m pendant) --- */
+
+function hangingLoader(): AssetLoader {
+  const manifest = hangingManifest();
+  const bank = projectBank(manifest, PROJECT_BASE);
+  return new AssetLoader([], {
+    defaultLibrary: manifest.library.id,
+    ceilingHeight: HANGING.ceiling,
+    catalogue: bank.catalogue,
+    resolveFinish: bank.resolveFinish,
+    modelUrl: (asset) => bank.modelUrl(asset),
+    modelSource: () => Promise.resolve({ group: modelFrameBox(HANGING.dims), triangles: 12, warnings: [], bytes: 0 }),
+  });
+}
+
+const HANGING_PLACEMENT: DemoAsset = {
+  id: HANGING.placement,
+  type: HANGING.archetype,
+  asset: HANGING.archetype,
+  variant: HANGING.variant,
+  position: { x: 5.5, y: 0, z: 7.06 },
+};
+
+function worldBox(object: THREE.Object3D): THREE.Box3 {
+  object.updateMatrixWorld(true);
+  return new THREE.Box3().setFromObject(object);
+}
+
+describe('a ceiling body no builder made hangs from the ceiling plane', () => {
+  test('the stand-in box has its top at the ceiling and hangs its own height down', () => {
+    const loader = hangingLoader();
+    const { group } = loader.load(HANGING_PLACEMENT);
+    expect(group.position.y).toBe(HANGING.ceiling);
+    const box = worldBox(group);
+    expect(box.max.y).toBeCloseTo(HANGING.ceiling, 3);
+    expect(box.min.y).toBeCloseTo(HANGING.ceiling - HANGING.dims[1], 3);
+    loader.dispose();
+  });
+
+  test('the GLB body lands in the same world box as its stand-in, not 2.65 to 3.70 m', async () => {
+    const loader = hangingLoader();
+    const { group } = loader.load(HANGING_PLACEMENT);
+    const standIn = worldBox(group);
+    const upgrade = await loader.upgrade(HANGING_PLACEMENT, new AbortController().signal);
+    if (!upgrade) throw new Error('the pendant should have a model');
+    for (const child of [...group.children]) child.removeFromParent();
+    group.add(upgrade.body);
+    const glb = worldBox(group);
+    expect(glb.max.y).toBeCloseTo(HANGING.ceiling, 3);
+    expect(glb.min.y).toBeCloseTo(1.598, 3);
+    for (const axis of ['x', 'y', 'z'] as const) {
+      expect(glb.min[axis]).toBeCloseTo(standIn.min[axis], 3);
+      expect(glb.max[axis]).toBeCloseTo(standIn.max[axis], 3);
+    }
+    loader.dispose();
+  });
+
+  test('a bank pendant, which its builder draws hanging, keeps its body and world box exactly', () => {
+    const loader = new AssetLoader([], { ceilingHeight: HANGING.ceiling });
+    const { group } = loader.load({ id: PLACEMENT.pendant, type: 'pendant', position: { x: 1, y: 0, z: 2 } });
+    const body = group.children[0]!;
+    expect(body.position.toArray()).toEqual([0, 0, 0]);
+    const box = worldBox(group);
+    // Measured on the builder before non-builder bodies were offset.
+    expect(box.min.toArray().map((value) => Number(value.toFixed(6)))).toEqual([0.82, 1.59784, 1.82]);
+    expect(box.max.toArray().map((value) => Number(value.toFixed(6)))).toEqual([1.18, 2.65, 2.18]);
     loader.dispose();
   });
 });

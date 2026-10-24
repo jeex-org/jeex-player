@@ -138,6 +138,21 @@ function libraryModelUrl(asset: ResolvedAsset): string | undefined {
   return base && asset.model ? `${base}${asset.model}` : undefined;
 }
 
+/**
+ * Hangs a body no builder made from the ceiling plane.
+ *
+ * A ceiling group sits AT the ceiling (`ResolvedAsset.mountY`), and a builder
+ * draws its fixture downward from there. A `dims` stand-in and a delivered GLB
+ * are in the model frame instead (lowest point at y = 0), so without this they
+ * would stand UP from the ceiling. `top` is the body's own height: `dims[1]`
+ * for the stand-in, the measured top for a GLB. Lamp lights, children of the
+ * body, follow it. Nothing else reads the drawn origin: the walk, the plan and
+ * the layout lint read the catalogue facts (`y - height .. y`).
+ */
+function hangFromCeiling(body: THREE.Object3D, asset: ResolvedAsset, top: number): void {
+  if (asset.anchor === 'ceiling' && Number.isFinite(top)) body.position.y = -top;
+}
+
 export class AssetLoader {
   private readonly finishes: FinishRegistry;
   private readonly geometries = new GeometryCache();
@@ -205,7 +220,9 @@ export class AssetLoader {
     // `userData`, same `modelState: 'procedural'` - so `upgradeModels` finds
     // it and the picker indexes it exactly like anything else.
     if (!built && asset.model) {
-      const group = this.dressedGroup(placement, asset, this.pendingBody(asset));
+      const body = this.pendingBody(asset);
+      hangFromCeiling(body, asset, asset.dims[1]);
+      const group = this.dressedGroup(placement, asset, body);
       group.userData['degraded'] = PENDING_MODEL;
       return { group, degraded: false };
     }
@@ -289,6 +306,7 @@ export class AssetLoader {
     const loaded = await source(request, signal);
     const prepared = prepareGltfBody(loaded.group, request, this.finishes, asset.finishes, { baked: asset.baked });
     prepared.group.name = `${asset.variantId}-gltf`;
+    hangFromCeiling(prepared.group, asset, new THREE.Box3().setFromObject(prepared.group).max.y);
     return {
       body: prepared.group,
       triangles: prepared.triangles,

@@ -40,6 +40,12 @@ import { resolveFinish } from '../materials/material-catalogue.js';
 import { ARCHETYPE, OPENING_VARIANT, VARIANT } from '../assets/catalogue-ids.js';
 import { ARC_TOL, arcFromChord } from '../plan/plan-geometry.js';
 import { FaceMap, faceKey, type FaceKey, type SceneData } from '../scene/types.js';
+import { HANGING, hangingManifest, modelFrameBox } from '../fixtures/hanging-pendant.js';
+import { obstaclesFor } from '../assets/asset-footprint.js';
+import { projectAssetFacts } from '../assets/asset-facts.js';
+import { planDrawingInputs } from '../assets/plan-fixtures.js';
+import { buildPlanDrawing } from '../plan/plan-drawing.js';
+import { lintContext, lintLayout, projectLayoutCatalogue } from '../layout/layout-lint.js';
 
 type Built = { scene: SceneData; plan: SolvedPlan; builder: SceneBuilder; root: THREE.Group };
 
@@ -1217,6 +1223,114 @@ describe('a variant swap moves the upgrade onto the new body', () => {
     // And the model fetched is the one the DOCUMENT names now, not the one the
     // builder was constructed with.
     expect(requested).toEqual([CHOSEN]);
+    builder.dispose();
+  });
+});
+
+/**
+ * Ceiling bodies no builder made hang from the ceiling plane. The walk, the
+ * plan and the layout lint read the catalogue facts, never the drawn origin,
+ * so they say the same before and after the build, and what they say (a
+ * ceiling item spans `y - height .. y`) is now what is drawn.
+ */
+describe('a hanging project pendant, through the builder', () => {
+  /** A bank ceiling light: its builder draws it hanging, so it is left as it is. */
+  const BANK_CEILING = '01a16c46-c3ca-70cc-959a-dadafbfea9fb';
+
+  function hangingScene(): SceneData {
+    const scene = draftOf(lShapePlan);
+    scene.ceilingHeight = HANGING.ceiling;
+    scene.assetLibrary = HANGING.project;
+    scene.assets = [
+      {
+        id: HANGING.placement,
+        type: HANGING.archetype,
+        asset: HANGING.archetype,
+        variant: HANGING.variant,
+        room: ROOM.a,
+        position: { x: 3, y: 0, z: 3 },
+        rotationY: 0,
+      },
+      {
+        id: BANK_CEILING,
+        type: 'ceiling-light',
+        asset: ARCHETYPE.ceiling_light,
+        room: ROOM.a,
+        position: { x: 2, y: 0, z: 2 },
+        rotationY: 0,
+      },
+    ];
+    return scene;
+  }
+
+  /** Every ceiling fact the walk, the plan and the lint compute, as plain data. */
+  function facts(scene: SceneData, plan: SolvedPlan): unknown {
+    const library = hangingManifest().library;
+    const source = projectAssetFacts(library);
+    const catalogue = projectLayoutCatalogue(library);
+    return JSON.parse(
+      JSON.stringify({
+        obstacles: obstaclesFor(scene, source),
+        plan: buildPlanDrawing(plan, scene, planDrawingInputs(scene, source)),
+        lint: lintLayout(scene, plan, catalogue),
+        mounts: lintContext(scene, plan, catalogue).items.map((item) => ({ id: item.placement.id, mount: item.mount })),
+      }),
+    ) as unknown;
+  }
+
+  function hangingBuilder(scene: SceneData): SceneBuilder {
+    const manifest = hangingManifest();
+    const bank = projectBank(manifest, QUEUE_BASE_URL);
+    return new SceneBuilder(scene, solvePlan(scene), {
+      catalogue: bank.catalogue,
+      resolveFinish: bank.resolveFinish,
+      modelUrl: (asset) => bank.modelUrl(asset),
+      modelSource: () => Promise.resolve({ group: modelFrameBox(HANGING.dims), triangles: 12, warnings: [], bytes: 0 }),
+    });
+  }
+
+  function worldBoxOf(root: THREE.Object3D, id: string): THREE.Box3 {
+    const group = root.getObjectByName(FURNITURE_GROUP_NAME)!.getObjectByName(id)!;
+    root.updateMatrixWorld(true);
+    return new THREE.Box3().setFromObject(group);
+  }
+
+  test('stand-in and GLB occupy the same world box, its top at the ceiling', async () => {
+    const scene = hangingScene();
+    const builder = hangingBuilder(scene);
+    const { root } = builder.build();
+    const standIn = worldBoxOf(root, HANGING.placement);
+    const pass = await builder.upgradeModels(new AbortController().signal);
+    expect(pass.upgraded).toBe(1);
+    const glb = worldBoxOf(root, HANGING.placement);
+    expect(glb.max.y).toBeCloseTo(HANGING.ceiling, 3);
+    expect(glb.min.y).toBeCloseTo(HANGING.ceiling - HANGING.dims[1], 3);
+    for (const axis of ['x', 'y', 'z'] as const) {
+      expect(glb.min[axis]).toBeCloseTo(standIn.min[axis], 3);
+      expect(glb.max[axis]).toBeCloseTo(standIn.max[axis], 3);
+    }
+    builder.dispose();
+  });
+
+  test('walk obstacles, plan facts and the layout lint are identical before and after, and match the drawn box', async () => {
+    const scene = hangingScene();
+    const plan = solvePlan(scene);
+    const before = facts(scene, plan);
+    const builder = hangingBuilder(scene);
+    const { root } = builder.build();
+    await builder.upgradeModels(new AbortController().signal);
+    expect(facts(scene, plan)).toEqual(before);
+    const mounts = (before as { mounts: Array<{ id: string; mount: { low: number; high: number } }> }).mounts;
+    // Within 5 mm: the bank ceiling light's builder draws 2 mm more than its catalogue drop.
+    for (const id of [HANGING.placement, BANK_CEILING]) {
+      const mount = mounts.find((entry) => entry.id === id)!.mount;
+      const drawn = worldBoxOf(root, id);
+      expect({ id, low: drawn.min.y, high: drawn.max.y }).toEqual({
+        id,
+        low: expect.closeTo(mount.low, 2),
+        high: expect.closeTo(mount.high, 2),
+      });
+    }
     builder.dispose();
   });
 });
