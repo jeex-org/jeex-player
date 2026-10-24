@@ -59,6 +59,8 @@ export class ShellPaint {
   private readonly trimMaterials = new Map<string, THREE.MeshStandardMaterial>();
   /** Every library-dressed material this paint made, with the surface that owns its maps. */
   private readonly librarySurfaces = new Map<THREE.Material, LibrarySurface>();
+  /** The map loads still in flight (`mapsSettled`). */
+  private readonly loads = new Set<Promise<void>>();
   /**
    * Where the paint state is READ from. It starts at the document the paint
    * was constructed with and is re-pointed at the bound model's committed
@@ -100,8 +102,22 @@ export class ShellPaint {
   private libraryMaterial(draw: LibraryDraw, surface: FinishSurface, outline: readonly Vec2[]): THREE.MeshStandardMaterial {
     const library = new LibrarySurface(draw, surface, outline);
     this.librarySurfaces.set(library.material, library);
-    if (this.ctx.textures !== null) void library.load(this.ctx.textures);
+    if (this.ctx.textures !== null) {
+      const load = library.load(this.ctx.textures);
+      const settle = (): void => void this.loads.delete(load);
+      this.loads.add(load);
+      void load.then(settle, settle);
+    }
     return library.material;
+  }
+
+  /**
+   * Resolves once no library map of this shell is loading any more: every map
+   * asked for so far has attached or given up (a load never throws). A
+   * light bake waits for it, since its bound clones would miss a later map.
+   */
+  async mapsSettled(): Promise<void> {
+    while (this.loads.size > 0) await Promise.allSettled([...this.loads]);
   }
 
   /** The floor material of a room: its finish value (the painted one, else `Room.floorMaterial`), drawn on `outline`. */

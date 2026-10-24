@@ -8,6 +8,7 @@
  */
 
 import { afterEach, beforeEach, describe, expect, test } from 'bun:test';
+import type * as THREE from 'three';
 import { applyStartView, firstPicture, loadWithNoiseTiles, nextFrame } from './viewer-boot.js';
 import { TextureCache } from '../materials/texture-cache.js';
 import { ViewerDisposedError } from './viewer-context.js';
@@ -139,8 +140,12 @@ describe('firstPicture', () => {
 });
 
 /** The bits of `ViewerUI` and `TourControls` the start view drives. */
-function startHarness(overrides: Partial<ViewerOptions>) {
+function startHarness(overrides: Partial<ViewerOptions>, camera?: unknown) {
   const calls: string[] = [];
+  const page = globalThis as { __JEEX_DEBUG_CAMERA__?: unknown };
+  if (camera === undefined) delete page.__JEEX_DEBUG_CAMERA__;
+  else page.__JEEX_DEBUG_CAMERA__ = camera;
+  const at = (v: { x: number; y: number; z: number }): string => `${v.x},${v.y},${v.z}`;
   const options: ViewerOptions = { ...DEFAULT_VIEWER_OPTIONS, ...overrides };
   applyStartView({
     options,
@@ -154,12 +159,41 @@ function startHarness(overrides: Partial<ViewerOptions>) {
       play: () => calls.push('play'),
     } as never,
     setMode: (mode) => calls.push(`setMode:${mode}`),
-    engageTour: () => calls.push('engage'),
+    director: () =>
+      ({
+        engageTour: () => calls.push('engage'),
+        enterWalkAt: (pose: { position: THREE.Vector3; target: THREE.Vector3 }) =>
+          calls.push(`walkAt:${at(pose.position)}>${at(pose.target)}`),
+        controller: {
+          snapOrbit: (position: THREE.Vector3, target: THREE.Vector3) => calls.push(`snapOrbit:${at(position)}>${at(target)}`),
+        },
+      }) as never,
   });
+  delete page.__JEEX_DEBUG_CAMERA__;
   return calls;
 }
 
 describe('applyStartView', () => {
+  test("a page's debug camera opens the viewer in that mode at that pose, instead of the authored start view", () => {
+    const tour = { view: { ...DEFAULT_VIEWER_OPTIONS.view, mode: 'tour' as const } };
+    expect(startHarness(tour, { mode: 'walk', position: [1, 1.6, 2], target: [3, 1.5, 2] })).toEqual([
+      'buttons:walk',
+      'hint:walk',
+      'setMode:walk',
+      'walkAt:1,1.6,2>3,1.5,2',
+    ]);
+    expect(startHarness({}, { mode: 'orbit', position: [6, 9, 8], target: [2, 0, 1] })).toEqual([
+      'buttons:orbit',
+      'hint:orbit',
+      'setMode:orbit',
+      'snapOrbit:6,9,8>2,0,1',
+    ]);
+  });
+
+  test('a malformed debug camera leaves the authored start view', () => {
+    expect(startHarness({}, { mode: 'walk', position: [1, 1.6] })).toEqual(['buttons:orbit', 'hint:orbit']);
+  });
+
   test('a non-tour mode only switches the camera, never the clip', () => {
     const calls = startHarness({ view: { ...DEFAULT_VIEWER_OPTIONS.view, mode: 'walk' } });
     expect(calls).toEqual(['buttons:walk', 'hint:walk', 'setMode:walk']);

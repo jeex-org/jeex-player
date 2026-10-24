@@ -20,6 +20,9 @@ import type { Messages } from '../ui/messages.js';
 import type { TourControls } from '../camera/tour-controls.js';
 import type { ViewerOptions } from './viewer-options.js';
 import type { ViewerMode } from '../scene/types.js';
+import * as THREE from 'three';
+import type { CameraDirector } from '../camera/camera-director.js';
+import { debugCamera, type DebugCamera } from '../shared/debug-flags.js';
 import { COMMON_NOISE_TILES } from '../materials/noise-tiles.js';
 import { prewarmNoiseTiles } from '../materials/texture-prewarm.js';
 import { sharedTextureCache, type TextureCache } from '../materials/texture-cache.js';
@@ -128,9 +131,23 @@ type StartViewDeps = {
   tour: TourControls;
   /** Switches the camera mode; the composition root's own `setMode`. */
   setMode: (mode: ViewerMode) => void;
-  /** Puts the camera into tour mode without starting the clip. */
-  engageTour: () => void;
+  /** The camera director: engages the tour, and places a page's debug camera. */
+  director: () =>
+    | (Pick<CameraDirector, 'engageTour' | 'enterWalkAt'> & { readonly controller: Pick<CameraDirector['controller'], 'snapOrbit'> })
+    | undefined;
 };
+
+/** Opens in the page's debug camera (`__JEEX_DEBUG_CAMERA__`): its mode, standing exactly at its pose. */
+function openAtDebugCamera(deps: StartViewDeps, camera: DebugCamera): void {
+  deps.ui.setModeButtons(camera.mode);
+  deps.ui.setHintForMode(camera.mode);
+  deps.setMode(camera.mode);
+  const position = new THREE.Vector3(...camera.position);
+  const target = new THREE.Vector3(...camera.target);
+  const director = deps.director();
+  if (camera.mode === 'walk') director?.enterWalkAt({ position, target });
+  else director?.controller.snapOrbit(position, target);
+}
 
 /**
  * The mode the page opens in, `options.view` as authored.
@@ -142,6 +159,12 @@ type StartViewDeps = {
  * until the button is pressed.
  */
 export function applyStartView(deps: StartViewDeps): void {
+  // An internal switch of a page that compares two viewers: both open on the same pose (`shared/debug-flags.ts`).
+  const camera = debugCamera();
+  if (camera !== null) {
+    openAtDebugCamera(deps, camera);
+    return;
+  }
   const mode = deps.options.view.mode;
   deps.ui.setModeButtons(mode);
   deps.ui.setHintForMode(mode);
@@ -153,7 +176,7 @@ export function applyStartView(deps: StartViewDeps): void {
   if (tourMode === 'off') {
     // `view.mode: 'tour'` with `tour.mode: 'off'`: the tour mode is engaged,
     // the clip is not, and the button starts it.
-    deps.engageTour();
+    deps.director()?.engageTour();
     return;
   }
   // A seek, not a play with a fly-in: on first load the camera is PLACED on the

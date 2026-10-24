@@ -122,8 +122,14 @@ const HOST_BUNDLE_PREFIX = 'jeex-viewer-host';
  * `ening-frame`), so this `startsWith` cannot claim that chunk by accident.
  */
 const OPS_BUNDLE_PREFIX = 'jeex-viewer-ops';
-/** File-name prefix of the lighting entry's bundle (`vite.lib.config.ts`). */
-const LIGHTING_BUNDLE_PREFIX = 'jeex-viewer-lighting';
+/**
+ * File-name prefix of the lighting entry's bundle (`vite.lib.config.ts`),
+ * up to and including the dot: the `es` build also emits shared chunks named
+ * after a lighting MODULE (`jeex-viewer-lighting-context-<hash>.js`,
+ * `jeex-viewer-lighting-standard-<hash>.js`), which are viewer code and must
+ * fall through to the viewer's own budget.
+ */
+const LIGHTING_BUNDLE_PREFIX = 'jeex-viewer-lighting.';
 
 /**
  * File-name prefix both vite configs give every dynamic-import chunk

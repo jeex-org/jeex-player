@@ -54,6 +54,7 @@ import type { WalkPostState } from './walk-post-controller.js';
 import type { WalkLightingState } from './walk-lighting-controller.js';
 import type { WalkLightingStats } from '../render/walk-lighting/walk-lighting.js';
 import type { DemandCounters } from '../render/render-demand.js';
+import type { LightBakeState } from '../lightmap/light-bake-wiring.js';
 
 import { freeSpaceModule, layoutLintModule, loadLayoutModules } from './debug-layout-modules.js';
 
@@ -120,6 +121,8 @@ type ViewerDebugApi = {
    * a resting walk or tour keeps ticking while its draws stay flat.
    */
   renderDemand: () => DemandCounters;
+  /** The page's offline light bake (`__JEEX_DEBUG_LIGHT_BAKE__`): `off`, `waiting`, `loading`, `applied`, `refused` or `dropped`. */
+  lightBake: () => LightBakeState;
   /**
    * What every furniture body on screen actually IS, right now: the placement
    * id, whether its body is procedural, a `dims` stand-in waiting for a GLB or
@@ -370,6 +373,7 @@ type SceneDebug = {
   walkPost: () => WalkPostState | undefined;
   walkLighting: () => WalkLightingDebug | undefined;
   renderDemand: () => DemandCounters | undefined;
+  lightBake: () => LightBakeState;
   furnitureVisible: () => boolean;
   /** This instance's catalogue; `setLocale` replaces it. */
   messages: () => Messages;
@@ -500,6 +504,7 @@ export function installViewerDebug(host: ViewerDebugHost): ViewerDebugApi {
     walkPost: () => host.walkPost() ?? 'off',
     walkLighting: () => host.walkLighting() ?? { state: 'off', stats: null },
     renderDemand: () => host.renderDemand() ?? { ticks: 0, draws: 0 },
+    lightBake: () => host.lightBake(),
     assetModels: () => {
       const furniture = host.sceneRoot()?.getObjectByName(FURNITURE_GROUP_NAME);
       if (!furniture) return [];
