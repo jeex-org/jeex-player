@@ -402,7 +402,10 @@ as described under [Versioning](#versioning).
   `bottom-right` box instead of passing under it, so a host button there no
   longer covers the sheet's controls. No box moves; with no filled bottom box
   the sheet keeps its place. The clearance is published on the viewer root as
-  `--jeex-bottom-clearance`.
+  `--jeex-bottom-clearance`. A box too tall for the sheet to fit above it
+  caps the sheet at the room left under the viewer's top edge, and its
+  content scrolls; with less than 96 px left the sheet keeps that height from
+  the top inset and the box covers the overlap.
 - **Built-in objects match the sizes and facts they declare.** The dining
   chair's rear posts stand on the floor as its back legs; the media unit is
   as tall as its dims (1.366 m, 1.512 m for the 2.2 m variant) and its

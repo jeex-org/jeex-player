@@ -579,6 +579,62 @@ describe('the bottom sheet and filled host bottom boxes', { timeout: MOUNT_TIMEO
     expect(Math.round(box.getBoundingClientRect().top - panel.getBoundingClientRect().bottom)).toBe(8);
   });
 
+  /** A box filled to a given height, as the studio's camera panel or open assistant on a phone. */
+  function fillTall(box: HTMLElement, height: number): void {
+    const content = document.createElement('div');
+    content.style.setProperty('inline-size', '56px');
+    content.style.setProperty('block-size', `${height}px`);
+    box.append(content);
+  }
+
+  /** Waits for `host-slots.ts` to publish a filled box's clearance to the sheet. */
+  async function lifted(panel: HTMLElement): Promise<void> {
+    await until(
+      () => !['', '0px'].includes(getComputedStyle(panel).getPropertyValue('--jeex-bottom-clearance').trim()),
+      'the clearance published',
+    );
+  }
+
+  const tallCases = [
+    { slot: 'bottom-left', size: [390, 844], height: 560 },
+    { slot: 'bottom-right', size: [390, 600], height: 464 },
+  ] as const;
+  for (const { slot, size, height } of tallCases) {
+    test(`at ${size[0]}×${size[1]} a ${height} px ${slot} box: the sheet stays inside the viewer, clear of the box, and scrolls to the slider and back to Close`, async () => {
+      const viewer = await mount(size[0], { settings: { show: true }, slots: [slot] }, size[1]);
+      const box = viewer.slots.get(slot);
+      fillTall(box, height);
+      const { panel, slider } = await openSheet(viewer);
+      await lifted(panel);
+      expect(intersects(panel.getBoundingClientRect(), box.getBoundingClientRect())).toBe(false);
+      const [, top] = rect(viewer, panel);
+      expect(top).toBeGreaterThanOrEqual(10);
+      expect(Math.round(box.getBoundingClientRect().top - panel.getBoundingClientRect().bottom)).toBe(8);
+      expect(tappable(slider)).toBe(true);
+      expect(tappable(panel.querySelector<HTMLElement>('.settings-close')!)).toBe(true);
+    });
+  }
+
+  test('at 390×600 the capped sheet scrolls its content instead of growing past the viewer', async () => {
+    const viewer = await mount(390, { settings: { show: true }, slots: ['bottom-right'] }, 600);
+    fillTall(viewer.slots.get('bottom-right'), 464);
+    const { panel } = await openSheet(viewer);
+    await lifted(panel);
+    expect(rect(viewer, panel)[1]).toBeGreaterThanOrEqual(10);
+    expect(panel.scrollHeight).toBeGreaterThan(panel.clientHeight);
+  });
+
+  test('at 390×500 a 464 px bottom-right box leaves no room above it: the sheet keeps a usable minimum inside the viewer and the slider answers a tap', async () => {
+    const viewer = await mount(390, { settings: { show: true }, slots: ['bottom-right'] }, 500);
+    const box = viewer.slots.get('bottom-right');
+    fillTall(box, 464);
+    const { panel, slider } = await openSheet(viewer);
+    await lifted(panel);
+    const [, top, , bottom] = rect(viewer, panel);
+    expect([top, bottom]).toEqual([10, 106]);
+    expect(tappable(slider)).toBe(true);
+  });
+
   test('at 390×844 with no filled bottom box the sheet keeps its place, a claimed empty box included', async () => {
     const plain = await mount(PHONE[0], { settings: { show: true } }, PHONE[1]);
     const { panel } = await openSheet(plain);
