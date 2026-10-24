@@ -58,7 +58,7 @@ export { createKtx2Support } from '../materials/ktx2.js';
 type SceneMountDeps = {
   /**
    * The runtime: the scene graph the root lives in, the rig whose sun lights
-   * it (`render/sun-shadow.ts`) and the redraw demand of walk and tour
+   * it (`render/sun-shadow.ts`) and the redraw demand of the on-demand modes
    * (`render/render-demand.ts`); absent before the runtime exists.
    */
   runtime: () => { readonly scene: THREE.Scene; readonly sunRig?: ApartmentRig; readonly demand?: { invalidate(): void } } | undefined;
@@ -186,7 +186,7 @@ export class SceneMount {
       lightBakeWiring({
         source: () => debugLightBake(),
         log: deps.log ?? defaultLogger,
-        // The shell's geometry objects changed: the cached sun shadow refits, walk and tour draw.
+        // The shell's geometry objects changed: the cached sun shadow refits, the view draws.
         // Not while the document is released: the stage (and the rig the sun draws with) may be gone.
         changed: () => {
           if (this.releasing) return;
@@ -414,7 +414,7 @@ export class SceneMount {
     this.builtin = null;
   }
 
-  /** Something on screen changed: walk and tour draw the next tick (`render/render-demand.ts`). */
+  /** Something on screen changed: the next tick draws (`render/render-demand.ts`). */
   private invalidate(): void {
     this.deps.runtime()?.demand?.invalidate();
   }

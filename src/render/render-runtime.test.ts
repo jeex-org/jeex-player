@@ -304,7 +304,7 @@ describe('drawing switched off (plan2d) keeps the scene warm', () => {
   });
 });
 
-describe('drawing on demand in walk and tour', () => {
+describe('drawing on demand in walk, tour, orbit and plan3d', () => {
   /** A runtime in `mode` with a camera, started and past its first (drawn) frame. */
   function resting(mode = 'walk') {
     let current: string | undefined = mode;
@@ -326,7 +326,7 @@ describe('drawing on demand in walk and tour', () => {
     for (let frame = 0; frame < 60; frame += 1) tick(16);
     expect(hooks).toBe(60);
     expect(stub.renders).toBe(1);
-    expect(runtime.demand.counters()).toEqual({ ticks: 61, draws: 1 });
+    expect(runtime.demand.counters()).toEqual({ ticks: 61, draws: 1, insetDraws: 0 });
     runtime.dispose();
   });
 
@@ -372,11 +372,12 @@ describe('drawing on demand in walk and tour', () => {
     runtime.stop();
     runtime.start();
     tick(16);
+    // Into orbit, which draws on demand too: the switch draws once, then it rests.
     setMode('orbit');
     tick(16);
     tick(16);
-    expect(drawn).toEqual([true, false, true, true, true]);
-    expect(stub.renders).toBe(5);
+    expect(drawn).toEqual([true, false, true, true, false]);
+    expect(stub.renders).toBe(4);
     runtime.dispose();
   });
 
@@ -412,6 +413,29 @@ describe('drawing on demand in walk and tour', () => {
     tick(KEEP_WARM_MS);
     expect(stub.renders).toBe(2);
     for (let frame = 0; frame < 10; frame += 1) tick(16);
+    expect(stub.renders).toBe(2);
+    runtime.dispose();
+  });
+
+  test('a resting orbit and a resting top view keep ticking without drawing', () => {
+    for (const mode of ['orbit', 'plan3d']) {
+      const { runtime, stub, tick } = resting(mode);
+      for (let frame = 0; frame < 60; frame += 1) tick(16);
+      expect(stub.renders).toBe(1);
+      expect(runtime.demand.counters()).toEqual({ ticks: 61, draws: 1, insetDraws: 0 });
+      runtime.demand.invalidate();
+      tick(16);
+      expect(stub.renders).toBe(2);
+      runtime.dispose();
+    }
+  });
+
+  test('the flat plan draws only its heartbeat, at an unchanged camera too', () => {
+    const { runtime, stub, tick } = resting('plan2d');
+    runtime.setRenderEnabled(false);
+    tick(16);
+    expect(stub.renders).toBe(1);
+    tick(KEEP_WARM_MS);
     expect(stub.renders).toBe(2);
     runtime.dispose();
   });
@@ -925,17 +949,17 @@ describe('measureEntry', () => {
     const box = measureEntry(entry({ content: { inlineSize: 800.5, blockSize: 600.5 }, device: { inlineSize: 1601, blockSize: 1201 } }), 2);
     // Not `800.5 * 2 = 1601` by luck: the point is that the browser's own
     // reading is used rather than a multiplication after CSS rounding.
-    expect(box).toEqual({ cssWidth: 800.5, cssHeight: 600.5, deviceWidth: 1601, deviceHeight: 1201 });
+    expect(box).toEqual({ cssWidth: 800.5, cssHeight: 600.5, deviceWidth: 1601, deviceHeight: 1201, measured: true });
   });
 
   test('falls back to the CSS box times the pixel ratio where there is no device box', () => {
     const box = measureEntry(entry({ content: { inlineSize: 300, blockSize: 200 } }), 1.5);
-    expect(box).toEqual({ cssWidth: 300, cssHeight: 200, deviceWidth: 450, deviceHeight: 300 });
+    expect(box).toEqual({ cssWidth: 300, cssHeight: 200, deviceWidth: 450, deviceHeight: 300, measured: false });
   });
 
   test('falls back to contentRect where there is no contentBoxSize either', () => {
     const box = measureEntry(entry({ rect: { width: 120, height: 90 } }), 1);
-    expect(box).toEqual({ cssWidth: 120, cssHeight: 90, deviceWidth: 120, deviceHeight: 90 });
+    expect(box).toEqual({ cssWidth: 120, cssHeight: 90, deviceWidth: 120, deviceHeight: 90, measured: false });
   });
 
   test('a box with no area is no reading at all', () => {
@@ -1256,5 +1280,84 @@ describe('a canvas taken off the page without dispose', () => {
     tick(16);
     expect(stub.renders).toBe(drawn);
     expect(queue.size).toBe(0);
+  });
+});
+
+describe('a pixel-ratio change at a fixed CSS box', () => {
+  /**
+   * A runtime with a box observer (no device-pixel box: the CSS-box fallback a
+   * browser without `devicePixelContentBoxSize` takes) and a `matchMedia`
+   * whose resolution query the test flips by hand, as dragging the window to
+   * another display does. The CSS box never changes, so no observer entry
+   * follows: the ratio change alone must refit.
+   */
+  function dpr() {
+    const globals = globalThis as { ResizeObserver?: unknown; matchMedia?: unknown; window?: unknown };
+    const had = { ResizeObserver: 'ResizeObserver' in globals, matchMedia: 'matchMedia' in globals, window: 'window' in globals };
+    const saved = { ResizeObserver: globals.ResizeObserver, matchMedia: globals.matchMedia, window: globals.window };
+    const observers: ResizeObserverCallback[] = [];
+    globals.ResizeObserver = class {
+      constructor(callback: ResizeObserverCallback) {
+        observers.push(callback);
+      }
+      observe(): void {}
+      disconnect(): void {}
+    };
+    const changes: Array<() => void> = [];
+    globals.matchMedia = () => ({
+      addEventListener: (_type: string, listener: () => void) => changes.push(listener),
+    });
+    const screen = { devicePixelRatio: 1 };
+    globals.window = screen;
+    // A global that was absent goes away again: other files test for its presence, not its value.
+    const restore = (): void => {
+      for (const key of ['ResizeObserver', 'matchMedia', 'window'] as const) {
+        if (had[key]) globals[key] = saved[key];
+        else delete globals[key];
+      }
+    };
+    const { renderer, calls } = stubRuntime();
+    const queue: Array<() => void> = [];
+    const runtime = createRenderRuntime({
+      canvas: {} as HTMLCanvasElement,
+      viewport: { clientWidth: 800, clientHeight: 600, element: {} as HTMLElement },
+      createRenderer: () => renderer,
+      createLighting: stubLighting,
+      mode: () => 'orbit',
+      scheduleFrame: (callback) => queue.push(callback),
+      cancelFrame: () => undefined,
+      now: () => 0,
+    });
+    runtime.setCamera(new THREE.PerspectiveCamera());
+    const entry = { contentRect: { width: 800, height: 600 } } as unknown as ResizeObserverEntry;
+    for (const observer of observers) observer([entry], {} as ResizeObserver);
+    for (const callback of queue.splice(0)) callback();
+    /** The display's ratio becomes `ratio`, and the query it was armed with stops matching. */
+    const setRatio = (ratio: number): void => {
+      screen.devicePixelRatio = ratio;
+      for (const change of changes.splice(0)) change();
+    };
+    return { runtime, calls, setRatio, restore };
+  }
+
+  test('the drawing buffer follows the new ratio and the change asks for a frame', () => {
+    const { runtime, calls, setRatio, restore } = dpr();
+    try {
+      expect(calls.pixelRatio).toBe(1);
+      const before = calls.sizes.length;
+      expect(runtime.demand.shouldDraw(runtime.getCamera()!, 'orbit')).toBe(true);
+      runtime.demand.commit(runtime.getCamera()!);
+      setRatio(1.5);
+      expect(calls.pixelRatio).toBe(1.5);
+      expect(calls.sizes.length).toBe(before + 1);
+      expect(calls.sizes.at(-1)).toEqual({ width: 800, height: 600 });
+      expect(runtime.demand.shouldDraw(runtime.getCamera()!, 'orbit')).toBe(true);
+      // Re-armed for the new ratio: the way back refits too.
+      setRatio(1);
+      expect(calls.pixelRatio).toBe(1);
+    } finally {
+      runtime.dispose();
+      restore();
+    }
   });
 });

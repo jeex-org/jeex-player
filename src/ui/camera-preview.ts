@@ -16,11 +16,17 @@
  * `data-jeex-preview` on the shell root so the mini-map's own CSS steps aside
  * while the card is up.
  *
- * The scissor rectangle is read from the card's box EVERY FRAME it renders:
+ * The scissor rectangle is read from the card's box every time it renders:
  * the card is CSS-positioned like the mini-map it replaces, and the GL rect is
  * the window's box converted into the drawing buffer's flipped coordinates —
  * never cached, because a resize, a locale or a zoom changes it without a
  * mode change.
+ *
+ * The viewer draws on demand, so the card is split in two: `sync()` runs on
+ * every tick before the draw decision and asks for a main frame whenever the
+ * card's picture would change (open, close, pose, mode, either box), and
+ * `drawAfter()` draws the inset only over a main frame that was just drawn.
+ * A tick that draws nothing presents the last picture, inset included.
  *
  * The card is a control, not only a picture (pitch is set here, not on
  * the 3D gizmo): a drag inside it turns the camera — horizontal travel
@@ -37,7 +43,7 @@ import { AUTHORING_MODES, type CheckpointOverlay } from '../camera/checkpoint-ov
 import { wrapAngle } from '../camera/checkpoint-picking.js';
 import { listenerOptions } from '../shared/abort.js';
 import type { Messages } from './messages.js';
-import { TOUR_PITCH_LIMIT_RAD, type ViewerMode } from '../scene/types.js';
+import { TOUR_PITCH_LIMIT_RAD, type TourCheckpoint, type ViewerMode } from '../scene/types.js';
 
 /** Turn per pixel of drag inside the card: 0.25°. */
 export const LOOK_RAD_PER_PX = (0.25 / 180) * Math.PI;
@@ -74,6 +80,13 @@ export type CameraPreviewDeps = {
   onLookThrough?: ((id: string) => void) | undefined;
   /** The mounted viewer's lifetime; the card's listeners carry it. */
   signal?: AbortSignal | undefined;
+  /**
+   * The card changed what is on screen (opened, closed, re-aimed, moved,
+   * resized): the main picture must be drawn again, and the inset after it.
+   */
+  onChange?: (() => void) | undefined;
+  /** The inset was drawn (the debug surface counts it). */
+  onInsetDrawn?: (() => void) | undefined;
 };
 
 /** One drag-to-look gesture inside the card. */
@@ -91,6 +104,10 @@ export class CameraPreview {
   private readonly savedViewport = new THREE.Vector4();
   private readonly camera: THREE.PerspectiveCamera = new THREE.PerspectiveCamera(60, 16 / 9, NEAR_PLANE_M, FAR_PLANE_M);
   private visible = false;
+  /** What the last `sync` saw while the card was up; `null` while it is down. */
+  private shownKey: string | null = null;
+  /** The main draw count the inset was last drawn over. */
+  private drawnOver = -1;
 
   constructor(deps: CameraPreviewDeps) {
     this.deps = deps;
@@ -220,22 +237,76 @@ export class CameraPreview {
   }
 
   /**
-   * One frame, called from the post-render hook: syncs the card's visibility
-   * with the active checkpoint and, when up, draws the inset. Everything it
-   * reads is a comparison or a bounding box, so a hidden card costs nothing.
+   * Once per tick, before the frame's draw decision: syncs the card's
+   * visibility, mode and pose with the active checkpoint, and asks for a main
+   * frame when anything the card shows changed — opening, closing, the
+   * checkpoint's pose, the mode, or the card's box (a drag, a resize, a host
+   * box that moved it). Two bounding boxes are read while the card is up;
+   * a hidden card costs a comparison.
    */
-  render(): void {
-    const overlay = this.deps.overlay();
-    const checkpoint = overlay?.activeCheckpoint() ?? null;
+  sync(): void {
+    const checkpoint = this.wanted();
     const mode = this.deps.mode();
-    const wants = checkpoint !== null && mode !== undefined && PREVIEW_MODES.has(mode);
-    this.setVisible(wants);
-    if (!wants || !checkpoint) return;
+    const was = this.visible;
+    this.setVisible(checkpoint !== null);
+    if (!checkpoint) {
+      this.shownKey = null;
+      if (was) this.deps.onChange?.();
+      return;
+    }
     // The tour's progress bar runs along the bottom edge; the card steps over
     // it the same way the mini-map does.
     if (this.card.dataset['mode'] !== mode) this.card.dataset['mode'] = mode!;
     this.aimAt(checkpoint.position, checkpoint.yaw, checkpoint.pitch);
-    this.drawInset(checkpoint);
+    const key = this.keyOf(checkpoint, mode!);
+    if (key === this.shownKey) return;
+    this.shownKey = key;
+    this.deps.onChange?.();
+  }
+
+  /**
+   * Draws the inset over the main picture, once per main display draw: called
+   * after every tick with the runtime's display-draw count, it draws only when
+   * that count moved since the last inset (a skipped tick presents the last
+   * picture, inset included, and must not draw over it). Nothing while the
+   * card is down.
+   */
+  drawAfter(mainDraws: number): void {
+    if (mainDraws === this.drawnOver) return;
+    this.drawnOver = mainDraws;
+    const checkpoint = this.visible ? this.wanted() : null;
+    if (!checkpoint) return;
+    if (this.drawInset(checkpoint)) this.deps.onInsetDrawn?.();
+  }
+
+  /** The checkpoint the card shows now, or `null` when it should be down. */
+  private wanted(): TourCheckpoint | null {
+    const checkpoint = this.deps.overlay()?.activeCheckpoint() ?? null;
+    const mode = this.deps.mode();
+    return checkpoint !== null && mode !== undefined && PREVIEW_MODES.has(mode) ? checkpoint : null;
+  }
+
+  /** Everything the inset's picture depends on besides the scene: mode, pose, the window's offset on the canvas and both sizes. */
+  private keyOf(checkpoint: TourCheckpoint, mode: ViewerMode): string {
+    const box = this.window.getBoundingClientRect();
+    const canvas = this.deps.renderer()?.domElement.getBoundingClientRect();
+    const { x, y, z } = checkpoint.position;
+    return [
+      mode,
+      x,
+      y,
+      z,
+      checkpoint.yaw,
+      checkpoint.pitch,
+      // Relative to the canvas, as `drawInset` places it: the page scrolling, or
+      // the viewer moving on it, moves both boxes and changes nothing drawn.
+      canvas ? box.left - canvas.left : null,
+      canvas ? box.top - canvas.top : null,
+      box.width,
+      box.height,
+      canvas?.width,
+      canvas?.height,
+    ].join(',');
   }
 
   private setVisible(visible: boolean): void {
@@ -254,14 +325,14 @@ export class CameraPreview {
   }
 
   /** The scissored draw, in CSS pixels of the canvas, from the window's own box. */
-  private drawInset(checkpoint: NonNullable<ReturnType<CheckpointOverlay['activeCheckpoint']>>): void {
+  private drawInset(checkpoint: TourCheckpoint): boolean {
     const renderer = this.deps.renderer();
-    if (!renderer) return;
+    if (!renderer) return false;
     const canvasRect = renderer.domElement.getBoundingClientRect();
     const box = this.window.getBoundingClientRect();
     const width = box.width;
     const height = box.height;
-    if (width < 4 || height < 4 || canvasRect.width < 4 || canvasRect.height < 4) return;
+    if (width < 4 || height < 4 || canvasRect.width < 4 || canvasRect.height < 4) return false;
     // GL origin is BOTTOM-left; the DOM's is top-left. The numbers stay in CSS
     // pixels: three's `setViewport`/`setScissor` multiply by the renderer's own
     // pixel ratio internally, and multiplying here too drew the preview twice
@@ -292,5 +363,6 @@ export class CameraPreview {
       renderer.autoClear = previousAutoClear;
       hidden?.();
     }
+    return true;
   }
 }

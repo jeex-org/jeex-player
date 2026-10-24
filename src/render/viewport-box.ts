@@ -24,7 +24,19 @@ export type ViewportBox = { clientWidth: number; clientHeight: number; element?:
  * `devicePixelContentBoxSize` exists to avoid. It is Chromium 84+ / Firefox
  * 108+ and NOT Baseline (no Safari), so both paths ship.
  */
-export type ObservedBox = { cssWidth: number; cssHeight: number; deviceWidth: number; deviceHeight: number };
+export type ObservedBox = {
+  cssWidth: number;
+  cssHeight: number;
+  deviceWidth: number;
+  deviceHeight: number;
+  /**
+   * Whether the device size is the browser's own reading. `false` is the
+   * CSS-box fallback, computed with the ratio of the moment it was observed:
+   * a later ratio change alone (same CSS box, no new entry) makes it stale,
+   * so a reader takes the current `devicePixelRatio` instead.
+   */
+  measured: boolean;
+};
 
 /**
  * Measures one observer entry in CSS and in device pixels; `null` for a box
@@ -41,6 +53,7 @@ export function measureEntry(entry: ResizeObserverEntry, pixelRatio: number): Ob
     cssHeight,
     deviceWidth: device ? device.inlineSize : Math.round(cssWidth * pixelRatio),
     deviceHeight: device ? device.blockSize : Math.round(cssHeight * pixelRatio),
+    measured: device !== undefined,
   };
 }
 
@@ -71,4 +84,30 @@ export function observeBox(box: ViewportBox, onObserve: ResizeObserverCallback):
 /** `window.devicePixelRatio` where there is a window, 1 elsewhere. */
 export function devicePixelRatioOf(): number {
   return typeof window === 'undefined' ? 1 : window.devicePixelRatio;
+}
+
+/**
+ * Calls `onChange` each time the display's device pixel ratio changes, until
+ * `signal` aborts.
+ *
+ * There is no `devicepixelratiochange` event: the documented pattern is a
+ * `(resolution: Ndppx)` media query for the CURRENT ratio, which stops
+ * matching the moment the window is dragged onto a display with another one.
+ * The listener is one-shot and re-armed for the new ratio, so this costs one
+ * live listener whatever happens. Nothing where there is no `matchMedia`.
+ */
+export function watchPixelRatio(onChange: () => void, signal: AbortSignal): void {
+  if (typeof matchMedia !== 'function') return;
+  const arm = (): void => {
+    const query = matchMedia(`(resolution: ${devicePixelRatioOf()}dppx)`);
+    query.addEventListener(
+      'change',
+      () => {
+        onChange();
+        arm();
+      },
+      { once: true, signal },
+    );
+  };
+  arm();
 }

@@ -70,6 +70,7 @@ function build(
   options?: () => PlanModeOptions,
   scheduler?: { scheduleFrame?: (callback: () => void) => number; cancelFrame?: (handle: number) => void },
   assetFacts?: () => AssetFactsSource,
+  watchPixelRatio?: (onChange: () => void, signal: AbortSignal) => void,
 ): Harness {
   const shell = openShell();
   const perspective = new THREE.PerspectiveCamera(60, 1.5, 0.1, 100);
@@ -87,6 +88,7 @@ function build(
     scheduleFrame: scheduler?.scheduleFrame,
     cancelFrame: scheduler?.cancelFrame,
     assetFacts,
+    watchPixelRatio,
   });
   return { shell, runtime, modes, perspective };
 }
@@ -253,6 +255,29 @@ describe('resizing', () => {
     // an embedded viewer depends on.
     await until(() => harness.modes.element.width !== before, 'the overlay to refit');
     expect(harness.modes.element.width).toBeLessThan(before);
+  });
+});
+
+describe('a pixel-ratio change at a fixed CSS size', () => {
+  test('refits and repaints the drawing at the new ratio, with no box change to report it', async () => {
+    let changed: (() => void) | null = null;
+    const local = build(undefined, undefined, undefined, (onChange) => (changed = onChange));
+    local.modes.setDocument(demoPlan(), demoScene());
+    local.modes.setMode('plan2d');
+    await until(() => local.modes.element.width > 0, 'the first fit');
+    const before = local.modes.element.width;
+    const ratio = window.devicePixelRatio;
+    Object.defineProperty(window, 'devicePixelRatio', { configurable: true, value: ratio * 1.5 });
+    try {
+      expect(changed).not.toBeNull();
+      changed!();
+      await until(() => local.modes.element.width !== before, 'the overlay to refit at the new ratio');
+      expect(local.modes.element.width).toBe(Math.round(before * 1.5));
+    } finally {
+      delete (window as { devicePixelRatio?: number }).devicePixelRatio;
+      local.modes.dispose();
+      local.runtime.dispose();
+    }
   });
 });
 

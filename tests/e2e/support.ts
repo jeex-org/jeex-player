@@ -254,6 +254,18 @@ export type AxeViolation = { id: string; impact: string; nodes: number; help: st
  * green while those fixes land.
  */
 export async function axeScan(page: Page): Promise<AxeViolation[]> {
+  // Colours are judged at rest: a CSS transition still running (a mode button
+  // fading to its active colours) would be measured half-way. A page whose
+  // canvas rests no longer slows the steps before the scan, so the scan can
+  // land inside one.
+  await page.evaluate(() =>
+    Promise.all(
+      document
+        .getAnimations()
+        .filter((animation) => animation instanceof CSSTransition)
+        .map((animation) => animation.finished.catch(() => undefined)),
+    ),
+  );
   const results = await new AxeBuilder({ page }).withTags(WCAG_TAGS).analyze();
   return results.violations
     .map((violation) => ({
@@ -320,9 +332,10 @@ function allowOneScreenshot(): void {
  * Stops the page drawing, so a screenshot that follows costs one composite
  * instead of a race with the render loop.
  *
- * The viewer draws on every animation frame even when nothing moves, and on
- * SwiftShader every capture `toHaveScreenshot` takes queues behind those
- * frames in the GPU process: on a loaded machine a frame of a full-window
+ * A resting view draws nothing (every mode but `plan2d` draws on demand),
+ * but one still easing, animating or showing a selection aura draws on every
+ * animation frame, and on SwiftShader every capture `toHaveScreenshot` takes
+ * queues behind those frames in the GPU process: on a loaded machine a frame of a full-window
  * canvas took 2.7 s and a single capture of a resting canvas 40-50 s, past
  * `SCREENSHOT_TIMEOUT_MS` before any comparison. The page's
  * `requestAnimationFrame` is replaced by one that never calls back, so the

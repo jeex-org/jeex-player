@@ -153,6 +153,8 @@ export function assetMoveWiring(deps: AssetMoveWiringDeps): AssetMoveControl {
             bodyFacts,
             layoutCatalogue: () => deps.mount().layoutCatalogue(),
             show,
+            // The editing modes draw on demand: a preview pose or a field is a new picture.
+            redraw: () => deps.stage()?.runtime.demand.invalidate(),
             tint: (state) => deps.stage()?.selection.tint(state === null ? null : TINTS[state]),
             viewYaw,
             onEdit: (edit) => deps.events.emit('assetEdit', edit),

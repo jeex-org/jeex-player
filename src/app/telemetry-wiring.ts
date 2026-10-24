@@ -179,8 +179,8 @@ function live(telemetry: Telemetry, deps: TelemetryWiringDeps, win: Window): Tel
   let previousTick: number | null = null;
   let roomTime = 0;
   /**
-   * Every tick of the frame loop, drawn or not: walk and tour draw only on
-   * demand (`render/render-demand.ts`), so a visitor standing still makes
+   * Every tick of the frame loop, drawn or not: every mode but `plan2d` draws
+   * only on demand (`render/render-demand.ts`), so a visitor standing still makes
    * ticks that draw nothing. Frame intervals are measured between two
    * CONSECUTIVE display draws, and a skipped draw starts the measurement
    * over; room time runs on the ticks, so it grows while the view rests.

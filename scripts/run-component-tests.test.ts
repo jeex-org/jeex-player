@@ -20,6 +20,8 @@ import {
   resolveTimeoutMs,
   watchdogTimeoutMessage,
   shardOf,
+  SERIAL_GPU_FILES,
+  vitestRunsFor,
 } from './run-component-tests.js';
 
 describe('lockPathFor', () => {
@@ -177,5 +179,20 @@ describe('shardOf', () => {
     expect(shardOf(['--shard=2/4', '--maxWorkers=2'])).toBe('2/4');
     expect(shardOf(['--maxWorkers=2', '--shard', '1/4'])).toBe('1/4');
     expect(shardOf(['--maxWorkers=2', 'tests/component/element.test.ts'])).toBeUndefined();
+  });
+});
+
+describe('vitestRunsFor', () => {
+  test('a plain run is the parallel tier without the serial files, then the serial step without coverage', () => {
+    const runs = vitestRunsFor([]);
+    expect(runs).toHaveLength(2);
+    expect(runs[0]).toEqual(SERIAL_GPU_FILES.map((file) => `--exclude=${file}`));
+    expect(runs[1]).toEqual(['--coverage.enabled=false', '--no-file-parallelism', '--maxWorkers=1', ...SERIAL_GPU_FILES]);
+  });
+
+  test('a sharded run (hosted CI, one worker per runner) and a run naming its files stay one run', () => {
+    expect(vitestRunsFor(['--shard=2/8', '--maxWorkers=1'])).toEqual([['--shard=2/8', '--maxWorkers=1']]);
+    expect(vitestRunsFor(['--shard', '2/8'])).toEqual([['--shard', '2/8']]);
+    expect(vitestRunsFor(['tests/component/minimap.test.ts'])).toEqual([['tests/component/minimap.test.ts']]);
   });
 });

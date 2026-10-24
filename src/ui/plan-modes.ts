@@ -30,6 +30,7 @@ import { buildPlanDrawing, fitTransform, type PlanBounds, type PlanDrawing } fro
 import { planDrawingInputs } from '../assets/plan-fixtures.js';
 import { PLAN_PADDING, fitCanvasToBox, paintPlan, type PlanCameraMarker } from '../plan/plan-canvas.js';
 import { cameraMarker } from '../render/viewport-projection.js';
+import { watchPixelRatio } from '../render/viewport-box.js';
 import { planViewPose } from '../camera/plan-view-pose.js';
 import type { TourPose } from '../camera/tour-player.js';
 import type { RenderRuntime } from '../render/render-runtime.js';
@@ -71,6 +72,12 @@ export type PlanModesDeps = {
   scheduleFrame?: ((callback: () => void) => number) | undefined;
   /** Cancels a handle `scheduleFrame` returned. Defaults to `cancelAnimationFrame`. */
   cancelFrame?: ((handle: number) => void) | undefined;
+  /**
+   * Calls back on every device-pixel-ratio change until the signal aborts
+   * (`viewport-box.watchPixelRatio`, the default); injectable so a test can
+   * fire one. A ratio change at a fixed CSS size reaches no `ResizeObserver`.
+   */
+  watchPixelRatio?: ((onChange: () => void, signal: AbortSignal) => void) | undefined;
 };
 
 /** Height the top-view camera sits at, metres above the floor plane. */
@@ -109,6 +116,8 @@ export class PlanModes {
   private resizeHandle: number | null = null;
   /** Watches the viewport box; the overlay follows its CONTAINER, not the window. */
   private readonly observer: ResizeObserver | null;
+  /** Ends the pixel-ratio watch on dispose. */
+  private readonly watching = new AbortController();
   private drawing: PlanDrawing | null = null;
   private bounds: PlanBounds | null = null;
   private mode: ViewerMode = 'orbit';
@@ -130,6 +139,8 @@ export class PlanModes {
     // resizing at all (`render-runtime.ts` watches the same box).
     this.observer = typeof ResizeObserver === 'undefined' ? null : new ResizeObserver(this.onResize);
     this.observer?.observe(deps.container);
+    // The drawing buffer is sized in device pixels: a new ratio refits it too.
+    (deps.watchPixelRatio ?? watchPixelRatio)(this.onResize, this.watching.signal);
   }
 
   /** The overlay element, for tests and for the debug surface. */
@@ -227,6 +238,7 @@ export class PlanModes {
 
   dispose(): void {
     this.observer?.disconnect();
+    this.watching.abort();
     if (this.resizeHandle !== null) this.cancel(this.resizeHandle);
     this.resizeHandle = null;
     this.canvas.remove();

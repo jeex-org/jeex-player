@@ -125,15 +125,43 @@ export type AssetMoveSession = {
   dispose(): void;
 };
 
+/** The tool's host as the wiring gives it: the field is the session's own, and `redraw` asks the viewer for a frame. */
+export type SessionHost = Omit<AssetMoveHost, 'drawMask'> & {
+  /** Something the tool shows changed; the editing modes draw on demand (`RenderDemand.invalidate`). */
+  redraw?: (() => void) | undefined;
+};
+
+/**
+ * The tool's host with every on-screen change followed by `redraw`: a preview
+ * pose (a drag, a nudge, a mirror, the revert to the start) and the legality
+ * field drawn or removed. The editing modes draw on demand, so neither may
+ * rely on a frame something else happens to cause.
+ */
+export function redrawingHost(host: SessionHost, drawField: AssetMoveHost['drawMask']): AssetMoveHost {
+  const { redraw, ...rest } = host;
+  return {
+    ...rest,
+    show: (assetId, pose, mirror) => {
+      if (mirror) host.show(assetId, pose, mirror);
+      else host.show(assetId, pose);
+      redraw?.();
+    },
+    drawMask: (field) => {
+      drawField(field);
+      redraw?.();
+    },
+  };
+}
+
 /**
  * Builds the tool on first arming (`app/asset-move-wiring.ts` imports this
  * module dynamically, so none of it — the tool, the overlay, the legality
  * judge — is in the boot bundle). The field is drawn under `scene`.
  */
-export function startAssetMove(host: Omit<AssetMoveHost, 'drawMask'>, input: AssetMoveInputDeps, scene: THREE.Object3D): AssetMoveSession {
+export function startAssetMove(host: SessionHost, input: AssetMoveInputDeps, scene: THREE.Object3D): AssetMoveSession {
   const overlay = new AssetSurfaceOverlay();
   scene.add(overlay.group);
-  const tool = new AssetMoveTool({ ...host, drawMask: (field) => overlay.show(field) });
+  const tool = new AssetMoveTool(redrawingHost(host, (field) => overlay.show(field)));
   const unbind = bindAssetMoveInput(tool, input);
   return {
     tool,

@@ -130,6 +130,12 @@ export type CheckpointOverlayDeps = {
   onPlacing?: ((active: boolean) => void) | undefined;
   /** The key-burst timer; tests drive it. */
   schedule?: Scheduler | undefined;
+  /**
+   * Something the rig draws changed (markers, gizmo, hover, tints, the
+   * placement ghost, the tube, the switch): the editing modes draw on demand,
+   * so the stage answers with a redraw (`RenderDemand.invalidate`).
+   */
+  onChange?: (() => void) | undefined;
   /** The mounted viewer's lifetime; every listener carries it. */
   signal?: AbortSignal | undefined;
 };
@@ -180,6 +186,7 @@ export class CheckpointOverlay implements GestureHost {
 
   /** Applies the overlay switch; `false` drops any gesture, the placing state and the focus. */
   setEnabled(visible: boolean): void {
+    if (this.group.visible !== visible) this.requestRedraw();
     this.group.visible = visible;
     if (visible) return;
     this.gestures.flushKeys();
@@ -244,6 +251,7 @@ export class CheckpointOverlay implements GestureHost {
     this.hovered = null;
     this.gizmo.hover(null);
     this.syncAll();
+    this.requestRedraw();
     this.deps.onSelect({ id });
   }
 
@@ -335,6 +343,7 @@ export class CheckpointOverlay implements GestureHost {
     this.ghostMarker = null;
     this.placingId = null;
     this.canvas.style.cursor = '';
+    this.requestRedraw();
     this.deps.onPlacing?.(false);
   }
 
@@ -345,6 +354,7 @@ export class CheckpointOverlay implements GestureHost {
   ghost(point: { x: number; z: number } | null, aim: { x: number; z: number } | null, valid: boolean): void {
     const ghost = this.ghostMarker;
     if (!ghost) return;
+    this.requestRedraw();
     ghost.root.visible = point !== null;
     if (!point) return;
     const yaw = aim && Math.hypot(aim.x - point.x, aim.z - point.z) > 0.3 ? Math.atan2(aim.x - point.x, aim.z - point.z) : this.viewYaw();
@@ -402,6 +412,7 @@ export class CheckpointOverlay implements GestureHost {
     this.syncMarker(checkpoint);
     if (id === this.active) this.syncGizmo();
     this.tubeDirty = true;
+    this.requestRedraw();
   }
 
   commit(summary: string, baseRev: number): void {
@@ -439,6 +450,7 @@ export class CheckpointOverlay implements GestureHost {
     const before = this.hovered;
     this.hovered = pick;
     if (before?.id === pick?.id && before?.kind === pick?.kind) return;
+    this.requestRedraw();
     this.gizmo.hover(pick && pick.id === this.active ? pick.kind : null);
     for (const id of [before?.id, pick?.id]) {
       const checkpoint = id === undefined ? undefined : this.working(id);
@@ -464,6 +476,7 @@ export class CheckpointOverlay implements GestureHost {
     if (this.invalid === id) return;
     const before = this.invalid;
     this.invalid = id;
+    this.requestRedraw();
     for (const each of [before, id]) {
       const checkpoint = each === null ? undefined : this.working(each);
       if (checkpoint) this.syncMarker(checkpoint);
@@ -517,7 +530,7 @@ export class CheckpointOverlay implements GestureHost {
     this.badges?.update(entries);
   }
 
-  /** The deferred tube rebuild, once per frame from the post-render hook. */
+  /** The deferred tube rebuild, once per frame from a frame hook, before the frame's draw decision. */
   flush(): void {
     if (!this.tubeDirty) return;
     this.tubeDirty = false;
@@ -607,6 +620,7 @@ export class CheckpointOverlay implements GestureHost {
       marker.dispose();
       this.markers.delete(id);
     }
+    this.requestRedraw();
   }
 
   private syncMarker(checkpoint: TourCheckpoint): void {
@@ -633,6 +647,11 @@ export class CheckpointOverlay implements GestureHost {
     this.disposeTube();
     this.tube = trajectoryTube(this.workingList, ACCENT, this.deps.navigation?.() ?? undefined);
     if (this.tube) this.group.add(this.tube);
+    this.requestRedraw();
+  }
+
+  private requestRedraw(): void {
+    this.deps.onChange?.();
   }
 
   private disposeTube(): void {

@@ -1,23 +1,33 @@
 /**
- * Walk and tour draw on demand (`src/render/render-demand.ts`), in a real
- * browser on the demo apartment: a resting view keeps ticking while its
- * display draws stay flat and the compositor keeps the last picture, and
- * every kind of visible change draws.
+ * Walk, tour, orbit and plan3d draw on demand (`src/render/render-demand.ts`),
+ * in a real browser on the demo apartment: a resting view keeps ticking while
+ * its display draws stay flat and the compositor keeps the last picture, and
+ * every kind of visible change draws. In the editing modes each change is
+ * followed by the skipped-draw verifier (`verifyNothingSkipped`): the picture
+ * the compositor kept must equal a frame forced through the same path.
  *
  * Every wait is on the viewer's own tick counter (`__viewerDebug.renderDemand`),
  * never on the wall clock: at one or two frames a second a motion lasts the
  * same number of ticks and any number of seconds.
  */
 
-import { afterAll, beforeAll, describe, expect, test, vi } from 'vitest';
+import { afterAll, beforeAll, beforeEach, describe, expect, test, vi } from 'vitest';
 import { page } from 'vitest/browser';
 import * as THREE from 'three';
 import { InlineSceneRepository, mountViewer } from '../../src/app/viewer-api.js';
 import type { ViewerHandle } from '../../src/app/viewer-handle.js';
 import { RenderDemand, type DemandCounters } from '../../src/render/render-demand.js';
+import { RenderRuntime } from '../../src/render/render-runtime.js';
+import { trackLibraryMaps, type LibraryMaps } from './library-maps.js';
 import { WalkLighting } from '../../src/render/walk-post.js';
 import { FloorRing } from '../../src/camera/floor-ring.js';
-import { closeContainers, demoScene, nextFrame, openContainer, until } from './support.js';
+import { ViewerEditor } from '../../src/app/viewer-editor.js';
+import { ViewerSelectionController } from '../../src/app/selection.js';
+import { BOTTOM_RIGHT_CLAIMED_ATTRIBUTE } from '../../src/ui/host-slots.js';
+import { DEMO } from '../../src/demo/demo-ids.js';
+import { VARIANT } from '../../src/assets/catalogue-ids.js';
+import type { SceneData, TourCheckpoint } from '../../src/scene/types.js';
+import { ASSET_MOVE_CHUNK_TIMEOUT_MS, closeContainers, delay, demoScene, nextFrame, openContainer, until } from './support.js';
 
 const MOUNT_TIMEOUT_MS = 300_000;
 /** Ceiling of one wait on the tick counter: a hundred ticks at one frame a second, with room. */
@@ -33,7 +43,7 @@ async function ticks(count: number): Promise<DemandCounters> {
   const start = counters();
   await until(() => counters().ticks - start.ticks >= count, `${count} ticks`, TICKS_TIMEOUT_MS);
   const end = counters();
-  return { ticks: end.ticks - start.ticks, draws: end.draws - start.draws };
+  return { ticks: end.ticks - start.ticks, draws: end.draws - start.draws, insetDraws: end.insetDraws - start.insetDraws };
 }
 
 /** Waits until a window of `REST_TICKS` ticks draws nothing. */
@@ -81,6 +91,46 @@ async function differingShare(a: string, b: string): Promise<number> {
       differing += 1;
   }
   return differing / (left.length / 4);
+}
+
+/**
+ * Share of pixels of two PNG screenshots (base64) that differ by more than 8
+ * levels from every pixel within one pixel of them in the other picture, both
+ * ways. A sub-pixel shift of the whole picture (the end of a camera easing
+ * below the pose tolerance, by design not redrawn) is mostly explained by a
+ * neighbour; a change of any object's colour, place or presence is not.
+ */
+async function unexplainedShare(a: string, b: string): Promise<number> {
+  const decode = async (png: string): Promise<{ data: Uint8ClampedArray; width: number; height: number }> => {
+    const bitmap = await createImageBitmap(await (await fetch(`data:image/png;base64,${png}`)).blob());
+    const canvas = new OffscreenCanvas(bitmap.width, bitmap.height);
+    const context = canvas.getContext('2d')!;
+    context.drawImage(bitmap, 0, 0);
+    return { data: context.getImageData(0, 0, bitmap.width, bitmap.height).data, width: bitmap.width, height: bitmap.height };
+  };
+  const [left, right] = [await decode(a), await decode(b)];
+  const { width, height } = left;
+  const close = (from: Uint8ClampedArray, i: number, to: Uint8ClampedArray, j: number): boolean =>
+    Math.max(Math.abs(from[i]! - to[j]!), Math.abs(from[i + 1]! - to[j + 1]!), Math.abs(from[i + 2]! - to[j + 2]!)) <= 8;
+  const explained = (from: Uint8ClampedArray, to: Uint8ClampedArray, x: number, y: number): boolean => {
+    const i = (y * width + x) * 4;
+    for (let dy = -1; dy <= 1; dy += 1) {
+      for (let dx = -1; dx <= 1; dx += 1) {
+        const nx = x + dx;
+        const ny = y + dy;
+        if (nx < 0 || ny < 0 || nx >= width || ny >= height) continue;
+        if (close(from, i, to, (ny * width + nx) * 4)) return true;
+      }
+    }
+    return false;
+  };
+  let unexplained = 0;
+  for (let y = 0; y < height; y += 1) {
+    for (let x = 0; x < width; x += 1) {
+      if (!explained(left.data, right.data, x, y) || !explained(right.data, left.data, x, y)) unexplained += 1;
+    }
+  }
+  return unexplained / (width * height);
 }
 
 /** The compositor's picture of the page, as PNG base64. */
@@ -331,17 +381,585 @@ describe('walk and tour draw on demand', { timeout: MOUNT_TIMEOUT_MS }, () => {
     expect(after.draws).toBeGreaterThanOrEqual(1);
     await rest('after the clip');
   });
+});
 
-  test('editing modes keep drawing every tick; plan2d keeps only its heartbeat', async () => {
-    handle.setMode('orbit');
-    await ticks(5);
-    const orbit = await ticks(20);
-    expect(orbit.draws).toBe(orbit.ticks);
+/**
+ * Share of the 480 × 320 canvas allowed to differ after a camera motion's
+ * sub-tolerance tail (see `verifyNothingSkipped`): about 60 pixels, where 23 to
+ * 28 were measured after a drag. A skipped change of any object is far larger.
+ */
+const POSE_TAIL_SHARE = 0.0004;
+
+/** Verifier windows tried before a scene that keeps asking for frames is called restless. */
+const VERIFY_ATTEMPTS = 3;
+
+/** Two tour cameras for the editing describe, by fixed UUID v7: one in the living room, one in the bedroom. */
+const CAMERA_IDS = ['01a1300a-1c00-7000-8000-00000000c001', '01a1300a-1c00-7000-8000-00000000c002'] as const;
+
+/** The demo apartment with two tour cameras, standing over two of its pieces. */
+function sceneWithCameras(): SceneData {
+  const scene = demoScene();
+  const at = (assetId: string, id: string, yaw: number): TourCheckpoint => {
+    const asset = scene.assets.find((candidate) => candidate.id === assetId)!;
+    return { id, position: { x: asset.position.x, y: 1.6, z: asset.position.z }, yaw, pitch: 0 };
+  };
+  return { ...scene, tourCheckpoints: [at(DEMO.asset.livingTable, CAMERA_IDS[0], 0), at(DEMO.asset.bedroomBed, CAMERA_IDS[1], Math.PI)] };
+}
+
+describe('the editing modes draw on demand', { timeout: MOUNT_TIMEOUT_MS }, () => {
+  let handle: ViewerHandle;
+  let container: HTMLElement;
+  /** The runtime's gate, as the frame loop asks it. */
+  let demandOf: () => RenderDemand = () => {
+    throw new Error('no gate yet');
+  };
+  let editorOf: () => ViewerEditor = () => {
+    throw new Error('no editor yet');
+  };
+  let selectionOf: () => ViewerSelectionController = () => {
+    throw new Error('no selection controller yet');
+  };
+  const canvas = (): HTMLCanvasElement => container.querySelector<HTMLCanvasElement>('[data-jeex="scene-canvas"]')!;
+  const card = (): HTMLElement => container.querySelector<HTMLElement>('[data-jeex="camera-preview"]')!;
+  const root = (): HTMLElement => container.querySelector<HTMLElement>('.jeex-viewer')!;
+
+  /** Viewport pixels of a world point through the camera on screen. */
+  function pixel(x: number, y: number, z: number): { clientX: number; clientY: number } {
+    const point = debug().projectPoint(x, y, z);
+    if (!point) throw new Error(`(${x}, ${y}, ${z}) is not on screen`);
+    const box = canvas().getBoundingClientRect();
+    return { clientX: box.left + point.x, clientY: box.top + point.y };
+  }
+
+  let pointerId = 7000;
+  function pointer(target: Element, type: string, at: { clientX: number; clientY: number }, id: number): void {
+    target.dispatchEvent(
+      new PointerEvent(type, {
+        ...at,
+        pointerId: id,
+        button: 0,
+        buttons: type === 'pointerup' ? 0 : 1,
+        bubbles: true,
+        pointerType: 'mouse',
+      }),
+    );
+  }
+
+  /**
+   * The skipped-draw verifier: with the view at rest and animation time frozen,
+   * the picture the compositor kept must equal a frame forced through the same
+   * main-plus-inset path. A difference is a visible change nothing asked to draw.
+   * Ticks after the forced frame, on the frozen clock, draw nothing: no main
+   * frame and no inset.
+   *
+   * `tail` is the share of pixels allowed to differ after a camera motion: the
+   * rig's easing ends below the pose tolerance (`POSE_TOLERANCE`), by design
+   * not redrawn, and a forced frame at the final pose moves a few edge pixels.
+   * Every other scenario allows none.
+   */
+  /** The scene canvas alone, as the compositor shows it: the chrome over it is DOM, fading on its own clock, and no frame draws it. */
+  async function canvasShot(): Promise<string> {
+    const only = document.createElement('style');
+    only.textContent =
+      '.jeex-viewer * { visibility: hidden !important; } .jeex-viewer canvas[data-jeex="scene-canvas"] { visibility: visible !important; }';
+    document.head.append(only);
+    try {
+      await nextFrame();
+      return await page.screenshot({ element: canvas(), save: false });
+    } finally {
+      only.remove();
+    }
+  }
+
+  async function verifyNothingSkipped(what: string, tail = 0, afterKeep?: () => void): Promise<void> {
+    for (let attempt = 1; attempt <= VERIFY_ATTEMPTS; attempt += 1) {
+      await rest(what);
+      // Longer than `rest`: a sub-tolerance tail must have stopped adding up before the comparison.
+      await ticks(REST_TICKS);
+      const frozen = performance.now();
+      const clock = vi.spyOn(performance, 'now').mockReturnValue(frozen);
+      try {
+        const kept = counters().draws;
+        const retained = await canvasShot();
+        if (attempt === 1) afterKeep?.();
+        // A frame asked for while the picture was kept (a late library map
+        // landing) makes that picture out of date by design: no skipped draw,
+        // the scene had not come to rest. Keep it again.
+        await ticks(2);
+        if (counters().draws !== kept || (demandOf() as unknown as { dirty: boolean }).dirty) continue;
+        const start = counters();
+        demandOf().invalidate();
+        await until(() => counters().draws > start.draws, `${what}: the forced frame`, TICKS_TIMEOUT_MS);
+        await nextFrame();
+        const forced = await canvasShot();
+        const share = await unexplainedShare(retained, forced);
+        expect(share, `${what}: the kept picture is the forced one`).toBeLessThanOrEqual(tail);
+        const after = await ticks(10);
+        expect(after.draws, `${what}: frozen ticks after the forced frame`).toBe(0);
+        expect(after.insetDraws, `${what}: frozen ticks draw no inset`).toBe(0);
+        return;
+      } finally {
+        clock.mockRestore();
+      }
+    }
+    throw new Error(`${what}: the scene never rested (a frame was asked for in each of ${VERIFY_ATTEMPTS} verifier windows)`);
+  }
+
+  /** Runs `change` now (the view need not rest first) and follows its draws until the view rests. */
+  async function followNow(change: () => void): Promise<{ ticks: number; draws: number }> {
+    const start = counters();
+    change();
+    await rest('after the change');
+    const end = counters();
+    return { ticks: end.ticks - start.ticks, draws: end.draws - start.draws };
+  }
+
+  /** `change` on a resting view draws and the view rests again, with nothing skipped. */
+  async function draws(what: string, change: () => void): Promise<{ ticks: number; draws: number }> {
+    const result = await follow(change);
+    expect(result.draws, `${what}: draws`).toBeGreaterThanOrEqual(1);
+    await verifyNothingSkipped(what);
+    return result;
+  }
+
+  /** The runtime's scene, as the frame loop draws it. */
+  let sceneOf: () => THREE.Scene = () => {
+    throw new Error('no runtime yet');
+  };
+
+  let maps: LibraryMaps;
+
+  beforeAll(async () => {
+    maps = trackLibraryMaps();
+    const addFrameHook = Object.getOwnPropertyDescriptor(RenderRuntime.prototype, 'addFrameHook')!.value as RenderRuntime['addFrameHook'];
+    vi.spyOn(RenderRuntime.prototype, 'addFrameHook').mockImplementation(function (this: RenderRuntime, hook) {
+      sceneOf = () => this.scene;
+      return addFrameHook.call(this, hook);
+    });
+    const shouldDraw = Object.getOwnPropertyDescriptor(RenderDemand.prototype, 'shouldDraw')!.value as RenderDemand['shouldDraw'];
+    vi.spyOn(RenderDemand.prototype, 'shouldDraw').mockImplementation(function (this: RenderDemand, live, mode) {
+      demandOf = () => this;
+      return shouldDraw.call(this, live, mode);
+    });
+    const updateGlows = Object.getOwnPropertyDescriptor(ViewerEditor.prototype, 'updateGlows')!.value as ViewerEditor['updateGlows'];
+    vi.spyOn(ViewerEditor.prototype, 'updateGlows').mockImplementation(function (this: ViewerEditor, now) {
+      editorOf = () => this;
+      return updateGlows.call(this, now);
+    });
+    const update = Object.getOwnPropertyDescriptor(ViewerSelectionController.prototype, 'update')!
+      .value as ViewerSelectionController['update'];
+    vi.spyOn(ViewerSelectionController.prototype, 'update').mockImplementation(function (this: ViewerSelectionController, now) {
+      selectionOf = () => this;
+      return update.call(this, now);
+    });
+    container = openContainer(480, 320);
+    handle = mountViewer(container, {
+      scene: { repository: new InlineSceneRepository(sceneWithCameras()) },
+      tour: { mode: 'off' },
+      doors: { autoOpen: false },
+      debug: true,
+    });
+    await handle.ready;
+    expect(handle.getMode()).toBe('orbit');
+    await rest('orbit after ready');
+  }, MOUNT_TIMEOUT_MS);
+
+  afterAll(() => {
+    handle.dispose();
+    vi.restoreAllMocks();
+    closeContainers();
+  });
+
+  // Every test starts from the same resting orbit, whatever the one before it left behind.
+  beforeEach(async () => {
+    handle.setAssetMoveTool(false);
+    handle.cancelCheckpointPlacement();
+    handle.setCheckpointOverlay(false);
+    handle.setSelection(null);
+    if (editorOf !== undefined) {
+      try {
+        editorOf().handleFurniturePick(null);
+      } catch {
+        // No editor captured yet: nothing selected through it.
+      }
+    }
+    if (handle.getMode() !== 'orbit') handle.setMode('orbit');
+    // At rest means the library maps landed too: one that lands later asks for its own frame.
+    await until(() => maps.pending() === 0, 'the library maps settled', TICKS_TIMEOUT_MS);
+    await rest('a clean resting orbit');
+  }, TICKS_TIMEOUT_MS);
+
+  test('a visible change that asks for its frame inside the verifier window is a rest not yet reached, not a skipped draw', async () => {
+    // A late library map does this: it lands while the kept picture is taken and
+    // asks for a frame (`LibrarySurface.load` → `attached` → `invalidate`).
+    const scene = sceneOf();
+    const before = scene.environmentIntensity;
+    try {
+      await verifyNothingSkipped('a late landing inside the window', 0, () => {
+        scene.environmentIntensity = before * 1.5;
+        demandOf().invalidate();
+      });
+    } finally {
+      scene.environmentIntensity = before;
+      demandOf().invalidate();
+    }
+  });
+
+  test('a resting orbit ticks on with no draw over 60 ticks and over two seconds, and keeps its picture', async () => {
+    const before = await canvasShot();
+    const idle = await ticks(60);
+    expect(idle.ticks).toBeGreaterThanOrEqual(60);
+    expect(idle.draws).toBe(0);
+    const start = counters();
+    await delay(2000);
+    const window2s = counters();
+    expect(window2s.ticks).toBeGreaterThan(start.ticks);
+    expect(window2s.draws).toBe(start.draws);
+    expect(await canvasShot()).toBe(before);
+    await verifyNothingSkipped('resting orbit');
+  });
+
+  test('the top view rests too; the flat plan keeps only its heartbeat', async () => {
+    const top = await follow(() => handle.setMode('plan3d'));
+    expect(top.draws).toBeGreaterThanOrEqual(1);
+    const idle = await ticks(60);
+    expect(idle.draws).toBe(0);
+    await verifyNothingSkipped('resting plan3d');
     handle.setMode('plan2d');
     await ticks(5);
-    const plan = await ticks(20);
-    expect(plan.draws).toBeLessThan(plan.ticks);
-    handle.setMode('walk');
-    await rest('back in walk');
+    const start = counters();
+    await delay(2000);
+    const flat = { ticks: counters().ticks - start.ticks, draws: counters().draws - start.draws };
+    expect(flat.draws).toBeGreaterThanOrEqual(1);
+    expect(flat.draws).toBeLessThan(flat.ticks);
+    handle.setMode('orbit');
+    await rest('back in orbit');
+  });
+
+  test('a real drag orbits the camera; the easing draws until it settles, then the view rests', async () => {
+    await rest('before the drag');
+    const box = canvas().getBoundingClientRect();
+    const from = { clientX: box.left + box.width / 2, clientY: box.top + box.height / 2 };
+    const id = (pointerId += 1);
+    const start = counters();
+    pointer(canvas(), 'pointerdown', from, id);
+    for (let step = 1; step <= 6; step += 1) {
+      pointer(canvas(), 'pointermove', { clientX: from.clientX + step * 12, clientY: from.clientY }, id);
+      await nextFrame();
+    }
+    pointer(canvas(), 'pointerup', { clientX: from.clientX + 72, clientY: from.clientY }, id);
+    await rest('after the drag');
+    expect(counters().draws - start.draws).toBeGreaterThan(1);
+    await verifyNothingSkipped('after the drag', POSE_TAIL_SHARE);
+  });
+
+  test('the editor aura draws every tick while shown and through its fade-out, then the view rests', async () => {
+    await rest('before the aura');
+    const without = await canvasShot();
+    editorOf().handleFurniturePick(DEMO.asset.livingSofa);
+    // A live aura never rests: every tick draws while it is shown.
+    const whileShown = await ticks(30);
+    expect(whileShown.draws).toBeGreaterThanOrEqual(whileShown.ticks - 1);
+    const cleared = await followNow(() => editorOf().handleFurniturePick(null));
+    expect(cleared.draws).toBeGreaterThanOrEqual(1);
+    expect(await differingShare(without, await canvasShot())).toBe(0);
+    await verifyNothingSkipped('after the aura');
+  });
+
+  test('a host selection tint draws through its finite fade and rests; a recolour draws too', async () => {
+    await rest('before the tint');
+    const set = await follow(() => handle.setSelection({ kind: 'furniture', id: DEMO.asset.livingSofa }));
+    expect(set.draws).toBeGreaterThan(1);
+    await verifyNothingSkipped('host tint');
+    await draws('selection recolour', () => selectionOf().tint(0xd9534f));
+    await draws('selection colour back', () => selectionOf().tint(null));
+    await draws('selection cleared', () => handle.setSelection(null));
+  });
+
+  test('scene edits draw: a move, a finish, a variant swap, a shell rebuild; each rests', async () => {
+    const asset = demoScene().assets.find((candidate) => candidate.id === DEMO.asset.livingCoffeeTable)!;
+    const apply = (ops: Parameters<NonNullable<ReturnType<typeof debug>['applyOps']>>[0]) => () => {
+      const result = debug().applyOps!(ops);
+      expect('error' in result ? result.error : undefined).toBeUndefined();
+    };
+    await draws(
+      'move_object',
+      apply([{ op: 'move_object', assetId: asset.id, position: { x: asset.position.x + 0.1, y: asset.position.y, z: asset.position.z } }]),
+    );
+    const finish = debug().presets()[0];
+    if (finish) await draws('a finish preset', () => debug().applyPreset(finish.id));
+    const armchair = handle.getScene()!.assets.find((candidate) => candidate.id === DEMO.asset.livingArmchair)!;
+    const variant =
+      (armchair as { variant?: string }).variant === VARIANT.armchair_boucle ? VARIANT.armchair_sage : VARIANT.armchair_boucle;
+    // The swap pops the old body out and the new one in over a tenth of a second: every frame of it draws, the last one included.
+    await draws('a variant swap', apply([{ op: 'replace_asset_variant', assetId: armchair.id, variant }]));
+    await draws('a shell rebuild', apply([{ op: 'set_ceiling', height: demoScene().ceilingHeight + 0.1 }]));
+  });
+
+  test('a door draws every tick of its motion and its final pose; the furniture ripple draws to its last frame', async () => {
+    const door = debug().doors()[0]!;
+    const motion = await draws('door', () => debug().toggleDoor(door.id));
+    expect(motion.draws).toBeGreaterThanOrEqual(motion.ticks - 1);
+    const hidden = await draws('furniture hidden', () => handle.setFurnitureVisible(false));
+    expect(hidden.draws).toBeGreaterThanOrEqual(hidden.ticks - 1);
+    await draws('furniture shown', () => handle.setFurnitureVisible(true));
+  });
+
+  test('the light temperature draws', async () => {
+    await draws('warm light', () => handle.setLightTemperature(2700));
+    await draws('original light', () => handle.setLightTemperature(null));
+  });
+
+  test('the tour-camera rig: switched on and off, hover, focus, a marker drag and its cancel', async () => {
+    const without = await canvasShot();
+    await draws('overlay on', () => handle.setCheckpointOverlay(true));
+    expect(await differingShare(without, await canvasShot())).toBeGreaterThan(0);
+    await draws('overlay off', () => handle.setCheckpointOverlay(false));
+    expect(await differingShare(without, await canvasShot())).toBe(0);
+    await draws('overlay on again', () => handle.setCheckpointOverlay(true));
+    const camera = sceneWithCameras().tourCheckpoints![0]!;
+    const marker = pixel(camera.position.x, camera.position.y, camera.position.z);
+    const hoverId = (pointerId += 1);
+    await draws('hover', () =>
+      canvas().dispatchEvent(new PointerEvent('pointermove', { ...marker, pointerId: hoverId, bubbles: true, pointerType: 'mouse' })),
+    );
+    await draws('hover off', () =>
+      canvas().dispatchEvent(
+        new PointerEvent('pointermove', {
+          clientX: marker.clientX + 150,
+          clientY: marker.clientY - 100,
+          pointerId: hoverId,
+          bubbles: true,
+          pointerType: 'mouse',
+        }),
+      ),
+    );
+    // A marker drag, a frame at a time, then cancelled: every move draws, and the reverted rig is drawn.
+    const id = (pointerId += 1);
+    const before = await canvasShot();
+    pointer(canvas(), 'pointerdown', marker, id);
+    let moved = 0;
+    for (let step = 1; step <= 4; step += 1) {
+      const start = counters();
+      pointer(canvas(), 'pointermove', { clientX: marker.clientX + step * 15, clientY: marker.clientY }, id);
+      await ticks(2);
+      if (counters().draws > start.draws) moved += 1;
+    }
+    expect(moved).toBe(4);
+    await draws('drag cancelled', () => pointer(canvas(), 'pointercancel', marker, id));
+    // The focus the press gave survives the cancel; clearing it puts the rig back as it was.
+    await draws('focus cleared', () => handle.focusCheckpoint(null));
+    expect(await differingShare(before, await canvasShot())).toBe(0);
+    await draws('overlay off at the end', () => handle.setCheckpointOverlay(false));
+  });
+
+  test('the placement ghost draws as it follows the pointer and goes when placing is cancelled', async () => {
+    await draws('overlay on for placing', () => handle.setCheckpointOverlay(true));
+    const id = '01a1300a-1c00-7000-8000-00000000c003';
+    expect(handle.startCheckpointPlacement({ id })).toBe(true);
+    const box = canvas().getBoundingClientRect();
+    const hoverId = (pointerId += 1);
+    await draws('ghost', () =>
+      canvas().dispatchEvent(
+        new PointerEvent('pointermove', {
+          clientX: box.left + box.width * 0.5,
+          clientY: box.top + box.height * 0.7,
+          pointerId: hoverId,
+          bubbles: true,
+          pointerType: 'mouse',
+        }),
+      ),
+    );
+    await draws('ghost moved', () =>
+      canvas().dispatchEvent(
+        new PointerEvent('pointermove', {
+          clientX: box.left + box.width * 0.55,
+          clientY: box.top + box.height * 0.7,
+          pointerId: hoverId,
+          bubbles: true,
+          pointerType: 'mouse',
+        }),
+      ),
+    );
+    await draws('placing cancelled', () => handle.cancelCheckpointPlacement());
+    await draws('overlay off after placing', () => handle.setCheckpointOverlay(false));
+  });
+
+  test('the camera preview: open, aim, card resized and relocated, aim cancelled, closed; the inset is drawn once per main frame', async () => {
+    await rest('before the preview');
+    const without = await canvasShot();
+    await draws('overlay on for the preview', () => handle.setCheckpointOverlay(true));
+    const open = counters();
+    await draws('preview open', () => handle.focusCheckpoint(CAMERA_IDS[1]));
+    expect(card().dataset['visible']).toBe('true');
+    expect(counters().insetDraws).toBeGreaterThan(open.insetDraws);
+    const windowEl = card().querySelector<HTMLElement>('.camera-preview-window')!;
+    const box = windowEl.getBoundingClientRect();
+    const centre = { clientX: box.left + box.width / 2, clientY: box.top + box.height / 2 };
+    // Aiming, a frame at a time: each move draws the main picture and the inset over it.
+    const id = (pointerId += 1);
+    pointer(windowEl, 'pointerdown', centre, id);
+    for (let step = 1; step <= 3; step += 1) {
+      const start = counters();
+      pointer(windowEl, 'pointermove', { clientX: centre.clientX + step * 10, clientY: centre.clientY }, id);
+      await ticks(2);
+      expect(counters().draws).toBeGreaterThan(start.draws);
+      expect(counters().insetDraws).toBeGreaterThan(start.insetDraws);
+    }
+    await draws('aim cancelled', () => pointer(windowEl, 'pointercancel', centre, id));
+    await draws('card resized', () => (card().style.width = '240px'));
+    await draws('card relocated by a host box', () => root().setAttribute(BOTTOM_RIGHT_CLAIMED_ATTRIBUTE, 'true'));
+    root().removeAttribute(BOTTOM_RIGHT_CLAIMED_ATTRIBUTE);
+    card().style.width = '';
+    await rest('card back');
+    const closing = counters();
+    await draws('preview closed', () => handle.focusCheckpoint(null));
+    expect(card().dataset['visible']).toBe('false');
+    const closed = counters();
+    expect(closed.insetDraws).toBe(closing.insetDraws);
+    await draws('overlay off', () => handle.setCheckpointOverlay(false));
+    expect(await differingShare(without, await canvasShot())).toBe(0);
+  });
+
+  test('the asset move tool: a drag with its legality field, a nudge, a mirror and a revert each draw; the field goes', async () => {
+    handle.setSelection({ kind: 'furniture', id: DEMO.asset.livingCoffeeTable });
+    handle.setAssetMoveTool(true);
+    await until(() => debug().assetMove().loaded, 'the asset move chunk', ASSET_MOVE_CHUNK_TIMEOUT_MS);
+    await rest('the tool armed');
+    const without = await canvasShot();
+    const table = handle.getScene()!.assets.find((asset) => asset.id === DEMO.asset.livingCoffeeTable)!;
+    const from = pixel(table.position.x, 0.3, table.position.z);
+    const id = (pointerId += 1);
+    pointer(canvas(), 'pointerdown', from, id);
+    let drawnMoves = 0;
+    for (let step = 1; step <= 4; step += 1) {
+      const start = counters();
+      pointer(canvas(), 'pointermove', { clientX: from.clientX + step * 4, clientY: from.clientY }, id);
+      await ticks(2);
+      if (counters().draws > start.draws) drawnMoves += 1;
+    }
+    expect(drawnMoves).toBe(4);
+    expect(debug().assetMove().state?.maskCells ?? 0).toBeGreaterThan(0);
+    // The release takes the field away (a mask-only change at the release pose) and the move is emitted.
+    await draws('drag released', () => pointer(canvas(), 'pointerup', { clientX: from.clientX + 16, clientY: from.clientY }, id));
+    expect(debug().assetMove().state?.maskCells).toBe(0);
+    await draws('revert', () => handle.revertAssetEdit());
+    await draws('mirror', () => expect(handle.mirrorAsset(DEMO.asset.livingCoffeeTable, 'x')).toBe(true));
+    await draws('revert the mirror', () => handle.revertAssetEdit());
+    await draws('nudge', () => root().dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowLeft', bubbles: true })));
+    handle.setAssetMoveTool(false);
+    await draws('selection cleared', () => handle.setSelection(null));
+    await rest('the tool off');
+    expect(await differingShare(without, await canvasShot())).toBeLessThan(0.002);
+  });
+
+  test('lifecycle: resize, a hidden tab, a context restore, each draw once and rest', async () => {
+    await draws('resize', () => (container.style.width = '440px'));
+    await draws('resize back', () => (container.style.width = '480px'));
+    // A pixel-ratio change alone is proved below the browser: the runtime refits its buffer
+    // (`render-runtime.test.ts`, «a pixel-ratio change at a fixed CSS box») and the plan canvas
+    // refits its drawing (`plan-modes.test.ts`); a headless page cannot change its own ratio.
+    // A backgrounded tab parks the loop; coming back draws once.
+    Object.defineProperty(document, 'hidden', { configurable: true, get: () => true });
+    let parked: DemandCounters;
+    try {
+      document.dispatchEvent(new Event('visibilitychange'));
+      await delay(300);
+      parked = counters();
+      await delay(300);
+      // Parked: no tick, no draw while the tab is hidden.
+      expect(counters().ticks).toBe(parked.ticks);
+    } finally {
+      delete (document as { hidden?: boolean }).hidden;
+      document.dispatchEvent(new Event('visibilitychange'));
+    }
+    await until(() => counters().draws > parked.draws, 'a draw when the tab is visible again', TICKS_TIMEOUT_MS);
+    await verifyNothingSkipped('tab visible again');
+    const lose = canvas().getContext('webgl2')!.getExtension('WEBGL_lose_context')!;
+    const lost = new Promise((resolve) => {
+      canvas().addEventListener('webglcontextlost', resolve, { once: true });
+    });
+    lose.loseContext();
+    await lost;
+    const atLoss = counters();
+    // Nothing is drawn while the context is gone.
+    await nextFrame();
+    await nextFrame();
+    expect(counters().draws).toBe(atLoss.draws);
+    lose.restoreContext();
+    await until(() => counters().draws > atLoss.draws, 'a draw after the restore', TICKS_TIMEOUT_MS);
+    await verifyNothingSkipped('after the restore');
+  });
+
+  test('captures keep a pending redraw: no display draw during the capture, the redraw on the next tick', async () => {
+    for (const capture of [
+      () => handle.capture.still({ width: 80, height: 60, caption: false }),
+      () => handle.capture.panorama({ width: 64, roomId: DEMO.room.living, caption: false }),
+    ]) {
+      await rest('before the capture');
+      // Hold every display draw (the gate answers «no» while held): the capture
+      // runs with one redraw pending and no frame that could clear it.
+      let held = true;
+      let commits = 0;
+      const demand = demandOf();
+      const gate = demand.shouldDraw.bind(demand);
+      const commit = demand.commit.bind(demand);
+      // Own properties over the prototype's, for this capture only.
+      Object.assign(demand, {
+        shouldDraw: (live: Parameters<RenderDemand['shouldDraw']>[0], mode: string | undefined) => {
+          const wants = gate(live, mode);
+          return held ? false : wants;
+        },
+        commit: (live: Parameters<RenderDemand['commit']>[0]) => {
+          commits += 1;
+          commit(live);
+        },
+      });
+      try {
+        demand.invalidate();
+        const start = counters();
+        const { blob } = await capture();
+        expect(blob.size).toBeGreaterThan(0);
+        // The capture rendered on its own path: no display draw, no display commit.
+        expect(commits).toBe(0);
+        expect(counters().draws).toBe(start.draws);
+        // Released: the redraw that was pending before the capture is drawn on the next tick.
+        held = false;
+        await ticks(2);
+        expect(counters().draws).toBeGreaterThan(start.draws);
+      } finally {
+        delete (demand as { shouldDraw?: unknown }).shouldDraw;
+        delete (demand as { commit?: unknown }).commit;
+      }
+      await verifyNothingSkipped('after the capture');
+    }
+  });
+});
+
+describe('the editing modes from a hidden mount', { timeout: MOUNT_TIMEOUT_MS }, () => {
+  afterAll(() => closeContainers());
+
+  test('mounted hidden: ready without a draw; an edit while hidden; shown, it draws the edited scene once and rests', async () => {
+    const container = openContainer(480, 320);
+    container.style.display = 'none';
+    const handle = mountViewer(container, {
+      scene: { repository: new InlineSceneRepository(demoScene()) },
+      tour: { mode: 'off' },
+      doors: { autoOpen: false },
+      debug: true,
+    });
+    try {
+      await handle.ready;
+      expect(counters().draws).toBe(0);
+      handle.setFurnitureVisible(false);
+      await delay(500);
+      expect(counters().draws).toBe(0);
+      container.style.display = '';
+      await until(() => counters().draws > 0, 'the first picture once shown', 60_000);
+      await rest('after the reveal');
+      expect(debug().furnitureRendered()).toBe(false);
+    } finally {
+      handle.dispose();
+    }
   });
 });

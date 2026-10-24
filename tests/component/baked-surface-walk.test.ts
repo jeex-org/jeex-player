@@ -34,6 +34,7 @@ import { RoomGrid } from '../../src/render/walk-lighting/room-grid.js';
 import type { RoomBox } from '../../src/render/walk-lighting/room-volumes.js';
 import { WALK_LIGHTING_TUNING as T } from '../../src/render/walk-lighting/walk-lighting-tuning.js';
 import { closeContainers, demoScene, nextFrame, openContainer, until } from './support.js';
+import { trackLibraryMaps, type LibraryMaps } from './library-maps.js';
 
 const SIZE = 32;
 const CENTRE = [16, 16] as const;
@@ -408,8 +409,10 @@ describe('the demo apartment with its shell baked, in walk', { timeout: MOUNT_TI
   let live: THREE.Scene | null = null;
   let lighting: { renderer: THREE.WebGLRenderer } | null = null;
   const view = { position: { x: 0.6, y: 1.3, z: 7.6 }, target: { x: 1.6, y: 1.3, z: 7.6 } };
+  let maps: LibraryMaps;
 
   beforeAll(async () => {
+    maps = trackLibraryMaps();
     const add = Object.getOwnPropertyDescriptor(THREE.Object3D.prototype, 'add')!.value as THREE.Object3D['add'];
     vi.spyOn(THREE.Object3D.prototype, 'add').mockImplementation(function (this: THREE.Object3D, ...objects) {
       if ((this as THREE.Scene).isScene && objects.some((object) => object.name === 'jeex-lighting-apartment-rig'))
@@ -429,6 +432,8 @@ describe('the demo apartment with its shell baked, in walk', { timeout: MOUNT_TI
     });
     await handle.ready;
     await until(() => live !== null, 'the live scene', 60_000);
+    // As the light-bake binding does: the shell is marked once its library maps settled.
+    await until(() => maps.pending() === 0, 'the library maps settled', 60_000);
     expect(bakeShell(live!)).toBeGreaterThan(0);
   }, MOUNT_TIMEOUT_MS);
 
@@ -487,6 +492,7 @@ describe('the demo apartment with its shell baked, in walk', { timeout: MOUNT_TI
   });
 
   test('a context restore in walk comes back to the same frame once the bake is done', async () => {
+    await until(() => maps.pending() === 0, 'the library maps settled before', 60_000);
     const before = await still();
     const canvas = handle.element.querySelector('canvas')!;
     const context = (canvas.getContext('webgl2') ?? canvas.getContext('webgl'))!;
@@ -505,7 +511,10 @@ describe('the demo apartment with its shell baked, in walk', { timeout: MOUNT_TI
     extension.restoreContext();
     await ready;
     await until(() => live !== null, 'the re-mounted scene', 60_000);
-    // The light-bake binding marks the re-mounted shell; this test stands in for it.
+    // The light-bake binding marks the re-mounted shell once its models and
+    // library maps have settled (`scene-mount.ts`, `settled`); this test stands
+    // in for it, so it waits for the same: the maps reload after the restore.
+    await until(() => maps.pending() === 0, 'the re-mounted library maps settled', 60_000);
     expect(bakeShell(live!)).toBeGreaterThan(0);
     if (handle.getState().mode !== 'walk') handle.setMode('walk');
     await until(() => debug().walkLighting().state === 'live', 'room lighting live after the restore', MOUNT_TIMEOUT_MS - 60_000);

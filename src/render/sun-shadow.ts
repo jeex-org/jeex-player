@@ -260,7 +260,7 @@ function sameSite(a: SceneSite | undefined, b: SceneSite | undefined): boolean {
  * Prepares `root` (built from `scene` and `plan`) for `rig`'s sun: slabs,
  * direction and fit. The rig is the caller's; `dispose` leaves it lit.
  * `redrawn` hears every redraw of the map asked of the rig: the next display
- * draw shows a new shadow (walk and tour draw on demand, `render-demand.ts`).
+ * draw shows a new shadow (the view draws on demand, `render-demand.ts`).
  */
 export function prepareSunShadow(
   root: THREE.Object3D,

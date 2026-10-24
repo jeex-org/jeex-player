@@ -100,7 +100,20 @@ test('the element sends view and ready, with closed keys, no referrer and no coo
   // the call arrived; the jump fires a timer due in that minute at most once.
   await page.clock.install();
   await page.clock.pauseAt((await page.evaluate(() => Date.now())) + 60_000);
-  await page.clock.runFor(40);
+  // A resting view draws nothing, and frame times are measured only between
+  // two consecutive drawn frames: a change on every frame (the light
+  // temperature stepping back and forth) keeps it drawing.
+  await page.evaluate(() => {
+    const viewer = document.querySelector('#viewer');
+    let warm = false;
+    const step = (): void => {
+      warm = !warm;
+      viewer?.setAttribute('light-temperature', warm ? '3000' : '3100');
+      requestAnimationFrame(step);
+    };
+    requestAnimationFrame(step);
+  });
+  await page.clock.runFor(200);
   await page.evaluate(() => window.dispatchEvent(new PageTransitionEvent('pagehide')));
   await expect.poll(() => seen.some((entry) => entry.body['group'] === 'device')).toBe(true);
   expect(JSON.stringify(seen.map((entry) => entry.body))).not.toContain('utm_source');

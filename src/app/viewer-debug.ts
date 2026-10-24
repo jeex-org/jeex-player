@@ -118,7 +118,8 @@ type ViewerDebugApi = {
   walkLighting: () => WalkLightingDebug;
   /**
    * Cumulative frame-loop ticks and display draws (`render/render-demand.ts`):
-   * a resting walk or tour keeps ticking while its draws stay flat.
+   * a resting view keeps ticking while its draws stay flat; `insetDraws`
+   * counts the camera-preview inset, drawn only after a main draw.
    */
   renderDemand: () => DemandCounters;
   /** The page's offline light bake (`__JEEX_DEBUG_LIGHT_BAKE__`): `off`, `waiting`, `loading`, `applied`, `refused` or `dropped`. */
@@ -503,7 +504,7 @@ export function installViewerDebug(host: ViewerDebugHost): ViewerDebugApi {
     sunShadow: () => host.sun()?.state() ?? null,
     walkPost: () => host.walkPost() ?? 'off',
     walkLighting: () => host.walkLighting() ?? { state: 'off', stats: null },
-    renderDemand: () => host.renderDemand() ?? { ticks: 0, draws: 0 },
+    renderDemand: () => host.renderDemand() ?? { ticks: 0, draws: 0, insetDraws: 0 },
     lightBake: () => host.lightBake(),
     assetModels: () => {
       const furniture = host.sceneRoot()?.getObjectByName(FURNITURE_GROUP_NAME);
