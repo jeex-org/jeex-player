@@ -1017,20 +1017,39 @@
       inset-inline: 0 auto;
     }
   }
+  /* The sheet stands clear of every filled host bottom box: a box sits on a
+     higher layer (8) and would paint over the sheet. `host-slots.ts` publishes
+     the boxes' full-width clearance as `--jeex-bottom-clearance` (8px above
+     the tallest filled box; absent or `0px` with none, and then the sheet
+     keeps its 10px inset). No box moves, and the sheet's layer stays 7.
+     A tall box (a phone's open assistant or camera panel) leaves less room
+     than the sheet needs: the sheet is capped at the room between the
+     viewer's top inset (10px) and its lifted bottom, and its content scrolls.
+     Where even 96px is not left, the sheet keeps that minimum from the top
+     inset down, never above the viewer's top edge, and the box covers its
+     overlap. With room to spare neither the cap nor the floor applies. */
   @container (max-width: 430px) {
     .jeex-viewer .settings-panel {
+      --jeex-sheet-bottom: min(max(10px, env(safe-area-inset-bottom), var(--jeex-bottom-clearance, 0px)), calc(100% - 10px - 96px));
       top: auto;
       right: 10px;
-      bottom: max(10px, env(safe-area-inset-bottom));
+      bottom: var(--jeex-sheet-bottom);
       left: 10px;
       inline-size: auto;
+      max-block-size: calc(100% - 10px - var(--jeex-sheet-bottom));
+      overflow-y: auto;
+      overscroll-behavior: contain;
     }
     /* The sheet is the same for both anchors: this outweighs the left-anchored rule above. */
     .jeex-viewer .settings-panel[data-anchor='left'] {
       top: auto;
       right: 10px;
-      bottom: max(10px, env(safe-area-inset-bottom));
+      bottom: var(--jeex-sheet-bottom);
       left: 10px;
+    }
+    /* Capped, the column would shrink its rows instead of scrolling them. */
+    .jeex-viewer .settings-panel > * {
+      flex-shrink: 0;
     }
   }
 
