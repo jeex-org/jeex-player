@@ -18,7 +18,7 @@ import type { AssetDims, AssetOptions, AssetPricing, CatalogueObject, CatalogueV
 import { DEFAULT_LIBRARY, findCatalogueEntry } from './asset-catalogue.js';
 import { assetRefOf } from '../scene/registries.js';
 import { resolveFinishId } from './asset-finishes.js';
-import { surfacesAt, type SlotFinishes, type SlotName, type SurfaceFacts, type VariantAccess } from './asset-types.js';
+import { surfacesAt, type LampLight, type SlotFinishes, type SlotName, type SurfaceFacts, type VariantAccess } from './asset-types.js';
 
 /**
  * One VARIANT as the resolver reads it: a catalogue variant that may carry a
@@ -133,6 +133,8 @@ export type ResolvedAsset = {
   mirrorFacts?: MirrorFacts | undefined;
   /** Surfaces and tucking at this variant's size; `{}` for none. */
   surfaceFacts?: SurfaceFacts | undefined;
+  /** The variant's lamp lights, in its model frame; absent when it emits none (every bank variant). */
+  lights?: readonly LampLight[] | undefined;
 };
 
 export type ResolveFailure = {
@@ -313,6 +315,7 @@ export function resolveAsset(placement: DemoAsset, options: ResolveOptions = {})
       baked: isBakedVariant(object, variant),
       mirrorFacts: object.mirror,
       surfaceFacts: surfacesAt(object, object.dims, dims),
+      ...(variant.lights !== undefined && { lights: variant.lights }),
     },
   };
 }

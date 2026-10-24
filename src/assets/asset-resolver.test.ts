@@ -18,6 +18,11 @@ import { FINISH } from '../materials/finish-ids.js';
 import type { DemoAsset } from '../scene/types.js';
 import type { ResolvableObject } from './asset-resolver.js';
 import { ARCHETYPE, VARIANT } from './catalogue-ids.js';
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
+import { projectBank } from './project-catalogue.js';
+import { parseProjectManifest } from './project-manifest.schema.js';
+import { LAMP_PROJECT_FIXTURE as LAMPS, PROJECT_FIXTURE } from '../../tests/fixtures/project/fixture-ids.js';
 
 /** Ids no bank carries: a placement, a library, a baked archetype and its variant, a finish. */
 const PLACEMENT = '01a12fed-dd98-7894-8642-886f3cb7ba35';
@@ -251,5 +256,40 @@ describe('baked variants', () => {
       for (const variant of object.variants)
         expect({ id: variant.id, baked: isBakedVariant(object, variant) }).toEqual({ id: variant.id, baked: false });
     }
+  });
+});
+
+describe('lamp lights', () => {
+  const fixture = (folder: string) =>
+    parseProjectManifest(
+      JSON.parse(readFileSync(join(import.meta.dirname, '..', '..', 'tests', 'fixtures', folder, 'project.json'), 'utf8')) as unknown,
+    );
+
+  function resolveIn(folder: string, asset: string, variant: string) {
+    const manifest = fixture(folder);
+    const bank = projectBank(manifest, 'https://example.com/bake/');
+    const result = resolveAsset(
+      { id: PLACEMENT, type: asset, asset, variant, position: { x: 0, y: 0, z: 0 } },
+      {
+        defaultLibrary: manifest.library.id,
+        catalogue: bank.catalogue,
+        catalogueLibrary: manifest.library.id,
+        resolveFinish: bank.resolveFinish,
+      },
+    );
+    if (!isResolved(result)) throw new Error(`${asset} should resolve`);
+    return result.asset;
+  }
+
+  test('a lit project variant carries its lights, as authored', () => {
+    const asset = resolveIn('project-lamps', LAMPS.asset.pendant, LAMPS.variant.pendant);
+    expect(asset.lights).toEqual([{ kind: 'point', position: [0, 0.063, 0], colour: '#ffd9a4', lumens: 600, cutoff: 5.2 }]);
+  });
+
+  test('an unlit project variant and a bank variant carry none', () => {
+    expect('lights' in resolveIn('project', PROJECT_FIXTURE.asset.boxSofa, PROJECT_FIXTURE.variant.boxSofa)).toBe(false);
+    const bank = resolveAsset(placement({ type: 'pendant', asset: ARCHETYPE.pendant }));
+    if (!isResolved(bank)) throw new Error('the bank pendant should resolve');
+    expect('lights' in bank.asset).toBe(false);
   });
 });
