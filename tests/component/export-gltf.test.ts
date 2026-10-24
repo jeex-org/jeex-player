@@ -11,11 +11,14 @@ import { exportGlb, type ExportDeps } from '../../src/app/export-gltf.js';
 import { lShapePlan } from '../../src/fixtures/plan-l-shape.js';
 import { metadataTable } from '../../src/scene/metadata-table.js';
 import { solvePlan } from '../../src/plan/plan-solver.js';
-import { closeContainers, openContainer, parkForExport } from './support.js';
+import { closeContainers, openContainer, parkForExport, until } from './support.js';
 import { readScalars, readStringColumn, type GltfJson } from './glb-conformance.js';
 import { FINISH } from '../../src/materials/finish-ids.js';
 import { BUILTIN_FINISHES } from '../../src/materials/builtin-library.js';
 import { firstFrameColour } from '../../src/materials/library-material.js';
+import { TextureSource } from '../../src/materials/texture-source.js';
+import { builtinFolder } from '../../src/materials/builtin-folder.js';
+import { createLogger } from '../../src/shared/logger.js';
 
 const GLB_MAGIC = 0x46546c67;
 
@@ -244,6 +247,22 @@ describe('exportGlb', () => {
     expect(compareExports(first, second)).toBe('identical');
   }, 90_000);
 
+  // The same with the bundled finishes drawn from their shipped WebP maps: the
+  // decoded maps and the derived tint image (the walls' tintable scan) must
+  // encode to the same bytes twice.
+  test('re-exporting a document with textured bundled finishes byte-for-byte matches the first export', async () => {
+    const builtin = new TextureSource({ baseUrl: builtinFolder(), log: createLogger(() => undefined), maxAnisotropy: 1 });
+    const textured: ExportDeps = {
+      ...fakeDeps(),
+      getSurfaces: () => ({ textures: null, builtinTextures: { source: builtin, device: 'low', compressed: false } }),
+    };
+    const firstBlob = await exportGlb(textured);
+    const first = await firstBlob.arrayBuffer();
+    const second = await (await exportGlb(textured)).arrayBuffer();
+    expect(((splitGlb(first).json['images'] as unknown[] | undefined) ?? []).length).toBeGreaterThan(2);
+    expect(compareExports(first, second)).toBe('identical');
+  }, 90_000);
+
   /*
    * The invariant behind the test above, checked on ONE export so a regression
    * is named rather than merely observed as "the bytes moved".
@@ -337,4 +356,52 @@ describe('exportGlb, wired through a mounted handle', () => {
     const extras = json['extras'] as { jeex: { sceneId: string } };
     expect(extras.jeex.sceneId).toBe(lShapePlan.id);
   });
+
+  // The bundled finishes the live view drew (room a's oak floor, the sand
+  // walls) travel with their maps, taken from the viewer's own source: the
+  // export fetches nothing the live view already fetched.
+  test('handle.exportGlb() writes the bundled maps the live view loaded and fetches none of them again', async () => {
+    // The page has loaded hundreds of modules: a full resource-timing buffer drops every later entry.
+    performance.setResourceTimingBufferSize(100_000);
+    performance.clearResourceTimings();
+    const container = openContainer();
+    const handle = mountViewer(container, {
+      scene: { repository: new InlineSceneRepository(lShapePlan) },
+      tour: { mode: 'off' },
+      debug: false,
+    });
+    handles.push(handle);
+    await handle.ready;
+    const finishMaps = (): string[] =>
+      performance
+        .getEntriesByType('resource')
+        .map((entry) => entry.name)
+        .filter((name) => name.includes('/finish-maps/tex/'));
+    await until(() => finishMaps().length > 0, 'the live view to fetch its bundled maps', 30_000);
+    let settledCount = -1;
+    await until(
+      () => {
+        const count = finishMaps().length;
+        const stable = count === settledCount;
+        settledCount = count;
+        return stable;
+      },
+      'the live map fetches to settle',
+      30_000,
+    );
+    parkForExport(handle);
+    const before = finishMaps();
+
+    const json = await readGlbJson(await handle.exportGlb());
+    expect(finishMaps()).toEqual(before);
+    const materials = (json['materials'] as Array<{ name?: string; pbrMetallicRoughness?: { baseColorTexture?: unknown } }>) ?? [];
+    const oak = materials.find((material) => material.name === FINISH.oak);
+    expect(oak?.pbrMetallicRoughness?.baseColorTexture).toBeDefined();
+    // The size the live view loaded is the size written.
+    const sizes = new Set(before.map((name) => /\.(\d+)\.webp$/.exec(name)?.[1]));
+    expect(sizes.size).toBe(1);
+    const usdz = new Uint8Array(await (await handle.exportUsdz()).arrayBuffer());
+    expect(finishMaps()).toEqual(before);
+    expect(new TextDecoder('latin1').decode(usdz)).toMatch(/textures\/Texture_[^.]+\.png/);
+  }, 120_000);
 });

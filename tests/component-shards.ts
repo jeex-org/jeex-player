@@ -48,6 +48,7 @@ export const COMPONENT_FILE_COST_S: Readonly<Record<string, number>> = {
   'export-glb-conformance.test.ts': 3,
   'export-gltf.test.ts': 7,
   'export-graph.test.ts': 1,
+  'export-library.test.ts': 40,
   'export-usdz.test.ts': 22,
   'first-frame.test.ts': 74,
   'focus-visible.test.ts': 1,

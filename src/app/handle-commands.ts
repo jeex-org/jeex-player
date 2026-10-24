@@ -23,6 +23,7 @@ import type { ViewerUI } from '../ui/viewer-ui.js';
 import type { ViewerEvents } from './viewer-events.js';
 import type { TourControls } from '../camera/tour-controls.js';
 import type { SceneMount } from './scene-mount.js';
+import type { ExportSurfaces } from './export-surfaces.js';
 import type { FurnitureAnimator } from '../geometry/furniture-animator.js';
 import type { ViewerContext } from './viewer-context.js';
 import type { ViewerOptions } from './viewer-options.js';
@@ -62,6 +63,8 @@ export type HandleCommands = {
   getLocale(): Locale;
   getState(): ViewerState;
   getScene(): SceneData | null;
+  /** What an export draws room surfaces with (`export-surfaces.ts`); internal, never on the public handle. */
+  exportSurfaces(): ExportSurfaces | null;
   focusRoom(roomId: string): boolean;
   stepCamera(to: 'next' | 'previous' | 'first' | 'last' | number): boolean;
   setLocale(locale: Locale): void;
@@ -216,6 +219,10 @@ export function handleCommands(deps: HandleCommandsDeps): HandleCommands {
         checkpoints: () => ({ lookThrough: deps.stage()?.pilot.id ?? null, placing: deps.stage()?.overlay.placing() ?? false }),
         lightTemperature: () => lightTemperature.value,
       });
+    },
+
+    exportSurfaces() {
+      return deps.mount().exportSurfaces();
     },
 
     /** A deep, mutable copy of the committed document; `null` before the first one. */
