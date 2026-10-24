@@ -1,6 +1,21 @@
 import { describe, expect, test } from 'bun:test';
 import { probePoint, rectilinearBoxes, roomOrder, roomVolumes, type VolumeInput } from './room-volumes.js';
 import { WALK_LIGHTING_TUNING as T } from './walk-lighting-tuning.js';
+import { searchLattice } from '../../plan/search-lattice.js';
+
+type Box3D = { minX: number; maxX: number; minY: number; maxY: number; minZ: number; maxZ: number };
+
+/** Euclidean distance from a point to a box, zero inside it. */
+const boxDistance = (p: { x: number; y: number; z: number }, b: Box3D): number =>
+  Math.hypot(
+    Math.max(b.minX - p.x, 0, p.x - b.maxX),
+    Math.max(b.minY - p.y, 0, p.y - b.maxY),
+    Math.max(b.minZ - p.z, 0, p.z - b.maxZ),
+  );
+
+/** Distance from a plan point to the nearest edge of an axis-aligned rectangular room. */
+const rectEdge = (p: { x: number; z: number }, x0: number, z0: number, x1: number, z1: number): number =>
+  Math.min(p.x - x0, x1 - p.x, p.z - z0, z1 - p.z);
 
 const square = (x0: number, z0: number, x1: number, z1: number) => [
   { x: x0, z: z0 },
@@ -77,6 +92,33 @@ describe('probePoint', () => {
     const point = probePoint(square(0, 0, 4, 2), [table]);
     const inside = point.x > table.minX && point.x < table.maxX && point.z > table.minZ && point.z < table.maxZ;
     expect(inside).toBe(false);
+  });
+});
+
+describe('probePoint keeps a 3D clearance from furniture', () => {
+  test('a floor lamp whose shade reaches the probe height pushes the probe at least the clearance away', () => {
+    const lamp: Box3D = { minX: 1.8, maxX: 2.2, minY: 0, maxY: 1.7, minZ: 1.8, maxZ: 2.2 };
+    const point = probePoint(square(0, 0, 4, 4), [lamp]);
+    expect(boxDistance(point, lamp)).toBeGreaterThanOrEqual(T.probeClearanceM);
+  });
+
+  test('a sofa 0.8 m high does not move the probe off the empty room\'s point', () => {
+    const sofa: Box3D = { minX: 1, maxX: 3, minY: 0, maxY: 0.8, minZ: 0.5, maxZ: 1.5 };
+    expect(probePoint(square(0, 0, 4, 2), [sofa])).toEqual(probePoint(square(0, 0, 4, 2), []));
+  });
+
+  test('without a qualifying point, the largest min(furniture clearance, edge distance) wins', () => {
+    const column: Box3D = { minX: 0.5, maxX: 0.7, minY: 0, maxY: 2.6, minZ: 0.5, maxZ: 0.7 };
+    const point = probePoint(square(0, 0, 1.2, 1.2), [column]);
+    const key = (p: { x: number; z: number }) => Math.min(boxDistance({ x: p.x, y: T.probeHeightM, z: p.z }, column), rectEdge(p, 0, 0, 1.2, 1.2));
+    expect(key(point)).toBeLessThan(T.probeClearanceM);
+    const best = Math.max(...searchLattice(0, 1.2, 0, 1.2, 0.1).map(key));
+    expect(key(point)).toBeCloseTo(best, 9);
+  });
+
+  test('answers the same point on every run', () => {
+    const lamp: Box3D = { minX: 1.8, maxX: 2.2, minY: 0, maxY: 1.7, minZ: 1.8, maxZ: 2.2 };
+    expect(probePoint(square(0, 0, 4, 4), [lamp])).toEqual(probePoint(square(0, 0, 4, 4), [lamp]));
   });
 });
 
