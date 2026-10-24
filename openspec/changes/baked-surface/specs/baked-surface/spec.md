@@ -104,14 +104,14 @@ The lightmap's contribution on a baked surface SHALL be scaled by the same inter
 
 ### Requirement: No recompile once warmed up
 
-Marking a material baked SHALL compile it once; the first entry into walk and the grid and probe bake MAY compile programs. Once that warm-up is done, the swap frame, later switches between modes, and marking a lamp baked or live or changing its intensity SHALL compile no new program while the number and kinds of lights stay the same.
+Marking a material baked SHALL compile it once; the first entry into walk, the grid and probe bake and the first return to an editing mode (where hidden grids change three's own program parameters) MAY compile programs. Once that warm-up is done, the swap frame, later switches between modes, and marking a lamp baked or live or changing its intensity SHALL compile no new program while the number and kinds of lights stay the same.
 
 #### Scenario: Toggle a lamp after warm-up
 - **WHEN** after the walk bake has completed a lamp is switched between baked and live and its intensity changed over several frames, with no light added or removed
 - **THEN** the number of compiled programs stays constant
 
 #### Scenario: Mode switches after warm-up
-- **WHEN** after the walk bake has completed the viewer switches from walk to an editing mode and back
+- **WHEN** after the warm-up the viewer switches from walk to an editing mode and back
 - **THEN** the number of compiled programs stays constant
 
 ### Requirement: Shader rewrites compose

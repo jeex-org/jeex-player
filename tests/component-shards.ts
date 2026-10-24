@@ -92,6 +92,8 @@ export const COMPONENT_FILE_COST_S: Readonly<Record<string, number>> = {
   'viewer-ui.test.ts': 1,
   'walk-keys.test.ts': 22,
   'walk-lighting.test.ts': 198,
+  'baked-surface.test.ts': 30,
+  'baked-surface-walk.test.ts': 240,
   'walk-post.test.ts': 24,
   'webgl-probe.test.ts': 1,
   'wheel-ownership.test.ts': 1,
