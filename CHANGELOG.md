@@ -9,6 +9,14 @@ as described under [Versioning](#versioning).
 
 ### Changed
 
+- **Orbit and the top view draw on demand.** Like walk and tour, orbit and
+  the 3D top view now draw a frame only when something on screen changes: the
+  camera, the scene, a selection, an overlay or the lighting. A view at rest
+  keeps ticking without drawing, which saves battery and GPU time on every
+  device. The flat 2D plan keeps its half-second heartbeat. Telemetry measures
+  frame times only between two drawn frames, so a view that never moves
+  reports none.
+
 - **Reflection probes keep clear of furniture.** A room's reflection probe
   stays at least 0.5 m from every piece of furniture in 3D where the room
   allows (a low sofa does not push it away, a floor lamp's shade or a tall
