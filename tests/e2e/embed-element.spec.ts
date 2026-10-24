@@ -4,7 +4,7 @@
  */
 
 import { expect, test } from '@playwright/test';
-import { expectCanvasScreenshot, expectChromeScreenshot, expectNoNewA11yViolations, waitForBoot } from './support.js';
+import { expectCanvasScreenshot, expectChromeScreenshot, expectNoNewA11yViolations, screenshotOnly, waitForBoot } from './support.js';
 import { scaled } from './time-scale.js';
 
 /** The color-contrast finding (#log/#events) is fixed. */
@@ -85,6 +85,7 @@ test('taking the element out of the DOM disposes the viewer and the page globals
 });
 
 test('the chrome looks as it did', async ({ page }) => {
+  screenshotOnly();
   // Pointer parked on the brand lockup inside the shadow root, so the bar stays
   // open for the whole capture (see `index.spec.ts`).
   await page.locator('#viewer [data-jeex="brand-lockup"]').hover({ force: true });
@@ -95,6 +96,7 @@ test('the chrome looks as it did', async ({ page }) => {
 });
 
 test('the apartment is still being rendered inside the shadow root', async ({ page }) => {
+  screenshotOnly();
   await expectCanvasScreenshot(page.locator('#viewer [data-jeex="scene-canvas"]'), 'embed-element-canvas.png');
 });
 
