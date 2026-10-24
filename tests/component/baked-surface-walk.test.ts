@@ -504,8 +504,6 @@ describe('the demo apartment with its shell baked, in walk', { timeout: MOUNT_TI
       });
     });
     live = null;
-    // The re-mounted shell's library maps land late, as they do on a loaded machine.
-    maps.delay(4000);
     extension.loseContext();
     await new Promise((resolve) => {
       setTimeout(resolve, 50);
@@ -517,7 +515,6 @@ describe('the demo apartment with its shell baked, in walk', { timeout: MOUNT_TI
     // library maps have settled (`scene-mount.ts`, `settled`); this test stands
     // in for it, so it waits for the same: the maps reload after the restore.
     await until(() => maps.pending() === 0, 'the re-mounted library maps settled', 60_000);
-    maps.delay(0);
     expect(bakeShell(live!)).toBeGreaterThan(0);
     if (handle.getState().mode !== 'walk') handle.setMode('walk');
     await until(() => debug().walkLighting().state === 'live', 'room lighting live after the restore', MOUNT_TIMEOUT_MS - 60_000);

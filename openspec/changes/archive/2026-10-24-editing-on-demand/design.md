@@ -66,3 +66,7 @@ With the editing modes resting, the mounted viewer no longer saturates the main 
 ## Migration Plan
 
 No data or API migration. Rollback is reverting the mode set to `walk` and `tour`; the request points and ordering are harmless under continuous drawing.
+
+## Test tier
+
+`tests/component/render-on-demand.test.ts` and `tests/component/baked-surface-walk.test.ts` run in a serial step after the parallel component tier (`scripts/run-component-tests.ts`, `SERIAL_GPU_FILES`): one worker, coverage off, same browser and GPU. Exact kept-vs-forced frame comparison is a single-tenant GPU check; under concurrent GPU rendering the first kept draw differs by ±1–8 levels on thin edges.
