@@ -79,6 +79,18 @@ const NOTICE_LIFT_PROPERTY = '--jeex-notice-lift';
 /** Clear space between the notice and whatever it was lifted above, pixels. */
 const NOTICE_GAP_PX = 8;
 
+/**
+ * The custom property the bottom boxes' clearance is published as on the root,
+ * in pixels: the distance from the root's bottom edge to the top of the
+ * tallest filled bottom box, plus `NOTICE_GAP_PX`, ACROSS THE WHOLE WIDTH
+ * (`0px` when no bottom box is filled). The narrow settings sheet
+ * (`styles/viewer.css`) spans the full width, so the notice's lift, which
+ * counts only what lies under the notice's own span, does not fit it. The
+ * hint card is not counted: it is the viewer's own chrome, under the sheet's
+ * layer, and the sheet already covers it.
+ */
+const BOTTOM_CLEARANCE_PROPERTY = '--jeex-bottom-clearance';
+
 /** The three boxes along the bottom edge a notice can collide with. */
 const BOTTOM_SLOTS: readonly SlotName[] = ['bottom-left', 'bottom-center', 'bottom-right'];
 
@@ -101,7 +113,9 @@ function rendered(rect: DOMRect): boolean {
 
 /**
  * Lifts the degraded-asset notice above every filled bottom box and the hint
- * card that it would otherwise overlap, plus `NOTICE_GAP_PX`.
+ * card that it would otherwise overlap, plus `NOTICE_GAP_PX`, and publishes
+ * the full-width clearance of the filled bottom boxes for the narrow settings
+ * sheet (`BOTTOM_CLEARANCE_PROPERTY`).
  *
  * Only what overlaps the notice HORIZONTALLY counts: the lift moves the notice
  * up and never sideways, so its horizontal span is the same before and after,
@@ -113,12 +127,23 @@ function rendered(rect: DOMRect): boolean {
  */
 function observeNoticeLift(root: HTMLElement, boxes: ReadonlyMap<SlotName, HTMLElement>, targets: NoticeLiftTargets): void {
   if (typeof ResizeObserver === 'undefined' || targets.signal.aborted) return;
-  const candidates = [...BOTTOM_SLOTS.flatMap((name) => boxes.get(name) ?? []), targets.hint];
+  const bottomBoxes = BOTTOM_SLOTS.flatMap((name) => boxes.get(name) ?? []);
+  const candidates = [...bottomBoxes, targets.hint];
   let lift = 0;
+  let boxesClearance = 0;
   const measure = (): void => {
+    const bottom = root.getBoundingClientRect().bottom;
+    let across = 0;
+    for (const box of bottomBoxes) {
+      const rect = box.getBoundingClientRect();
+      if (rendered(rect)) across = Math.max(across, Math.ceil(bottom - rect.top + NOTICE_GAP_PX));
+    }
+    if (across !== boxesClearance) {
+      boxesClearance = across;
+      root.style.setProperty(BOTTOM_CLEARANCE_PROPERTY, `${across}px`);
+    }
     const own = targets.notice.getBoundingClientRect();
     if (!rendered(own)) return;
-    const bottom = root.getBoundingClientRect().bottom;
     // The notice's own inset without the lift: its distance from the root's
     // bottom edge now, minus what this function already added.
     const base = bottom - own.bottom - lift;

@@ -396,6 +396,13 @@ as described under [Versioning](#versioning).
   (a 1.052 m pendant under a 2.65 m ceiling was drawn from 2.65 to 3.70 m);
   both now hang their own height down from it, in the same world box, as the
   layout rules always assumed. Objects of the built-in bank are unchanged.
+- **The settings sheet stands clear of the host's bottom boxes.** In viewers
+  430 px wide or narrower the open settings panel (the bottom sheet) now sits
+  8 px above the tallest filled `bottom-left`, `bottom-center` or
+  `bottom-right` box instead of passing under it, so a host button there no
+  longer covers the sheet's controls. No box moves; with no filled bottom box
+  the sheet keeps its place. The clearance is published on the viewer root as
+  `--jeex-bottom-clearance`.
 - **Built-in objects match the sizes and facts they declare.** The dining
   chair's rear posts stand on the floor as its back legs; the media unit is
   as tall as its dims (1.366 m, 1.512 m for the 2.2 m variant) and its

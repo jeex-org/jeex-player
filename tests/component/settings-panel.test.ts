@@ -13,7 +13,7 @@ import { InlineSceneRepository, mountViewer } from '../../src/app/viewer-api.js'
 import type { ViewerHandle } from '../../src/app/viewer-handle.js';
 import type { ViewerOptionsInput } from '../../src/app/viewer-options.js';
 import type { LightTemperatureChange } from '../../src/app/light-temperature-control.js';
-import { closeContainers, delay, demoScene, openContainer, until } from './support.js';
+import { closeContainers, delay, demoScene, fillSlot, intersects, openContainer, until } from './support.js';
 
 const MOUNT_TIMEOUT_MS = 120_000;
 const viewers: ViewerHandle[] = [];
@@ -492,4 +492,73 @@ describe('the plate under the bar and its neighbours', () => {
       MOUNT_TIMEOUT_MS,
     );
   }
+});
+
+/**
+ * The phone sheet and the host's bottom boxes: a filled box sits above the
+ * viewer's chrome (layer 8), so the open sheet stands clear of it instead of
+ * passing under it, and the box keeps its place. `elementFromPoint` at the
+ * slider is the real tap check.
+ */
+describe('the bottom sheet and filled host bottom boxes', { timeout: MOUNT_TIMEOUT_MS }, () => {
+  const PHONE: readonly [number, number] = [390, 844];
+
+  async function openSheet(viewer: ViewerHandle): Promise<{ panel: HTMLElement; slider: HTMLInputElement }> {
+    press(node<HTMLButtonElement>(viewer, 'settings-button')!);
+    const panel = node(viewer, 'settings-panel')!;
+    expect(panel.hidden).toBe(false);
+    return { panel, slider: panel.querySelector<HTMLInputElement>('input[type="range"]')! };
+  }
+
+  /** The sheet's insets from the viewer's left, right and bottom edges. */
+  function insets(viewer: ViewerHandle, panel: HTMLElement): number[] {
+    const at = panel.getBoundingClientRect();
+    const box = viewer.element.getBoundingClientRect();
+    return [at.left - box.left, box.right - at.right, box.bottom - at.bottom].map((v) => Math.round(v));
+  }
+
+  function tappable(target: HTMLElement): boolean {
+    target.scrollIntoView({ block: 'center', inline: 'center' });
+    const at = target.getBoundingClientRect();
+    const hit = document.elementFromPoint(at.left + at.width / 2, at.top + at.height / 2);
+    return hit !== null && target.contains(hit);
+  }
+
+  for (const slot of ['bottom-right', 'bottom-left'] as const) {
+    test(`at 390×844 the open sheet stands clear of a filled ${slot} box, the slider answers a tap, the box stays`, async () => {
+      const viewer = await mount(PHONE[0], { settings: { show: true }, slots: [slot] }, PHONE[1]);
+      const box = viewer.slots.get(slot);
+      fillSlot(box);
+      // Relative to the viewer: opening the panel may scroll this tall container in the test page.
+      const place = (): number[] => {
+        const at = box.getBoundingClientRect();
+        const origin = viewer.element.getBoundingClientRect();
+        return [at.left - origin.left, at.top - origin.top, at.width, at.height];
+      };
+      const before = place();
+      const { panel, slider } = await openSheet(viewer);
+      await until(() => !intersects(panel.getBoundingClientRect(), box.getBoundingClientRect()), `the sheet clear of ${slot}`);
+      expect(place()).toEqual(before);
+      // Still a full-width sheet, only higher: 8 px above the box.
+      const [left, right] = insets(viewer, panel);
+      expect([left, right]).toEqual([10, 10]);
+      expect(Math.round(box.getBoundingClientRect().top - panel.getBoundingClientRect().bottom)).toBe(8);
+      expect(tappable(slider)).toBe(true);
+    });
+  }
+
+  test('at 390×844 with no filled bottom box the sheet keeps its place, a claimed empty box included', async () => {
+    const plain = await mount(PHONE[0], { settings: { show: true } }, PHONE[1]);
+    const { panel } = await openSheet(plain);
+    const expected = insets(plain, panel);
+    expect(expected).toEqual([10, 10, 10]);
+    const height = panel.getBoundingClientRect().height;
+    plain.dispose();
+    const claimed = await mount(PHONE[0], { settings: { show: true }, slots: ['bottom-left', 'bottom-center', 'bottom-right'] }, PHONE[1]);
+    const sheet = (await openSheet(claimed)).panel;
+    // One more frame for the observer: an empty box measures zero and must not lift anything.
+    await delay(100);
+    expect(insets(claimed, sheet)).toEqual(expected);
+    expect(sheet.getBoundingClientRect().height).toBe(height);
+  });
 });

@@ -1017,11 +1017,16 @@
       inset-inline: 0 auto;
     }
   }
+  /* The sheet stands clear of every filled host bottom box: a box sits on a
+     higher layer (8) and would paint over the sheet. `host-slots.ts` publishes
+     the boxes' full-width clearance as `--jeex-bottom-clearance` (8px above
+     the tallest filled box; absent or `0px` with none, and then the sheet
+     keeps its 10px inset). No box moves, and the sheet's layer stays 7. */
   @container (max-width: 430px) {
     .jeex-viewer .settings-panel {
       top: auto;
       right: 10px;
-      bottom: max(10px, env(safe-area-inset-bottom));
+      bottom: max(10px, env(safe-area-inset-bottom), var(--jeex-bottom-clearance, 0px));
       left: 10px;
       inline-size: auto;
     }
@@ -1029,7 +1034,7 @@
     .jeex-viewer .settings-panel[data-anchor='left'] {
       top: auto;
       right: 10px;
-      bottom: max(10px, env(safe-area-inset-bottom));
+      bottom: max(10px, env(safe-area-inset-bottom), var(--jeex-bottom-clearance, 0px));
       left: 10px;
     }
   }
