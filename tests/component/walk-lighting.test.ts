@@ -64,8 +64,8 @@ async function centreLuminance(blob: Blob, size = 8): Promise<number> {
 }
 
 /** The renderer string of `renderer`'s context, for the record. */
-function debugRenderer(renderer: THREE.WebGLRenderer): string {
-  const gl = renderer.getContext();
+function debugRenderer(of: THREE.WebGLRenderer): string {
+  const gl = of.getContext();
   const info = gl.getExtension('WEBGL_debug_renderer_info');
   return String(gl.getParameter(info ? info.UNMASKED_RENDERER_WEBGL : gl.RENDERER));
 }
