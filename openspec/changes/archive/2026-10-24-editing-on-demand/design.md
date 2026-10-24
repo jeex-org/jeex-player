@@ -6,7 +6,7 @@ See proposal.md - Why. The runtime's frame loop (`src/render/render-runtime.ts`)
 
 The stage (`src/app/viewer-stage.ts`) registers one post-render hook that runs `CheckpointOverlay.flush()` (deferred trajectory tube rebuild) and then `CameraPreview.render()`, which syncs the inset card's visibility, mode and pose and draws the inset scissored into the same canvas. Both run after the main draw.
 
-Most visible-change sources already call `runtime.demand.invalidate()` or report through the frame hooks (inventory in brainstorm.md). The checkpoint overlay and the asset move previews and legality mask do not: they reach the screen only because every frame draws, or through an incidental sun-shadow change.
+Most visible-change sources already call `runtime.demand.invalidate()` or report through the frame hooks: edits and rebuilds, model and texture arrival, the light bake, doors and the furniture ripple, cutaways, the selection tint and aura, the floor ring and the light temperature. The checkpoint overlay and the asset move previews and legality mask do not: they reach the screen only because every frame draws, or through an incidental sun-shadow change.
 
 ## Goals / Non-Goals
 
@@ -20,7 +20,7 @@ Most visible-change sources already call `runtime.demand.invalidate()` or report
 
 `ON_DEMAND_MODES` becomes `walk`, `tour`, `orbit`, `plan3d`. Nothing else in `RenderDemand` changes: the same snapshot comparison, the same `POSE_TOLERANCE`, commit only after a successful draw. `plan2d` stays out of the set, so it keeps returning `true` and is limited by the existing `renderEnabled` heartbeat (`KEEP_WARM_MS`). The module comment is rewritten to name the modes and the `plan2d` exception.
 
-Alternative: a rig-reported "moved" flag. Rejected in brainstorm.md; the snapshot already covers the rig, the plan cameras, `flyTo` and keyboard pan.
+Alternative: a rig-reported "moved" flag. Rejected: the snapshot already covers the rig, the plan cameras, `flyTo` and keyboard pan.
 
 ### 2. Explicit request points in the overlays
 
