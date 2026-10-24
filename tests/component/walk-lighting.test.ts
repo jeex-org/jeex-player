@@ -10,7 +10,7 @@
  */
 
 import * as THREE from 'three';
-import { afterAll, beforeAll, describe, expect, test, vi } from 'vitest';
+import { afterAll, afterEach, beforeAll, describe, expect, test, vi } from 'vitest';
 import { commands } from 'vitest/browser';
 import { InlineSceneRepository, mountViewer } from '../../src/app/viewer-api.js';
 import type { ViewerHandle } from '../../src/app/viewer-handle.js';
@@ -838,7 +838,14 @@ describe('reflections from the room probes', { timeout: MOUNT_TIMEOUT_MS }, () =
 
 /* ------------------------------------------- probe placement after furniture edits */
 
+/** Three's own probe capture, taken before any test wraps it. */
+const FROM_SCENE = original(THREE.PMREMGenerator.prototype, 'fromScene');
+
 describe('probe placement follows furniture edits', { timeout: MOUNT_TIMEOUT_MS }, () => {
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
   const A: Box = { x0: 0, x1: 4, z0: 0, z1: 4 };
   const B: Box = { x0: 4, x1: 8, z0: 0, z1: 4 };
   /** A floor lamp's bounds centred at (x, z) in plan, its shade reaching the probe height. */
@@ -872,11 +879,10 @@ describe('probe placement follows furniture edits', { timeout: MOUNT_TIMEOUT_MS 
     });
     const lighting = new WalkLighting(gl, scene);
     const captures: THREE.Vector3[] = [];
-    const fromScene = original(THREE.PMREMGenerator.prototype, 'fromScene');
     const spy = vi.spyOn(THREE.PMREMGenerator.prototype, 'fromScene').mockImplementation(function (this: THREE.PMREMGenerator, ...args) {
       const position = args[4]?.position;
       if (position) captures.push(position.clone());
-      return fromScene.apply(this, args);
+      return FROM_SCENE.apply(this, args);
     });
     const live = (): void => {
       for (let frame = 0; frame < 2000 && lighting.phase !== 'live'; frame += 1) lighting.frame(true);
