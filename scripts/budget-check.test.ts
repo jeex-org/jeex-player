@@ -53,7 +53,7 @@ describe('constants', () => {
     expect(LAZY_CHUNK_PREFIX).toBe('lazy-');
     // The walk and tour chain: its last measured size plus 1 KB.
     expect(LAZY_LIMITS).toEqual({
-      'lazy-jeex-viewer-walk-post': 63_734 + 1024,
+      'lazy-jeex-viewer-walk-post': 65_356 + 1024,
       // The KTX2 loader chunk and the transcoder's JS wrapper: measured plus 1 KB.
       'lazy-jeex-viewer-KTX2Loader': 25_052 + 1024,
       'lazy-jeex-viewer-basis-transcoder-': 15_259 + 1024,
