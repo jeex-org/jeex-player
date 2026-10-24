@@ -33,7 +33,7 @@ async function ticks(count: number): Promise<DemandCounters> {
   const start = counters();
   await until(() => counters().ticks - start.ticks >= count, `${count} ticks`, TICKS_TIMEOUT_MS);
   const end = counters();
-  return { ticks: end.ticks - start.ticks, draws: end.draws - start.draws };
+  return { ticks: end.ticks - start.ticks, draws: end.draws - start.draws, insetDraws: end.insetDraws - start.insetDraws };
 }
 
 /** Waits until a window of `REST_TICKS` ticks draws nothing. */

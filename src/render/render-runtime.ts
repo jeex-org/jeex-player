@@ -58,7 +58,7 @@ import type { PostProcessor } from './post-processor.js';
 import { RenderDemand } from './render-demand.js';
 import { FirstDrawGate, FirstDrawSignal } from './first-draw.js';
 import { compileScene } from './scene-compile.js';
-import { devicePixelRatioOf, measureEntry, observeBox, type ObservedBox, type ViewportBox } from './viewport-box.js';
+import { devicePixelRatioOf, measureEntry, observeBox, watchPixelRatio, type ObservedBox, type ViewportBox } from './viewport-box.js';
 
 /** Device pixel ratio cap: above this the fill cost outgrows the visible gain. */
 const PIXEL_RATIO_CAP = 1.7;
@@ -327,39 +327,21 @@ export class RenderRuntime {
     this.handle = this.schedule(this.frame);
   }
 
-  /**
-   * Follows the display's device pixel ratio.
-   *
-   * There is no `devicepixelratiochange` event: the documented pattern is a
-   * `(resolution: Ndppx)` media query for the CURRENT ratio, which stops
-   * matching the moment the window is dragged onto a display with another one.
-   * The listener is one-shot and re-armed for the new ratio, so this costs one
-   * live listener whatever happens.
-   */
+  /** Follows the display's device pixel ratio (`viewport-box.watchPixelRatio`): a change refits the drawing buffer. */
   private watchPixelRatio(): void {
-    if (typeof matchMedia !== 'function') return;
-    const arm = (): void => {
-      const query = matchMedia(`(resolution: ${devicePixelRatioOf()}dppx)`);
-      query.addEventListener(
-        'change',
-        () => {
-          this.resize();
-          arm();
-        },
-        { once: true, signal: this.listeners.signal },
-      );
-    };
-    arm();
+    watchPixelRatio(() => this.resize(), this.listeners.signal);
   }
 
   /**
    * The ratio the drawing buffer is built at: measured from the device box
-   * where the browser reports one, `window.devicePixelRatio` otherwise, capped
-   * because above the cap the fill cost outgrows the visible gain.
+   * where the browser reports one, the CURRENT `window.devicePixelRatio`
+   * otherwise (a fallback box computed with an older ratio is stale after a
+   * ratio change at the same CSS size), capped because above the cap the fill
+   * cost outgrows the visible gain.
    */
   private pixelRatio(): number {
     const box = this.box;
-    const measured = box && box.cssWidth > 0 ? box.deviceWidth / box.cssWidth : devicePixelRatioOf();
+    const measured = box?.measured && box.cssWidth > 0 ? box.deviceWidth / box.cssWidth : devicePixelRatioOf();
     return Math.min(measured, this.pixelRatioCap);
   }
 

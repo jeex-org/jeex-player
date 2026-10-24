@@ -325,6 +325,8 @@ export class ViewerStage {
       onSelect: checkpoints.onSelect,
       onEdit: checkpoints.onEdit,
       onPlacing: checkpoints.onPlacing,
+      // The editing modes draw on demand: every change of the rig is a new picture.
+      onChange: () => this.runtime.demand.invalidate(),
       signal: deps.signal,
     });
     this.pilot = new CheckpointPilot({
@@ -353,15 +355,13 @@ export class ViewerStage {
       mode: () => this.mode,
       messages: deps.messages,
       onLookThrough: checkpoints.lookThrough,
+      onChange: () => this.runtime.demand.invalidate(),
+      onInsetDrawn: () => this.runtime.demand.insetDrawn(),
       signal: deps.signal,
     });
-    // The overlay's cheap transforms applied live during a drag; the expensive
-    // tube rebuild deferred to the frame's end, before the preview card draws
-    // (which must see the finished trajectory).
-    this.runtime.addPostRenderHook(() => {
-      this.overlay.flush();
-      this.preview.render();
-    });
+    // The inset is drawn over the main picture, and only over one that was
+    // just drawn: a skipped tick presents the last picture, inset included.
+    this.runtime.addPostRenderHook(() => this.preview.drawAfter(this.runtime.demand.counters().draws));
     this.selection = new ViewerSelectionController({
       canvas: deps.roots.canvas,
       picker: deps.director.picker,
@@ -495,7 +495,15 @@ export class ViewerStage {
       // a change of its look is a new picture in walk and tour.
       if (this.walkLighting.update(mode)) this.runtime.demand.invalidate();
     };
-    for (const hook of orderFrameHooks(cameraHook, hooks)) this.runtime.addFrameHook(hook);
+    // Last, before the draw decision: the overlay's cheap transforms are applied
+    // live during a drag, the expensive tube rebuild is deferred to here, once
+    // per tick, so the frame drawn now shows the finished trajectory; then the
+    // preview card syncs and asks for a frame if its picture changed.
+    const frameEnd: FrameHook = () => {
+      this.overlay.flush();
+      this.preview.sync();
+    };
+    for (const hook of [...orderFrameHooks(cameraHook, hooks), frameEnd]) this.runtime.addFrameHook(hook);
     this.runtime.start();
   }
 

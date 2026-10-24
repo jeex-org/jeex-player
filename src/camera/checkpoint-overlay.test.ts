@@ -107,6 +107,8 @@ type Harness = {
   world: { mode: ViewerMode };
   timer: ReturnType<typeof manualScheduler>;
   reload: () => void;
+  /** How many times the overlay asked for a redraw. */
+  changes: { count: number };
 };
 
 function harness(checkpoints: TourCheckpoint[] = [CAM_A, CAM_B]): Harness {
@@ -126,6 +128,7 @@ function harness(checkpoints: TourCheckpoint[] = [CAM_A, CAM_B]): Harness {
   const framed: string[] = [];
   const world = { mode: 'orbit' as ViewerMode };
   const timer = manualScheduler();
+  const changes = { count: 0 };
   const doc = { ...lShapePlan, tourCheckpoints: checkpoints };
   const overlay = new CheckpointOverlay({
     canvas: canvas as unknown as HTMLCanvasElement,
@@ -145,10 +148,11 @@ function harness(checkpoints: TourCheckpoint[] = [CAM_A, CAM_B]): Harness {
     onEdit: (edit) => edits.push(edit),
     onPlacing: (active) => placing.push(active),
     schedule: timer.schedule,
+    onChange: () => (changes.count += 1),
   });
   overlay.group.visible = true;
   overlay.setScene(doc);
-  return { canvas, keys, overlay, camera, top, selections, edits, placing, framed, world, timer, reload: () => overlay.setScene(doc) };
+  return { canvas, keys, overlay, camera, top, selections, edits, placing, framed, world, timer, reload: () => overlay.setScene(doc), changes };
 }
 
 /** Stands the author at `from` looking at `at`. */
@@ -641,5 +645,65 @@ describe('picking on the 3D plan', () => {
     const placed = h.edits[0]!.checkpoints.at(-1)!;
     expect(placed.position.x).toBeCloseTo(3, 1);
     expect(placed.position.z).toBeCloseTo(5.5, 1);
+  });
+});
+
+describe('redraw requests: the editing modes draw on demand, so every visible change of the rig asks for a frame', () => {
+  /** Runs `change` and answers whether it asked for a redraw. */
+  function asks(h: Harness, change: () => void): boolean {
+    const before = h.changes.count;
+    change();
+    return h.changes.count > before;
+  }
+
+  test('a scene, the switch, focus, a revert, a remove and a settle each ask', () => {
+    const h = harness();
+    SIDE(h);
+    expect(asks(h, () => h.reload())).toBe(true);
+    expect(asks(h, () => h.overlay.setActive(CAM.a))).toBe(true);
+    expect(asks(h, () => h.overlay.setActive(CAM.a))).toBe(false);
+    expect(asks(h, () => h.overlay.revert())).toBe(true);
+    expect(asks(h, () => h.overlay.settle(CAM.a))).toBe(true);
+    expect(asks(h, () => h.overlay.setEnabled(false))).toBe(true);
+    expect(asks(h, () => h.overlay.setEnabled(true))).toBe(true);
+    expect(asks(h, () => h.overlay.remove(CAM.b))).toBe(true);
+  });
+
+  test('a working change asks, and so does the deferred tube rebuild it leads to', () => {
+    const h = harness();
+    h.overlay.working(CAM.a)!.position.x += 0.5;
+    expect(asks(h, () => h.overlay.changed(CAM.a))).toBe(true);
+    expect(asks(h, () => h.overlay.flush())).toBe(true);
+    expect(asks(h, () => h.overlay.flush())).toBe(false);
+  });
+
+  test('hover asks only when what is hovered changes; the invalid tint asks only when it moves', () => {
+    const h = harness();
+    expect(asks(h, () => h.overlay.hover({ id: CAM.a, kind: 'move' }))).toBe(true);
+    expect(asks(h, () => h.overlay.hover({ id: CAM.a, kind: 'move' }))).toBe(false);
+    expect(asks(h, () => h.overlay.hover(null))).toBe(true);
+    expect(asks(h, () => h.overlay.setInvalid(CAM.a))).toBe(true);
+    expect(asks(h, () => h.overlay.setInvalid(CAM.a))).toBe(false);
+    expect(asks(h, () => h.overlay.setInvalid(null))).toBe(true);
+  });
+
+  test('the placement ghost asks as it follows the floor and when placing ends', () => {
+    const h = harness([]);
+    look(h.camera, new THREE.Vector3(4, 12, 4.01), new THREE.Vector3(4, 0, 4), new THREE.Vector3(0, 0, -1));
+    h.overlay.startPlacing(CAM.added);
+    expect(asks(h, () => h.overlay.ghost({ x: 2, z: 2 }, null, true))).toBe(true);
+    expect(asks(h, () => h.overlay.ghost(null, null, true))).toBe(true);
+    expect(asks(h, () => h.overlay.cancelPlacing())).toBe(true);
+    expect(asks(h, () => h.overlay.cancelPlacing())).toBe(false);
+  });
+
+  test('a drag asks on every move, and a cancel asks for the reverted rig', () => {
+    const h = harness();
+    SIDE(h);
+    const at = screen(h.camera, CAM_A.position);
+    h.canvas.fire('pointerdown', at);
+    expect(asks(h, () => h.canvas.fire('pointermove', { clientX: at.clientX + 40, clientY: at.clientY }))).toBe(true);
+    expect(asks(h, () => h.canvas.fire('pointermove', { clientX: at.clientX + 80, clientY: at.clientY }))).toBe(true);
+    expect(asks(h, () => h.canvas.fire('pointercancel', {}))).toBe(true);
   });
 });
