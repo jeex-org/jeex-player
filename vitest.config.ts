@@ -107,7 +107,7 @@ export default defineConfig({
       // `include` alone is the whole policy in Vitest 5: an included file
       // that no test imported is reported at 0 % rather than left out, which
       // is the only honest way to floor a layer.
-      include: ['src/ui/**', 'src/app/**', 'src/doors/**', 'src/embed/**', 'src/render/**'],
+      include: ['src/ui/**', 'src/app/**', 'src/doors/**', 'src/embed/**', 'src/render/**', 'src/lightmap/**'],
       exclude: ['**/*.test.ts'],
     },
   },

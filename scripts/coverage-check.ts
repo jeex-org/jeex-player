@@ -68,6 +68,7 @@ export const COMPONENT_LAYER_FLOORS: Readonly<Record<string, number>> = {
   'src/app': 0.57,
   'src/doors': 0.6,
   'src/embed': 0.84,
+  'src/lightmap': 0.81,
   'src/render': 0.9,
   'src/ui': 0.85,
 };

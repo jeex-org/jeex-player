@@ -61,6 +61,7 @@ const CODED = new Set([
   'MissingShellNodeError',
   'MissingSlotError',
   'ByteLimitError',
+  'LightBakeError',
 ]);
 
 describe('ViewerLibError', () => {

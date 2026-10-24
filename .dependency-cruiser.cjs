@@ -34,6 +34,10 @@
  * `jeex-viewer/lighting`: it reaches nothing of the viewer, not even
  * `shared/`, so it sits at the very bottom, and `render` (which binds it to
  * the player's renderer) is far above it.
+ *
+ * `lightmap` sits right above `render`: it applies a light bake to a shell
+ * and marks what it bound through `render/baked-surface.ts`, the seam the
+ * lighting reads, so nothing below it ever imports the lightmap layer.
  */
 const LAYERS = [
   'lighting',
@@ -48,6 +52,7 @@ const LAYERS = [
   'layout',
   'geometry',
   'render',
+  'lightmap',
   'edit',
   'camera',
   'doors',
