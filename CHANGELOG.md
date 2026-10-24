@@ -9,6 +9,10 @@ as described under [Versioning](#versioning).
 
 ### Changed
 
+- **A sheen without a colour is visible.** A library material that states
+  `sheen` and no `sheenColour` draws its sheen in its tint (the finish
+  colour, else its first suggested colour), or in white when it has no tint,
+  instead of three.js's black default, which hid the sheen.
 - **Contemporary room surfaces.** The bundled finishes move to an approved
   contemporary set under their ids: Warm white, Oat, Olive and Clay
   limewash, Mocha (formerly Graphite), Stacked white tile, White terrazzo
@@ -50,6 +54,10 @@ as described under [Versioning](#versioning).
 
 ### Added
 
+- **Sheen roughness on library materials.** A library material's `pbr` may
+  state `sheenRoughness`, a fraction in [0, 1], drawn as the physical
+  material's sheen roughness; absent, three.js's default of 1 applies, and a
+  value out of range refuses the manifest like every other PBR fact.
 - `FINISH_ALIASES` and `FINISH_NAMES` in `jeex-viewer/ops`: retired bundled
   room finish id to the id it reads as, and bundled floor and wall finish id
   to its picker name.
