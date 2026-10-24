@@ -15,6 +15,7 @@
 import { defineConfig, devices } from '@playwright/test';
 import { headlessWebglLaunch } from './tests/headless-webgl.js';
 import { scaled } from './tests/e2e/time-scale.js';
+import { SCREENSHOTS_IGNORED } from './tests/e2e/snapshot-policy.js';
 import { portEnv, positiveIntEnv } from './scripts/config-input.js';
 
 /**
@@ -66,12 +67,14 @@ export default defineConfig({
    */
   snapshotPathTemplate: '{testDir}/__screenshots__/{platform}/{testFilePath}/{arg}{ext}',
   /**
-   * Screenshot comparisons are local-only: with `CI` set every
-   * `toHaveScreenshot` is skipped (the rest of each spec still runs), because
-   * the baselines are rendered on the maintainers' machines and a hosted
-   * runner's fonts and rasteriser differ from them.
+   * Screenshot comparisons are local-only (`tests/e2e/snapshot-policy.ts`):
+   * with `CI` set every `toHaveScreenshot` is skipped, because the baselines
+   * are rendered on the maintainers' machines and a hosted runner's fonts and
+   * rasteriser differ from them. A test that only prepares and compares a
+   * picture calls `screenshotOnly()` and is skipped whole; a test with other
+   * assertions still runs them.
    */
-  ignoreSnapshots: !!process.env['CI'],
+  ignoreSnapshots: SCREENSHOTS_IGNORED,
   use: {
     baseURL: E2E_BASE_URL,
     trace: 'on-first-retry',

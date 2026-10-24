@@ -8,7 +8,14 @@
  */
 
 import { expect, test, type Locator, type Page } from '@playwright/test';
-import { expectCanvasScreenshot, expectChromeScreenshot, expectNoNewA11yViolations, modeButton, waitForBoot } from './support.js';
+import {
+  expectCanvasScreenshot,
+  expectChromeScreenshot,
+  expectNoNewA11yViolations,
+  modeButton,
+  screenshotOnly,
+  waitForBoot,
+} from './support.js';
 import { scaled } from './time-scale.js';
 
 /** The color-contrast finding (.stage-label) is fixed. */
@@ -93,6 +100,7 @@ test('disposing the first leaves the second rendering and takes the globals with
 });
 
 test('the chrome of both viewers looks as it did', async ({ page }) => {
+  screenshotOnly();
   // One pointer, two bars, so each is put in a state that holds: the first
   // viewer's bar open under the pointer resting on its brand lockup (its idle
   // timer re-arms while hovered), the second's collapsed to its reveal pill
@@ -108,6 +116,7 @@ test('the chrome of both viewers looks as it did', async ({ page }) => {
 });
 
 test('the second viewer is still rendering its own apartment', async ({ page }) => {
+  screenshotOnly();
   await expectCanvasScreenshot(stage(page, 'stage-b').locator('[data-jeex="scene-canvas"]'), 'embed-two-canvas.png');
 });
 

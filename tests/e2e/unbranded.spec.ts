@@ -11,6 +11,7 @@ import {
   expectCanvasScreenshot,
   expectChromeScreenshot,
   expectNoNewA11yViolations,
+  screenshotOnly,
   viewerRoot,
   waitForBoot,
   waitForChromeIdle,
@@ -60,6 +61,7 @@ for (const viewport of [
     });
 
     test('the canvas does not move on its own for 3 s without input', async ({ page }) => {
+      screenshotOnly();
       await gotoUnbranded(page);
       const canvas = page.locator('[data-jeex="scene-canvas"]');
       // The bar auto-hides on an idle timer: capture once it has, so the
@@ -102,6 +104,7 @@ for (const viewport of [
     });
 
     test('the chrome looks as it did', async ({ page }) => {
+      screenshotOnly();
       await gotoUnbranded(page);
       // No brand lockup to rest on here, so the pointer rests on the bar's own
       // left padding: the bar stays open for the whole capture (its idle timer
