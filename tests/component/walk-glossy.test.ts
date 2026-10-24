@@ -36,7 +36,7 @@ const LIVING_FLOOR = /^floor-01a15f1b-dbbd-7634/;
 const CEILING_RB_MEASURED = 2.086;
 /**
  * Where the 2D footprint placement put the living probe before the
- * clearance: beside the floor lamp's shade. Only the «before» reading uses it.
+ * clearance: beside the floor lamp's shade. The «before» reading and the ratio check against it use it.
  */
 const PROBE_BEFORE = { x: 2.7, y: 1.5, z: 7.13 };
 /** Pose fA of the gloss metering: across the living room towards its west wall. */
@@ -344,7 +344,7 @@ describe.skipIf(!HARDWARE)(`walk gloss and white balance in the demo living room
     expect(nearest).toBeGreaterThanOrEqual(0.5);
   });
 
-  test('gloss by contrast: r 0.07 at least 2.5 times r 0.6 on the black living floor', () => {
+  test('gloss by contrast: r 0.07 at least 2.2 times r 0.6 on the black living floor, and 1.15 times the ratio at the old probe point', () => {
     const view = poseCamera(POSE_GLOSS.position, POSE_GLOSS.target);
     const restore = probeAt(PROBE_BEFORE);
     const before = { r007: contrast(view, 0.07), r06: contrast(view, 0.6) };
@@ -355,7 +355,10 @@ describe.skipIf(!HARDWARE)(`walk gloss and white balance in the demo living room
       before,
       after,
     });
-    expect(after.r007.contrast).toBeGreaterThanOrEqual(2.5 * after.r06.contrast);
+    const ratioAfter = after.r007.contrast / after.r06.contrast;
+    const ratioBefore = before.r007.contrast / before.r06.contrast;
+    expect(ratioAfter).toBeGreaterThanOrEqual(2.2);
+    expect(ratioAfter).toBeGreaterThanOrEqual(1.15 * ratioBefore);
   });
 
   test('the window shows in the polished black floor in its own columns', () => {

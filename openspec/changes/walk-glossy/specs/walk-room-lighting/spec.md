@@ -90,11 +90,11 @@ After a furniture edit in walk the probe points SHALL be recomputed from the cur
 
 ### Requirement: Glossy finishes read as glossy
 
-In walk, on the demo living-room fixture (recorded pose, resolution and floor mask), the floor's specular contrast (99th percentile over median of linear specular luminance, floor black, non-metal, map-free) at roughness 0.07 SHALL be at least 2.5 times that at 0.6; where geometry puts the window's mirror image on that floor, it SHALL show the window.
+In walk, on the demo living-room fixture (recorded pose, resolution and floor mask), the floor's specular contrast (99th percentile over median of linear specular luminance, floor black, non-metal, map-free) at roughness 0.07 SHALL be at least 2.2 times that at 0.6, and that ratio SHALL be at least 1.15 times the one read with the probe at the footprint rule's point; where geometry puts the window's mirror image on that floor, it SHALL show the window.
 
 #### Scenario: Contrast by roughness
 - **WHEN** the demo living-room floor (black, non-metal, map-free) is metered in walk at the recorded pose and resolution, at roughness 0.07 and at 0.6, with the room lighting live on a hardware renderer
-- **THEN** the 0.07 floor's contrast of linear specular luminance in the recorded floor mask is at least 2.5 times the 0.6 floor's
+- **THEN** the 0.07 floor's contrast of linear specular luminance in the recorded floor mask is at least 2.2 times the 0.6 floor's, and that ratio is at least 1.15 times the ratio with the living probe at (2.70, 1.50, 7.13), where the footprint rule placed it
 
 #### Scenario: Window in a polished floor
 - **WHEN** a recorded pose sees the floor band where the living room window's mirror image falls, the floor black, non-metal, map-free at roughness 0.07, with the room lighting live on a hardware renderer

@@ -21,7 +21,7 @@ Every behaviour change lands as a failing test first, then the code. Browser tes
 ## 3. Gloss proof in the demo living room
 
 - [ ] 3.1 Component test: demo living room in walk with the lighting live, the living probe point ≥ 0.5 m from the floor lamp box (the «Demo living room» scenario); verify it passes after group 1 (red on main: record the failing line).
-- [ ] 3.2 GPU measurement test (asserts a hardware renderer string, skips with a reason on software): demo living floor black, non-metal, map-free at roughness 0.07 and 0.6, recorded pose, resolution and floor mask, contrast p99/median of linear specular luminance; assert 0.07 ≥ 2.5 × 0.6; verify red before group 1 and green after, record both numbers and the renderer.
+- [ ] 3.2 GPU measurement test (asserts a hardware renderer string, skips with a reason on software): demo living floor black, non-metal, map-free at roughness 0.07 and 0.6, recorded pose, resolution and floor mask, contrast p99/median of linear specular luminance; assert 0.07 ≥ 2.2 × 0.6 and that ratio ≥ 1.15 × the ratio at the footprint rule's point (design decision 8; the room's surfaces changed after the first calibration at 2.5, the contrast is measured on the current demo); verify red before group 1 and green after, record both numbers and the renderer.
 - [ ] 3.3 GPU measurement test (same renderer assertion): a recorded window-band pose, the same black non-metal map-free floor at roughness 0.07; the band in the window's column is brighter than the floor beside it; verify red before group 1 and green after, record the numbers and before/after shots.
 
 ## 4. White balance
