@@ -1,7 +1,7 @@
 # render-loop Specification
 
 ## Purpose
-Defines when the viewer schedules frames: the render loop parks while its canvas is detached from the document, without disposing anything, and resumes when the canvas is attached again.
+Defines when the viewer schedules and draws frames: the render loop parks while its canvas is detached from the document, without disposing anything, and resumes when the canvas is attached again; the editing modes draw only on demand, with the flat plan's keep-warm heartbeat as the one exception.
 
 ## Requirements
 
