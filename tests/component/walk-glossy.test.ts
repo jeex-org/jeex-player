@@ -41,6 +41,8 @@ const CEILING_RB_MEASURED = 2.086;
 const PROBE_BEFORE = { x: 2.7, y: 1.5, z: 7.13 };
 /** Pose fA of the gloss metering: across the living room towards its west wall. */
 const POSE_GLOSS = { position: new THREE.Vector3(5.6, 1.6, 6.2), target: new THREE.Vector3(0.3, 0.9, 7.7) };
+/** Pose P2 of the window metering: across the living room towards the bay. */
+const POSE_WINDOW = { position: new THREE.Vector3(2.6, 1.6, 6.0), target: new THREE.Vector3(2.4, 0.4, 9.6) };
 const SIZE = { w: 480, h: 300 };
 /** Classes a mask can tell apart. */
 const MASK_CLASSES = 64;
@@ -220,6 +222,33 @@ describe.skipIf(!HARDWARE)(`walk gloss and white balance in the demo living room
     return () => move(placed);
   }
 
+  /** Mean linear luminance of the black r 0.07 living floor in the glass's screen columns and beside them. */
+  function windowBand(view: THREE.Camera): { columns: [number, number]; inside: number; beside: number; counts: [number, number] } {
+    const restore = blackFloor(0.07);
+    try {
+      const classes = mask(view, (mesh) => (isGlass(mesh) ? 1 : LIVING_FLOOR.test(mesh.name) ? 0 : null));
+      const pixels = linearShot(view);
+      let x0 = SIZE.w;
+      let x1 = -1;
+      for (let i = 0; i < classes.length; i += 1) {
+        if (classes[i] !== 1) continue;
+        x0 = Math.min(x0, i % SIZE.w);
+        x1 = Math.max(x1, i % SIZE.w);
+      }
+      const inside: number[] = [];
+      const beside: number[] = [];
+      for (let i = 0; i < classes.length; i += 1) {
+        if (classes[i] !== 0) continue;
+        const x = i % SIZE.w;
+        (x >= x0 && x <= x1 ? inside : beside).push(luminance(pixels[i * 4]!, pixels[i * 4 + 1]!, pixels[i * 4 + 2]!));
+      }
+      const mean = (list: number[]): number => list.reduce((sum, v) => sum + v, 0) / Math.max(1, list.length);
+      return { columns: [x0, x1], inside: mean(inside), beside: mean(beside), counts: [inside.length, beside.length] };
+    } finally {
+      restore();
+    }
+  }
+
   beforeAll(async () => {
     const load = Object.getOwnPropertyDescriptor(WalkLighting.prototype, 'load')!.value as WalkLighting['load'];
     vi.spyOn(WalkLighting.prototype, 'load').mockImplementation(function (this: WalkLighting, doc) {
@@ -293,64 +322,24 @@ describe.skipIf(!HARDWARE)(`walk gloss and white balance in the demo living room
   });
 
   test('the window shows in the polished black floor in its own columns', () => {
-    // The living room's largest glass pane, and a pose 3.5 m into the room facing it.
-    const living = lighting.volumes.boxes.filter((b) => b.roomId === LIVING);
-    const near = (p: THREE.Vector3): boolean =>
-      living.some(
-        (b) =>
-          p.x > b.selection.min.x - 0.5 && p.x < b.selection.max.x + 0.5 && p.z > b.selection.min.z - 0.5 && p.z < b.selection.max.z + 0.5,
-      );
-    let pane: { mesh: THREE.Mesh; box: THREE.Box3; area: number } | null = null;
+    // Pose P2: across the living room towards the bay, where geometry puts the windows' mirror image on the floor.
+    const view = poseCamera(POSE_WINDOW.position, POSE_WINDOW.target);
+    let panes = 0;
     lighting.scene.traverse((object) => {
-      const mesh = object as THREE.Mesh;
-      if (!mesh.isMesh || !isGlass(mesh)) return;
-      const box = new THREE.Box3().setFromObject(mesh);
-      const size = box.getSize(new THREE.Vector3());
-      const area = Math.max(size.x, size.z) * size.y;
-      if (near(box.getCenter(new THREE.Vector3())) && (!pane || area > pane.area)) pane = { mesh, box, area };
+      if ((object as THREE.Mesh).isMesh && isGlass(object as THREE.Mesh)) panes += 1;
     });
-    expect(pane).not.toBeNull();
-    const glass = pane!;
-    const centre = glass.box.getCenter(new THREE.Vector3());
-    const probe = lighting.volumes.probes.find((p) => p.roomId === LIVING)!.position;
-    const inward = new THREE.Vector3(probe.x - centre.x, 0, probe.z - centre.z);
-    if (Math.abs(inward.x) > Math.abs(inward.z)) inward.set(Math.sign(inward.x), 0, 0);
-    else inward.set(0, 0, Math.sign(inward.z));
-    const position = centre.clone().addScaledVector(inward, 3.5).setY(1.6);
-    const view = poseCamera(position, centre.clone().addScaledVector(inward, 1.5).setY(0.3));
-    const restore = blackFloor(0.07);
-    try {
-      const classes = mask(view, (mesh) => (mesh === glass.mesh ? 1 : LIVING_FLOOR.test(mesh.name) ? 0 : null));
-      const pixels = linearShot(view);
-      let x0 = SIZE.w;
-      let x1 = -1;
-      for (let i = 0; i < classes.length; i += 1) {
-        if (classes[i] !== 1) continue;
-        const x = i % SIZE.w;
-        x0 = Math.min(x0, x);
-        x1 = Math.max(x1, x);
-      }
-      const inside: number[] = [];
-      const beside: number[] = [];
-      for (let i = 0; i < classes.length; i += 1) {
-        if (classes[i] !== 0) continue;
-        const x = i % SIZE.w;
-        const value = luminance(pixels[i * 4]!, pixels[i * 4 + 1]!, pixels[i * 4 + 2]!);
-        (x >= x0 && x <= x1 ? inside : beside).push(value);
-      }
-      const mean = (list: number[]): number => list.reduce((sum, v) => sum + v, 0) / Math.max(1, list.length);
-      record('windowBand', {
-        pane: glass.mesh.name,
-        pose: { position: position.toArray(), columns: [x0, x1] },
-        inside: mean(inside),
-        beside: mean(beside),
-        counts: [inside.length, beside.length],
-      });
-      expect(x1).toBeGreaterThan(x0);
-      expect(mean(inside)).toBeGreaterThan(mean(beside));
-    } finally {
-      restore();
-    }
+    const restore = probeAt(PROBE_BEFORE);
+    const before = windowBand(view);
+    restore();
+    const after = windowBand(view);
+    record('windowBand', {
+      pose: { position: POSE_WINDOW.position.toArray(), target: POSE_WINDOW.target.toArray(), fov: 60, size: SIZE },
+      panes,
+      before,
+      after,
+    });
+    expect(after.columns[1]).toBeGreaterThan(after.columns[0]);
+    expect(after.inside).toBeGreaterThan(after.beside);
   });
 
   test('white balance at the walk start: the ceiling reads warm white, a saturated finish and the sky keep their hue', () => {
@@ -399,7 +388,7 @@ describe.skipIf(!HARDWARE)(`walk gloss and white balance in the demo living room
     const sums = [0, 1, 2, 3].map(() => [0, 0, 0, 0]);
     for (let i = 0; i < classes.length; i += 1) {
       const raw = classes[i]!;
-      const k = raw === furnitureClass ? 2 : raw;
+      const k = raw >= FURNITURE_CLASS0 ? (raw === furnitureClass ? 2 : -1) : raw;
       if (k < 0 || k > 3) continue;
       for (let c = 0; c < 3; c += 1) sums[k]![c]! += pixels[i * 4 + c]!;
       sums[k]![3]! += 1;
