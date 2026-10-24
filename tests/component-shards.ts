@@ -64,6 +64,7 @@ export const COMPONENT_FILE_COST_S: Readonly<Record<string, number>> = {
   'host-slots.test.ts': 27,
   'ktx2.test.ts': 1,
   'lamp-lights.test.ts': 3,
+  'lamp-shade-emissive.test.ts': 200,
   'library-material.test.ts': 1,
   'library-panel.test.ts': 12,
   'light-bake-hook.test.ts': 22,
