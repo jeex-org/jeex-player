@@ -32,6 +32,49 @@ export function isArtificialLight(object: THREE.Object3D): object is THREE.Light
 /** The original colour a tagged object carries, or `null`. */
 export function artificialColour(object: THREE.Object3D): readonly [number, number, number] | null {
   const tag = object.userData[ARTIFICIAL_LIGHT_KEY] as Partial<ArtificialLightTag> | undefined;
-  const colour = tag?.colour;
-  return Array.isArray(colour) && colour.length === 3 ? (colour as readonly [number, number, number]) : null;
+  const colour: unknown = tag?.colour;
+  if (!Array.isArray(colour) || colour.length !== 3) return null;
+  const [r, g, b]: unknown[] = colour;
+  return isFiniteNumber(r) && isFiniteNumber(g) && isFiniteNumber(b) ? (colour as [number, number, number]) : null;
+}
+
+/** A number that is neither NaN nor ±Infinity; a tag may arrive from a GLB's extras untyped. */
+function isFiniteNumber(value: unknown): value is number {
+  return typeof value === 'number' && Number.isFinite(value);
+}
+
+/** The `userData` key of the tag a light built from a variant's `lights` fact carries. */
+export const LAMP_LIGHT_KEY = 'lampLight';
+
+/**
+ * What a fact light carries beside the artificial tag: where it came from
+ * (`source: 'fact'`, never on a bank builder's bulb), its placement, its index
+ * in the variant's `lights`, and the authored `lumens`, `cutoff` and `shadow`
+ * hint, so the bake reads the fact rather than the live, tinted light.
+ */
+export type LampLightTag = {
+  readonly source: 'fact';
+  readonly placementId: string;
+  readonly index: number;
+  readonly lumens: number;
+  readonly cutoff: number;
+  readonly shadow: boolean;
+};
+
+/**
+ * The fact tag `object` carries, or `null` for any other object (a bank bulb
+ * included) and for a tag whose fields have the wrong types: a GLB node's
+ * `extras` reach `userData` unfiltered, so the fields are checked here.
+ */
+export function lampLightTag(object: THREE.Object3D): LampLightTag | null {
+  const tag = object.userData[LAMP_LIGHT_KEY] as Partial<Record<keyof LampLightTag, unknown>> | undefined;
+  if (tag?.source !== 'fact') return null;
+  const { placementId, index, lumens, cutoff, shadow } = tag;
+  return typeof placementId === 'string' &&
+    Number.isInteger(index) &&
+    isFiniteNumber(lumens) &&
+    isFiniteNumber(cutoff) &&
+    typeof shadow === 'boolean'
+    ? (tag as LampLightTag)
+    : null;
 }

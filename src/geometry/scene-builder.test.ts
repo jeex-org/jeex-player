@@ -10,7 +10,7 @@
 
 import { CATALOGUE_REGISTRIES } from '../assets/catalogue-registries.js';
 import { describe, expect, spyOn, test } from 'bun:test';
-import { draftOf } from '../shared/committed.js';
+import { draftOf, type Draft } from '../shared/committed.js';
 import * as THREE from 'three';
 import { SceneBuilder, FURNITURE_GROUP_NAME, type UpgradeResult } from './scene-builder.js';
 import { MAX_MODEL_PARALLEL, MAX_PROJECT_BYTES } from '../shared/limits.js';
@@ -40,6 +40,20 @@ import { resolveFinish } from '../materials/material-catalogue.js';
 import { ARCHETYPE, OPENING_VARIANT, VARIANT } from '../assets/catalogue-ids.js';
 import { ARC_TOL, arcFromChord } from '../plan/plan-geometry.js';
 import { FaceMap, faceKey, type FaceKey, type SceneData } from '../scene/types.js';
+import { HANGING, hangingManifest, modelFrameBox } from '../fixtures/hanging-pendant.js';
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
+import { createGltfModelSource } from './model-source.js';
+import { parseProjectManifest } from '../assets/project-manifest.schema.js';
+import { lampLightTag } from '../assets/artificial-light.js';
+import { tintArtificialLights } from '../render/light-temperature.js';
+import { setLampBaked } from '../render/baked-surface.js';
+import { LAMP_PROJECT_FIXTURE as LAMPS } from '../../tests/fixtures/project/fixture-ids.js';
+import { obstaclesFor } from '../assets/asset-footprint.js';
+import { projectAssetFacts } from '../assets/asset-facts.js';
+import { planDrawingInputs } from '../assets/plan-fixtures.js';
+import { buildPlanDrawing } from '../plan/plan-drawing.js';
+import { lintContext, lintLayout, projectLayoutCatalogue } from '../layout/layout-lint.js';
 
 type Built = { scene: SceneData; plan: SolvedPlan; builder: SceneBuilder; root: THREE.Group };
 
@@ -1217,6 +1231,319 @@ describe('a variant swap moves the upgrade onto the new body', () => {
     // And the model fetched is the one the DOCUMENT names now, not the one the
     // builder was constructed with.
     expect(requested).toEqual([CHOSEN]);
+    builder.dispose();
+  });
+});
+
+/**
+ * Ceiling bodies no builder made hang from the ceiling plane. The walk, the
+ * plan and the layout lint read the catalogue facts, never the drawn origin,
+ * so they say the same before and after the build, and what they say (a
+ * ceiling item spans `y - height .. y`) is now what is drawn.
+ */
+describe('a hanging project pendant, through the builder', () => {
+  /** A bank ceiling light: its builder draws it hanging, so it is left as it is. */
+  const BANK_CEILING = '01a16c46-c3ca-70cc-959a-dadafbfea9fb';
+
+  function hangingScene(): SceneData {
+    const scene = draftOf(lShapePlan);
+    scene.ceilingHeight = HANGING.ceiling;
+    scene.assetLibrary = HANGING.project;
+    scene.assets = [
+      {
+        id: HANGING.placement,
+        type: HANGING.archetype,
+        asset: HANGING.archetype,
+        variant: HANGING.variant,
+        room: ROOM.a,
+        position: { x: 3, y: 0, z: 3 },
+        rotationY: 0,
+      },
+      {
+        id: BANK_CEILING,
+        type: 'ceiling-light',
+        asset: ARCHETYPE.ceiling_light,
+        room: ROOM.a,
+        position: { x: 2, y: 0, z: 2 },
+        rotationY: 0,
+      },
+    ];
+    return scene;
+  }
+
+  /** Every ceiling fact the walk, the plan and the lint compute, as plain data. */
+  function facts(scene: SceneData, plan: SolvedPlan): unknown {
+    const library = hangingManifest().library;
+    const source = projectAssetFacts(library);
+    const catalogue = projectLayoutCatalogue(library);
+    return JSON.parse(
+      JSON.stringify({
+        obstacles: obstaclesFor(scene, source),
+        plan: buildPlanDrawing(plan, scene, planDrawingInputs(scene, source)),
+        lint: lintLayout(scene, plan, catalogue),
+        mounts: lintContext(scene, plan, catalogue).items.map((item) => ({ id: item.placement.id, mount: item.mount })),
+      }),
+    ) as unknown;
+  }
+
+  function hangingBuilder(scene: SceneData): SceneBuilder {
+    const manifest = hangingManifest();
+    const bank = projectBank(manifest, QUEUE_BASE_URL);
+    return new SceneBuilder(scene, solvePlan(scene), {
+      catalogue: bank.catalogue,
+      resolveFinish: bank.resolveFinish,
+      modelUrl: (asset) => bank.modelUrl(asset),
+      modelSource: () => Promise.resolve({ group: modelFrameBox(HANGING.dims), triangles: 12, warnings: [], bytes: 0 }),
+    });
+  }
+
+  function worldBoxOf(root: THREE.Object3D, id: string): THREE.Box3 {
+    const group = root.getObjectByName(FURNITURE_GROUP_NAME)!.getObjectByName(id)!;
+    root.updateMatrixWorld(true);
+    return new THREE.Box3().setFromObject(group);
+  }
+
+  test('stand-in and GLB occupy the same world box, its top at the ceiling', async () => {
+    const scene = hangingScene();
+    const builder = hangingBuilder(scene);
+    const { root } = builder.build();
+    const standIn = worldBoxOf(root, HANGING.placement);
+    const pass = await builder.upgradeModels(new AbortController().signal);
+    expect(pass.upgraded).toBe(1);
+    const glb = worldBoxOf(root, HANGING.placement);
+    expect(glb.max.y).toBeCloseTo(HANGING.ceiling, 3);
+    expect(glb.min.y).toBeCloseTo(HANGING.ceiling - HANGING.dims[1], 3);
+    for (const axis of ['x', 'y', 'z'] as const) {
+      expect(glb.min[axis]).toBeCloseTo(standIn.min[axis], 3);
+      expect(glb.max[axis]).toBeCloseTo(standIn.max[axis], 3);
+    }
+    builder.dispose();
+  });
+
+  test('the document facts (walk obstacles, plan facts, layout lint) are unchanged by the build and the upgrade', async () => {
+    const scene = hangingScene();
+    const plan = solvePlan(scene);
+    const before = facts(scene, plan);
+    const builder = hangingBuilder(scene);
+    builder.build();
+    await builder.upgradeModels(new AbortController().signal);
+    expect(facts(scene, plan)).toEqual(before);
+    builder.dispose();
+  });
+
+  test('the drawn box after the upgrade matches the catalogue mount the walk and lint read', async () => {
+    const scene = hangingScene();
+    const before = facts(scene, solvePlan(scene));
+    const builder = hangingBuilder(scene);
+    const { root } = builder.build();
+    await builder.upgradeModels(new AbortController().signal);
+    const mounts = (before as { mounts: Array<{ id: string; mount: { low: number; high: number } }> }).mounts;
+    // Within 5 mm: the bank ceiling light's builder draws 2 mm more than its catalogue drop.
+    for (const id of [HANGING.placement, BANK_CEILING]) {
+      const mount = mounts.find((entry) => entry.id === id)!.mount;
+      const drawn = worldBoxOf(root, id);
+      expect({ id, low: drawn.min.y, high: drawn.max.y }).toEqual({
+        id,
+        low: expect.closeTo(mount.low, 2),
+        high: expect.closeTo(mount.high, 2),
+      });
+    }
+    builder.dispose();
+  });
+});
+
+/* ------------------------------------------------- lamp lights, upgraded --- */
+
+const LAMP_DIR = join(import.meta.dirname, '..', '..', 'tests', 'fixtures', 'project-lamps');
+const LAMP_BASE = 'https://lamps.test/bake/';
+
+type EditableLamps = { library: { objects: Array<{ variants: Array<Record<string, unknown>> }> } };
+
+/**
+ * The committed lamp GLB at `path`, with a `KHR_lights_punctual` point light
+ * of its own added when `foreignLight` says so: the defect a supplier's file
+ * may carry, which the source strips (`light-in-model`).
+ */
+function lampGlb(path: string, foreignLight: boolean): ArrayBuffer {
+  const bytes = new Uint8Array(readFileSync(join(LAMP_DIR, path)));
+  if (!foreignLight) return bytes.slice().buffer;
+  const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
+  const jsonLength = view.getUint32(12, true);
+  const json = JSON.parse(new TextDecoder().decode(bytes.subarray(20, 20 + jsonLength))) as {
+    extensionsUsed?: string[];
+    extensions?: Record<string, unknown>;
+    nodes: Record<string, unknown>[];
+    scenes: { nodes: number[] }[];
+  };
+  json.extensionsUsed = [...(json.extensionsUsed ?? []), 'KHR_lights_punctual'];
+  json.extensions = { KHR_lights_punctual: { lights: [{ type: 'point', intensity: 5 }] } };
+  json.nodes.push({ name: 'supplier_bulb', translation: [0, 0.3, 0], extensions: { KHR_lights_punctual: { light: 0 } } });
+  json.scenes[0]!.nodes.push(json.nodes.length - 1);
+  const text = new TextEncoder().encode(JSON.stringify(json));
+  const padded = new Uint8Array((text.byteLength + 3) & ~3).fill(0x20);
+  padded.set(text);
+  const binary = bytes.subarray(20 + jsonLength);
+  const glb = new Uint8Array(12 + 8 + padded.byteLength + binary.byteLength);
+  const out = new DataView(glb.buffer);
+  out.setUint32(0, 0x46546c67, true);
+  out.setUint32(4, 2, true);
+  out.setUint32(8, glb.byteLength, true);
+  out.setUint32(12, padded.byteLength, true);
+  out.setUint32(16, 0x4e4f534a, true);
+  glb.set(padded, 20);
+  glb.set(binary, 20 + padded.byteLength);
+  return glb.buffer;
+}
+
+/** The lamp fixture's scene and bake through a real builder and the real GLB source. */
+function lampBuilder(
+  options: { edit?: (manifest: EditableLamps) => void; place?: (scene: Draft<SceneData>) => void; foreignLight?: boolean } = {},
+): { builder: SceneBuilder; root: THREE.Group; warnings: Array<{ code: string; detail: unknown }> } {
+  const raw = JSON.parse(readFileSync(join(LAMP_DIR, 'project.json'), 'utf8')) as EditableLamps;
+  options.edit?.(raw);
+  const manifest = parseProjectManifest(raw);
+  const scene = draftOf(JSON.parse(readFileSync(join(LAMP_DIR, 'scene.json'), 'utf8')) as SceneData);
+  options.place?.(scene);
+  const bank = projectBank(manifest, LAMP_BASE);
+  const fetch = ((url: string) =>
+    Promise.resolve(
+      new Response(lampGlb(url.slice(LAMP_BASE.length), options.foreignLight ?? false), { status: 200 }),
+    )) as unknown as typeof globalThis.fetch;
+  const warnings: Array<{ code: string; detail: unknown }> = [];
+  const builder = new SceneBuilder(scene, solvePlan(scene), {
+    catalogue: bank.catalogue,
+    catalogueLibrary: bank.defaultLibrary,
+    resolveFinish: bank.resolveFinish,
+    projectMaterials: manifest.library.materials,
+    modelUrl: (asset) => bank.modelUrl(asset),
+    modelSource: createGltfModelSource({ fetch }),
+    log: { warn: (code, _message, detail) => warnings.push({ code, detail }), error: () => undefined },
+  });
+  const { root } = builder.build();
+  return { builder, root, warnings };
+}
+
+function lampGroup(root: THREE.Object3D, id: string): THREE.Group {
+  const group = root.getObjectByName(FURNITURE_GROUP_NAME)?.getObjectByName(id);
+  if (!(group instanceof THREE.Group)) throw new Error(`no group for ${id}`);
+  return group;
+}
+
+function pointLights(root: THREE.Object3D): THREE.PointLight[] {
+  const lights: THREE.PointLight[] = [];
+  root.traverse((child) => {
+    if ((child as THREE.PointLight).isPointLight) lights.push(child as THREE.PointLight);
+  });
+  return lights;
+}
+
+function worldOf(object: THREE.Object3D): THREE.Vector3 {
+  object.updateWorldMatrix(true, false);
+  return object.getWorldPosition(new THREE.Vector3());
+}
+
+const TABLE_BULB = { kind: 'point', position: [0, 0.443, 0], colour: '#ffd9a4', lumens: 400, cutoff: 3 } as const;
+const tableLights =
+  (lights: readonly Record<string, unknown>[]) =>
+  (manifest: EditableLamps): void => {
+    manifest.library.objects[0]!.variants[0]!['lights'] = lights;
+  };
+
+describe('lamp lights survive the GLB upgrade', () => {
+  test('the GLB body holds the SAME light, at the authored local position, at the same world position', async () => {
+    const { builder, root } = lampBuilder();
+    const group = lampGroup(root, LAMPS.placement.pendant);
+    const [light] = pointLights(group);
+    const standIn = light!.parent!;
+    expect(light!.position.toArray()).toEqual([0, 0.063, 0]);
+    const before = worldOf(light!);
+    const swaps: Array<readonly THREE.Object3D[]> = [];
+    const pass = await builder.upgradeModels(new AbortController().signal, undefined, (swapped, replaced) => {
+      if (swapped === group) swaps.push(replaced);
+    });
+    expect(pass.upgraded).toBe(2);
+    const after = pointLights(group);
+    expect(after).toHaveLength(1);
+    expect(after[0]).toBe(light);
+    expect(light!.parent).not.toBe(standIn);
+    expect(light!.parent!.name).toBe(`${LAMPS.variant.pendant}-gltf`);
+    expect(light!.position.toArray()).toEqual([0, 0.063, 0]);
+    expect(worldOf(light!).distanceTo(before)).toBeLessThan(1e-6);
+    // The light is not a body: the swap reports the stand-in alone.
+    expect(swaps).toEqual([[standIn]]);
+    expect(lampLightTag(light!)?.index).toBe(0);
+    builder.dispose();
+  });
+
+  test('a lamp placed at scale 1.5 holds its light at 1.5 times the authored offset, distance and intensity unchanged', async () => {
+    const { builder, root } = lampBuilder({
+      place: (scene) => {
+        scene.assets.find((asset) => asset.id === LAMPS.placement.tableLamp)!.scale = 1.5;
+      },
+    });
+    await builder.upgradeModels(new AbortController().signal);
+    const group = lampGroup(root, LAMPS.placement.tableLamp);
+    const [light] = pointLights(group);
+    const offset = worldOf(light!).sub(worldOf(group));
+    expect(offset.y).toBeCloseTo(1.5 * 0.443, 6);
+    expect(light!.distance).toBe(3);
+    expect(light!.intensity).toBeCloseTo(1.2, 9);
+    builder.dispose();
+  });
+
+  test('a tint and a bake mark ride along, and «Original» still restores the authored colour', async () => {
+    const { builder, root } = lampBuilder();
+    const [light] = pointLights(lampGroup(root, LAMPS.placement.tableLamp));
+    const authored = light!.color.clone();
+    tintArtificialLights(root, 2700);
+    setLampBaked(light!, true);
+    const tinted = light!.color.clone();
+    const marks = { ...light!.userData };
+    expect(tinted.equals(authored)).toBe(false);
+    await builder.upgradeModels(new AbortController().signal);
+    expect(pointLights(lampGroup(root, LAMPS.placement.tableLamp))).toEqual([light!]);
+    expect(light!.color.equals(tinted)).toBe(true);
+    expect(light!.userData).toEqual(marks);
+    tintArtificialLights(root, null);
+    expect(light!.color.equals(authored)).toBe(true);
+    builder.dispose();
+  });
+
+  test("a light the GLB file brings is dropped and reported; only the variant's own light remains", async () => {
+    const { builder, root } = lampBuilder({ foreignLight: true });
+    const group = lampGroup(root, LAMPS.placement.tableLamp);
+    const [own] = pointLights(group);
+    await builder.upgradeModels(new AbortController().signal);
+    expect(pointLights(group)).toEqual([own!]);
+    expect(group.userData['modelWarnings']).toContain('light-in-model');
+    builder.dispose();
+  });
+
+  test('a variant without lights has no light on its stand-in and none after the upgrade', async () => {
+    const { builder, root } = lampBuilder({
+      edit: (manifest) => {
+        for (const object of manifest.library.objects) for (const variant of object.variants) delete variant['lights'];
+      },
+    });
+    expect(pointLights(root)).toEqual([]);
+    await builder.upgradeModels(new AbortController().signal);
+    expect(pointLights(root)).toEqual([]);
+    builder.dispose();
+  });
+
+  test('a placement mirrored on x keeps its off-axis light mirrored on the GLB body', async () => {
+    const { builder, root } = lampBuilder({
+      edit: tableLights([{ ...TABLE_BULB, position: [0.2, 0.443, 0] }]),
+      place: (scene) => {
+        scene.assets.find((asset) => asset.id === LAMPS.placement.tableLamp)!.mirror = { x: true };
+      },
+    });
+    const group = lampGroup(root, LAMPS.placement.tableLamp);
+    const inGroup = (): THREE.Vector3 => group.worldToLocal(worldOf(pointLights(group)[0]!));
+    expect(inGroup().x).toBeCloseTo(-0.2, 6);
+    await builder.upgradeModels(new AbortController().signal);
+    expect(inGroup().x).toBeCloseTo(-0.2, 6);
+    expect(inGroup().y).toBeCloseTo(0.443, 6);
     builder.dispose();
   });
 });

@@ -22,8 +22,16 @@ import { z } from 'zod/mini';
 import { ViewerLibError } from '../shared/errors.js';
 import { PROJECT_FORMAT, isProjectDocument, projectLibraryOf } from './project-manifest.js';
 import type { BakedProjectManifest } from './project-manifest.js';
-import { parseProjectManifest, projectManifestIssues, projectManifestSchema } from './project-manifest.schema.js';
-import { PROJECT_FIXTURE as FIXTURE } from '../../tests/fixtures/project/fixture-ids.js';
+import {
+  LAMP_MAX_CUTOFF,
+  LAMP_MAX_LIGHTS,
+  LAMP_MAX_LUMENS,
+  lampLightSchema,
+  parseProjectManifest,
+  projectManifestIssues,
+  projectManifestSchema,
+} from './project-manifest.schema.js';
+import { LAMP_PROJECT_FIXTURE, PROJECT_FIXTURE as FIXTURE } from '../../tests/fixtures/project/fixture-ids.js';
 
 /** A UUID of version 4, as another system might mint one: well-formed, and still not an id of this format. */
 const UUID_V4 = '3f1c2e4a-9b7d-4c1e-8a2f-5d6e7f8a9b0c';
@@ -1001,5 +1009,116 @@ describe('projectLibraryOf marks the library materials', () => {
       { id: LIB.oakScan, apply: ['floor'], library: true },
       { id: LIB.paint, apply: ['wall', 'ceiling', 'facade', 'trim'], library: true },
     ]);
+  });
+});
+
+/* ------------------------------------------------------------- lamp lights --- */
+
+/** The spec's minimal point light: a table lamp's bulb. */
+const TABLE_BULB = { kind: 'point', position: [0, 0.443, 0], colour: '#ffd9a4', lumens: 400, cutoff: 3 } as const;
+
+/** The fixture with `lights` on its first variant. */
+function lit(lights: unknown): unknown {
+  return broken((manifest) => {
+    firstVariant(manifest)['lights'] = lights;
+  });
+}
+
+const VARIANT_AT = 'library.objects.0.variants.0';
+
+describe('lights: an optional variant fact', () => {
+  test('a manifest without lights is accepted as before', () => {
+    expect(projectManifestIssues(fixtureManifest())).toEqual([]);
+    expect(fixtureManifest().library.objects[0]!.variants.some((variant) => 'lights' in variant)).toBe(false);
+  });
+
+  test('the lamp fixture is accepted, its two variants each carrying one point light', () => {
+    const document = JSON.parse(
+      readFileSync(join(import.meta.dirname, '..', '..', 'tests', 'fixtures', 'project-lamps', 'project.json'), 'utf8'),
+    ) as unknown;
+    const manifest = parseProjectManifest(document);
+    expect(manifest.projectId).toBe(LAMP_PROJECT_FIXTURE.projectId);
+    expect(manifest.library.objects.map((object) => object.variants.map((variant) => variant.lights?.map((light) => light.kind)))).toEqual([
+      [['point']],
+      [['point']],
+    ]);
+  });
+
+  test('lights on a library object are an unknown key on that object', () => {
+    const value = broken((manifest) => {
+      firstObject(manifest)['lights'] = [TABLE_BULB];
+    });
+    expect(projectManifestIssues(value).map((issue) => ({ path: issue.path.join('.'), message: issue.message }))).toEqual([
+      { path: 'library.objects.0', message: 'unknown key "lights"' },
+    ]);
+  });
+
+  test('a point light with exactly kind, position, colour, lumens, cutoff and shadow is accepted', () => {
+    expect(projectManifestIssues(lit([{ ...TABLE_BULB, shadow: true }]))).toEqual([]);
+  });
+
+  test('the minimal point light is accepted, and nothing is written into it', () => {
+    const value = lit([TABLE_BULB]);
+    expect(projectManifestIssues(value)).toEqual([]);
+    const parsed = parseProjectManifest(value);
+    expect(parsed.library.objects[0]!.variants[0]!.lights).toEqual([TABLE_BULB]);
+    expect('shadow' in parsed.library.objects[0]!.variants[0]!.lights![0]!).toBe(false);
+  });
+
+  test('a small negative y is legal: the model frame starts at the lowest point, not at the bulb', () => {
+    expect(projectManifestIssues(lit([{ ...TABLE_BULB, position: [0, -0.098, 0] }]))).toEqual([]);
+  });
+
+  test("1 to 4 lights; an empty array and a fifth light are refused at the variant's lights", () => {
+    expect(projectManifestIssues(lit(Array.from({ length: LAMP_MAX_LIGHTS }, () => TABLE_BULB)))).toEqual([]);
+    expect(issuePaths(lit(Array.from({ length: LAMP_MAX_LIGHTS + 1 }, () => TABLE_BULB)))).toEqual([`${VARIANT_AT}.lights`]);
+    expect(issuePaths(lit([]))).toEqual([`${VARIANT_AT}.lights`]);
+  });
+
+  test("an unknown kind is refused at that light's kind", () => {
+    expect(issuePaths(lit([{ ...TABLE_BULB, kind: 'spot' }]))).toEqual([`${VARIANT_AT}.lights.0.kind`]);
+  });
+
+  test('an id or a decay on a light is an unknown key at that light', () => {
+    for (const extra of [{ decay: 2 }, { id: '01a16c46-c3ca-70cd-992f-c22c81ba7995' }]) {
+      const issues = projectManifestIssues(lit([TABLE_BULB, { ...TABLE_BULB, ...extra }]));
+      expect(issues.map((issue) => ({ path: issue.path.join('.'), code: issue.code }))).toEqual([
+        { path: `${VARIANT_AT}.lights.1`, code: 'unrecognized_keys' },
+      ]);
+    }
+  });
+
+  test('lumens and cutoff outside their ranges are refused at that field', () => {
+    const at = (field: string): string[] => [`${VARIANT_AT}.lights.0.${field}`];
+    expect(issuePaths(lit([{ ...TABLE_BULB, lumens: 0 }]))).toEqual(at('lumens'));
+    expect(issuePaths(lit([{ ...TABLE_BULB, lumens: -1 }]))).toEqual(at('lumens'));
+    expect(issuePaths(lit([{ ...TABLE_BULB, lumens: LAMP_MAX_LUMENS + 1 }]))).toEqual(at('lumens'));
+    expect(issuePaths(lit([{ ...TABLE_BULB, cutoff: 0 }]))).toEqual(at('cutoff'));
+    expect(issuePaths(lit([{ ...TABLE_BULB, cutoff: 20 }]))).toEqual(at('cutoff'));
+    expect(projectManifestIssues(lit([{ ...TABLE_BULB, lumens: LAMP_MAX_LUMENS, cutoff: LAMP_MAX_CUTOFF }]))).toEqual([]);
+  });
+
+  test("a colour that is not #rrggbb is refused at that light's colour", () => {
+    for (const colour of ['#fd9', 'ffd9a4', 'warm', '#ffd9a4ff']) {
+      expect(issuePaths(lit([{ ...TABLE_BULB, colour }]))).toEqual([`${VARIANT_AT}.lights.0.colour`]);
+    }
+  });
+
+  test("a position holding NaN or Infinity, built in code, is refused at that light's position", () => {
+    for (const bad of [Number.NaN, Number.POSITIVE_INFINITY]) {
+      const value = lit([{ ...TABLE_BULB, position: [0, bad, 0] }]);
+      expect(issuePaths(value).every((path) => path.startsWith(`${VARIANT_AT}.lights.0.position`))).toBe(true);
+      expect(issuePaths(value).length).toBeGreaterThan(0);
+    }
+  });
+
+  test('the light schema and its limits are published for the formats that mirror it', () => {
+    expect({ lumens: LAMP_MAX_LUMENS, cutoff: LAMP_MAX_CUTOFF, lights: LAMP_MAX_LIGHTS }).toEqual({
+      lumens: 10_000,
+      cutoff: 15,
+      lights: 4,
+    });
+    expect(z.safeParse(lampLightSchema, TABLE_BULB).success).toBe(true);
+    expect(z.safeParse(lampLightSchema, { ...TABLE_BULB, lumens: 0 }).success).toBe(false);
   });
 });

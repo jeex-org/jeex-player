@@ -15,6 +15,11 @@ import { LightBakeError } from './light-bake-error.js';
 import { bindLightBake } from './lightmap-binding.js';
 import { rgbmRangeOf } from './lightmap-shader.js';
 import { createWalkUniforms, installWalkPatch } from '../render/walk-lighting/box-probe-patch.js';
+import { AssetLoader } from '../geometry/asset-loader.js';
+import { projectBank } from '../assets/project-catalogue.js';
+import { parseProjectManifest } from '../assets/project-manifest.schema.js';
+import { lampLightTag } from '../assets/artificial-light.js';
+import { LAMP_PROJECT_FIXTURE as LAMPS } from '../../tests/fixtures/project/fixture-ids.js';
 
 const DIR = new URL('../../tests/fixtures/lightmap-calibration/', import.meta.url);
 const sidecar = (): LightBake => JSON.parse(readFileSync(new URL('sidecar.json', DIR), 'utf8')) as LightBake;
@@ -279,5 +284,45 @@ describe('bindLightBake', () => {
     root.add(group);
     bindLightBake(root, sidecar(), [page()]).unbind();
     expect(light.userData).toEqual({ jeexBaked: false });
+  });
+});
+
+describe('bindLightBake and the lamp lights of a project', () => {
+  /** The lamp fixture's table lamp, built by the loader as the placement the calibration bake lists. */
+  function factLamp(): { group: THREE.Group; light: THREE.PointLight } {
+    const manifest = parseProjectManifest(JSON.parse(readFileSync(new URL('../project-lamps/project.json', DIR), 'utf8')) as unknown);
+    const bank = projectBank(manifest, 'https://lamps.test/bake/');
+    const loader = new AssetLoader([], {
+      defaultLibrary: manifest.library.id,
+      catalogue: bank.catalogue,
+      resolveFinish: bank.resolveFinish,
+      projectMaterials: manifest.library.materials,
+      modelUrl: () => undefined,
+    });
+    const { group } = loader.load({
+      id: CALIBRATION_LAMP.id,
+      type: LAMPS.asset.tableLamp,
+      asset: LAMPS.asset.tableLamp,
+      variant: LAMPS.variant.tableLamp,
+      position: { x: 1, y: 0, z: 1 },
+    });
+    let light: THREE.PointLight | undefined;
+    group.traverse((child) => {
+      if (lampLightTag(child) !== null) light = child as THREE.PointLight;
+    });
+    if (!light) throw new Error('the table lamp should carry its fact light');
+    return { group, light };
+  }
+
+  test('a listed fact lamp has its lights marked baked, and unbinding restores their state', async () => {
+    const root = await shell();
+    const { group, light } = factLamp();
+    root.add(group);
+    const before = { ...light.userData };
+    const bound = bindLightBake(root, sidecar(), [page()]);
+    expect(bound.unresolvedLamps).toEqual([]);
+    expect(light.userData).toEqual({ ...before, jeexBaked: true });
+    bound.unbind();
+    expect(light.userData).toEqual(before);
   });
 });

@@ -888,6 +888,16 @@ type ProjectVariant = {               // the unit of geometry and of the Replace
   preview?: string;                  // relative path OR an absolute http(s) URL — what the picker shows
   access?: 'free' | 'pro' | 'exclusive';   // carried to `SelectionOption.access`; the viewer judges nothing
   allowed?: boolean;                 // carried to `SelectionOption.allowed`; the host writes it, the host decides
+  lights?: LampLight[];              // 1 to 4; absent emits no light (see «Lamp lights»)
+};
+
+type LampLight = {                    // a discriminated union on `kind`; only `point` exists today
+  kind: 'point';
+  position: [number, number, number]; // metres, in the variant's model frame
+  colour: string;                    // #rrggbb, the light's «Original» colour
+  lumens: number;                    // nominal lumens, in (0, 10 000]
+  cutoff: number;                    // metres where the light reaches zero, in (0, 15]
+  shadow?: boolean;                  // a hint, false when absent; not cast in this release
 };
 
 type AssetPricing = {
@@ -995,6 +1005,17 @@ A placement that names an archetype of the loaded project takes its Replace list
 type ProjectInfo = { manifest: BakedProjectManifest; baseUrl: string };
 handle.project(): ProjectInfo | null;   // null for a bare scene
 ```
+
+### Lamp lights
+
+A lamp of a baked project has no builder to light it, so its light is a fact of its variant: `lights` ([its shape](#project-format)), 1 to 4 point lights with no ids (a light is its placement and its index) and no decay field (it is always 2). A refused light refuses the manifest like every other fact, with a path naming the variant and the light (`library.objects[1].variants[0].lights[0].lumens`): non-finite numbers, `lumens` at or below 0 or above 10 000, `cutoff` at or below 0 or above 15, a colour that is not `#rrggbb`, an empty array, a fifth light and unknown keys.
+
+- **Model frame.** `position` is in the frame of the variant's GLB and of its `dims` stand-in: metres, front towards −Z, origin at the centre of the floor footprint, y up from the model's lowest point, for every anchor, before the placement's scale and mirror. A pendant 1.052 m tall whose bulb sits 0.989 m below its top is `[0, 0.063, 0]`; a bulb just under a flush ceiling light may have a small negative y.
+- **Units.** The player draws each light as a three.js `PointLight` of intensity `lampCandela(lumens)` candela (`jeex-viewer/lighting`), distance `cutoff` and decay 2. The lumens are nominal: they mean something only against `LIGHTING_STANDARD.lamp.exposure`, which reads 400 lm as 1.2 cd (the built-in table lamp), not the physical 400 / 4π ≈ 31.8 cd. `blenderPower(candela)` (4π · cd) is the power a lightmap bake gives the same light; it is unconfirmed until a calibration lamp checks it.
+- **Colour.** `colour` is the light's «Original»: a [light temperature](#settings-and-light-temperature) tints it like any other lamp, and «Original» restores it. There is no kelvin in the fact.
+- **On screen.** The lights are children of the lamp's body, so they are there from the first frame (on the stand-in), move with the same objects onto the GLB when it arrives, follow a placement's scale (position only, not distance or intensity) and mirror, and are rebuilt for the new variant on a variant swap. A light the GLB file brings itself is still dropped and reported (`light-in-model`). Each light is named `<placementId>-light`, then `<placementId>-light-2` and on, and carries `userData.lampLight = { source: 'fact', placementId, index, lumens, cutoff, shadow }`; a built-in lamp's own bulb carries no such tag. A lightmap bake that lists the placement marks its lights baked like a built-in lamp's.
+- **Ceiling objects hang.** A ceiling object's stand-in and GLB hang their own height down from the ceiling plane (the stand-in its `dims` height, the GLB its measured top), so the lights hang with them.
+- **Known costs and limits.** Adding or removing a lamp light recompiles the materials once, a visible hitch when a lamp is placed or swapped. Lamp lights do not feed the walk's room light-probe grid, and they reach through walls up to their cutoff, as the built-in lamps do. Under a ceiling lower than 2.73 m a ceiling stand-in is shortened to the clamped drop while its GLB is not, and the light follows the GLB. No light casts a shadow yet; the `shadow` hint is kept for later quality tiers.
 
 ### Library materials
 
@@ -1202,6 +1223,7 @@ lighting.dispose(); // disposes its rigs and the environment; never your rendere
 - **The apartment sun:** `createApartmentRig({ shadowMapSize?, shadowCache? })` returns an `ApartmentRig`. `rig.shadowMapSize` is the map size actually allocated (lowered to the renderer's maximum). `rig.setSunDirection(direction)` aims the sun (`direction` points from the scene towards the sun and must point upwards); `rig.setShadowFrustum(fit)` puts the sun, its target, the shadow camera's up vector and planes and both biases where a fit says. `fitShadowFrustum(boxes, direction, mapSize)` fits an orthographic frustum to world boxes (`{ min, max }` triples) with the standard's padding and bias rules; `sunDirection({ northDeg?, sun? })` turns an orientation into a direction and its world azimuth and elevation (`sunDirection()` is the default direction, `LEGACY_SUN_DIRECTION`). With `shadowCache: true` the sun's shadow map is drawn on the first render and afterwards only after `rig.markShadowDirty()` or a setter; without it (the default) the map is redrawn on every render, as for any light. `rig.shadowDraws` counts the draws. A zero, non-finite or downward direction, or a frustum with a non-finite or empty extent, is refused as `bad-options` and changes nothing.
 - **Version:** `LIGHTING_STANDARD_VERSION` (now 1) rises with every intentional change of the look; put it into the cache key of any preview you store. `LIGHTING_STANDARD` describes the standard as frozen data.
 - **Lost GPU context:** the entry installs no listeners. Stop rendering on `webglcontextlost`; on `webglcontextrestored`, dispose the old context and create a new one and new rigs for your scenes (a regenerated environment cannot be recovered from the old one).
+- **Lamp units:** `lampCandela(lumens)` turns a lamp's nominal lumens into a `PointLight` intensity, `lumens / 4π × LIGHTING_STANDARD.lamp.exposure`, with the exposure calibrated so 400 lm read as 1.2 cd (see [Lamp lights](#lamp-lights)); `blenderPower(candela)` is 4π · cd, the power a lightmap bake gives the same light. The exposure moves with any change of the display transform.
 - **Your content's own lights** (a lamp model with a point light) are left as they are.
 - **Captures:** a still or a panorama applies the display transform to the whole frame, and so does the live view in `walk` and `tour` (see «Rendering in walk and tour»), while the live view of the editing modes leaves a background texture, fog and content marked as not tone mapped out of it; lit surfaces agree between them.
 

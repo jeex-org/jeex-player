@@ -36,6 +36,7 @@ import { facadeFinishRefOf, floorFinishRefOf, roomWallFinishRefOf, type TouchedE
 import { dispatchTouched, type TouchedHandlers } from './touched-kind.js';
 import { GLOW_GROUP_NAME } from './selection-glow.js';
 import { bodyMirrorOf, mirrorBody } from './asset-mirror.js';
+import { lampLightTag } from '../assets/artificial-light.js';
 
 import type { OpeningListEntry } from './opening-builder.js';
 
@@ -111,6 +112,17 @@ export type YieldFrame = () => Promise<void>;
  * furniture registration and only re-registers the body it still holds.
  */
 export type BodySwapped = (group: THREE.Group, replaced: readonly THREE.Object3D[]) => void;
+
+/** The lights built from a variant's `lights` fact under `bodies` (never a builder's bulb). */
+function factLightsUnder(bodies: readonly THREE.Object3D[]): THREE.Object3D[] {
+  const lights: THREE.Object3D[] = [];
+  for (const body of bodies) {
+    body.traverse((child) => {
+      if (lampLightTag(child) !== null) lights.push(child);
+    });
+  }
+  return lights;
+}
 
 /**
  * The group that IS each placement's body right now, keyed by placement id.
@@ -376,10 +388,15 @@ export class SceneBuilder {
     // body (`geometry/selection-glow.ts`): dropping it here would make a
     // selection vanish the moment its model landed.
     const replaced = group.children.filter((child) => child.name !== GLOW_GROUP_NAME);
+    const lamps = factLightsUnder(replaced);
     for (const child of replaced) child.removeFromParent();
     // The model joins reflected the way the group's procedural body was.
     mirrorBody(upgrade.body, bodyMirrorOf(group));
     group.add(upgrade.body);
+    // The SAME lights move onto the model, with their tint and bake mark.
+    // `add`, not `attach`: each keeps its local position, the bulb in the
+    // model frame, so it follows the drawn GLB even where its pose differs.
+    for (const light of lamps) upgrade.body.add(light);
     group.userData['modelState'] = 'gltf' satisfies ModelState;
     // A body that arrived is no longer a stand-in, whatever it arrived with.
     delete group.userData['degraded'];

@@ -209,6 +209,26 @@ export function scaleSurfaces(facts: SurfaceFacts, h: number, d: number): Surfac
   };
 }
 
+/**
+ * A point light of a lamp variant (`lamp-light-fact`), in the variant's model
+ * frame: metres, front -Z, origin at the centre of the floor footprint, y up
+ * from the model's lowest point, before the placement's scale and mirror.
+ * `colour` is the light's «Original» `#rrggbb`; `lumens` are nominal
+ * (`lighting/lamp-units.ts` turns them into candela); `cutoff` is the distance,
+ * metres, where the light reaches zero; `shadow` is a hint, false when absent.
+ */
+export type PointLampLight = {
+  readonly kind: 'point';
+  readonly position: readonly [number, number, number];
+  readonly colour: string;
+  readonly lumens: number;
+  readonly cutoff: number;
+  readonly shadow?: boolean;
+};
+
+/** One light of a lamp variant; a union on `kind`, of which only `point` exists today. */
+export type LampLight = PointLampLight;
+
 export type CatalogueVariant = {
   /** The variant's UUID v7: what a placement's `variant` and a catalogue reference name. */
   id: string;
@@ -225,6 +245,8 @@ export type CatalogueVariant = {
   /** Configuration tweaks handed to the procedural builder. */
   options?: AssetOptions;
   pricing: AssetPricing;
+  /** The lights the variant emits, 1 to 4; absent emits none. The shipped bank never sets it: its builders own their bulbs. */
+  readonly lights?: readonly LampLight[];
 };
 
 export type CatalogueObject = {
