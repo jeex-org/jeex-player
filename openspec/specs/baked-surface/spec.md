@@ -85,22 +85,6 @@ Which lamp is baked SHALL be resolved per drawn light for every render, includin
 - **WHEN** a render draws another scene or camera in the middle of its own draw and then continues
 - **THEN** both renders apply the classification of their own lights
 
-### Requirement: Mode parity of baked light
-
-The lightmap's contribution on a baked surface SHALL be scaled by the same interior factor as the direct sun: 1 in the editing modes and in grid and probe captures, the walk sun factor inside room boxes in walk and tour. Specular reflections on a baked surface SHALL follow the mode as on any surface.
-
-#### Scenario: Walk scales like the sun
-- **WHEN** a baked floor inside a room is read in walk and in an editing mode with the same camera, before the post chain
-- **THEN** its lightmap contribution in walk is the editing contribution times the walk sun factor, within the tolerance
-
-#### Scenario: Baked wall reads as in editing
-- **WHEN** a lightmap-lit baked wall inside a room, with no sun on it, is displayed in walk and in an editing mode from the same camera
-- **THEN** the displayed readings agree within the tolerance (the walk sun factor cancels the walk exposure), apart from the walk's ambient occlusion
-
-#### Scenario: Capture sees the unscaled lightmap
-- **WHEN** a room probe is captured in walk
-- **THEN** the baked surface in the capture carries its unscaled lightmap
-
 ### Requirement: No recompile once warmed up
 
 Marking a material baked SHALL compile it once; the first entry into walk, the grid and probe bake and the first return to an editing mode (where hidden grids change three's own program parameters) MAY compile programs. Once that warm-up is done, the swap frame, later switches between modes, and marking a lamp baked or live or changing its intensity SHALL compile no new program while the number and kinds of lights stay the same.
@@ -144,3 +128,27 @@ After a lost and restored WebGL context, baked surfaces SHALL keep their policy 
 #### Scenario: Walk after restore
 - **WHEN** the context is lost and restored in walk with baked surfaces in view
 - **THEN** once the environment is regenerated and the walk bake has completed again, the frame matches the live walk frame before the loss within the tolerance
+
+### Requirement: Baked light per mode
+
+The lightmap's contribution on a baked surface SHALL be scaled by the baked-interior gain of the mode (`LIGHTING_STANDARD.baked.exposure`): the editing gain in the editing modes, the walk gain in walk and tour and in their captures inside the room boxes, the editing gain outside every box. It SHALL NOT be scaled by the walk sun factor (it is indirect light). The gain SHALL touch the lightmap alone.
+
+#### Scenario: Walk does not divide the lightmap by the walk exposure
+- **WHEN** a baked floor inside a room is read in walk and in an editing mode with the same camera, before the post chain
+- **THEN** its lightmap contribution in walk is the editing contribution times the walk gain over the editing gain, within the tolerance, and not times the walk sun factor
+
+#### Scenario: Outside the room boxes
+- **WHEN** a baked surface outside every room box is drawn in walk, in a capture or in an editing mode
+- **THEN** its lightmap carries the editing gain in each
+
+#### Scenario: The gain follows the mode
+- **WHEN** a scene leaves the editing modes for walk and comes back
+- **THEN** its baked surfaces carry the walk gain while in walk and the editing gain again once back, with no new program
+
+#### Scenario: Capture sees what walk shows
+- **WHEN** a room probe or a grid probe is captured for walk
+- **THEN** the baked surface in the capture carries its lightmap times the walk gain
+
+#### Scenario: Live objects keep their light
+- **WHEN** a surface that is not baked is drawn beside a baked one, in an editing mode and in walk
+- **THEN** its reading does not depend on the baked-interior gains

@@ -14,6 +14,7 @@
 import * as THREE from 'three';
 import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
 import { afterEach, describe, expect, test } from 'vitest';
+import { LIGHTING_STANDARD } from '../../src/lighting/lighting-standard.js';
 import { decorateRgbm } from '../../src/lightmap/lightmap-shader.js';
 import { markBakedSurface, setLampBaked } from '../../src/render/baked-surface.js';
 import { APARTMENT_FILL_LIGHT_NAME, createLightingContext } from '../../src/lighting/lighting-context.js';
@@ -202,9 +203,9 @@ describe('indirect and directional light on a baked surface', () => {
     const reference = new THREE.Scene();
     reference.add(plane(grey()));
     addSun(reference);
-    // The lightmap's contribution alone: an unbaked plane with the same lightmap in the dark.
+    // The lightmap's contribution alone: an unbaked plane with the same lightmap, times the editing gain, in the dark.
     const alone = new THREE.Scene();
-    alone.add(plane(grey({ lightMap: lightmap(0.5), lightMapIntensity: 1 })));
+    alone.add(plane(grey({ lightMap: lightmap(0.5), lightMapIntensity: LIGHTING_STANDARD.baked.exposure.editing })));
     const got = read(gl, lit);
     const sun = read(gl, reference);
     const map = read(gl, alone);
@@ -468,10 +469,10 @@ describe('composition', () => {
     expect(b.key).toBe(a.key);
     expect(gl.info.programs?.length).toBe(programs);
     expect(close(a.value, b.value)).toBe(true);
-    // Decoded: the RGBM texel reads as its decoded value on the grey albedo, not as rgb alone times eight.
+    // Decoded: the RGBM texel reads as its decoded value (times the editing gain) on the grey albedo, not as rgb alone times eight.
     const plain = new THREE.Scene();
-    plain.add(plane(grey({ lightMap: lightmap(128 / 255), lightMapIntensity: 1 })));
-    expect(close(a.value, read(gl, plain).at(...CENTRE))).toBe(true);
+    plain.add(plane(grey({ lightMap: lightmap(128 / 255), lightMapIntensity: LIGHTING_STANDARD.baked.exposure.editing })));
+    expect(close(a.value, read(gl, plain).at(...CENTRE), TOL * LIGHTING_STANDARD.baked.exposure.editing)).toBe(true);
   });
 
   test('a copy with the compile hooks assigned, marked again, is the only baked material drawn: its lamps are classified', () => {

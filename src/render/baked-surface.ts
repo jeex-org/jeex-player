@@ -9,6 +9,14 @@
  * shadows, specular reflections and live lamps (`render/baked-surface-glsl.ts`
  * says what changes in the shader). A lamp left unmarked counts as live.
  *
+ * Gain: the lightmap is multiplied by the baked-interior gain of the drawn
+ * scene's mode (`LIGHTING_STANDARD.baked.exposure`) inside the walk's room
+ * boxes, and by the editing gain outside every box, recorded per scene by
+ * `setBakedLightMode` (the walk rig sets `walk`; a scene nobody set is
+ * `editing`) and put into a shared uniform by the same draw hook as the
+ * masks, so two viewers in different modes keep their own gains and no
+ * program changes with the mode.
+ *
  * Masks: which drawn light is baked is resolved per render and camera by
  * `render/light-order.ts`, in the material's draw hook, into uniforms every
  * baked material shares. A capture, or a render nested in another one, has
@@ -23,6 +31,7 @@
  */
 
 import type * as THREE from 'three';
+import { LIGHTING_STANDARD } from '../lighting/lighting-standard.js';
 import { bakeFragmentShader } from './baked-surface-glsl.js';
 import { lightMasks, LAMP_BAKED_KEY } from './light-order.js';
 import { addShaderTransform, BAKED_TRANSFORM_ID, hasShaderTransform } from './shader-compose.js';
@@ -32,26 +41,47 @@ export { addShaderTransform, type ShaderTransform } from './shader-compose.js';
 /** The material `userData` key a baked surface is marked by. */
 const SURFACE_KEY = 'jeexBakedSurface';
 /** The baked transform's version: changes with its shader text. */
-const BAKED_VERSION = 1;
+const BAKED_VERSION = 2;
 
-/** The mask uniforms every baked material shares, resized to three's light counts per render. */
-const MASKS = {
+/** The uniforms every baked material shares: the light masks, resized to three's light counts per render, and the gains. */
+const SHARED = {
   jeexPointDiffuse: { value: [] as number[] },
   jeexSpotDiffuse: { value: [] as number[] },
   jeexDirDirect: { value: [] as number[] },
+  jeexBakedGain: { value: LIGHTING_STANDARD.baked.exposure.editing },
+  /** Outside every room box, in every mode: such a surface keeps the editing look, like a facade. */
+  jeexBakedEditingGain: { value: LIGHTING_STANDARD.baked.exposure.editing },
 };
+
+/** The mode that picks the baked-interior gain: the editing modes, or walk and tour with their captures. */
+export type BakedLightMode = 'editing' | 'walk';
+
+/** The mode of each scene that left the editing default, by scene object. */
+const SCENE_MODES = new WeakMap<object, BakedLightMode>();
+
+/** Records the mode whose baked-interior gain the baked surfaces drawn in `scene` take. */
+export function setBakedLightMode(scene: object, mode: BakedLightMode): void {
+  if (mode === 'editing') SCENE_MODES.delete(scene);
+  else SCENE_MODES.set(scene, mode);
+}
+
+/** The gain on the lightmap of a baked surface drawn in `scene`. */
+export function bakedLightGain(scene: object): number {
+  return LIGHTING_STANDARD.baked.exposure[SCENE_MODES.get(scene) ?? 'editing'];
+}
 
 /** The (render, scene, camera) the masks were last computed for, by id: no reference keeps a released scene alive. */
 const computed = { frame: -1, scene: -1, camera: -1 };
 
 function updateMasks(renderer: THREE.WebGLRenderer, scene: THREE.Object3D, camera: THREE.Camera): void {
+  SHARED.jeexBakedGain.value = bakedLightGain(scene);
   const frame = renderer.info.render.frame;
   if (computed.frame === frame && computed.scene === scene.id && computed.camera === camera.id) return;
   Object.assign(computed, { frame, scene: scene.id, camera: camera.id });
   const masks = lightMasks(scene, camera);
-  MASKS.jeexPointDiffuse.value = masks.point;
-  MASKS.jeexSpotDiffuse.value = masks.spot;
-  MASKS.jeexDirDirect.value = masks.directional;
+  SHARED.jeexPointDiffuse.value = masks.point;
+  SHARED.jeexSpotDiffuse.value = masks.spot;
+  SHARED.jeexDirDirect.value = masks.directional;
 }
 
 /** Materials whose draw hook this module installed: the runtime state idempotence checks, not the copyable flag. */
@@ -83,7 +113,7 @@ export function markBakedSurface(material: THREE.MeshStandardMaterial): void {
   material.userData[SURFACE_KEY] = true;
   if (!hasShaderTransform(material, BAKED_TRANSFORM_ID, BAKED_VERSION)) {
     addShaderTransform(material, BAKED_TRANSFORM_ID, BAKED_VERSION, (shader) => {
-      Object.assign(shader.uniforms, MASKS);
+      Object.assign(shader.uniforms, SHARED);
       shader.fragmentShader = bakeFragmentShader(shader.fragmentShader);
     });
   }

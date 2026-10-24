@@ -29,7 +29,8 @@ describe('patchFragmentShader', () => {
   test('rewrites the expanded lighting chunks and keeps everything else', () => {
     expect(physical).not.toContain('#include <lights_fragment_begin>');
     expect(physical).not.toContain('#include <lights_fragment_maps>');
-    expect(physical).toContain('#define JEEX_WALK_LIGHTING');
+    // The room lookup exists where the box count is defined: the baked policy keys its gain on it.
+    expect(physical).toContain('#define JEEX_MAX_BOXES');
     // Raw and already expanded text give the same shader.
     expect(patchFragmentShader(expandOwnedChunks(THREE.ShaderLib.physical.fragmentShader))).toBe(physical);
     expect(physical).toContain('#include <lights_fragment_end>');
@@ -65,10 +66,12 @@ describe('patchFragmentShader', () => {
     expect(locate).toBeLessThan(physical.indexOf('vec3 geometryPosition = - vViewPosition;'));
     // Once, in the directional loop: point lights (the lamps) and the rest keep their light.
     expect(physical.split('directLight.color *= jeexSunScale;')).toHaveLength(2);
-    // Declared at fragment scope, 1 for a material without the studio environment (no room lookup).
+    // Declared beside the directional light, 1 for a material without the studio environment (no room lookup).
+    const declared = physical.indexOf('float jeexSunScale = mix( 1.0, jeexSun, jeexInRoom );');
+    expect(declared).toBeGreaterThan(physical.indexOf('DirectionalLight directionalLight;'));
+    expect(declared).toBeLessThan(begin);
     expect(physical).toContain('float jeexSunScale = 1.0;');
-    expect(physical).toContain('jeexSunScale = mix( 1.0, jeexSun, jeexInRoom );');
-    expect(physical.indexOf('float jeexSunScale = 1.0;')).toBeLessThan(physical.indexOf(chunkMarker('lights_fragment_begin', 'begin')));
+    expect(physical.indexOf('float jeexSunScale')).toBeGreaterThan(physical.indexOf(chunkMarker('lights_fragment_begin', 'begin')));
   });
 
   test("keeps the grid's irradiance apart so the walk can hand it to the environment's place", () => {

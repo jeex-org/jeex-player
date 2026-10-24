@@ -101,21 +101,21 @@ In walk and tour, direct sunlight reaching surfaces inside a room box SHALL be s
 - **WHEN** a façade is viewed in walk
 - **THEN** it reads as in the editing modes within 5 %
 
-### Requirement: Baked surfaces in walk and tour
+### Requirement: Baked surfaces under the walk lighting
 
-In walk and tour a baked surface inside a room box SHALL show its lightmap scaled by the walk sun factor, its direct sun scaled as on any surface, and its reflections from the room probes. Outside every room box its lightmap factor SHALL be 1, its reflections SHALL come from the studio environment and the existing outside exposure compensation SHALL apply; the diffuse sources the baked policy excludes SHALL stay excluded there. Captures for grids and probes SHALL see its unscaled lightmap.
+In walk and tour a baked surface SHALL show its lightmap times the walk gain (`LIGHTING_STANDARD.baked.exposure.walk`) at the walk exposure, never scaled by the walk sun factor; its sun SHALL be scaled as on any surface, its reflections inside a room box SHALL come from the room probes. Outside every box it SHALL read as in the editing modes, like a facade. Captures SHALL see what walk shows.
 
 #### Scenario: Baked room in walk
 - **WHEN** a baked room is viewed in walk after the bake of grids and probes
-- **THEN** its lightmap contribution is the editing contribution times the walk sun factor and its glossy surfaces reflect the room probe
+- **THEN** its lightmap contribution is the editing contribution times the walk gain over the editing gain, and its glossy surfaces reflect the room probe
 
 #### Scenario: Baked surface outside the rooms
 - **WHEN** a baked surface outside every room box is read in walk and in an editing mode
-- **THEN** its walk reading is its editing reading times the outside exposure compensation, its lightmap unscaled, and the exterior grid adds no diffuse light to it
+- **THEN** its walk reading is its editing reading times the outside exposure compensation, so under the walk exposure it reads as in the editing modes within the tolerance, its capture reading equals its editing reading, and the exterior grid adds no diffuse light to it
 
-#### Scenario: Unscaled lightmap in a grid capture
+#### Scenario: Lightmap with the walk gain in a grid capture
 - **WHEN** a room grid is baked in walk with a baked surface in view of a grid probe
-- **THEN** the probe sees the surface's unscaled lightmap, read back from the capture within the tolerance
+- **THEN** the probe sees the surface's lightmap times the walk gain, read back from the capture within the tolerance
 
 #### Scenario: No shader change on entry
 - **WHEN** the viewer enters walk with baked surfaces in view, the bake completes and the room lighting switches on

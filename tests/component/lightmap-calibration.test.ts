@@ -22,6 +22,7 @@
 import * as THREE from 'three';
 import { afterEach, describe, expect, test } from 'vitest';
 import { createLightingContext } from '../../src/lighting/lighting-context.js';
+import { LIGHTING_STANDARD } from '../../src/lighting/lighting-standard.js';
 import { rgbmDecode } from '../../src/lightmap/rgbm.js';
 import { CALIBRATION_LAMP, CALIBRATION_ROOM, GOLDEN_LEVELS } from '../fixtures/lightmap-calibration/calibration-facts.js';
 import {
@@ -43,6 +44,9 @@ afterEach(closeRenderers);
 const [ROOM_W, , ROOM_D] = CALIBRATION_ROOM.size;
 const FLOOR_W = ROOM_W * FLOOR_PPM;
 const FLOOR_H = ROOM_D * FLOOR_PPM;
+
+/** The gain a bound (baked-marked) shell's lightmap carries in the editing modes. */
+const GAIN = LIGHTING_STANDARD.baked.exposure.editing;
 
 const peak = (pixels: Float32Array, i: number): number => Math.max(pixels[4 * i]!, pixels[4 * i + 1]!, pixels[4 * i + 2]!);
 
@@ -126,8 +130,9 @@ describe('lightmap calibration', () => {
         sum += (pixels[at]! + pixels[at + 1]! + pixels[at + 2]!) / 3;
         n++;
       }
-    const irradiance = ((sum / n) * Math.PI) / CALIBRATION_ROOM.plate.albedo;
-    const factor = (Math.PI * CALIBRATION_ROOM.skyRadiance * CALIBRATION_ROOM.plate.albedo) / (sum / n);
+    // The bound shell is baked-marked: its lightmap carries the editing gain, divided out to read the units.
+    const irradiance = ((sum / n) * Math.PI) / CALIBRATION_ROOM.plate.albedo / GAIN;
+    const factor = (Math.PI * CALIBRATION_ROOM.skyRadiance * CALIBRATION_ROOM.plate.albedo * GAIN) / (sum / n);
     console.info(
       `lightmap calibration: plate irradiance ${irradiance.toFixed(4)} (expected ${(Math.PI * CALIBRATION_ROOM.skyRadiance).toFixed(4)}), factor ${factor.toFixed(4)}`,
     );
@@ -246,7 +251,8 @@ describe('lightmap calibration', () => {
     const source = floor.material as THREE.MeshStandardMaterial;
     const plain = new THREE.MeshStandardMaterial({ color: source.color, roughness: source.roughness, metalness: source.metalness });
     plain.lightMap = reference;
-    plain.lightMapIntensity = Math.PI;
+    // The bound material is baked-marked and carries the editing gain; the plain one takes it as intensity.
+    plain.lightMapIntensity = Math.PI * GAIN;
     floor.material = plain;
     const float = renderFloor(calibration);
     const errors: number[] = [];
