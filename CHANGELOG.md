@@ -334,6 +334,14 @@ as described under [Versioning](#versioning).
 
 ### Fixed
 
+- **Built-in objects match the sizes and facts they declare.** The dining
+  chair's rear posts stand on the floor as its back legs; the media unit is
+  as tall as its dims (1.366 m, 1.512 m for the 2.2 m variant) and its
+  screen is a near-black, glossy, unlit panel on a black-glass bezel, through
+  a new finish `screen_tv` (in `CATALOGUE_ID_BY_SLUG`); houseplant crowns reach
+  their declared height; the island, vanity and bath declare their carcass top
+  as `layout.blockingHeight` (0.94, 0.88, 0.58 m), so a tap never sets how high
+  they block; the vanity's vessel basin is open.
 - **A baked project's own furniture collides and is drawn on the plan.**
   Walk obstacles, the 2D plan's fixture outlines, the tour's room routes and
   checkpoints read only the built-in objects, so a project whose library

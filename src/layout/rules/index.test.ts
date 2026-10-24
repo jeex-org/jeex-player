@@ -103,7 +103,8 @@ describe('archetype layout facts live in the catalogue', () => {
     expect(findObject(ARCHETYPE.mirror_round)?.layout?.mount).toEqual({ centre: 1.6 });
     expect(findObject(ARCHETYPE.cabinet_wall)?.layout?.mount).toEqual({ bottom: 1.45 });
     expect(findObject(ARCHETYPE.counter_run)?.layout?.blockingHeight).toBe(0.92);
-    expect(findObject(ARCHETYPE.island_kitchen)?.layout?.blockingHeight).toBe(0.92);
+    // Was 0.92; now the island's built worktop top, pinned on the geometry in `asset-bank-fit.test.ts`.
+    expect(findObject(ARCHETYPE.island_kitchen)?.layout?.blockingHeight).toBe(0.94);
   });
 
   test('every layout fact names a real archetype, so no dead row can hide in a table', () => {

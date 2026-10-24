@@ -283,13 +283,17 @@ export const buildMediaUnit: Builder = (asset, kit) => {
     barHandle(group, kit, 'metal', Math.min(0.24, cellWidth * 0.5), cx, legHeight + bodyHeight * 0.7, depth / 2 + frontDepth);
   }
 
-  // Screen: a bezel panel on a plate stand, tilted a hair back.
+  // Screen: a bezel panel on a plate stand, tilted a hair back. The bezel is
+  // the screen's own black glass and the stand takes the `leg` finish, never
+  // the `metal` trim of the handles: a brass frame round a 1.3 m panel reads
+  // as a gold board, not as a TV.
   const screenHeight = screenWidth * 0.5625;
   const standHeight = 0.09;
-  put(group, kit.cylinder(0.09, 0.11, 0.022, 20), kit.finish('metal'), { y: bodyTop + 0.011 });
-  put(group, kit.box(0.05, standHeight, 0.03), kit.finish('metal'), { y: bodyTop + 0.022 + standHeight / 2 });
+  const stand = kit.finish('leg');
+  put(group, kit.cylinder(0.09, 0.11, 0.022, 20), stand, { y: bodyTop + 0.011 });
+  put(group, kit.box(0.05, standHeight, 0.03), stand, { y: bodyTop + 0.022 + standHeight / 2 });
   const panelY = bodyTop + 0.022 + standHeight + screenHeight / 2;
-  put(group, kit.box(screenWidth, screenHeight, 0.024), kit.finish('metal'), { y: panelY, rx: -0.04 });
+  put(group, kit.box(screenWidth, screenHeight, 0.024), kit.finish('screen'), { y: panelY, rx: -0.04 });
   put(group, kit.box(screenWidth - 0.03, screenHeight - 0.03, 0.006), kit.finish('screen'), { y: panelY, z: 0.015, rx: -0.04 });
   return group;
 };
