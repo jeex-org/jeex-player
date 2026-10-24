@@ -66,6 +66,15 @@ export function warnInvalid(log: Logger, path: string, value: unknown, fallback:
   );
 }
 
+/**
+ * The `option-invalid` warning of an option that has no fallback value: the
+ * part named by `path` is dropped. The value is not echoed (it may carry
+ * signed URLs); `reason` says what was wrong.
+ */
+export function warnDropped(path: string, reason: string): void {
+  sink.warn('option-invalid', `viewer options: ${path} is not valid (${reason}); dropped`, { path, reason });
+}
+
 function warn(path: string, value: unknown, fallback: unknown): void {
   warnInvalid(sink, path, value, fallback);
 }

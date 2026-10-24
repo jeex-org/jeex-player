@@ -4,15 +4,15 @@ Every task starts with a test that fails for the right reason; the implementatio
 
 ## 1. Fixtures
 
-- [ ] 1.1 Write `scripts/make-fixture-hdri.test.ts` (JPEG with `hdrgm` XMP and MPF, AVIF `ftyp`, sizes under 48 KB and 8 KB, sidecar JSON with sun facts and reference radiance samples) and see it fail on the missing files; verify with `bun test scripts/make-fixture-hdri.test.ts`
-- [ ] 1.2 Write `scripts/make-fixture-hdri.ts` (procedural 1024×512 sky, sun spot at 54°/40°, red marker 90° clockwise, libultrahdr and ImageMagick paths as arguments, scan of the float data for the sidecar) and commit its outputs under `tests/fixtures/hdri/`; verify 1.1 passes and the script header documents how to re-run it
+- [x] 1.1 Write `scripts/make-fixture-hdri.test.ts` (JPEG with gain-map metadata (ISO 21496-1 or `hdrgm` XMP) and MPF, AVIF `ftyp`, sizes under 48 KB and 8 KB, sidecar JSON with sun facts and reference radiance samples) and see it fail on the missing files; verify with `bun test scripts/make-fixture-hdri.test.ts`
+- [x] 1.2 Write `scripts/make-fixture-hdri.ts` (procedural 1024×512 sky, sun spot at 54°/40°, red marker 90° clockwise, libultrahdr and ImageMagick paths as arguments, scan of the float data for the sidecar) and commit its outputs under `tests/fixtures/hdri/`; verify 1.1 passes and the script header documents how to re-run it
 
 ## 2. Host option
 
-- [ ] 2.1 Write `src/app/hdri-option.schema.test.ts` for every rule of spec «HDRI option validation» (URL schemes, relative URL, finite angles, elevation bounds, colour normalisation, share in [0, 1), unknown keys, unknown preset) and see it fail; then add `src/app/hdri-option.schema.ts` (`zod/mini`); verify the test passes
-- [ ] 2.2 Extend `src/app/viewer-options.test.ts`: default `{}`, an entry kept as given, one refused entry dropped with one `option-invalid` warning naming `lighting.hdri.<key>` while its sibling stays, no value from query or dataset; see it fail; then add the fold step and the `ViewerOptions` type; verify the tests pass and `viewer-options.schema.test.ts` agreement stays green
-- [ ] 2.3 Write the agreement test (representative entries through the runtime schema and the published JSON Schema give the same verdicts) and see it fail; then extend `viewerOptionsSchema` with the entry schema, annotate `Hdri` for the generator, add the `contains: { const: 1 }` and preset-key post-processing to `scripts/schema-gen.ts`, regenerate; verify the agreement test, `scripts/schema-gen.test.ts` and `scripts/schema-gate.sh` pass
-- [ ] 2.4 Document the option, the azimuth convention (`90 − a`), the active preset rule and the fallback in the README; verify the spelling check passes
+- [x] 2.1 Write `src/app/hdri-option.schema.test.ts` for every rule of spec «HDRI option validation» (URL schemes, relative URL, finite angles, elevation bounds, colour normalisation, share in [0, 1), unknown keys, unknown preset) and see it fail; then add `src/app/hdri-option.schema.ts` (`zod/mini`); verify the test passes
+- [x] 2.2 Extend `src/app/viewer-options.test.ts`: default `{}`, an entry kept as given, one refused entry dropped with one `option-invalid` warning naming `lighting.hdri.<key>` while its sibling stays, no value from query or dataset; see it fail; then add the fold step and the `ViewerOptions` type; verify the tests pass and `viewer-options.schema.test.ts` agreement stays green
+- [x] 2.3 Write the agreement test (representative entries through the runtime schema and the published JSON Schema give the same verdicts) and see it fail; then extend `viewerOptionsSchema` with the entry schema, annotate `Hdri` for the generator, add the `contains: { const: 1 }` and preset-key post-processing to `scripts/schema-gen.ts`, regenerate; verify the agreement test, `scripts/schema-gen.test.ts` and `scripts/schema-gate.sh` pass
+- [x] 2.4 Document the option, the azimuth convention (`90 − a`), the active preset rule and the fallback in the README; verify the spelling check passes
 
 ## 3. Standard values and calibration math
 

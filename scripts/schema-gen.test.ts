@@ -283,3 +283,40 @@ describe('host objects stay out of the published viewer options', () => {
     expect(JSON.stringify(generateSchema(options, FIXED_VERSION))).not.toContain('resolveTexture');
   });
 });
+
+describe('lighting.hdri in the published viewer options', () => {
+  const entry = (sun: Record<string, unknown> = {}, urls: Record<string, unknown> = {}): Record<string, unknown> => ({
+    environmentUrl: 'https://cdn.example.test/noon.jpg',
+    skyUrl: 'https://cdn.example.test/noon.avif',
+    ...urls,
+    sun: { azimuthDeg: 54, elevationDeg: 43, colourLinear: [1, 0.94, 0.87], horizontalIrradianceShare: 0.78, ...sun },
+  });
+  const cases: readonly [string, unknown][] = [
+    ['valid', { noon: entry() }],
+    ['blob URL', { noon: entry({}, { skyUrl: 'blob:https://a.test/0f6d2c1e' }) }],
+    ['relative URL', { noon: entry({}, { skyUrl: 'sky.avif' }) }],
+    ['ftp URL', { noon: entry({}, { environmentUrl: 'ftp://a.test/noon.jpg' }) }],
+    ['elevation 0', { noon: entry({ elevationDeg: 0 }) }],
+    ['elevation 91', { noon: entry({ elevationDeg: 91 }) }],
+    ['share 1', { noon: entry({ horizontalIrradianceShare: 1 }) }],
+    ['share 0', { noon: entry({ horizontalIrradianceShare: 0 }) }],
+    ['colour above 1', { noon: entry({ colourLinear: [2, 1, 0.5] }) }],
+    ['colour not normalised', { noon: entry({ colourLinear: [0.5, 0.5, 0.5] }) }],
+    ['colour negative', { noon: entry({ colourLinear: [1, -0.1, 0.5] }) }],
+    ['colour of two', { noon: entry({ colourLinear: [1, 0.5] }) }],
+    ['unknown preset', { night: entry() }],
+    ['unknown key', { noon: { ...entry(), licence: 'CC0' } }],
+  ];
+
+  test('the published schema and the runtime judge give the same verdict on every case', async () => {
+    const { judgeHdriOption } = await import('../src/app/hdri-option.schema.js');
+    const schema = generateSchema(VIEWER_OPTIONS_TARGET, FIXED_VERSION);
+    const ajv = new Ajv2020({ strict: false });
+    ajv.addSchema(schema);
+    const lighting = ajv.getSchema(`${String(schema['$id'])}#/definitions/ViewerOptions/properties/lighting/properties/hdri`)!;
+    for (const [name, value] of cases) {
+      const runtime = judgeHdriOption(value).refused.length === 0;
+      expect({ name, published: lighting(value) }).toEqual({ name, published: runtime });
+    }
+  });
+});

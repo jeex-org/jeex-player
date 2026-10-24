@@ -141,7 +141,7 @@ The controller reads the bake wiring's state each eligible frame. `waiting` and 
 ### D13. Fixtures and generator
 
 1. `scripts/make-fixture-hdri.ts <ultrahdr_app> <magick>`: outside every check tier, run by hand like `make-fixture-ktx2.ts`. It builds a 1024×512 linear float panorama procedurally (sky gradient, a Gaussian sun spot at azimuth 54° / elevation 40° in the panorama frame, peak well above SDR white, a saturated red marker 90° clockwise at 10°, a dark ground), encodes it with libultrahdr (`-m 0 -a 4 -t 0 -C 0 -c 0`, base and gain map quality 85, gain map at half size) into `tests/fixtures/hdri/sky-1k.jpg`, tone-maps a 256×128 copy and encodes it with ImageMagick to `tests/fixtures/hdri/sky-256.avif`, and writes `tests/fixtures/hdri/sky.json`: the entry's sun facts computed from the float data by the same scan the calibration uses, the reference radiance samples for the loader compensation, the encoder versions.
-2. `scripts/make-fixture-hdri.test.ts` keeps them honest: JPEG with an `hdrgm` XMP and an MPF segment; AVIF `ftyp`; sizes under 48 KB and 8 KB; the JSON passes the option schema once given two URLs.
+2. `scripts/make-fixture-hdri.test.ts` keeps them honest: JPEG with gain-map metadata (ISO 21496-1, which libultrahdr 2 writes, or `hdrgm` XMP) and an MPF segment; AVIF `ftyp`; sizes under 48 KB and 8 KB; the JSON passes the option schema once given two URLs.
 3. Browser tests load them from the test server by absolute URL (`new URL('/tests/fixtures/hdri/…', location.href)`) through the real decoder and the browser's AVIF decoder. An empty-plan scene and the demo apartment cover both hand-over paths.
 
 ### D14. Budget

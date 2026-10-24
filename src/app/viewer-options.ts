@@ -15,7 +15,10 @@
  * Pure module: no `three`, no DOM (a `DOMStringMap` is read as a plain record).
  */
 
-import type { ViewerMode } from '../scene/types.js';
+import type { SiteSun, ViewerMode } from '../scene/types.js';
+import type { HdriEntry } from './hdri-entry.js';
+
+export type { HdriEntry } from './hdri-entry.js';
 // TYPE only, and it must be: `ui/host-slots.ts` touches the DOM. The runtime
 // copy of `SLOT_NAMES` this table validates against lives in `option-sets.ts`.
 import type { SlotName } from '../ui/host-slots.js';
@@ -23,7 +26,8 @@ import { SLOT_VALUES, closedSet } from './option-sets.js';
 import type { Locale } from '../ui/messages.js';
 import type { SceneSource } from '../scene/scene-repository.js';
 import { createLogger, type Logger, type LogSink } from '../shared/logger.js';
-import { resolveBySpec, warnInvalid, withOptionSink, type OptionSpec } from './option-resolvers.js';
+import { resolveBySpec, warnDropped, warnInvalid, withOptionSink, type OptionSpec } from './option-resolvers.js';
+import { judgeHdriOption } from './hdri-option.schema.js';
 import { blankRecord, containerFor, descend, split, toDatasetKey, type SectionShorthands } from './option-paths.js';
 import { asFlag, convertRaw } from './option-raw.js';
 
@@ -253,6 +257,15 @@ export type ViewerOptions = {
      * @multipleOf 100
      */
     temperature: number | null;
+    /**
+     * A sky per sun preset (`HdriEntry`): walk and tour show it through the
+     * windows and light the apartment from it. The scene's `site.sun` picks
+     * the entry (`noon` when the site names none); a scene without a site, or
+     * a preset without an entry, keeps the standard look. Read once at mount,
+     * as an object only: no query parameter, no attribute. An invalid entry
+     * is dropped with one `option-invalid` warning. Default: none.
+     */
+    hdri: Partial<Record<SiteSun, HdriEntry>>;
   };
 };
 
@@ -315,7 +328,7 @@ export const DEFAULT_VIEWER_OPTIONS: ViewerOptions = {
   scene: {},
   analytics: { mode: 'on' },
   settings: { show: false, side: 'end' },
-  lighting: { temperature: null },
+  lighting: { temperature: null, hdri: {} },
 };
 
 /**
@@ -632,6 +645,11 @@ function foldOptions(given: (path: string) => unknown): ViewerOptions {
     if (section === null) result[field] = resolved;
     else containerFor(result, section, blankRecord)[field] = resolved;
   }
+  // `lighting.hdri`: a typed object with no string spelling, judged entry by
+  // entry; a refused entry is dropped with the usual warning, its siblings kept.
+  const hdri = judgeHdriOption(given('lighting.hdri'));
+  for (const refusal of hdri.refused) warnDropped(refusal.path, refusal.message);
+  containerFor(result, 'lighting', blankRecord)['hdri'] = hdri.value;
   // The host objects, copied through: there is nothing here to validate, and
   // dropping them would take the scene with them.
   for (const path of OPAQUE_PATHS) {
