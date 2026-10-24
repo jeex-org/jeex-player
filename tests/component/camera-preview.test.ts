@@ -197,6 +197,16 @@ describe('the camera preview under on-demand drawing', () => {
     preview.dispose();
   });
 
+  test('the page scrolling or the viewer moving on it, with the card open, asks for no frame', () => {
+    const { shell, preview, world } = build();
+    world.active = CAM;
+    preview.sync();
+    // The card and the canvas move together: the inset's place on the canvas is unchanged.
+    expect(asks(preview, world, () => (shell.container.style.marginTop = '40px'))).toBe(false);
+    expect(asks(preview, world, () => (shell.container.style.marginLeft = '25px'))).toBe(false);
+    preview.dispose();
+  });
+
   test('the inset is drawn once per main draw, never on a tick without one, and not while closed', () => {
     const { preview, world } = build();
     world.active = CAM;
