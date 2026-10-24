@@ -286,7 +286,7 @@ export class CameraPreview {
     return checkpoint !== null && mode !== undefined && PREVIEW_MODES.has(mode) ? checkpoint : null;
   }
 
-  /** Everything the inset's picture depends on besides the scene: mode, pose, the window's and the canvas's boxes. */
+  /** Everything the inset's picture depends on besides the scene: mode, pose, the window's offset on the canvas and both sizes. */
   private keyOf(checkpoint: TourCheckpoint, mode: ViewerMode): string {
     const box = this.window.getBoundingClientRect();
     const canvas = this.deps.renderer()?.domElement.getBoundingClientRect();
@@ -298,12 +298,12 @@ export class CameraPreview {
       z,
       checkpoint.yaw,
       checkpoint.pitch,
-      box.left,
-      box.top,
+      // Relative to the canvas, as `drawInset` places it: the page scrolling, or
+      // the viewer moving on it, moves both boxes and changes nothing drawn.
+      canvas ? box.left - canvas.left : null,
+      canvas ? box.top - canvas.top : null,
       box.width,
       box.height,
-      canvas?.left,
-      canvas?.top,
       canvas?.width,
       canvas?.height,
     ].join(',');
