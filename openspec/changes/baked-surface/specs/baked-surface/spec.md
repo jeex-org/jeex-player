@@ -62,6 +62,10 @@ A point or spot light marked baked SHALL add no diffuse light to a baked surface
 - **WHEN** a baked lamp shines on a glossy baked surface
 - **THEN** its specular highlight is present and equals the highlight on the same surface unbaked
 
+#### Scenario: Marking live removes the mark
+- **WHEN** a lamp marked baked is marked live again
+- **THEN** it carries no bake mark at all, exactly as before it was first marked
+
 #### Scenario: Unbaked surface lit by a baked lamp
 - **WHEN** a baked lamp shines on a surface that is not baked
 - **THEN** the surface is lit as if the lamp were live
@@ -89,6 +93,10 @@ The lightmap's contribution on a baked surface SHALL be scaled by the same inter
 #### Scenario: Walk scales like the sun
 - **WHEN** a baked floor inside a room is read in walk and in an editing mode with the same camera, before the post chain
 - **THEN** its lightmap contribution in walk is the editing contribution times the walk sun factor, within the tolerance
+
+#### Scenario: Baked wall reads as in editing
+- **WHEN** a lightmap-lit baked wall inside a room, with no sun on it, is displayed in walk and in an editing mode from the same camera
+- **THEN** the displayed readings agree within the tolerance (the walk sun factor cancels the walk exposure), apart from the walk's ambient occlusion
 
 #### Scenario: Capture sees the unscaled lightmap
 - **WHEN** a room probe is captured in walk
