@@ -304,6 +304,32 @@ describe.skipIf(!HARDWARE)(`walk gloss and white balance in the demo living room
     closeContainers();
   });
 
+  test('mask diagnosis: how glazing and furniture meshes are drawn', () => {
+    const how = (mesh: THREE.Mesh) => {
+      const chain: Array<{ name: string; visible: boolean; layers: number }> = [];
+      for (let o: THREE.Object3D | null = mesh; o; o = o.parent)
+        chain.push({ name: `${o.type}:${o.name}`, visible: o.visible, layers: o.layers.mask });
+      return {
+        chain,
+        frustumCulled: mesh.frustumCulled,
+        renderOrder: mesh.renderOrder,
+        hooks: mesh.onBeforeRender.toString().slice(0, 120),
+        material: [mesh.material].flat().map((m) => m.type),
+      };
+    };
+    let glass: THREE.Mesh | null = null;
+    let item: THREE.Mesh | null = null;
+    lighting.scene.traverse((o) => {
+      const mesh = o as THREE.Mesh;
+      if (!mesh.isMesh) return;
+      if (!glass && isGlass(mesh)) glass = mesh;
+      let p: THREE.Object3D | null = mesh;
+      while (p && p.userData['assetId'] === undefined) p = p.parent;
+      if (!item && p) item = mesh;
+    });
+    record('maskDiagnosis', { glass: glass && how(glass), item: item && how(item) });
+  });
+
   test('the living probe is clear of the floor lamp', () => {
     const probe = lighting.volumes.probes.find((p) => p.roomId === LIVING)!.position;
     let nearest = Number.POSITIVE_INFINITY;
