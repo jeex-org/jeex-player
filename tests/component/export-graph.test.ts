@@ -15,7 +15,7 @@ import { SceneBuilder } from '../../src/geometry/scene-builder.js';
 import { solvePlan } from '../../src/plan/plan-solver.js';
 import { lShapePlan } from '../../src/fixtures/plan-l-shape.js';
 import { metadataTable } from '../../src/scene/metadata-table.js';
-import { exportGraph } from '../../src/render/export-graph.js';
+import { exportGraphWithRows } from '../../src/render/export-graph.js';
 import { isFaceKey } from '../../src/scene/types.js';
 
 function build(): { root: THREE.Group; dispose: () => void } {
@@ -26,12 +26,12 @@ function build(): { root: THREE.Group; dispose: () => void } {
 }
 
 describe('exportGraph, in a real browser', () => {
-  test('the clone is JSON-safe throughout, carries EXT_mesh_features, and forces the ceiling visible', () => {
+  test('the clone is JSON-safe throughout, carries no node extension, maps its element meshes to rows, and forces the ceiling visible', () => {
     const { root, dispose } = build();
     try {
       const plan = solvePlan(lShapePlan);
       const rows = metadataTable(lShapePlan, plan);
-      const clone = exportGraph(root, rows);
+      const { graph: clone, meshRows } = exportGraphWithRows(root, rows);
 
       let nodes = 0;
       let tagged = 0;
@@ -43,8 +43,11 @@ describe('exportGraph, in a real browser', () => {
         expect(() => JSON.stringify(object.userData)).not.toThrow();
         for (const value of Object.values(object.userData)) expect(typeof value).not.toBe('function');
 
-        const extensions = (object.userData as { gltfExtensions?: { EXT_mesh_features?: unknown } })['gltfExtensions'];
-        if (extensions?.EXT_mesh_features) tagged += 1;
+        expect(object.userData['gltfExtensions']).toBeUndefined();
+        if (object instanceof THREE.Mesh && meshRows.has(object)) {
+          tagged += 1;
+          expect(rows[meshRows.get(object)!]).toBeTruthy();
+        }
 
         if (object.userData['isCeiling'] === true) {
           ceilingSeen = true;

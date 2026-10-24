@@ -47,3 +47,17 @@ range and changes the lockfile only (`bun audit fix`). The `latest` tag is the 4
 | Package    | Version | Was     | Command                                 |
 | ---------- | ------- | ------- | --------------------------------------- |
 | `fast-uri` | `3.1.9` | `3.1.8` | `npm view fast-uri version dist-tags`   |
+
+## 2026-10-24: gltf-validator for the export conformance test
+
+A new dev dependency: the Khronos glTF Validator, run by
+`tests/component/export-glb-conformance.test.ts` on an exported GLB. `npm view gltf-validator
+version dist-tags license maintainers time dependencies` returned `2.0.0-dev.3.10`, `latest:
+2.0.0-dev.3.10`, Apache-2.0, maintainers `khronos` and `emackey`, published 2024-10-22, no
+dependencies. The package has only ever been published on the `2.0.0-dev` line; the `latest`
+tag is that line, so it is taken as is. It is a test-only import and never reaches the library
+or the IIFE bundle. `bun audit` after the install: no vulnerabilities (364 packages).
+
+| Package          | Version          | Was | Command                                         |
+| ---------------- | ---------------- | --- | ----------------------------------------------- |
+| `gltf-validator` | `2.0.0-dev.3.10` | new | `npm view gltf-validator version dist-tags`     |

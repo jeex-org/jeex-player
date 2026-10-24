@@ -11,8 +11,8 @@
  * Invariant: `metadataTable` is a pure function of `(scene, plan)` — same
  * document in, same rows out, in the same ORDER (class; then id, or for a wall face wall and side) — which is
  * what lets `exportGlb`'s byte-for-byte determinism test hold: a row's
- * position is what `EXT_mesh_features` on a mesh points at
- * (`render/export-graph.ts`), so a re-export of the same document must lay the
+ * position is what a primitive's `EXT_mesh_features` feature id holds
+ * (`render/export-graph.ts`, `app/export-gltf.ts`), so a re-export of the same document must lay the
  * rows out identically.
  *
  * Deliberately narrower than `ElementKind` allows: `'floor'` and `'ceiling'`
@@ -165,64 +165,94 @@ export function metadataTable(scene: SceneData, plan: SolvedPlan): ElementRow[] 
   return rows;
 }
 
+/** Every property of class `jeexElement`, in declaration order. */
+const COLUMNS: readonly Column[] = [
+  'guid',
+  'ifcGuid',
+  'class',
+  'id',
+  'roomId',
+  'wallId',
+  'side',
+  'openingType',
+  'assetId',
+  'libraryId',
+  'variantId',
+  'finish',
+];
+
 /**
- * The `EXT_structural_metadata` root extension object for `rows`.
- *
- * One schema, one class (`jeexElement`), one property table. Deliberately
- * simplified against the real extension (no binary buffers yet): a conformant
- * reader expects a property's values in a binary buffer view addressed by the
- * mesh's glTF `bufferViews`, and this writes them inline as JSON arrays
- * instead, which is not what the ratified spec's schema validator accepts. It
- * is enough for our own reader (a debug panel, a future IFC round-trip) and is
- * a documented deviation, not a claim of `EXT_structural_metadata` conformance.
- * An absent value is `null` in its column, in every optional column alike —
- * the id columns of a wall-face row included (`WallFaceRow`).
+ * The value a cell holds when its row has none: the class property's `noData`.
+ * No real value is ever empty (UUIDs, IFC GUIDs, `L`/`R`, opening types,
+ * finish ids), so the sentinel never shadows data.
  */
-export function structuralMetadataExtension(rows: readonly ElementRow[]): Record<string, unknown> {
-  const column = (key: Column): Array<string | null> => rows.map((entry) => (entry as Partial<Record<Column, string>>)[key] ?? null);
+const NO_DATA = '';
+
+/** One STRING column as the extension stores it: UTF-8 `values` and `count + 1` UINT32 `stringOffsets`. */
+function stringColumn(cells: readonly string[]): { values: Uint8Array; stringOffsets: Uint8Array } {
+  const encoder = new TextEncoder();
+  const encoded = cells.map((cell) => encoder.encode(cell));
+  const values = new Uint8Array(encoded.reduce((sum, bytes) => sum + bytes.byteLength, 0));
+  const stringOffsets = new Uint8Array((cells.length + 1) * 4);
+  const offsets = new DataView(stringOffsets.buffer);
+  let cursor = 0;
+  encoded.forEach((bytes, rowIndex) => {
+    offsets.setUint32(rowIndex * 4, cursor, true);
+    values.set(bytes, cursor);
+    cursor += bytes.byteLength;
+  });
+  offsets.setUint32(cells.length * 4, cursor, true);
+  return { values, stringOffsets };
+}
+
+/**
+ * The `EXT_structural_metadata` root extension object for `rows`, and the
+ * binary blocks its property table points at.
+ *
+ * Written against the extension's text (a Cesium vendor extension, draft
+ * status: the CesiumGS glTF repository, branch `3d-tiles-next`,
+ * `extensions/2.0/Vendor/EXT_structural_metadata`). One schema (version
+ * `"2"`; the inline-array shape before it had none), one class
+ * (`jeexElement`), one property table. Every property is a `STRING` stored in
+ * binary: a UTF-8 `values` block and a `stringOffsets` block of `count + 1`
+ * UINT32 offsets. `class` is required; every other property is optional with
+ * `noData: ""`, the value a row without it holds (a wall face's `guid`,
+ * `ifcGuid` and `id`, a facade face's `roomId`). An optional property with no
+ * value in any row stays declared but is left out of the table (a reader reads
+ * an absent optional property as all `noData`; a zero-length bufferView is not
+ * valid glTF). A table needs at least one row, so `rows = []` gives the schema
+ * alone.
+ *
+ * `blocks[k]` is meant to become bufferView `firstBufferView + k`; the
+ * table's `values`/`stringOffsets` already name those indexes. Placing the
+ * blocks (alignment, the binary chunk) is the GLB writer's job.
+ */
+export function structuralMetadataExtension(
+  rows: readonly ElementRow[],
+  firstBufferView: number,
+): { extension: Record<string, unknown>; blocks: Uint8Array[] } {
+  const properties: Record<string, Record<string, unknown>> = {};
+  for (const name of COLUMNS) {
+    properties[name] = name === 'class' ? { type: 'STRING', required: true } : { type: 'STRING', required: false, noData: NO_DATA };
+  }
+  const schema = { id: 'jeexViewerElementSchema', version: '2', classes: { jeexElement: { name: 'JEEX scene element', properties } } };
+  if (rows.length === 0) return { extension: { schema }, blocks: [] };
+
+  const blocks: Uint8Array[] = [];
+  const stored: Record<string, Record<string, unknown>> = {};
+  for (const name of COLUMNS) {
+    const cells = rows.map((entry) => (entry as Partial<Record<Column, string>>)[name] ?? NO_DATA);
+    if (name !== 'class' && cells.every((cell) => cell === NO_DATA)) continue;
+    const { values, stringOffsets } = stringColumn(cells);
+    stored[name] = {
+      values: firstBufferView + blocks.length,
+      stringOffsets: firstBufferView + blocks.length + 1,
+      stringOffsetType: 'UINT32',
+    };
+    blocks.push(values, stringOffsets);
+  }
   return {
-    schema: {
-      id: 'jeexViewerElementSchema',
-      classes: {
-        jeexElement: {
-          name: 'JEEX scene element',
-          properties: {
-            guid: { type: 'STRING', required: false },
-            ifcGuid: { type: 'STRING', required: false },
-            class: { type: 'STRING' },
-            id: { type: 'STRING', required: false },
-            roomId: { type: 'STRING', required: false },
-            wallId: { type: 'STRING', required: false },
-            side: { type: 'STRING', required: false },
-            openingType: { type: 'STRING', required: false },
-            assetId: { type: 'STRING', required: false },
-            libraryId: { type: 'STRING', required: false },
-            variantId: { type: 'STRING', required: false },
-            finish: { type: 'STRING', required: false },
-          },
-        },
-      },
-    },
-    propertyTables: [
-      {
-        name: 'jeexElements',
-        class: 'jeexElement',
-        count: rows.length,
-        properties: {
-          guid: column('guid'),
-          ifcGuid: column('ifcGuid'),
-          class: column('class'),
-          id: column('id'),
-          roomId: column('roomId'),
-          wallId: column('wallId'),
-          side: column('side'),
-          openingType: column('openingType'),
-          assetId: column('assetId'),
-          libraryId: column('libraryId'),
-          variantId: column('variantId'),
-          finish: column('finish'),
-        },
-      },
-    ],
+    extension: { schema, propertyTables: [{ name: 'jeexElements', class: 'jeexElement', count: rows.length, properties: stored }] },
+    blocks,
   };
 }
