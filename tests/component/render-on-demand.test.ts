@@ -18,6 +18,7 @@ import { InlineSceneRepository, mountViewer } from '../../src/app/viewer-api.js'
 import type { ViewerHandle } from '../../src/app/viewer-handle.js';
 import { RenderDemand, type DemandCounters } from '../../src/render/render-demand.js';
 import { RenderRuntime } from '../../src/render/render-runtime.js';
+import { trackLibraryMaps, type LibraryMaps } from './library-maps.js';
 import { WalkLighting } from '../../src/render/walk-post.js';
 import { FloorRing } from '../../src/camera/floor-ring.js';
 import { ViewerEditor } from '../../src/app/viewer-editor.js';
@@ -389,6 +390,9 @@ describe('walk and tour draw on demand', { timeout: MOUNT_TIMEOUT_MS }, () => {
  */
 const POSE_TAIL_SHARE = 0.0004;
 
+/** Verifier windows tried before a scene that keeps asking for frames is called restless. */
+const VERIFY_ATTEMPTS = 3;
+
 /** Two tour cameras for the editing describe, by fixed UUID v7: one in the living room, one in the bedroom. */
 const CAMERA_IDS = ['01a1300a-1c00-7000-8000-00000000c001', '01a1300a-1c00-7000-8000-00000000c002'] as const;
 
@@ -468,27 +472,37 @@ describe('the editing modes draw on demand', { timeout: MOUNT_TIMEOUT_MS }, () =
   }
 
   async function verifyNothingSkipped(what: string, tail = 0, afterKeep?: () => void): Promise<void> {
-    await rest(what);
-    // Longer than `rest`: a sub-tolerance tail must have stopped adding up before the comparison.
-    await ticks(REST_TICKS);
-    const frozen = performance.now();
-    const clock = vi.spyOn(performance, 'now').mockReturnValue(frozen);
-    try {
-      const retained = await canvasShot();
-      afterKeep?.();
-      const start = counters();
-      demandOf().invalidate();
-      await until(() => counters().draws > start.draws, `${what}: the forced frame`, TICKS_TIMEOUT_MS);
-      await nextFrame();
-      const forced = await canvasShot();
-      const share = await unexplainedShare(retained, forced);
-      expect(share, `${what}: the kept picture is the forced one`).toBeLessThanOrEqual(tail);
-      const after = await ticks(10);
-      expect(after.draws, `${what}: frozen ticks after the forced frame`).toBe(0);
-      expect(after.insetDraws, `${what}: frozen ticks draw no inset`).toBe(0);
-    } finally {
-      clock.mockRestore();
+    for (let attempt = 1; attempt <= VERIFY_ATTEMPTS; attempt += 1) {
+      await rest(what);
+      // Longer than `rest`: a sub-tolerance tail must have stopped adding up before the comparison.
+      await ticks(REST_TICKS);
+      const frozen = performance.now();
+      const clock = vi.spyOn(performance, 'now').mockReturnValue(frozen);
+      try {
+        const kept = counters().draws;
+        const retained = await canvasShot();
+        if (attempt === 1) afterKeep?.();
+        // A frame asked for while the picture was kept (a late library map
+        // landing) makes that picture out of date by design: no skipped draw,
+        // the scene had not come to rest. Keep it again.
+        await ticks(2);
+        if (counters().draws !== kept || (demandOf() as unknown as { dirty: boolean }).dirty) continue;
+        const start = counters();
+        demandOf().invalidate();
+        await until(() => counters().draws > start.draws, `${what}: the forced frame`, TICKS_TIMEOUT_MS);
+        await nextFrame();
+        const forced = await canvasShot();
+        const share = await unexplainedShare(retained, forced);
+        expect(share, `${what}: the kept picture is the forced one`).toBeLessThanOrEqual(tail);
+        const after = await ticks(10);
+        expect(after.draws, `${what}: frozen ticks after the forced frame`).toBe(0);
+        expect(after.insetDraws, `${what}: frozen ticks draw no inset`).toBe(0);
+        return;
+      } finally {
+        clock.mockRestore();
+      }
     }
+    throw new Error(`${what}: the scene never rested (a frame was asked for in each of ${VERIFY_ATTEMPTS} verifier windows)`);
   }
 
   /** Runs `change` now (the view need not rest first) and follows its draws until the view rests. */
@@ -513,7 +527,10 @@ describe('the editing modes draw on demand', { timeout: MOUNT_TIMEOUT_MS }, () =
     throw new Error('no runtime yet');
   };
 
+  let maps: LibraryMaps;
+
   beforeAll(async () => {
+    maps = trackLibraryMaps();
     const addFrameHook = Object.getOwnPropertyDescriptor(RenderRuntime.prototype, 'addFrameHook')!.value as RenderRuntime['addFrameHook'];
     vi.spyOn(RenderRuntime.prototype, 'addFrameHook').mockImplementation(function (this: RenderRuntime, hook) {
       sceneOf = () => this.scene;
@@ -567,6 +584,8 @@ describe('the editing modes draw on demand', { timeout: MOUNT_TIMEOUT_MS }, () =
       }
     }
     if (handle.getMode() !== 'orbit') handle.setMode('orbit');
+    // At rest means the library maps landed too: one that lands later asks for its own frame.
+    await until(() => maps.pending() === 0, 'the library maps settled', TICKS_TIMEOUT_MS);
     await rest('a clean resting orbit');
   }, TICKS_TIMEOUT_MS);
 
