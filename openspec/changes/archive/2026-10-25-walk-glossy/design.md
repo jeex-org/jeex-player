@@ -2,7 +2,7 @@
 
 ## Context
 
-See proposal.md for the motivation and brainstorm.md for the evidence. The state this design builds on:
+See proposal.md for the motivation and the evidence. The state this design builds on:
 
 1. `src/render/walk-lighting/room-volumes.ts` `probePoint` walks a bounded lattice (`plan/search-lattice.ts`, 0.1 m step, widening with the room) over the room polygon and keeps the point farthest from the room's edges, preferring points outside every furniture footprint. Footprints are plan `Rect`s (`src/app/walk-lighting-wiring.ts` `volumeInput`, from `Box3.setFromObject` of each child of the furniture group); heights are dropped, so a sofa and a floor lamp block the same way, and a point 9 cm beside a lamp shade is "free".
 2. `WalkLighting.load` computes the volumes once; `refresh(scope)` re-captures probes at the positions from that load. `setRoomBoxes` writes each box's `jeexProbe` (the projection centre) from the same positions. The room grids and the box layout depend only on the rooms, never on furniture.
@@ -42,7 +42,7 @@ For each lattice point inside the polygon, with `p = (x, probeHeightM, z)`:
 
 Choice, in this order: a qualifying point beats a non-qualifying one; among qualifying points the higher `score` wins (today's rule); among non-qualifying points the higher `min(furnitureClearance, edge)` wins, then the higher `score`; an exact tie keeps the earlier lattice point, and the lattice order is fixed, so the answer is deterministic.
 
-Alternatives: a 2D footprint grown by the clearance (rejected: a low sofa would push the probe away for nothing, and a tall shelf's top would not count); a point on the far side of the lamp only (rejected: special-cases one asset kind); several probes per room (rejected in the brainstorm).
+Alternatives: a 2D footprint grown by the clearance (rejected: a low sofa would push the probe away for nothing, and a tall shelf's top would not count); a point on the far side of the lamp only (rejected: special-cases one asset kind); several probes per room (rejected: selection and blending work plus atlas memory, with no evidence they are needed).
 
 Cost: lattice points times furniture boxes, per room, CPU only, at load and after an edit. Measured on the demo plan (9 rooms, 59 furniture boxes): 25–42 ms for the whole apartment, against 8 ms without furniture. Accepted as is; no culling.
 
