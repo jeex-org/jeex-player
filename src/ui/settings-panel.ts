@@ -1,6 +1,7 @@
 /**
- * The viewer's settings: a button attached to the end of the control bar and
- * the non-modal panel it opens. Its first (and so far only) setting is the
+ * The viewer's settings: a button attached to one inline edge of the control
+ * bar (its end by default, its start when the host asks) and the non-modal
+ * panel it opens. Its first (and so far only) setting is the
  * colour temperature of the interior's artificial light.
  *
  * Off by default: nothing of it exists until the host enables it
@@ -8,11 +9,16 @@
  * control bar it always had.
  *
  * Layout invariant: the button's wrapper is positioned ABSOLUTELY at the
- * bar's end, so the bar's centring and its flex layout ignore it and no
- * existing control moves. In a narrow viewer it sits under the bar's end,
- * inside the viewer. The panel is the bar's next sibling (so Tab goes from the
- * button straight into it), anchored under the button, and a bottom sheet in a
- * narrow viewer (`styles/viewer.css`).
+ * bar's chosen edge, so the bar's centring and its flex layout ignore it and
+ * no existing control moves. In a narrow viewer it sits under that edge,
+ * inside the viewer. On the end side the wrapper is the bar's last child and
+ * the panel its next sibling (so Tab goes from the button straight into it);
+ * on the start side the wrapper is the bar's first child, so Tab order still
+ * follows what is seen. The panel is anchored under the button, and is a
+ * bottom sheet in a narrow viewer (`styles/viewer.css`).
+ *
+ * Start and end are the bar's inline edges by its computed `direction`; the
+ * clearance check and the panel's anchoring resolve them to a physical side.
  *
  * Behaviour (shadcn's Popover, Field and Slider as the reference): a labelled
  * non-modal dialog; the slider takes focus on open; Escape and the Close
@@ -40,6 +46,9 @@ const NEUTRAL_MAX_K = 4600;
 /** The gap between the bar's end and the button's plate beside it, and the least room left to the viewer's edge, CSS px. */
 const PLATE_GAP_PX = 4;
 const EDGE_MARGIN_PX = 8;
+
+/** The control bar edge the button attaches to (`options.settings.side`). */
+export type SettingsSide = 'start' | 'end';
 
 /** The `data-jeex` names of the nodes this module builds. */
 export const SETTINGS_NAMES = { extension: 'settings-extension', button: 'settings-button', panel: 'settings-panel' } as const;
@@ -125,6 +134,8 @@ export class SettingsPanel {
   private nodes: Nodes | null = null;
   private value: number | null = null;
   private opened = false;
+  /** Read once: the first `setEnabled(true)` builds the nodes on this side. */
+  private side: SettingsSide = 'end';
   /** The document listener of an open panel; aborted on close. */
   private outside: AbortController | null = null;
   private focusTimer: number | undefined;
@@ -136,9 +147,12 @@ export class SettingsPanel {
     this.messages = deps.messages;
   }
 
-  /** Whether the host enabled the button (`options.settings.show`). */
-  setEnabled(show: boolean): void {
-    if (show) this.build();
+  /** Whether the host enabled the button (`options.settings.show`), and on which side of the bar (read at the first build only). */
+  setEnabled(show: boolean, side: SettingsSide = 'end'): void {
+    if (show && !this.nodes) {
+      this.side = side;
+      this.build();
+    }
     if (!this.nodes) return;
     if (!show) this.close(false);
     this.nodes.extension.hidden = !show;
@@ -170,8 +184,9 @@ export class SettingsPanel {
     this.opened = true;
     this.deps.onOpen();
     this.render();
-    this.anchor();
+    // Shown first, so `anchor()` can measure the panel's width to keep it inside the viewer.
     nodes.panel.hidden = false;
+    this.anchor();
     nodes.button.setAttribute('aria-expanded', 'true');
     this.listenOutside();
     nodes.slider.focus();
@@ -213,7 +228,7 @@ export class SettingsPanel {
     const { roots } = this.deps;
     const doc = roots.root.ownerDocument;
     const bar = roots.byName('control-bar');
-    const extension = element(doc, 'div', 'settings-extension', { 'data-jeex': SETTINGS_NAMES.extension });
+    const extension = element(doc, 'div', 'settings-extension', { 'data-jeex': SETTINGS_NAMES.extension, 'data-side': this.side });
     const button = element(doc, 'button', 'icon-button settings-button', {
       type: 'button',
       'data-jeex': SETTINGS_NAMES.button,
@@ -239,7 +254,8 @@ export class SettingsPanel {
     const reset = element(doc, 'button', 'settings-reset', { type: 'button' });
     field.append(fieldHead, slider, reset);
     panel.append(head, field);
-    bar.append(extension);
+    if (this.side === 'start') bar.prepend(extension);
+    else bar.append(extension);
     bar.after(panel);
     this.nodes = { extension, button, panel, title, close, label, output, slider, reset };
     this.bind();
@@ -260,17 +276,28 @@ export class SettingsPanel {
     }
   }
 
+  /** Whether the chosen side is the bar's physical left: start in a left-to-right bar, end in a right-to-left one. */
+  private onLeft(): boolean {
+    const bar = this.deps.roots.byName('control-bar');
+    const rtl = bar.ownerDocument.defaultView?.getComputedStyle(bar).direction === 'rtl';
+    return (this.side === 'start') !== rtl;
+  }
+
   /**
-   * Beside the bar's end where it fits, else under it: a bar that a long scene
-   * name has made nearly as wide as the viewer leaves no room beside it, and
-   * the narrow position (`styles/viewer.css`, 600 px and below) is used then too.
+   * Beside the bar's chosen edge where it fits, else under it: a bar that a
+   * long scene name has made nearly as wide as the viewer leaves no room
+   * beside it, and the narrow position (`styles/viewer.css`, 600 px and below)
+   * is used then too.
    */
   private place(): void {
     const nodes = this.nodes;
     if (!nodes) return;
     const bar = this.deps.roots.byName('control-bar').getBoundingClientRect();
+    // A bar with no box yet (before the chrome shows) says nothing about the room beside it; the next resize decides.
+    if (bar.width === 0) return;
     const frame = this.deps.roots.viewport.getBoundingClientRect();
-    const fits = bar.right + PLATE_GAP_PX + nodes.extension.offsetWidth + EDGE_MARGIN_PX <= frame.right;
+    const room = PLATE_GAP_PX + nodes.extension.offsetWidth + EDGE_MARGIN_PX;
+    const fits = this.onLeft() ? bar.left - room >= frame.left : bar.right + room <= frame.right;
     nodes.extension.dataset['placement'] = fits ? 'beside' : 'under';
   }
 
@@ -341,15 +368,28 @@ export class SettingsPanel {
     if (button && !this.opened && button.isConnected) button.focus();
   }
 
-  /** Puts the panel under the button, its end edge on the button's (a narrow viewer's sheet ignores both). */
+  /**
+   * Puts the panel under the button, the edge of the chosen side on the
+   * button's (a narrow viewer's sheet ignores all of it). A panel anchored by
+   * its left edge is clamped inside the viewer; the right-edge anchoring is
+   * the one the end side always had.
+   */
   private anchor(): void {
     const nodes = this.nodes!;
     const viewport = this.deps.roots.viewport;
     const frame = viewport.getBoundingClientRect();
     const button = nodes.button.getBoundingClientRect();
     const top = Math.max(0, button.bottom - frame.top + 8);
-    const right = Math.max(8, frame.right - button.right);
     nodes.panel.style.setProperty('--jeex-settings-top', `${Math.round(top)}px`);
+    if (this.onLeft()) {
+      const widest = frame.width - nodes.panel.offsetWidth - EDGE_MARGIN_PX;
+      const left = Math.max(EDGE_MARGIN_PX, Math.min(button.left - frame.left, widest));
+      nodes.panel.dataset['anchor'] = 'left';
+      nodes.panel.style.setProperty('--jeex-settings-left', `${Math.round(left)}px`);
+      return;
+    }
+    delete nodes.panel.dataset['anchor'];
+    const right = Math.max(8, frame.right - button.right);
     nodes.panel.style.setProperty('--jeex-settings-right', `${Math.round(right)}px`);
   }
 

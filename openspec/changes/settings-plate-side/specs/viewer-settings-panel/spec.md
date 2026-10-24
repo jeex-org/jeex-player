@@ -28,7 +28,7 @@ The host SHALL choose the control bar edge the settings button attaches to with 
 
 #### Scenario: Right-to-left bar
 - **WHEN** the control bar computes `direction: rtl` (for example inherited from the host page)
-- **THEN** `'start'` attaches the button to the bar's right edge and `'end'` to its left edge, and the plate and an open panel stay inside the viewer
+- **THEN** `'start'` attaches the button to the bar's right edge and `'end'` to its left edge (beside it, or under it when there is no room beside), and an open panel stays inside the viewer; the bar's own right-to-left centring is outside this requirement
 
 #### Scenario: Side alone
 - **WHEN** a viewer mounts with `settings.side: 'start'` or `settings-side="start"` but without `settings`

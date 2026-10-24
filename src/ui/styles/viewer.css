@@ -877,7 +877,9 @@
     never see it and no control of the bar moves. Below 600 px of viewer the
     bar can reach the viewer's edges, so the wrapper sits under the bar's end
     instead, inside the viewer. The panel is a popover under the button, and a
-    bottom sheet in the narrowest viewers.
+    bottom sheet in the narrowest viewers. `data-side='start'` mirrors the
+    plate to the bar's start; the panel's `data-anchor='left'` is a panel
+    `settings-panel.ts` anchored by its left edge.
   */
   .jeex-viewer .settings-extension {
     position: absolute;
@@ -988,11 +990,24 @@
     inset-inline: auto 0;
     translate: none;
   }
+  .jeex-viewer .settings-extension[data-side='start'] {
+    inset-inline: auto calc(100% + 4px);
+  }
+  .jeex-viewer .settings-extension[data-side='start'][data-placement='under'] {
+    inset-inline: 0 auto;
+  }
+  .jeex-viewer .settings-panel[data-anchor='left'] {
+    right: auto;
+    left: var(--jeex-settings-left, 12px);
+  }
   @container (max-width: 600px) {
     .jeex-viewer .settings-extension {
       inset-block-start: calc(100% + 6px);
       inset-inline: auto 0;
       translate: none;
+    }
+    .jeex-viewer .settings-extension[data-side='start'] {
+      inset-inline: 0 auto;
     }
   }
   @container (max-width: 430px) {
@@ -1002,6 +1017,13 @@
       bottom: max(10px, env(safe-area-inset-bottom));
       left: 10px;
       inline-size: auto;
+    }
+    /* The sheet is the same for both anchors: this outweighs the left-anchored rule above. */
+    .jeex-viewer .settings-panel[data-anchor='left'] {
+      top: auto;
+      right: 10px;
+      bottom: max(10px, env(safe-area-inset-bottom));
+      left: 10px;
     }
   }
 

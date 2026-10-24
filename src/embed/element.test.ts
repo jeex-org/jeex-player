@@ -989,6 +989,21 @@ describe('the light temperature', () => {
     expect(record.mounted[0]!.options).toMatchObject({ lighting: { temperature: 3000 }, settings: { show: true } });
   });
 
+  test('`settings-side` reaches the mount and is read once: a change after the start warns and changes nothing', async () => {
+    const attributes: Record<string, string> = { settings: '', 'settings-side': 'start' };
+    const { controller, record } = harness(attributes);
+    const logged = collectLog();
+    controller.onLog = logged.sink;
+    controller.connect();
+    expect(record.mounted[0]!.options).toMatchObject({ settings: { show: true, side: 'start' } });
+    expect(OBSERVED_ATTRIBUTES).toContain('settings-side');
+    attributes['settings-side'] = 'end';
+    controller.attributeChanged('settings-side');
+    await flushed();
+    expect(logged.entries.map((entry) => [entry.code, entry.detail])).toEqual([['attribute-read-once', { attribute: 'settings-side' }]]);
+    expect(record.mounted).toHaveLength(1);
+  });
+
   test('`light-temperature` is live after the start: a number, `original`, and removal for «Original»', async () => {
     const attributes: Record<string, string> = { 'light-temperature': '3000' };
     const { controller, record } = harness(attributes);

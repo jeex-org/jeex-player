@@ -23,7 +23,13 @@ as described under [Versioning](#versioning).
   Interior styles without moving any control, under the bar's end in viewers
   600 px wide or narrower, opening a non-modal panel with the light
   temperature. Hosts that place their own button at the bar's end need to leave
-  room for it.
+  room for it, or choose the other side with `settings.side`.
+- **Settings side** (`settings.side: 'start' | 'end'`, attribute
+  `settings-side`, query `settingsSide`; default `'end'`, read once at mount):
+  attaches the settings button to the control bar's start instead of its end,
+  beside it or under it in narrow viewers, with the panel anchored by its start
+  edge and the button first in the bar's keyboard order. Start and end follow
+  the bar's writing direction.
 - `jeex-viewer/lighting` exports `colourTemperatureRgb` and
   `isLightTemperature`, and `LIGHTING_STANDARD.temperature` holds the range.
   `LIGHTING_STANDARD_VERSION` stays 1.

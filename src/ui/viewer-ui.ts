@@ -36,7 +36,7 @@ export type ChromeOptions = {
   fullscreenButton: FullscreenButtonFlags;
   readonly: boolean;
   /** The settings button (`settings-panel.ts`); the value it shows comes from `setLightTemperature`. */
-  settings: { show: boolean };
+  settings: { show: boolean; side: 'start' | 'end' };
 };
 
 export type { PanelItem, PanelRequest } from './selection-panel.js';
@@ -225,7 +225,7 @@ export class ViewerUI implements DirectorChrome {
     this.setChrome(options.chrome);
     this.chrome.setFullscreenButton(options.fullscreenButton);
     this.chrome.setReadonly(options.readonly);
-    this.settings.setEnabled(options.settings.show);
+    this.settings.setEnabled(options.settings.show, options.settings.side);
   }
   /** The light temperature changed (a host, or the panel itself): the panel shows it. */
   setLightTemperature(temperature: number | null): void {
