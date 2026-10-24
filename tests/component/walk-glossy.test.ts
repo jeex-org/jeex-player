@@ -32,7 +32,7 @@ const LIVING = '01a15f1b-dbbd-7634-b8b8-af9c8008284d';
 /** Mesh names of the living room's floor (the shell names its floor meshes after the room). */
 const LIVING_FLOOR = /^floor-01a15f1b-dbbd-7634/;
 /** The ceiling of the living room at the walk start, metered without the white balance (scene linear, R/B). */
-const CEILING_RB_MEASURED = 2.09;
+const CEILING_RB_MEASURED = 2.086;
 /**
  * Where the 2D footprint placement put the living probe before the
  * clearance: beside the floor lamp's shade. Only the «before» reading uses it.
@@ -66,6 +66,10 @@ type Internals = {
   volumes: { boxes: RoomBox[]; probes: RoomProbe[] };
   refresh: WalkLighting['refresh'];
 };
+
+/** Window glass: a transmissive material (the opening builder names no pane). */
+const isGlass = (mesh: THREE.Mesh): boolean =>
+  ([mesh.material].flat() as THREE.MeshPhysicalMaterial[]).some((material) => (material.transmission ?? 0) > 0.5);
 
 const luminance = (r: number, g: number, b: number): number => 0.2126 * r + 0.7152 * g + 0.0722 * b;
 const times = (m: Mat3, c: Rgb): Rgb =>
@@ -293,7 +297,7 @@ describe.skipIf(!HARDWARE)(`walk gloss and white balance in the demo living room
     let pane: { mesh: THREE.Mesh; box: THREE.Box3; area: number } | null = null;
     lighting.scene.traverse((object) => {
       const mesh = object as THREE.Mesh;
-      if (!mesh.isMesh || !/glass|pane/i.test(mesh.name)) return;
+      if (!mesh.isMesh || !isGlass(mesh)) return;
       const box = new THREE.Box3().setFromObject(mesh);
       const size = box.getSize(new THREE.Vector3());
       const area = Math.max(size.x, size.z) * size.y;
@@ -349,22 +353,27 @@ describe.skipIf(!HARDWARE)(`walk gloss and white balance in the demo living room
     view.position.copy(start.position);
     view.quaternion.copy(start.quaternion);
     view.updateMatrixWorld();
+    // The living walls count only where their finish is neutral (the demo's default is sand, so none do).
     const neutralWall = (mesh: THREE.Mesh): boolean => {
       const material = [mesh.material].flat()[0] as THREE.MeshStandardMaterial;
       const c = material.color;
       return (
-        mesh.name.startsWith('wall') &&
+        mesh.userData['surface'] === 'wall' &&
+        mesh.userData['roomId'] === LIVING &&
         c !== undefined &&
         Math.max(c.r, c.g, c.b) > 0.5 &&
         Math.max(c.r, c.g, c.b) - Math.min(c.r, c.g, c.b) < 0.08 * Math.max(c.r, c.g, c.b)
       );
     };
     // The most saturated furniture finish in view.
+    const frustum = new THREE.Frustum().setFromProjectionMatrix(
+      new THREE.Matrix4().multiplyMatrices(view.projectionMatrix, view.matrixWorldInverse),
+    );
     let furniture: THREE.Mesh | null = null;
     let best = 0;
     lighting.scene.traverse((object) => {
       const mesh = object as THREE.Mesh;
-      if (!mesh.isMesh) return;
+      if (!mesh.isMesh || !mesh.visible || !frustum.intersectsObject(mesh)) return;
       let owner: THREE.Object3D | null = mesh;
       while (owner && owner.userData['assetId'] === undefined) owner = owner.parent;
       if (!owner) return;
@@ -377,7 +386,7 @@ describe.skipIf(!HARDWARE)(`walk gloss and white balance in the demo living room
       }
     });
     const classes = mask(view, (mesh) =>
-      mesh.name.startsWith('ceiling-') ? 0 : neutralWall(mesh) ? 1 : mesh === furniture ? 2 : /glass|pane/i.test(mesh.name) ? 3 : null,
+      mesh.name === `ceiling-${LIVING}` ? 0 : neutralWall(mesh) ? 1 : mesh === furniture ? 2 : isGlass(mesh) ? 3 : null,
     );
     const pixels = linearShot(view);
     const sums = [0, 1, 2, 3].map(() => [0, 0, 0, 0]);
