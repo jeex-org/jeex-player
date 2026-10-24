@@ -1,7 +1,8 @@
 /**
  * Applies a light bake to a loaded shell, as one transaction.
  *
- * Each binding names one mesh by its entity id (`Object3D.name`). A clone is
+ * Each binding names one mesh by its entity id (`Object3D.name`, or the
+ * shell file's name for it when the shell was adopted). A clone is
  * made even for a material no other mesh uses, so a material the shell
  * shares with furniture is never marked. Before
  * anything changes, every binding must resolve to exactly one single-material
@@ -138,12 +139,19 @@ function bakedClone(source: THREE.MeshStandardMaterial, texture: THREE.Texture, 
 /**
  * Binds `bake` onto the shell under `root` with its loaded page textures
  * (`textures[i]` for page `i`); throws a `LightBakeError` and changes nothing
- * when any binding does not fit.
+ * when any binding does not fit. A binding names its mesh by `Object3D.name`
+ * under `root`, or, when `named` is given (an adopted shell file,
+ * `shell-adopt.ts`), by the file's name for it.
  */
-export function bindLightBake(root: THREE.Object3D, bake: LightBake, textures: readonly THREE.Texture[]): BoundLightBake {
+export function bindLightBake(
+  root: THREE.Object3D,
+  bake: LightBake,
+  textures: readonly THREE.Texture[],
+  named?: ReadonlyMap<string, THREE.Object3D>,
+): BoundLightBake {
   if (textures.length !== bake.pages.length)
     throw new LightBakeError('binding', `light bake: ${String(textures.length)} textures for ${String(bake.pages.length)} pages`);
-  const index = byName(root);
+  const index = named ? new Map([...named].map(([name, object]) => [name, [object]])) : byName(root);
   const resolved = bake.bindings.map((binding) => ({ binding, mesh: resolveMesh(index, binding, bake.pages[binding.page]!) }));
   const transmits = (mesh: THREE.Mesh): boolean => ((mesh.material as Partial<THREE.MeshPhysicalMaterial>).transmission ?? 0) > 0;
   const transmissive = resolved.filter(({ mesh }) => transmits(mesh)).map(({ binding }) => binding.node);

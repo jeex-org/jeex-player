@@ -3,7 +3,8 @@
  * atlas pages, judged in that order so nothing is uploaded for a bake that
  * does not fit.
  *
- * The sidecar is judged first; the shell's bytes must hash (SHA-256) to the
+ * The sidecar is judged first, and a caller's `checkSidecar` runs on it before
+ * the shell file is fetched; the shell's bytes must hash (SHA-256) to the
  * sidecar's `shellHash`, since a bake applied to any other shell would light
  * the wrong surfaces; only then are the pages fetched and decoded. Level files
  * are resolved next to the sidecar.
@@ -31,8 +32,26 @@ export async function sha256Of(bytes: ArrayBuffer): Promise<string> {
   return `sha256:${Array.from(digest, (byte) => byte.toString(16).padStart(2, '0')).join('')}`;
 }
 
+/**
+ * A further check of the judged sidecar and the verified shell bytes, run
+ * before any page is fetched; it throws a `LightBakeError` to refuse.
+ */
+export type ShellCheck = (bake: LightBake, shell: ArrayBuffer) => Promise<void>;
+
+/** The caller's further checks; each throws a `LightBakeError` to refuse. */
+export type LoadChecks = {
+  /** Runs on the judged sidecar before the shell file is fetched. */
+  readonly checkSidecar?: (bake: LightBake) => void;
+  readonly checkShell?: ShellCheck;
+};
+
 /** Loads the bake whose sidecar is `sidecarUrl` for the shell at `shellUrl`. */
-export async function loadLightBake(sidecarUrl: URL, shellUrl: URL, fetchBytes: FetchBytes = fetchBlob): Promise<LoadedLightBake> {
+export async function loadLightBake(
+  sidecarUrl: URL,
+  shellUrl: URL,
+  fetchBytes: FetchBytes = fetchBlob,
+  checks: LoadChecks = {},
+): Promise<LoadedLightBake> {
   let document: unknown;
   try {
     document = JSON.parse(await (await fetchBytes(sidecarUrl)).text());
@@ -42,6 +61,7 @@ export async function loadLightBake(sidecarUrl: URL, shellUrl: URL, fetchBytes: 
   const verdict = judgeLightBake(document);
   if (!verdict.ok) throw new LightBakeError('sidecar', verdict.message);
   const bake = verdict.value;
+  checks.checkSidecar?.(bake);
 
   let shell: ArrayBuffer;
   let hash: string;
@@ -55,6 +75,7 @@ export async function loadLightBake(sidecarUrl: URL, shellUrl: URL, fetchBytes: 
     throw new LightBakeError('shell', `light bake ${bake.bakeId} was made for another shell`, {
       detail: { expected: bake.shellHash, actual: hash },
     });
+  await checks.checkShell?.(bake, shell);
 
   const pages: LightmapPage[] = [];
   const dispose = (): void => {

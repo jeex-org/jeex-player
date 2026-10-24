@@ -6,7 +6,9 @@
  * into UV1 of the shell's meshes and stored as atlas pages. The sidecar binds
  * the bake to its input and tells the player how to read it:
  * - `bakeId` (UUID v7, minted by the bake), `sceneId`, `contentHash` (the
- *   bake's input) and `shellHash` (the shell GLB the bake was made for);
+ *   bake's input), `shellHash` (the shell GLB the bake was made for) and,
+ *   for an apartment, `shellInputsHash` (the scene inputs that shell was
+ *   built from, `shell-inputs.ts`; a calibration room has no scene);
  * - `sun` (the direction light travels, glTF frame +Y up, unit; linear
  *   Rec.709 colour; irradiance in W/m²): the sun the bake left out of its
  *   direct term, which the player keeps live;
@@ -89,6 +91,7 @@ export const lightBakeSchema = z
     sceneId: uuid,
     contentHash: hash,
     shellHash: hash,
+    shellInputsHash: z.optional(hash),
     baker: z.optional(z.looseObject({})),
     sun: z.strictObject({
       direction: vec3.check(z.refine((v) => Math.abs(Math.hypot(...v) - 1) <= 1e-3, { error: 'must be a unit vector' })),

@@ -196,10 +196,14 @@ function cylinder(radius: number, height: number, material: THREE.Material, x: n
   return mesh;
 }
 
+/** An opening part material's light bake facts (finish id, glazing); kept off userData because `exportGlb` writes userData into its file. */
+export const openingMaterialFacts = new WeakMap<THREE.Material, { readonly finish?: string; readonly glass?: true }>();
+
 /** Material for a variant's finish id, remembered so the group can dispose it. */
 function variantMaterial(finishId: string, materials: THREE.Material[]): THREE.MeshStandardMaterial {
   const finish = findFinish(finishId) ?? findFinish('white')!;
   const material = finishMaterial(finish, 1, 1);
+  openingMaterialFacts.set(material, { finish: finish.id });
   materials.push(material);
   return material;
 }
@@ -215,6 +219,8 @@ function glassMaterial(variant: OpeningVariant, materials: THREE.Material[]): TH
     depthWrite: false,
     side: THREE.DoubleSide,
   });
+  // Glazing passes sky and sun in a light bake and is never lightmapped (`lightmap/shell-contract.ts`).
+  openingMaterialFacts.set(material, { glass: true });
   materials.push(material);
   return material;
 }
