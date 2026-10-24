@@ -81,7 +81,11 @@ export const WALK_LIGHTING_TUNING = Object.freeze({
    * is kept and a term under it passes unchanged. At the walk exposure the
    * catalogue's shade glows read 0.79-6.66 and blew out against PBR Neutral's
    * knee (0.76); the shade's lit part adds to this, so the cap sits below it.
-   * Chosen by measurement (`tests/component/lamp-shade-emissive.test.ts`).
+   * Measured 2026-10-24 on an NVIDIA GPU with the demo floor lamp
+   * (`tests/component/lamp-shade-emissive.test.ts`), the shade's mean
+   * brightest channel and its luminance over the unlit shade: ivory 0.667 and
+   * 1.63, opal 0.677 and 1.63, warm lamp 0.716 and 1.50, ink 0.306 and 6.97;
+   * every shade at or under 0.76 and at least 1.25 times its unlit self.
    */
   walkEmissiveCap: 0.3,
   /** Quiet time after the last edit in walk before the affected rooms are refreshed, milliseconds. */
