@@ -4,7 +4,9 @@
  * operation appliers can resolve a finish id without importing `three`.
  *
  * Every bank row is addressed by its fixed UUID literal (`FINISH` in
- * `finish-ids.ts`); its readable name is its display-only `slug`.
+ * `finish-ids.ts`); its readable name is its display-only `slug`. A bound
+ * row's maps, tint and tile live in the generated built-in table, which this
+ * module does not import: the scene-operation entry reads only ids and names.
  *
  * Invariant: floor and wall finish ids are disjoint, which is what lets
  * `finishKind` route a `set_material` on a room to its floor or to its walls.
@@ -16,9 +18,11 @@ import type { FinishGenerator, ProjectMaterial } from './finish-types.js';
 export type FinishKind = 'planks' | 'chevron' | 'terrazzo' | 'tiles' | 'plaster' | 'stripes';
 
 /**
- * A swapable surface finish. Floor finishes map to procedural textures sized by
- * `tile` (world metres one texture tile covers); wall finishes are plaster
- * paints baked into a subtly noisy texture.
+ * A swapable surface finish. A bundled row bound to a library material
+ * (`builtin-library.ts`) is DRAWN as that material, and its `base` is the
+ * material's first-frame colour; the other fields are what the legacy
+ * generators draw a kept row, or a scene without the table, with: `tile`
+ * (world metres one texture tile covers), the kind's pattern, roughness.
  */
 export type Finish = {
   /** UUID v7 of the finish: a bank literal, or a project material's own id. */
@@ -71,21 +75,21 @@ type BankFinish = Finish & { slug: string };
 export const DEFAULT_FLOOR_FINISH = FINISH.oak;
 
 export const FLOOR_FINISHES: BankFinish[] = [
-  { id: FINISH.oak, slug: 'oak', name: 'Natural oak', kind: 'planks', base: '#b5855a', roughness: 0.54, tile: 3.2, bump: 0.035, seed: 1 },
+  { id: FINISH.oak, slug: 'oak', name: 'Natural oak', kind: 'planks', base: '#83654c', roughness: 0.54, tile: 3.2, bump: 0.035, seed: 1 },
   {
     id: FINISH.walnut,
     slug: 'walnut',
     name: 'Dark walnut',
     kind: 'planks',
-    base: '#6e4a30',
+    base: '#745224',
     roughness: 0.5,
     tile: 3.2,
     bump: 0.035,
     seed: 2,
   },
-  { id: FINISH.ash, slug: 'ash', name: 'Bleached ash', kind: 'planks', base: '#d8c6a9', roughness: 0.6, tile: 3.2, bump: 0.03, seed: 3 },
-  { id: FINISH.teak, slug: 'teak', name: 'Honey teak', kind: 'planks', base: '#a0673f', roughness: 0.52, tile: 3.2, bump: 0.035, seed: 4 },
-  { id: FINISH.chevron, slug: 'chevron', name: 'Chevron parquet', kind: 'chevron', base: '#a97b4e', roughness: 0.48, tile: 2.4, seed: 5 },
+  { id: FINISH.ash, slug: 'ash', name: 'Bleached ash', kind: 'planks', base: '#e1c59c', roughness: 0.6, tile: 3.2, bump: 0.03, seed: 3 },
+  { id: FINISH.teak, slug: 'teak', name: 'Honey teak', kind: 'planks', base: '#ab8256', roughness: 0.52, tile: 3.2, bump: 0.035, seed: 4 },
+  { id: FINISH.chevron, slug: 'chevron', name: 'Chevron parquet', kind: 'chevron', base: '#917258', roughness: 0.48, tile: 2.4, seed: 5 },
   { id: FINISH.terrazzo, slug: 'terrazzo', name: 'Sage terrazzo', kind: 'terrazzo', base: '#a7b5a6', roughness: 0.62, tile: 2.4, seed: 6 },
   {
     id: FINISH.stone,
@@ -132,10 +136,10 @@ export const FLOOR_FINISHES: BankFinish[] = [
 ];
 
 export const WALL_FINISHES: BankFinish[] = [
-  { id: FINISH.sand, slug: 'sand', name: 'Warm sand', kind: 'plaster', base: '#b0a294', roughness: 0.85, tile: 2.4, seed: 11 },
-  { id: FINISH.white, slug: 'white', name: 'Cotton white', kind: 'plaster', base: '#eae4d6', roughness: 0.85, tile: 2.4, seed: 12 },
-  { id: FINISH.sage, slug: 'sage', name: 'Sage green', kind: 'plaster', base: '#a8b5a4', roughness: 0.85, tile: 2.4, seed: 13 },
-  { id: FINISH.terra, slug: 'terra', name: 'Terracotta', kind: 'plaster', base: '#c08a70', roughness: 0.85, tile: 2.4, seed: 14 },
+  { id: FINISH.sand, slug: 'sand', name: 'Warm sand', kind: 'plaster', base: '#b1a395', roughness: 0.85, tile: 2.4, seed: 11 },
+  { id: FINISH.white, slug: 'white', name: 'Cotton white', kind: 'plaster', base: '#ebe5d7', roughness: 0.85, tile: 2.4, seed: 12 },
+  { id: FINISH.sage, slug: 'sage', name: 'Sage green', kind: 'plaster', base: '#a9b6a5', roughness: 0.85, tile: 2.4, seed: 13 },
+  { id: FINISH.terra, slug: 'terra', name: 'Terracotta', kind: 'plaster', base: '#c18b70', roughness: 0.85, tile: 2.4, seed: 14 },
   { id: FINISH.graphite, slug: 'graphite', name: 'Graphite', kind: 'plaster', base: '#6a6862', roughness: 0.85, tile: 2.4, seed: 15 },
   {
     id: FINISH.wallpaper_cream,

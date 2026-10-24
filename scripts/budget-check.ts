@@ -35,8 +35,12 @@
  */
 
 import { gzipSync } from 'node:zlib';
-import { readdirSync, readFileSync, statSync } from 'node:fs';
-import { join } from 'node:path';
+import { existsSync, readdirSync, readFileSync, statSync } from 'node:fs';
+import { join, relative } from 'node:path';
+import { MAX_PROJECT_TEXTURE_BYTES, MAX_TEXTURE_FILE_BYTES } from '../src/shared/limits.ts';
+import { FINISH_MAPS_DIR, listedMaps } from './finish-maps-fetch.ts';
+import { indexedFiles } from './finish-maps-plugin.ts';
+import { finishMapsIndexSchema } from './finish-maps-index.schema.ts';
 
 /** Hard limit for the shipped JavaScript, gzip bytes (700 KB incl. Three.js). */
 export const BUDGET_FAIL_BYTES = 700 * 1024;
@@ -180,6 +184,58 @@ export const LAZY_LIMITS: Readonly<Record<string, number>> = {
 export const LAZY_WASM_LIMITS: Readonly<Record<string, number>> = { 'lazy-jeex-viewer-basis-transcoder-': 248_951 + 1024 };
 
 /** How the sizes are judged: as one download, or as alternatives. */
+/**
+ * Hard limit for the bundled finishes' maps a build ships in `finish-maps/`,
+ * bytes on disk (WebP does not gzip). Set from the measured folder plus 5 %:
+ * 5,821,304 bytes of maps for six library versions (five floor scans and the
+ * wall and ceiling plaster) at 256, 512 and 768 px, measured 2026-10-24 right
+ * after `scripts/finish-maps-fetch.ts`, plus `SOURCES.md`. Most of it is the
+ * ARM packs, which the library ships lossless. A re-fetch that binds more
+ * finishes re-measures and updates this comment; never raise it from memory.
+ */
+export const FINISH_MAPS_BUDGET_BYTES = Math.round(5_821_304 * 1.05);
+
+/** Every file under `dir`, recursively, with its size. */
+function filesUnder(dir: string): { path: string; bytes: number }[] {
+  const out: { path: string; bytes: number }[] = [];
+  for (const name of readdirSync(dir)) {
+    const path = join(dir, name);
+    const stat = statSync(path);
+    if (stat.isDirectory()) out.push(...filesUnder(path));
+    else out.push({ path, bytes: stat.size });
+  }
+  return out;
+}
+
+/**
+ * The `finish-maps/` folder of the build in `dir` against the shipped index:
+ * every listed map present, the total under `FINISH_MAPS_BUDGET_BYTES`, no
+ * file over `MAX_TEXTURE_FILE_BYTES`, and every map at its largest size
+ * together under `MAX_PROJECT_TEXTURE_BYTES`, the count the viewer's
+ * built-in source never resets. One message per failure.
+ */
+export function checkFinishMaps(dir: string, shipped: string = FINISH_MAPS_DIR): string[] {
+  const folder = join(dir, 'finish-maps');
+  if (!existsSync(folder)) return [`${folder} is missing: the build ships no bundled finish maps`];
+  const failures: string[] = [];
+  for (const path of indexedFiles(shipped))
+    if (!existsSync(join(folder, path))) failures.push(`finish-maps/${path} is missing from the build`);
+  const files = filesUnder(folder);
+  const total = files.reduce((sum, file) => sum + file.bytes, 0);
+  if (total > FINISH_MAPS_BUDGET_BYTES) failures.push(`finish-maps/ is ${total} bytes, over its ${FINISH_MAPS_BUDGET_BYTES} budget`);
+  for (const file of files) {
+    if (file.bytes > MAX_TEXTURE_FILE_BYTES)
+      failures.push(`${relative(dir, file.path)} is ${file.bytes} bytes, over MAX_TEXTURE_FILE_BYTES`);
+  }
+  const index = finishMapsIndexSchema.parse(JSON.parse(readFileSync(join(shipped, 'index.json'), 'utf8')));
+  const largest = index.versions.reduce(
+    (sum, version) => sum + listedMaps(version).reduce((inner, [, map]) => inner + map.files['768'].bytes, 0),
+    0,
+  );
+  if (largest > MAX_PROJECT_TEXTURE_BYTES) failures.push(`every bundled map at 768 px is ${largest} bytes, over MAX_PROJECT_TEXTURE_BYTES`);
+  return failures;
+}
+
 export type BudgetMode = 'total' | 'per-file';
 
 /** The hard limit that applies to one built BOOT file, addressed by its name. */
@@ -374,6 +430,7 @@ if (import.meta.main) {
   const mode: BudgetMode = args.includes('--per-file') ? 'per-file' : 'total';
   const dir = args.find((arg) => !arg.startsWith('--')) ?? 'dist/assets';
   const report = checkBudget(dir, mode);
+  report.failures.push(...checkFinishMaps(dir));
 
   console.log(`boot: ${formatBytes(report.boot.gzip)} gzip across ${report.boot.files.length} file(s) (${mode})`);
   for (const name of report.boot.files) console.log(`    ${name}`);

@@ -45,7 +45,7 @@ describe('finish catalogue', () => {
 
   test('the current wall colour matches a wall finish', () => {
     expect(WALL_FINISHES.some((finish) => finish.id === FINISH.sand)).toBe(true);
-    expect(findFinish(FINISH.sand)!.base).toBe('#b0a294');
+    expect(findFinish(FINISH.sand)!.base).toBe('#b1a395');
   });
 
   test('applyFinishToMaterial falls back to flat colour without a DOM canvas', () => {

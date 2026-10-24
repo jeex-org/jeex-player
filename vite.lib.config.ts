@@ -45,6 +45,7 @@ import { fileURLToPath } from 'node:url';
 import { CSS_TARGET } from './vite.css-target.ts';
 import { readPackageVersion } from './scripts/config-input.ts';
 import { basisTranscoder } from './scripts/basis-transcoder-plugin.ts';
+import { finishMaps } from './scripts/finish-maps-plugin.ts';
 import { defineConfig, type LibraryFormats, type Plugin, type UserConfig } from 'vite';
 
 /** Global the `iife` bundle of the whole viewer publishes itself as. */
@@ -150,15 +151,15 @@ const PASSES: Record<string, Pass> = {
     },
     formats: ['es'],
     empty: true,
-    plugins: [emitViewerCss(), emitFramePage(), basisTranscoder()],
+    plugins: [emitViewerCss(), emitFramePage(), basisTranscoder(), finishMaps()],
   },
   iife: {
     entry: { 'jeex-viewer': from('src/embed/iife-entry.ts') },
     formats: ['iife'],
     name: VIEWER_GLOBAL,
     empty: false,
-    // The same pair the `es` pass wrote (same bytes, same names): the IIFE finds it beside itself.
-    plugins: [basisTranscoder()],
+    // The same files the `es` pass wrote (same bytes, same names): the IIFE finds them beside itself.
+    plugins: [basisTranscoder(), finishMaps()],
   },
   host: {
     entry: { 'jeex-viewer-host': from('src/embed/host.ts') },

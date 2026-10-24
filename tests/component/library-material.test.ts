@@ -19,6 +19,9 @@ import { TextureSource } from '../../src/materials/texture-source.js';
 import type { LibraryDraw } from '../../src/materials/room-finish.js';
 import type { LibraryMapRole, LibraryMaterial, LibraryPbr } from '../../src/materials/finish-types.js';
 import { createLogger } from '../../src/shared/logger.js';
+import { BUILTIN_FINISHES } from '../../src/materials/builtin-library.js';
+import { builtinFolder } from '../../src/materials/builtin-folder.js';
+import { FINISH } from '../../src/materials/finish-ids.js';
 
 const SIZE = 64;
 const VERSION = '01a167f6-0409-7047-b2b7-9297ca140b6a';
@@ -341,5 +344,31 @@ describe('KTX2 library maps on a real context', () => {
       return mean(render(built, 1, 1, [light]), 0);
     };
     expect(await lit(1)).toBeGreaterThan((await lit(-1)) + 0.1);
+  });
+});
+
+describe('the bundled finishes’ maps beside the player', () => {
+  test('the folder next to the player file answers a shipped map, which decodes at its listed size, and refuses an unlisted one', async () => {
+    const oak = BUILTIN_FINISHES.get(FINISH.oak)!.material;
+    const warnings: string[] = [];
+    const source = new TextureSource({
+      baseUrl: builtinFolder(),
+      log: createLogger((entry) => void warnings.push(entry.code)),
+      maxAnisotropy: 1,
+    });
+    sources.push(source);
+    const owner = {};
+    const view = await source.acquire(
+      { versionId: oak.versionId, role: 'albedo', size: '256', path: oak.maps.albedo!.files['256']! },
+      owner,
+    );
+    expect(view).not.toBeNull();
+    expect((view!.image as { width: number }).width).toBe(256);
+    const missing = await source.acquire(
+      { versionId: oak.versionId, role: 'albedo', size: '128', path: `tex/${oak.versionId}/albedo.128.webp` },
+      owner,
+    );
+    expect(missing).toBeNull();
+    expect(warnings).toEqual(['texture-fetch']);
   });
 });

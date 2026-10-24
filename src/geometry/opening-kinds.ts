@@ -25,6 +25,7 @@
 import * as THREE from 'three';
 import type { BuilderContext } from './builder-context.js';
 import { finishMaterial, findFinish } from '../materials/finishes.js';
+import { FINISH } from '../materials/finish-ids.js';
 import type { ArcDef } from '../plan/plan-geometry.js';
 import { EPS } from '../plan/plan-geometry.js';
 import { leafPanelRects, paneLayout } from '../plan/opening-geometry.js';
@@ -201,7 +202,7 @@ export const openingMaterialFacts = new WeakMap<THREE.Material, { readonly finis
 
 /** Material for a variant's finish id, remembered so the group can dispose it. */
 function variantMaterial(finishId: string, materials: THREE.Material[]): THREE.MeshStandardMaterial {
-  const finish = findFinish(finishId) ?? findFinish('white')!;
+  const finish = findFinish(finishId) ?? findFinish(FINISH.white)!;
   const material = finishMaterial(finish, 1, 1);
   openingMaterialFacts.set(material, { finish: finish.id });
   materials.push(material);

@@ -15,7 +15,10 @@ import { solvePlan } from '../plan/plan-solver.js';
 import { lShapePlan } from '../fixtures/plan-l-shape.js';
 import { L_SHAPE } from '../fixtures/plan-l-shape-ids.js';
 import { effectiveOpening } from '../plan/plan-openings.js';
-import { OPENING_BUILDERS } from './opening-kinds.js';
+import { OPENING_BUILDERS, openingMaterialFacts } from './opening-kinds.js';
+import { createBuilderContext } from './builder-context.js';
+import { defaultOpeningVariant } from '../assets/opening-variants.js';
+import { FINISH } from '../materials/finish-ids.js';
 import type { Opening, OpeningType, SceneData } from '../scene/types.js';
 
 /** Every `OpeningType`, as a value. A new member of the union breaks this line. */
@@ -149,5 +152,24 @@ describe('windows', () => {
     // number that shows the builder used the shared projection and not a
     // default of its own.
     expect(entry.center.y).toBeCloseTo((expected.sill + expected.head) / 2, 10);
+  });
+});
+
+describe('an opening variant whose finish is unknown', () => {
+  test('draws the white fallback without throwing', () => {
+    const wall = lShapePlan.walls.find((candidate) => candidate.openings?.some((opening) => opening.id === L_SHAPE.opening.doorAb))!;
+    const opening = wall.openings!.find((candidate) => candidate.id === L_SHAPE.opening.doorAb)!;
+    const standard = defaultOpeningVariant('door', false);
+    const variant = { ...standard, frame: { ...standard.frame, material: '01a167f6-040a-72e4-9504-fef48f8fd18d' } };
+    const built = OPENING_BUILDERS.door.build({
+      builder: createBuilderContext(lShapePlan, solvePlan(lShapePlan)),
+      wall,
+      opening,
+      placement: { point: { x: 0, z: 0 }, angleY: 0, normal: { x: 0, z: 1 }, sill: opening.sill ?? 0, head: opening.head ?? 2.1 },
+      variant,
+      handleMaterial: new THREE.MeshStandardMaterial(),
+    });
+    const finishes = built.materials.map((material) => openingMaterialFacts.get(material)?.finish);
+    expect(finishes).toContain(FINISH.white);
   });
 });
