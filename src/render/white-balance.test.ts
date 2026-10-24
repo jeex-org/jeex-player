@@ -2,7 +2,8 @@ import { describe, expect, test } from 'bun:test';
 import { whiteBalanceMatrix, type Mat3, type Rgb } from './white-balance.js';
 
 const Y: Rgb = [0.2126, 0.7152, 0.0722];
-const apply = (m: Mat3, c: Rgb): Rgb => [0, 1, 2].map((r) => m[r * 3]! * c[0] + m[r * 3 + 1]! * c[1] + m[r * 3 + 2]! * c[2]) as unknown as Rgb;
+const apply = (m: Mat3, c: Rgb): Rgb =>
+  [0, 1, 2].map((r) => m[r * 3]! * c[0] + m[r * 3 + 1]! * c[1] + m[r * 3 + 2]! * c[2]) as unknown as Rgb;
 const luminance = (c: Rgb): number => Y[0] * c[0] + Y[1] * c[1] + Y[2] * c[2];
 const IDENTITY: Mat3 = [1, 0, 0, 0, 1, 0, 0, 0, 1];
 

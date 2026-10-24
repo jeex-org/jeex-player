@@ -7,11 +7,7 @@ type Box3D = { minX: number; maxX: number; minY: number; maxY: number; minZ: num
 
 /** Euclidean distance from a point to a box, zero inside it. */
 const boxDistance = (p: { x: number; y: number; z: number }, b: Box3D): number =>
-  Math.hypot(
-    Math.max(b.minX - p.x, 0, p.x - b.maxX),
-    Math.max(b.minY - p.y, 0, p.y - b.maxY),
-    Math.max(b.minZ - p.z, 0, p.z - b.maxZ),
-  );
+  Math.hypot(Math.max(b.minX - p.x, 0, p.x - b.maxX), Math.max(b.minY - p.y, 0, p.y - b.maxY), Math.max(b.minZ - p.z, 0, p.z - b.maxZ));
 
 /** Distance from a plan point to the nearest edge of an axis-aligned rectangular room. */
 const rectEdge = (p: { x: number; z: number }, x0: number, z0: number, x1: number, z1: number): number =>
@@ -102,7 +98,7 @@ describe('probePoint keeps a 3D clearance from furniture', () => {
     expect(boxDistance(point, lamp)).toBeGreaterThanOrEqual(T.probeClearanceM);
   });
 
-  test('a sofa 0.8 m high does not move the probe off the empty room\'s point', () => {
+  test("a sofa 0.8 m high does not move the probe off the empty room's point", () => {
     const sofa: Box3D = { minX: 1, maxX: 3, minY: 0, maxY: 0.8, minZ: 0.5, maxZ: 1.5 };
     expect(probePoint(square(0, 0, 4, 2), [sofa])).toEqual(probePoint(square(0, 0, 4, 2), []));
   });
@@ -110,9 +106,10 @@ describe('probePoint keeps a 3D clearance from furniture', () => {
   test('without a qualifying point, the largest min(furniture clearance, edge distance) wins', () => {
     const column: Box3D = { minX: 0.3, maxX: 0.9, minY: 0, maxY: 2.6, minZ: 0.3, maxZ: 0.9 };
     const point = probePoint(square(0, 0, 1.2, 1.2), [column]);
-    const key = (p: { x: number; z: number }) => Math.min(boxDistance({ x: p.x, y: T.probeHeightM, z: p.z }, column), rectEdge(p, 0, 0, 1.2, 1.2));
+    const key = (p: { x: number; z: number }) =>
+      Math.min(boxDistance({ x: p.x, y: T.probeHeightM, z: p.z }, column), rectEdge(p, 0, 0, 1.2, 1.2));
     expect(key(point)).toBeLessThan(T.probeClearanceM);
-    const best = Math.max(...searchLattice(0, 1.2, 0, 1.2, 0.1).map(key));
+    const best = Math.max(...searchLattice(0, 1.2, 0, 1.2, 0.1).map((p) => key(p)));
     expect(key(point)).toBeCloseTo(best, 9);
   });
 

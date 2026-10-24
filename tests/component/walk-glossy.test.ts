@@ -68,7 +68,8 @@ type Internals = {
 };
 
 const luminance = (r: number, g: number, b: number): number => 0.2126 * r + 0.7152 * g + 0.0722 * b;
-const times = (m: Mat3, c: Rgb): Rgb => [0, 1, 2].map((r) => Math.max(0, m[r * 3]! * c[0] + m[r * 3 + 1]! * c[1] + m[r * 3 + 2]! * c[2])) as unknown as Rgb;
+const times = (m: Mat3, c: Rgb): Rgb =>
+  [0, 1, 2].map((r) => Math.max(0, m[r * 3]! * c[0] + m[r * 3 + 1]! * c[1] + m[r * 3 + 2]! * c[2])) as unknown as Rgb;
 
 describe.skipIf(!HARDWARE)(`walk gloss and white balance in the demo living room (${RENDERER})`, { timeout: MOUNT_TIMEOUT_MS }, () => {
   let handle: ViewerHandle;
@@ -76,13 +77,13 @@ describe.skipIf(!HARDWARE)(`walk gloss and white balance in the demo living room
   let walkStart: { position: THREE.Vector3; quaternion: THREE.Quaternion; fov: number } | null = null;
 
   /** The live scene rendered from `camera` into a float target: scene-linear RGBA, rows from the bottom. */
-  function linearShot(camera: THREE.Camera): Float32Array {
+  function linearShot(view: THREE.Camera): Float32Array {
     const { renderer, scene } = lighting;
     const target = new THREE.WebGLRenderTarget(SIZE.w, SIZE.h, { type: THREE.FloatType });
     const previous = renderer.getRenderTarget();
     try {
       renderer.setRenderTarget(target);
-      renderer.render(scene, camera);
+      renderer.render(scene, view);
       const pixels = new Float32Array(SIZE.w * SIZE.h * 4);
       renderer.readRenderTargetPixels(target, 0, 0, SIZE.w, SIZE.h, pixels);
       return pixels;
@@ -93,10 +94,18 @@ describe.skipIf(!HARDWARE)(`walk gloss and white balance in the demo living room
   }
 
   /** Which class each pixel belongs to: `classify` names a class per mesh (or `null`); answers class indices, -1 for none. */
-  function mask(camera: THREE.Camera, classify: (mesh: THREE.Mesh) => number | null): Int8Array {
+  function mask(view: THREE.Camera, classify: (mesh: THREE.Mesh) => number | null): Int8Array {
     const { scene } = lighting;
     const swapped = new Map<THREE.Mesh, THREE.Material | THREE.Material[]>();
-    const palette = [0, 1, 2, 3].map((i) => new THREE.MeshBasicMaterial({ color: new THREE.Color().setRGB(i + 1, 0, 0), toneMapped: false, fog: false, side: THREE.DoubleSide }));
+    const palette = [0, 1, 2, 3].map(
+      (i) =>
+        new THREE.MeshBasicMaterial({
+          color: new THREE.Color().setRGB(i + 1, 0, 0),
+          toneMapped: false,
+          fog: false,
+          side: THREE.DoubleSide,
+        }),
+    );
     const none = new THREE.MeshBasicMaterial({ color: 0x000000, toneMapped: false, fog: false, side: THREE.DoubleSide });
     const background = scene.background;
     scene.traverse((object) => {
@@ -108,7 +117,7 @@ describe.skipIf(!HARDWARE)(`walk gloss and white balance in the demo living room
     });
     scene.background = null;
     try {
-      const pixels = linearShot(camera);
+      const pixels = linearShot(view);
       const out = new Int8Array(SIZE.w * SIZE.h);
       for (let i = 0; i < out.length; i += 1) out[i] = Math.round(pixels[i * 4]!) - 1;
       return out;
@@ -119,7 +128,7 @@ describe.skipIf(!HARDWARE)(`walk gloss and white balance in the demo living room
     }
   }
 
-  function camera(position: THREE.Vector3, target: THREE.Vector3, fov = 60): THREE.PerspectiveCamera {
+  function poseCamera(position: THREE.Vector3, target: THREE.Vector3, fov = 60): THREE.PerspectiveCamera {
     const result = new THREE.PerspectiveCamera(fov, SIZE.w / SIZE.h, 0.05, 200);
     result.position.copy(position);
     result.lookAt(target);
@@ -147,7 +156,15 @@ describe.skipIf(!HARDWARE)(`walk gloss and white balance in the demo living room
           normalMap: material.normalMap,
           aoMap: material.aoMap,
         };
-        Object.assign(material, { roughness, metalness: 0, map: null, roughnessMap: null, metalnessMap: null, normalMap: null, aoMap: null });
+        Object.assign(material, {
+          roughness,
+          metalness: 0,
+          map: null,
+          roughnessMap: null,
+          metalnessMap: null,
+          normalMap: null,
+          aoMap: null,
+        });
         material.color.setRGB(0, 0, 0);
         material.needsUpdate = true;
         saved.push(() => {
@@ -169,7 +186,8 @@ describe.skipIf(!HARDWARE)(`walk gloss and white balance in the demo living room
       const floor = mask(view, (mesh) => (LIVING_FLOOR.test(mesh.name) ? 0 : null));
       const pixels = linearShot(view);
       const values: number[] = [];
-      for (let i = 0; i < floor.length; i += 1) if (floor[i] === 0) values.push(luminance(pixels[i * 4]!, pixels[i * 4 + 1]!, pixels[i * 4 + 2]!));
+      for (let i = 0; i < floor.length; i += 1)
+        if (floor[i] === 0) values.push(luminance(pixels[i * 4]!, pixels[i * 4 + 1]!, pixels[i * 4 + 2]!));
       values.sort((a, b) => a - b);
       const median = values[Math.floor(values.length / 2)]!;
       const p99 = values[Math.floor(values.length * 0.99)]!;
@@ -201,7 +219,11 @@ describe.skipIf(!HARDWARE)(`walk gloss and white balance in the demo living room
     const draw = Object.getOwnPropertyDescriptor(WalkPost.prototype, 'render')!.value as WalkPost['render'];
     vi.spyOn(WalkPost.prototype, 'render').mockImplementation(function (this: WalkPost, ...args) {
       const view = args[1] as THREE.PerspectiveCamera;
-      walkStart ??= { position: view.getWorldPosition(new THREE.Vector3()), quaternion: view.getWorldQuaternion(new THREE.Quaternion()), fov: view.fov };
+      walkStart ??= {
+        position: view.getWorldPosition(new THREE.Vector3()),
+        quaternion: view.getWorldQuaternion(new THREE.Quaternion()),
+        fov: view.fov,
+      };
       draw.apply(this, args);
     });
     handle = mountViewer(openContainer(SIZE.w, SIZE.h), {
@@ -228,12 +250,16 @@ describe.skipIf(!HARDWARE)(`walk gloss and white balance in the demo living room
   test('the living probe is clear of the floor lamp', () => {
     const probe = lighting.volumes.probes.find((p) => p.roomId === LIVING)!.position;
     let nearest = Number.POSITIVE_INFINITY;
-    const living = new Set(demoScene().assets.filter((a) => a.room === LIVING).map((a) => a.id));
+    const living = new Set(
+      demoScene()
+        .assets.filter((a) => a.room === LIVING)
+        .map((a) => a.id),
+    );
     lighting.scene.traverse((object) => {
       const id = object.userData['assetId'] as string | undefined;
       if (id === undefined || !living.has(id)) return;
       let light = false;
-      object.traverse((child) => (light ||= (child as THREE.PointLight).isPointLight === true));
+      object.traverse((child) => (light ||= (child as THREE.PointLight).isPointLight));
       if (!light) return;
       const box = new THREE.Box3().setFromObject(object);
       if (box.max.y >= 1.4) nearest = Math.min(nearest, box.distanceToPoint(new THREE.Vector3(probe.x, probe.y, probe.z)));
@@ -243,19 +269,27 @@ describe.skipIf(!HARDWARE)(`walk gloss and white balance in the demo living room
   });
 
   test('gloss by contrast: r 0.07 at least 2.5 times r 0.6 on the black living floor', () => {
-    const view = camera(POSE_GLOSS.position, POSE_GLOSS.target);
+    const view = poseCamera(POSE_GLOSS.position, POSE_GLOSS.target);
     const restore = probeAt(PROBE_BEFORE);
     const before = { r007: contrast(view, 0.07), r06: contrast(view, 0.6) };
     restore();
     const after = { r007: contrast(view, 0.07), r06: contrast(view, 0.6) };
-    record('glossContrast', { pose: { position: POSE_GLOSS.position.toArray(), target: POSE_GLOSS.target.toArray(), fov: 60, size: SIZE }, before, after });
+    record('glossContrast', {
+      pose: { position: POSE_GLOSS.position.toArray(), target: POSE_GLOSS.target.toArray(), fov: 60, size: SIZE },
+      before,
+      after,
+    });
     expect(after.r007.contrast).toBeGreaterThanOrEqual(2.5 * after.r06.contrast);
   });
 
   test('the window shows in the polished black floor in its own columns', () => {
     // The living room's largest glass pane, and a pose 3.5 m into the room facing it.
     const living = lighting.volumes.boxes.filter((b) => b.roomId === LIVING);
-    const near = (p: THREE.Vector3): boolean => living.some((b) => p.x > b.selection.min.x - 0.5 && p.x < b.selection.max.x + 0.5 && p.z > b.selection.min.z - 0.5 && p.z < b.selection.max.z + 0.5);
+    const near = (p: THREE.Vector3): boolean =>
+      living.some(
+        (b) =>
+          p.x > b.selection.min.x - 0.5 && p.x < b.selection.max.x + 0.5 && p.z > b.selection.min.z - 0.5 && p.z < b.selection.max.z + 0.5,
+      );
     let pane: { mesh: THREE.Mesh; box: THREE.Box3; area: number } | null = null;
     lighting.scene.traverse((object) => {
       const mesh = object as THREE.Mesh;
@@ -273,7 +307,7 @@ describe.skipIf(!HARDWARE)(`walk gloss and white balance in the demo living room
     if (Math.abs(inward.x) > Math.abs(inward.z)) inward.set(Math.sign(inward.x), 0, 0);
     else inward.set(0, 0, Math.sign(inward.z));
     const position = centre.clone().addScaledVector(inward, 3.5).setY(1.6);
-    const view = camera(position, centre.clone().addScaledVector(inward, 1.5).setY(0.3));
+    const view = poseCamera(position, centre.clone().addScaledVector(inward, 1.5).setY(0.3));
     const restore = blackFloor(0.07);
     try {
       const classes = mask(view, (mesh) => (mesh === glass.mesh ? 1 : LIVING_FLOOR.test(mesh.name) ? 0 : null));
@@ -295,7 +329,13 @@ describe.skipIf(!HARDWARE)(`walk gloss and white balance in the demo living room
         (x >= x0 && x <= x1 ? inside : beside).push(value);
       }
       const mean = (list: number[]): number => list.reduce((sum, v) => sum + v, 0) / Math.max(1, list.length);
-      record('windowBand', { pane: glass.mesh.name, pose: { position: position.toArray(), columns: [x0, x1] }, inside: mean(inside), beside: mean(beside), counts: [inside.length, beside.length] });
+      record('windowBand', {
+        pane: glass.mesh.name,
+        pose: { position: position.toArray(), columns: [x0, x1] },
+        inside: mean(inside),
+        beside: mean(beside),
+        counts: [inside.length, beside.length],
+      });
       expect(x1).toBeGreaterThan(x0);
       expect(mean(inside)).toBeGreaterThan(mean(beside));
     } finally {
@@ -312,7 +352,12 @@ describe.skipIf(!HARDWARE)(`walk gloss and white balance in the demo living room
     const neutralWall = (mesh: THREE.Mesh): boolean => {
       const material = [mesh.material].flat()[0] as THREE.MeshStandardMaterial;
       const c = material.color;
-      return /^wall/.test(mesh.name) && c !== undefined && Math.max(c.r, c.g, c.b) > 0.5 && Math.max(c.r, c.g, c.b) - Math.min(c.r, c.g, c.b) < 0.08 * Math.max(c.r, c.g, c.b);
+      return (
+        mesh.name.startsWith('wall') &&
+        c !== undefined &&
+        Math.max(c.r, c.g, c.b) > 0.5 &&
+        Math.max(c.r, c.g, c.b) - Math.min(c.r, c.g, c.b) < 0.08 * Math.max(c.r, c.g, c.b)
+      );
     };
     // The most saturated furniture finish in view.
     let furniture: THREE.Mesh | null = null;
@@ -331,7 +376,9 @@ describe.skipIf(!HARDWARE)(`walk gloss and white balance in the demo living room
         furniture = mesh;
       }
     });
-    const classes = mask(view, (mesh) => (/^ceiling-/.test(mesh.name) ? 0 : neutralWall(mesh) ? 1 : mesh === furniture ? 2 : /glass|pane/i.test(mesh.name) ? 3 : null));
+    const classes = mask(view, (mesh) =>
+      mesh.name.startsWith('ceiling-') ? 0 : neutralWall(mesh) ? 1 : mesh === furniture ? 2 : /glass|pane/i.test(mesh.name) ? 3 : null,
+    );
     const pixels = linearShot(view);
     const sums = [0, 1, 2, 3].map(() => [0, 0, 0, 0]);
     for (let i = 0; i < classes.length; i += 1) {

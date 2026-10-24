@@ -530,13 +530,18 @@ describe('room lighting on the demo apartment', { timeout: MOUNT_TIMEOUT_MS }, (
     await until(() => refreshed.mock.calls.length > 0, 'the refresh after the debounce', 60_000);
     spy.mockRestore();
     refreshed.mockRestore();
-    const box = lampBox();
+    const lampNow = lampBox();
     const after = internals.volumes.probes.find((p) => p.roomId === ROOM.living)!.position;
-    record('livingProbeAfterLampMove', { before: probe, after, captures: captures.map((v) => v.toArray()), lamp: [box.min.toArray(), box.max.toArray()] });
+    record('livingProbeAfterLampMove', {
+      before: probe,
+      after,
+      captures: captures.map((v) => v.toArray()),
+      lamp: [lampNow.min.toArray(), lampNow.max.toArray()],
+    });
     // Captured at the new point, clear of the lamp's new box.
-    expect(box.distanceToPoint(new THREE.Vector3(after.x, after.y, after.z))).toBeGreaterThanOrEqual(T.probeClearanceM - 1e-6);
+    expect(lampNow.distanceToPoint(new THREE.Vector3(after.x, after.y, after.z))).toBeGreaterThanOrEqual(T.probeClearanceM - 1e-6);
     expect(captures.some((at) => at.distanceTo(new THREE.Vector3(after.x, after.y, after.z)) < 1e-6)).toBe(true);
-    for (const at of captures) expect(box.distanceToPoint(at)).toBeGreaterThan(0.2);
+    for (const at of captures) expect(lampNow.distanceToPoint(at)).toBeGreaterThan(0.2);
     // Every living box projects from it.
     internals.volumes.boxes.forEach((roomBox, i) => {
       if (roomBox.roomId === ROOM.living) expect(internals.uniforms.jeexProbe.value[i]!.toArray()).toEqual([after.x, after.y, after.z]);
@@ -552,14 +557,18 @@ describe('room lighting on the demo apartment', { timeout: MOUNT_TIMEOUT_MS }, (
 
 /** The demo living room's floor lamp: the furniture item there with a point light whose bounds reach 1.4 m. */
 function livingFloorLamp(scene: THREE.Scene): THREE.Object3D {
-  const living = new Set(demoScene().assets.filter((a) => a.room === ROOM.living).map((a) => a.id));
+  const living = new Set(
+    demoScene()
+      .assets.filter((a) => a.room === ROOM.living)
+      .map((a) => a.id),
+  );
   let found: THREE.Object3D | null = null;
   scene.traverse((object) => {
     const id = object.userData['assetId'] as string | undefined;
     if (found || id === undefined || !living.has(id)) return;
-    let light = false;
-    object.traverse((child) => (light ||= (child as THREE.PointLight).isPointLight === true));
-    if (light && new THREE.Box3().setFromObject(object).max.y >= 1.4) found = object;
+    let hasLight = false;
+    object.traverse((child) => (hasLight ||= (child as THREE.PointLight).isPointLight));
+    if (hasLight && new THREE.Box3().setFromObject(object).max.y >= 1.4) found = object;
   });
   if (!found) throw new Error('no floor lamp in the demo living room');
   return found;
@@ -833,7 +842,14 @@ describe('probe placement follows furniture edits', { timeout: MOUNT_TIMEOUT_MS 
   const A: Box = { x0: 0, x1: 4, z0: 0, z1: 4 };
   const B: Box = { x0: 4, x1: 8, z0: 0, z1: 4 };
   /** A floor lamp's bounds centred at (x, z) in plan, its shade reaching the probe height. */
-  const lampAt = (x: number, z: number): FurnitureBox => ({ minX: x - 0.2, maxX: x + 0.2, minY: 0, maxY: 1.7, minZ: z - 0.2, maxZ: z + 0.2 });
+  const lampAt = (x: number, z: number): FurnitureBox => ({
+    minX: x - 0.2,
+    maxX: x + 0.2,
+    minY: 0,
+    maxY: 1.7,
+    minZ: z - 0.2,
+    maxZ: z + 0.2,
+  });
   const distance = (p: THREE.Vector3, b: FurnitureBox): number =>
     new THREE.Box3(new THREE.Vector3(b.minX, b.minY, b.minZ), new THREE.Vector3(b.maxX, b.maxY, b.maxZ)).distanceToPoint(p);
 

@@ -254,7 +254,7 @@ describe('capture.panorama', () => {
     const balanced = await shot({ postChain: async () => chain(strong) });
     identityChain.forEach((v, i) => expect(Math.abs(v - plain[i]!)).toBeLessThanOrEqual(1));
     // A strong cooling matrix: blue gains on red against the unbalanced picture.
-    expect(balanced[2]! / balanced[0]!).toBeGreaterThan((plain[2]! / plain[0]!) * 1.1);
+    expect(balanced[2] / balanced[0]).toBeGreaterThan((plain[2] / plain[0]) * 1.1);
   });
 
   test('a room the scene does not have is refused', async () => {

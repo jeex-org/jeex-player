@@ -140,7 +140,9 @@ describe('capturePanorama', () => {
     };
     const matrix = whiteBalanceMatrix([1, 0.6, 0.35], 0.8);
     const colour = [0.6, 0.3, 0.05];
-    const balanced = [0, 1, 2].map((r) => Math.max(0, matrix[r * 3]! * colour[0]! + matrix[r * 3 + 1]! * colour[1]! + matrix[r * 3 + 2]! * colour[2]!));
+    const balanced = [0, 1, 2].map((r) =>
+      Math.max(0, matrix[r * 3]! * colour[0]! + matrix[r * 3 + 1]! * colour[1]! + matrix[r * 3 + 2]! * colour[2]!),
+    );
     const spec = { width: 128, position: { x: 0, y: 0, z: 0 }, faceSize: 32 };
     const renderer = openRenderer();
     const got = centre(await decode((await capturePanorama(renderer, uniform(colour), { ...spec, whiteBalance: matrix })).blob));

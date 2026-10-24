@@ -25,7 +25,8 @@ const BRADFORD = [0.8951, 0.2664, -0.1614, -0.7502, 1.7135, 0.0367, 0.0389, -0.0
 
 function multiply(a: readonly number[], b: readonly number[]): number[] {
   const out: number[] = [];
-  for (let r = 0; r < 3; r += 1) for (let c = 0; c < 3; c += 1) out.push(a[r * 3]! * b[c]! + a[r * 3 + 1]! * b[3 + c]! + a[r * 3 + 2]! * b[6 + c]!);
+  for (let r = 0; r < 3; r += 1)
+    for (let c = 0; c < 3; c += 1) out.push(a[r * 3]! * b[c]! + a[r * 3 + 1]! * b[3 + c]! + a[r * 3 + 2]! * b[6 + c]!);
   return out;
 }
 

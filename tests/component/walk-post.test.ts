@@ -65,7 +65,12 @@ function renderer(width = WIDTH, height = HEIGHT): THREE.WebGLRenderer {
 /** The white balance that changes nothing: what comparisons with the direct path use. */
 const IDENTITY: Mat3 = [1, 0, 0, 0, 1, 0, 0, 0, 1];
 
-async function chainOn(gl: THREE.WebGLRenderer, scene: THREE.Scene, camera: THREE.Camera, whiteBalance: Mat3 = IDENTITY): Promise<WalkPost> {
+async function chainOn(
+  gl: THREE.WebGLRenderer,
+  scene: THREE.Scene,
+  camera: THREE.Camera,
+  whiteBalance: Mat3 = IDENTITY,
+): Promise<WalkPost> {
   const chain = await createWalkPost(gl, scene, camera, { whiteBalance });
   disposers.push(() => chain.dispose());
   return chain;
@@ -132,7 +137,9 @@ describe('the white balance in the output pass', () => {
   test('applies the matrix once, before the display transform, clamped at zero; adds no pass', async () => {
     const matrix = whiteBalanceMatrix([1, 0.6, 0.35], 0.8);
     const colour = [0.6, 0.3, 0.05];
-    const balanced = [0, 1, 2].map((r) => Math.max(0, matrix[r * 3]! * colour[0]! + matrix[r * 3 + 1]! * colour[1]! + matrix[r * 3 + 2]! * colour[2]!));
+    const balanced = [0, 1, 2].map((r) =>
+      Math.max(0, matrix[r * 3]! * colour[0]! + matrix[r * 3 + 1]! * colour[1]! + matrix[r * 3 + 2]! * colour[2]!),
+    );
     const gl = renderer();
     const a = patch(colour);
     const chain = await chainOn(gl, a.scene, a.camera, matrix);

@@ -77,7 +77,8 @@ export function volumeInput(model: SceneModel, root: THREE.Object3D): VolumeInpu
   const box = new THREE.Box3();
   for (const item of root.getObjectByName(FURNITURE_GROUP_NAME)?.children ?? []) {
     box.setFromObject(item);
-    if (!box.isEmpty()) furniture.push({ minX: box.min.x, maxX: box.max.x, minY: box.min.y, maxY: box.max.y, minZ: box.min.z, maxZ: box.max.z });
+    if (!box.isEmpty())
+      furniture.push({ minX: box.min.x, maxX: box.max.x, minY: box.min.y, maxY: box.max.y, minZ: box.min.z, maxZ: box.max.z });
   }
   return { rooms, ceilingHeight: scene.ceilingHeight, doors, furniture };
 }

@@ -58,7 +58,13 @@ const MOVED_M = 1e-3;
 /** Whether two box lists are the same rooms in the same order with the same projection boxes. */
 function sameBoxes(a: readonly RoomBox[], b: readonly RoomBox[]): boolean {
   const same = (p: Vec3, q: Vec3): boolean => Math.abs(p.x - q.x) < 1e-9 && Math.abs(p.y - q.y) < 1e-9 && Math.abs(p.z - q.z) < 1e-9;
-  return a.length === b.length && a.every((box, i) => box.roomId === b[i]!.roomId && same(box.projection.min, b[i]!.projection.min) && same(box.projection.max, b[i]!.projection.max));
+  return (
+    a.length === b.length &&
+    a.every(
+      (box, i) =>
+        box.roomId === b[i]!.roomId && same(box.projection.min, b[i]!.projection.min) && same(box.projection.max, b[i]!.projection.max),
+    )
+  );
 }
 
 /** Measured cost of the last full bake, and the GPU memory the lighting holds. */
