@@ -7,6 +7,7 @@ import { readFileSync, writeFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { expect, test, type APIRequestContext, type FrameLocator, type Locator, type Page, type TestInfo } from '@playwright/test';
 import AxeBuilder from '@axe-core/playwright';
+import { SCREENSHOTS_IGNORED } from './snapshot-policy.js';
 import { scaled } from './time-scale.js';
 
 /** The WCAG levels the viewer commits to. */
@@ -372,6 +373,18 @@ async function waitForFonts(page: Page): Promise<void> {
 }
 
 /**
+ * Skips the calling test where screenshot comparisons are ignored (`CI` set,
+ * `snapshot-policy.ts`). For a test whose steps other than the comparison
+ * only prepare the picture: there it would assert nothing, and its setup (a
+ * pointer resting on the bar, an idle wait) only races a software
+ * rasteriser. Call it as the test's first statement, so no setup runs;
+ * `scripts/screenshot-only.test.ts` holds every screenshot test to that.
+ */
+export function screenshotOnly(): void {
+  test.skip(SCREENSHOTS_IGNORED, 'screenshot-only: comparisons run on the machines that render the baselines, not with CI set');
+}
+
+/**
  * A baseline of the page's CHROME, with the scene left unpainted
  * (`STILL_CHROME_CSS`).
  *
@@ -383,7 +396,9 @@ async function waitForFonts(page: Page): Promise<void> {
  * The caller puts the chrome into ONE deterministic state first: the control
  * bar collapses on a 4.2 s idle timer, so a test that wants it open parks the
  * pointer on the bar (its timer re-arms while the bar is hovered), and one that
- * wants it collapsed waits for `waitForChromeIdle`.
+ * wants it collapsed waits for `waitForChromeIdle`. Those pointer setups
+ * hold only on a machine that draws fast enough, which is why such a test is
+ * `screenshotOnly()`.
  */
 export async function expectChromeScreenshot(page: Page, name: string): Promise<void> {
   allowOneScreenshot();

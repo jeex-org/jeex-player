@@ -558,8 +558,11 @@ describe('the bottom sheet and filled host bottom boxes', { timeout: MOUNT_TIMEO
     const viewer = await mount(PHONE[0], { settings: { show: true }, slots: ['bottom-right'] }, PHONE[1]);
     const box = viewer.slots.get('bottom-right');
     const { panel } = await openSheet(viewer);
-    const rest = [10, 706, 380, 834];
-    expect(rect(viewer, panel)).toEqual(rest);
+    // Left, right and bottom come from the sheet's insets; its top edge follows
+    // the content height, which follows the machine's fonts (706 px here, 707
+    // on a hosted runner), so the rest is the sheet's own first reading.
+    const rest = rect(viewer, panel);
+    expect([rest[0], rest[2], rest[3]]).toEqual([10, 380, 834]);
     fillSlot(box);
     await until(() => !intersects(panel.getBoundingClientRect(), box.getBoundingClientRect()), 'the sheet clear of bottom-right');
     expect(Math.round(box.getBoundingClientRect().top - panel.getBoundingClientRect().bottom)).toBe(8);
