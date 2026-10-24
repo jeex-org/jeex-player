@@ -28,6 +28,8 @@ import type { Messages } from '../ui/messages.js';
 import { toViewerError } from './viewer-events.js';
 import { directorWiring } from './director-wiring.js';
 import { checkpointsWiring } from './checkpoints-wiring.js';
+import { hdriTarget } from './hdri-wiring.js';
+import type { Logger } from '../shared/logger.js';
 
 type StageWiringDeps = {
   /** Hears accepted map and camera use (`shared/usage.ts`). */
@@ -52,6 +54,8 @@ type StageWiringDeps = {
   checkpointsVisible: () => boolean;
   /** The host commands, for the tour-camera tool's own buttons (frame, look through, done). */
   handle: () => import('./handle-commands.js').HandleCommands;
+  /** Where the host sky's warnings go. */
+  log: Logger;
 };
 
 /**
@@ -75,6 +79,11 @@ export function stageWiring(deps: StageWiringDeps): ViewerStageDeps {
     },
     usage: deps.usage,
     artificialLights: (root) => deps.handle().lightTemperature.apply(root),
+    hdri: {
+      target: () => hdriTarget(deps.options.lighting.hdri, deps.mount.model?.scene.site, deps.mount.lightBake.state().state),
+      warn: (code, message) => deps.log.warn(code, message),
+      sun: () => deps.mount.sunShadow,
+    },
     onContextLost: deps.onContextLost,
     onContextRestored: deps.onContextRestored,
     signal: deps.signal,

@@ -51,7 +51,7 @@ import type { ViewerSelection, ViewerSelectionTarget } from './selection.js';
 import type { SelectionDescription } from '../ui/selection-options.js';
 import type { AssetMoveDebug } from '../edit/asset-move-session.js';
 import type { WalkPostState } from './walk-post-controller.js';
-import type { WalkLightingState } from './walk-lighting-controller.js';
+import type { HdriDebug, WalkLightingState } from './walk-lighting-controller.js';
 import type { WalkLightingStats } from '../render/walk-lighting/walk-lighting.js';
 import type { DemandCounters } from '../render/render-demand.js';
 import type { LightBakeState } from '../lightmap/light-bake-wiring.js';
@@ -116,6 +116,13 @@ type ViewerDebugApi = {
   walkPost: () => WalkPostState;
   /** The walk and tour room lighting: its phase and the last full bake's measurement (`walk-lighting-controller.ts`). */
   walkLighting: () => WalkLightingDebug;
+  /**
+   * The host sky (`lighting.hdri`): `off`, `loading`, `ready` (installed,
+   * waiting for the room lighting's swap), `live`, `sky-only` (over a light
+   * bake) or `failed`, with the active preset, the environment's cube size
+   * and the analytic sun's intensity (`walk-lighting-controller.ts`).
+   */
+  hdri: () => HdriDebug;
   /**
    * Cumulative frame-loop ticks and display draws (`render/render-demand.ts`):
    * a resting view keeps ticking while its draws stay flat; `insetDraws`
@@ -373,6 +380,7 @@ type SceneDebug = {
   sun: () => SunShadow | undefined;
   walkPost: () => WalkPostState | undefined;
   walkLighting: () => WalkLightingDebug | undefined;
+  hdri: () => HdriDebug | undefined;
   renderDemand: () => DemandCounters | undefined;
   lightBake: () => LightBakeState;
   furnitureVisible: () => boolean;
@@ -504,6 +512,7 @@ export function installViewerDebug(host: ViewerDebugHost): ViewerDebugApi {
     sunShadow: () => host.sun()?.state() ?? null,
     walkPost: () => host.walkPost() ?? 'off',
     walkLighting: () => host.walkLighting() ?? { state: 'off', stats: null },
+    hdri: () => host.hdri() ?? { state: 'off', preset: null, cubeSize: null, sunIntensity: null },
     renderDemand: () => host.renderDemand() ?? { ticks: 0, draws: 0, insetDraws: 0 },
     lightBake: () => host.lightBake(),
     assetModels: () => {

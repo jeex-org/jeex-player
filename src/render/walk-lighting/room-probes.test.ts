@@ -29,7 +29,6 @@ function setup(height = 512) {
     mirrors: () => [mirror],
     grids,
     exterior,
-    expectedHeight: 512,
     capture,
     copy: (_source, tile) => copied.push(tile),
   });
@@ -68,7 +67,7 @@ describe('RoomProbes', () => {
     expect(captured).toHaveLength(3);
   });
 
-  test('fails loudly when the probe layout is not the studio environment layout', () => {
+  test('fails loudly when the probe layout is not the atlas tile layout', () => {
     const { probes, state } = setup(256);
     expect(() => probes.step()).toThrow(/layout/);
     expect(state()).toBe('editing');

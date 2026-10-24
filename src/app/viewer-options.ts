@@ -16,9 +16,9 @@
  */
 
 import type { SiteSun, ViewerMode } from '../scene/types.js';
-import type { HdriEntry } from './hdri-entry.js';
+import type { HdriEntry } from '../lighting/hdri-entry.js';
 
-export type { HdriEntry } from './hdri-entry.js';
+export type { HdriEntry } from '../lighting/hdri-entry.js';
 // TYPE only, and it must be: `ui/host-slots.ts` touches the DOM. The runtime
 // copy of `SLOT_NAMES` this table validates against lives in `option-sets.ts`.
 import type { SlotName } from '../ui/host-slots.js';

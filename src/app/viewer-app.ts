@@ -363,6 +363,7 @@ export class ViewerApp {
         doors: this.doors,
         tourEvents: this.tourEvents,
         usage: this.usage,
+        log: this.log,
       }),
       model.scene.presentationCamera.position,
     );

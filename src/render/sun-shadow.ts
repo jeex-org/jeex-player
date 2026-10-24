@@ -69,6 +69,12 @@ export type SunShadow = {
   settle(): void;
   /** Aims the sun by `site` (absent: the legacy direction); `true` when it changed and the fit was redone. */
   orient(site: SceneSite | undefined): boolean;
+  /**
+   * A host sky's elevation (walk and tour with an HDRI): the sun keeps the
+   * site's world azimuth and takes `elevationDeg`, through every later fit and
+   * orientation, until `override(null)` returns it to the preset.
+   */
+  override(elevationDeg: number | null): void;
   /** The world box around everything the fit is made of, for tests and the debug surface. */
   bounds(): ShadowBox;
   state(): SunShadowState;
@@ -273,7 +279,17 @@ export function prepareSunShadow(
   const casters: CeilingCasters = buildCeilingCasters(scene, plan);
   root.add(casters.group);
   let site: SceneSite | undefined = scene.site;
-  let sun: SunDirection = sunDirection(site);
+  let elevationOverride: number | null = null;
+  /** The site's direction, at the override's elevation while there is one. */
+  const aimed = (): SunDirection => {
+    const preset = sunDirection(site);
+    if (elevationOverride === null) return preset;
+    const w = (preset.azimuth * Math.PI) / 180;
+    const e = (elevationOverride * Math.PI) / 180;
+    const direction = Object.freeze([Math.sin(w) * Math.cos(e), Math.sin(e), Math.cos(w) * Math.cos(e)]) as Triple;
+    return { direction, azimuth: preset.azimuth, elevation: elevationOverride };
+  };
+  let sun: SunDirection = aimed();
   let fit: ShadowFit | null = null;
   let signature: number | null = null;
   let base: ShadowBox[] = [];
@@ -348,11 +364,19 @@ export function prepareSunShadow(
     orient(next) {
       if (released || sameSite(site, next)) return false;
       site = next;
-      sun = sunDirection(site);
+      sun = aimed();
       rig.setSunDirection(sun.direction);
       fit = null;
       refit();
       return true;
+    },
+    override(elevationDeg) {
+      if (released || elevationDeg === elevationOverride) return;
+      elevationOverride = elevationDeg;
+      sun = aimed();
+      rig.setSunDirection(sun.direction);
+      fit = null;
+      refit();
     },
     bounds: () => union(withFootprint([...base, ...extra])),
     // Copies: the debug surface hands this to page code, which must not reach the live fit.

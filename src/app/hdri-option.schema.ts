@@ -14,7 +14,7 @@
 import { z } from 'zod/mini';
 import { SITE_SUNS } from '../scene/schema-sets.js';
 import type { SiteSun } from '../scene/types.js';
-import type { HdriEntry } from './hdri-entry.js';
+import type { HdriEntry } from '../lighting/hdri-entry.js';
 
 /** URL schemes an HDRI file may be fetched from. */
 const URL_SCHEMES: ReadonlySet<string> = new Set(['http:', 'https:', 'blob:']);

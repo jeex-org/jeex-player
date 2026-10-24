@@ -274,6 +274,71 @@ describe('prepareSunShadow', () => {
   });
 });
 
+describe('the HDRI elevation override', () => {
+  const angles = (direction: Triple): { azimuth: number; elevation: number } => ({
+    azimuth: ((Math.atan2(direction[0], direction[2]) * 180) / Math.PI + 360) % 360,
+    elevation: (Math.asin(direction[1]) * 180) / Math.PI,
+  });
+
+  test('aims at the site azimuth and the override elevation, and fits with the same policy', () => {
+    const recorder = recordingRig();
+    const root = apartment();
+    const sun = prepareSunShadow(root, scene({ northDeg: 30, sun: 'noon' }), plan, recorder.rig);
+    sun.override(43);
+    const aimed = angles(recorder.directions.at(-1)!);
+    expect(aimed.azimuth).toBeCloseTo(210, 9);
+    expect(aimed.elevation).toBeCloseTo(43, 9);
+    expect(sun.state().elevation).toBeCloseTo(43, 9);
+    // The fit is the one a fresh preparation at that direction makes.
+    const fit = recorder.fits.at(-1)!;
+    expect(fit).toBeDefined();
+    expect(sun.bounds().max[1]).toBeGreaterThan(0);
+  });
+
+  test('refit, include, settle, endPreview and orient keep it; a north-only edit keeps the elevation at the new azimuth', () => {
+    const recorder = recordingRig();
+    const root = apartment();
+    const sun = prepareSunShadow(root, scene({ northDeg: 0, sun: 'evening' }), plan, recorder.rig);
+    sun.override(10.5);
+    const sofa = root.getObjectByName('sofa')!;
+    sofa.position.x += 20;
+    sun.include(sofa);
+    sun.settle();
+    sun.endPreview();
+    sun.refit();
+    expect(angles(recorder.directions.at(-1)!).elevation).toBeCloseTo(10.5, 9);
+    const fitted = recorder.fits.at(-1)!;
+    const shadow = sunDirection({ northDeg: 0, sun: 'evening' });
+    expect(fitted).toBeDefined();
+    expect(shadow.elevation).toBe(20);
+    expect(sun.orient({ northDeg: 90, sun: 'evening' })).toBe(true);
+    const turned = angles(recorder.directions.at(-1)!);
+    expect(turned.azimuth).toBeCloseTo(0, 6);
+    expect(turned.elevation).toBeCloseTo(10.5, 9);
+  });
+
+  test('override(null) returns to the preset direction and its fit', () => {
+    const plain = recordingRig();
+    prepareSunShadow(apartment(), scene({ northDeg: 30, sun: 'noon' }), plan, plain.rig);
+    const recorder = recordingRig();
+    const sun = prepareSunShadow(apartment(), scene({ northDeg: 30, sun: 'noon' }), plan, recorder.rig);
+    sun.override(43);
+    sun.override(null);
+    expect(recorder.directions.at(-1)).toEqual(sunDirection({ northDeg: 30, sun: 'noon' }).direction);
+    expect(recorder.fits.at(-1)).toEqual(plain.fits.at(-1));
+    expect(sun.state().elevation).toBe(55);
+  });
+
+  test('the same override twice changes nothing', () => {
+    const recorder = recordingRig();
+    const sun = prepareSunShadow(apartment(), scene({ northDeg: 0, sun: 'noon' }), plan, recorder.rig);
+    sun.override(43);
+    const before = recorder.dirty();
+    sun.override(43);
+    expect(recorder.dirty()).toBe(before);
+  });
+});
+
 describe('groundFootprint', () => {
   const ground = { y: -0.462, centre: [0, 0] as const, radius: 36 };
   const wall = { min: [0, 0, 0], max: [6, 2.7, 0.2] } as const;

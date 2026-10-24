@@ -4,11 +4,7 @@
   "sun": {
     "azimuthDeg": 54,
     "elevationDeg": 40,
-    "colourLinear": [
-      1,
-      0.93,
-      0.8
-    ],
+    "colourLinear": [1, 0.93, 0.8],
     "horizontalIrradianceShare": 0.6351
   },
   "reference": {
@@ -43,11 +39,7 @@
       "2",
       "-z"
     ],
-    "magick": [
-      "-strip",
-      "-quality",
-      "60"
-    ],
+    "magick": ["-strip", "-quality", "60"],
     "versions": {
       "magick": "Version: ImageMagick 7.1.2-18 Q16 x86_64 23822 https://imagemagick.org",
       "ultrahdr": "libultrahdr ultrahdr_app (see the encoder arguments)"

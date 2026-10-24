@@ -681,13 +681,20 @@ const square = (b: Box) => [
 ];
 
 /** A renderer, the apartment rig and the room lighting over `rooms`, baked and live. */
-function lit(rooms: Array<{ id: string; box: Box }>, build: (scene: THREE.Scene) => void, size = { w: 320, h: 240 }) {
+function lit(
+  rooms: Array<{ id: string; box: Box }>,
+  build: (scene: THREE.Scene) => void,
+  size = { w: 320, h: 240 },
+  environment?: (gl: THREE.WebGLRenderer) => THREE.Texture,
+) {
   const gl = renderer(size.w);
   gl.setSize(size.w, size.h, false);
   gl.shadowMap.enabled = true;
   const context = createLightingContext(THREE, gl);
   const scene = new THREE.Scene();
   context.createApartmentRig().attach(scene);
+  // A host environment of another size over the rig's (an HDRI): the probes must not depend on its layout.
+  if (environment) scene.environment = environment(gl);
   build(scene);
   const lighting = new WalkLighting(gl, scene);
   lighting.load({
@@ -778,6 +785,57 @@ describe('reflections from the room probes', { timeout: MOUNT_TIMEOUT_MS }, () =
     const second = read();
     expect(second.every((value, i) => value === first[i])).toBe(true);
     world.dispose();
+  });
+
+  test('under a 1K environment (a 256 cube) the probes capture without a layout error and reflect the stripe in the same column', () => {
+    /** A 1024 x 512 grey equirect prefiltered by three: the cube-UV layout of a 1K HDRI. */
+    const hdri = (gl: THREE.WebGLRenderer): THREE.Texture => {
+      const data = new Float32Array(1024 * 512 * 4).fill(0.4);
+      const equirect = new THREE.DataTexture(data, 1024, 512, THREE.RGBAFormat, THREE.FloatType);
+      equirect.mapping = THREE.EquirectangularReflectionMapping;
+      equirect.needsUpdate = true;
+      const generator = new THREE.PMREMGenerator(gl);
+      const target = generator.fromEquirectangular(equirect);
+      equirect.dispose();
+      generator.dispose();
+      return target.texture;
+    };
+    const columns = (environment?: (gl: THREE.WebGLRenderer) => THREE.Texture): { stripe: number; reflection: number; height: number } => {
+      const world = lit(
+        [{ id: 'a', box: A }],
+        (scene) => {
+          room(scene, A);
+          floor(scene, A, 0.02);
+          light(scene, [0.12, 2.2, 0.04], [2.9, 1.2, 0.04]);
+        },
+        undefined,
+        environment,
+      );
+      const height = (world.scene.environment?.image as { height?: number } | undefined)?.height ?? 0;
+      const { pixels } = world.shoot({ x: 1.3, y: 1.3, z: 3.6 }, { x: 1.3, y: 1.3, z: 0 });
+      const centroid = (row: number): number => {
+        let peak = 0;
+        for (let x = 0; x < world.size.w; x += 1) peak = Math.max(peak, world.lum(pixels, x, row));
+        let sum = 0;
+        let weight = 0;
+        for (let x = 0; x < world.size.w; x += 1) {
+          const value = world.lum(pixels, x, row);
+          if (value < peak / 2) continue;
+          sum += x * value;
+          weight += value;
+        }
+        return sum / weight;
+      };
+      const out = { stripe: centroid(Math.round(world.size.h * 0.6)), reflection: centroid(Math.round(world.size.h * 0.1)), height };
+      world.dispose();
+      return out;
+    };
+    const recipe = columns();
+    const big = columns(hdri);
+    record('reflectionColumns1k', { recipe, big });
+    expect(big.height).toBe(1024);
+    expect(Math.abs(big.reflection - big.stripe)).toBeLessThanOrEqual(2);
+    expect(Math.abs(big.reflection - recipe.reflection)).toBeLessThanOrEqual(2);
   });
 
   test('a glossy floor in a closed room without a window reflects no window of the next room', () => {
