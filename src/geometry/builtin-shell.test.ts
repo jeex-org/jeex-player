@@ -64,7 +64,7 @@ async function flush(): Promise<void> {
     });
 }
 
-/** The L-shape (room a on oak, room b on the kept limestone, sand walls) built with both sources. */
+/** The L-shape (room a on oak, room b on limestone, sand walls) built with both sources. */
 function bare(scene: SceneData = lShapePlan) {
   const builtin = stubSource('https://player.test/finish-maps/');
   const project = stubSource('https://project.test/');
@@ -100,10 +100,19 @@ describe('a bare scene on bundled finishes', () => {
     expect(materialOf(root, `floor-${ROOM.a}`).map).not.toBeNull();
   });
 
-  test('a kept floor still draws through the legacy path', () => {
-    const { root } = bare();
-    expect(BUILTIN_FINISHES.has(FINISH.stone)).toBe(false);
-    expect(isLibrary(materialOf(root, `floor-${ROOM.b}`), FINISH.stone)).toBe(false);
+  test('a kept wall finish still draws through the legacy path', () => {
+    const scene = draftOf(lShapePlan) as SceneData & { schemaVersion: string; finishes?: unknown };
+    scene.schemaVersion = '2.3';
+    scene.finishes = { rooms: { [ROOM.b]: { walls: FINISH.wallpaper_cream } } };
+    const { root } = bare(scene);
+    expect(BUILTIN_FINISHES.has(FINISH.wallpaper_cream)).toBe(false);
+    const walls: THREE.MeshStandardMaterial[] = [];
+    root.traverse((object) => {
+      if (object instanceof THREE.Mesh && object.userData['surface'] === 'wall') walls.push(object.material as THREE.MeshStandardMaterial);
+    });
+    const striped = walls.filter((wall) => !isLibrary(wall, DEFAULT_WALL_FINISH));
+    expect(striped.length).toBeGreaterThan(0);
+    for (const wall of striped) expect(isLibrary(wall, FINISH.wallpaper_cream)).toBe(false);
   });
 
   test('the default walls draw their library material in its tinted first-frame colour', () => {

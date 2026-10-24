@@ -120,3 +120,48 @@ describe('runtime table', () => {
     }
   });
 });
+
+describe('the final binding', () => {
+  test('only the two striped wallpapers stay kept, and nothing is pending', () => {
+    const kept = index.finishes.filter((entry) => 'kept' in entry);
+    expect(kept.map((entry) => entry.finish).sort()).toEqual([FINISH.wallpaper_cream, FINISH.wallpaper_sage].sort());
+    expect(kept.every((entry) => 'kept' in entry && entry.why === 'keep')).toBe(true);
+    expect('kept' in index.defaults.ceiling).toBe(false);
+  });
+
+  test('terrazzo, the ceramics and the wall tiles draw tinted library scans in their finish colour', () => {
+    for (const [id, colour] of [
+      [FINISH.terrazzo, '#a7b5a6'],
+      [FINISH.ceramic_light, '#e9e5dc'],
+      [FINISH.ceramic_graphite, '#4c4c4a'],
+      [FINISH.tiles_white, '#e6e2d8'],
+    ] as const) {
+      const binding = BUILTIN_FINISHES.get(id);
+      expect(binding?.material.kind).toBe('scan');
+      expect(binding?.material.facts.colourMode).toBe('tintable');
+      expect(binding?.colour).toBe(colour);
+    }
+    expect(BUILTIN_FINISHES.get(FINISH.ceramic_light)?.material).toBe(BUILTIN_FINISHES.get(FINISH.ceramic_graphite)?.material);
+  });
+
+  test('the limestone draws a natural library scan', () => {
+    const binding = BUILTIN_FINISHES.get(FINISH.stone);
+    expect(binding?.material.kind).toBe('scan');
+    expect(binding?.material.facts.colourMode).toBe('natural');
+    expect(binding?.colour).toBeUndefined();
+  });
+
+  test('a tiled finish repeats every generated tile module times the tiles its scan holds', () => {
+    for (const [id, tiles, module] of [
+      [FINISH.stone, 6, 0.62],
+      [FINISH.ceramic_light, 8, 0.625],
+      [FINISH.ceramic_graphite, 8, 0.625],
+      [FINISH.tiles_white, 12, 0.3],
+    ] as const) {
+      const tileM = BUILTIN_FINISHES.get(id)?.material.facts.tileM;
+      expect(tileM).not.toBeNull();
+      expect(tileM?.[0]).toBeCloseTo(tiles * module, 6);
+      expect(tileM?.[1]).toBeCloseTo(tiles * module, 6);
+    }
+  });
+});
