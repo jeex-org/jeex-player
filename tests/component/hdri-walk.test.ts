@@ -14,7 +14,7 @@ import { afterAll, describe, expect, test, vi } from 'vitest';
 import { commands } from 'vitest/browser';
 import { InlineSceneRepository, mountViewer } from '../../src/app/viewer-api.js';
 import type { ViewerHandle } from '../../src/app/viewer-handle.js';
-import { HdriSky, loadHdriPair, WalkLighting } from '../../src/render/walk-post.js';
+import { HdriSky, loadHdriEnvironment, loadHdriSky, WalkLighting } from '../../src/render/walk-post.js';
 import { hdriTarget } from '../../src/app/hdri-wiring.js';
 import { hdriSunDirection } from '../../src/lighting/hdri-calibration.js';
 import type { HdriEntry } from '../../src/lighting/hdri-entry.js';
@@ -35,6 +35,20 @@ const fixture = (name: string): string => new URL(`/tests/fixtures/hdri/${name}`
 async function fixtureEntry(): Promise<HdriEntry> {
   const sidecar = (await (await fetch(fixture('sky.json'))).json()) as { sun: HdriEntry['sun'] };
   return { environmentUrl: fixture('sky-1k.jpg'), skyUrl: fixture('sky-256.avif'), sun: sidecar.sun };
+}
+
+/** Both files of `entry`, as the walk lighting controller loads them. */
+async function loadPair(gl: THREE.WebGLRenderer, entry: HdriEntry) {
+  const signal = new AbortController().signal;
+  const [environment, sky] = await Promise.all([loadHdriEnvironment(gl, entry, signal), loadHdriSky(entry, signal)]);
+  return {
+    environment,
+    sky,
+    dispose: () => {
+      environment.dispose();
+      sky.dispose();
+    },
+  };
 }
 
 function rendererString(gl: THREE.WebGLRenderer): string {
@@ -82,7 +96,7 @@ describe('rotation of a host sky, pinned by rendering', () => {
       const site = { northDeg: 30, sun: 'noon' as const };
       const sun = prepareSunShadow(root, { rooms: [], ceilingHeight: 2.6, site }, { rooms: [] }, rig);
       const entry = await fixtureEntry();
-      const pair = await loadHdriPair(gl, entry, new AbortController().signal);
+      const pair = await loadPair(gl, entry);
       const view = hdriTarget({ noon: entry }, site, 'off')!.view;
       const sky = new HdriSky({ scene, renderer: gl, exterior: () => null, sun: () => sun });
       sky.install({ environment: pair.environment, sky: pair.sky, view });
@@ -220,7 +234,7 @@ describe('a plan without a closed room', () => {
       const lighting = new WalkLighting(gl, scene);
       lighting.load({ volumes: { rooms: [], ceilingHeight: 2.6, doors: [], furniture: [] }, furniture: null });
       const entry = await fixtureEntry();
-      const pair = await loadHdriPair(gl, entry, new AbortController().signal);
+      const pair = await loadPair(gl, entry);
       lighting.setHdri({ environment: pair.environment, sky: pair.sky, view: hdriTarget({ noon: entry }, {}, 'off')!.view });
       const hemisphere = scene.getObjectByName('jeex-lighting-sky') as THREE.Light;
       const fill = scene.getObjectByName('jeex-lighting-fill') as THREE.Light;

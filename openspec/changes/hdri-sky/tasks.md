@@ -26,7 +26,7 @@ Every task starts with a test that fails for the right reason; the implementatio
 
 ## 5. Loading the pair
 
-- [x] 5.1 Write a browser component test of `loadHdriPair` on the fixtures: concurrent requests, half-float decode, PMREM cube 256, decoded source and generator disposed (renderer texture count), the sky bitmap decoded upright (the red marker's row) with no colour conversion, abort disposes everything and closes the bitmap, a 404 on either file and a corrupt embedded gain-map image each settle as one rejection and leave no texture or open bitmap; see it fail; then write `src/render/hdri/hdri-assets.ts` with the fetch-and-parse adapter and re-export it from `walk-post.ts`; verify it passes
+- [x] 5.1 Write a browser component test of `loadHdriEnvironment` and `loadHdriSky` on the fixtures: half-float decode, PMREM cube 256, decoded source and generator disposed (renderer texture count), the sky bitmap decoded upright (the red marker's row) with no colour conversion, abort disposes everything and closes the bitmap, a 404 on either file and a corrupt embedded gain-map image each settle as one rejection and leave no texture or open bitmap; see it fail; then write `src/render/hdri/hdri-assets.ts` with the fetch-and-parse adapter and re-export it from `walk-post.ts`; verify it passes
 - [x] 5.2 Add the loader-compensation measurement to that test (the raw decoded mean may be darker; decoded mean × `loaderCompensation` equals the sidecar's reference within 2 %) and the irradiance measurement after compensation; verify it passes with the measured value set in the standard
 
 ## 6. Scene state of an installed HDRI

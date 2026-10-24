@@ -61,14 +61,14 @@ Alternative: an `OPTION_SCHEMA` kind `object`. Rejected: every row is shaped for
 
 ### D2. Module layout and load path
 
-1. `src/render/hdri/hdri-assets.ts` (walk chunk): `loadHdriPair(renderer, entry, signal)` fetches both files concurrently and settles as one promise.
+1. `src/render/hdri/hdri-assets.ts` (walk chunk): `loadHdriEnvironment(renderer, entry, signal)` and `loadHdriSky(entry, signal)` are separate loads (a pending light bake needs the sky alone); the walk lighting controller starts both at once and releases one when the other fails (D11).
    - Environment, one small adapter of ours: `fetch(url, { signal })` → `arrayBuffer()` → `UltraHDRLoader.parse(buffer, onLoad)` (half float) inside a promise. Synchronous throws of `parse` reject it; three r186 throws the asynchronous bitmap-decode error from inside its own `.catch` (it never reaches the caller), so the adapter replaces that one error callback on its loader instance (`_applyGainmapToSDR`, called with our `reject`) and the result is a `DataTexture` built the way `load()` builds it (`flipY`, linear sRGB, half float). The private hook is pinned to r186 and re-checked on every three upgrade, like `light-order.ts`. The signal is checked after the fetch and after the decode; an abort after decode disposes. No retry.
    - Sky: `fetch(url, { signal })` → `blob()` → `createImageBitmap(blob, { imageOrientation: 'flipY', colorSpaceConversion: 'none' })` (three ignores `Texture.flipY` for an `ImageBitmap`), wrapped in a `Texture` with `SRGBColorSpace`, `EquirectangularReflectionMapping`, mipmaps on. The bitmap is closed (`ImageBitmap.close()`) on release and on a stale or aborted completion.
-   - One failure of either file aborts the other and rejects once; whatever was made is disposed before the rejection.
+   - Each load rejects once on failure; whatever it made is disposed before the rejection.
    - After the environment decodes: measure irradiance (D6) from its texels, `PMREMGenerator.fromEquirectangular`, dispose the decoded texture and the generator. Returns `{ pmrem, sky, cubeSize, measurement }` with one `dispose()`.
 2. `src/render/hdri/hdri-sky.ts` (walk chunk): `HdriSky`, the scene state of an installed pair: `apply('off' | 'capture' | 'display' | 'sky-only')` saves on the first departure from `off` and restores exactly on return (background, its intensity, rotation and blurriness, environment, its gain and rotation, fog, sun direction, colour, intensity and frustum, the exterior grid's texture).
 3. Pure math in `src/lighting/hdri-calibration.ts` (pure, no three): rotation, sun angles, irradiance integration over a texel buffer, sun intensity. Imported by the walk chunk only; not exported from the lighting entry's index, so the entry's size gate sees none of it. The standard's values (D6) are data in `lighting-standard.ts`.
-4. `walk-post.ts` re-exports `loadHdriPair` and `HdriSky` beside `WalkLighting`; the dynamic import that already exists brings them.
+4. `walk-post.ts` re-exports `loadHdriEnvironment`, `loadHdriSky` and `HdriSky` beside `WalkLighting`; the dynamic import that already exists brings them.
 5. App side (boot bundle, wiring only): `src/app/hdri-wiring.ts` picks the active entry from the resolved options and the mounted document's `site` (D3) and hands it to the walk lighting controller with `setHdri(entry | null)`. The controller starts the load on the first eligible frame after the chain and the lighting exist, with an `AbortSignal` tied to the entry, the context and the viewer.
 
 ### D3. Active preset and hand-over

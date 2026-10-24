@@ -9,7 +9,7 @@ import * as THREE from 'three';
 import { afterAll, describe, expect, test } from 'vitest';
 import { commands } from 'vitest/browser';
 // Static, so Vite pre-bundles the chunk before the first test.
-import { loadHdriEnvironment, loadHdriPair, loadHdriSky } from '../../src/render/walk-post.js';
+import { loadHdriEnvironment, loadHdriSky } from '../../src/render/walk-post.js';
 import type { HdriEntry } from '../../src/lighting/hdri-entry.js';
 import { LIGHTING_STANDARD } from '../../src/lighting/lighting-standard.js';
 import { closeContainers, openContainer } from './support.js';
@@ -48,28 +48,6 @@ const renderString = (gl: THREE.WebGLRenderer): string => {
 };
 
 describe('loading a host sky', () => {
-  test('both files are requested before either has answered', async () => {
-    const entry = await entryOf();
-    const started: string[] = [];
-    const gates: Array<() => void> = [];
-    const fetcher = (url: string, init: { signal: AbortSignal }): Promise<Response> => {
-      started.push(url);
-      return new Promise<void>((resolve) => {
-        gates.push(resolve);
-      }).then(() => fetch(url, init));
-    };
-    const gl = renderer();
-    const loading = loadHdriPair(gl, entry, new AbortController().signal, fetcher);
-    await new Promise((resolve) => {
-      setTimeout(resolve, 20);
-    });
-    expect(started.sort()).toEqual([entry.environmentUrl, entry.skyUrl].sort());
-    for (const open of gates) open();
-    const pair = await loading;
-    pair.dispose();
-    gl.dispose();
-  });
-
   test('the environment decodes to a 256 cube; only the PMREM stays on the GPU; the measurement matches the reference after compensation', async () => {
     const entry = await entryOf();
     const reference = (await sidecar()).reference;
@@ -121,29 +99,27 @@ describe('loading a host sky', () => {
     sky.dispose();
   });
 
-  test('an abort before the answers settles once and leaves nothing on the GPU', async () => {
+  test('an abort before the answer settles once and leaves nothing on the GPU', async () => {
     const entry = await entryOf();
     const gl = renderer();
     const before = gl.info.memory.textures;
     const abort = new AbortController();
-    const loading = loadHdriPair(gl, entry, abort.signal);
+    const loading = loadHdriEnvironment(gl, entry, abort.signal);
     abort.abort(new Error('left walk'));
     await expect(loading).rejects.toThrow();
     expect(gl.info.memory.textures).toBe(before);
     gl.dispose();
   });
 
-  test('a 404 on either file rejects the pair once and leaves nothing behind', async () => {
+  test('a 404 on either file rejects its load once and leaves nothing behind', async () => {
     const entry = await entryOf();
-    for (const missing of [entry.environmentUrl, entry.skyUrl]) {
-      const gl = renderer();
-      const before = gl.info.memory.textures;
-      const fetcher = (url: string, init: { signal: AbortSignal }): Promise<Response> =>
-        url === missing ? Promise.resolve(new Response(null, { status: 404 })) : fetch(url, init);
-      await expect(loadHdriPair(gl, entry, new AbortController().signal, fetcher)).rejects.toThrow(/404/);
-      expect(gl.info.memory.textures).toBe(before);
-      gl.dispose();
-    }
+    const missing = (): Promise<Response> => Promise.resolve(new Response(null, { status: 404 }));
+    const gl = renderer();
+    const before = gl.info.memory.textures;
+    await expect(loadHdriEnvironment(gl, entry, new AbortController().signal, missing)).rejects.toThrow(/404/);
+    await expect(loadHdriSky(entry, new AbortController().signal, missing)).rejects.toThrow(/404/);
+    expect(gl.info.memory.textures).toBe(before);
+    gl.dispose();
   });
 
   test('a corrupt embedded gain-map image settles as one rejection, not an uncaught error', async () => {

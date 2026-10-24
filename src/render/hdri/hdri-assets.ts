@@ -16,9 +16,10 @@
  * flipped at decode because three ignores `flipY` for an `ImageBitmap`, with
  * no colour conversion; the bitmap is closed with the texture.
  *
- * Invariant: a load settles exactly once. A failure or an abort of either
- * file aborts the other and leaves no texture, target or bitmap behind.
- * No retry.
+ * Invariant: each load settles exactly once, and a failure or an abort
+ * leaves no texture, target or bitmap behind. The two files load separately
+ * (a pending light bake needs the sky alone); the walk lighting controller
+ * starts both at once and releases one when the other fails. No retry.
  */
 
 import * as THREE from 'three';
@@ -50,9 +51,6 @@ export type HdriEnvironment = {
 
 /** The display sky of one HDRI. */
 export type HdriSkyTexture = { readonly texture: THREE.Texture; dispose(): void };
-
-/** Both files of one HDRI. */
-export type HdriPair = { readonly environment: HdriEnvironment; readonly sky: HdriSkyTexture; dispose(): void };
 
 type Fetch = (url: string, init: { signal: AbortSignal }) => Promise<Response>;
 
@@ -135,10 +133,6 @@ export async function loadHdriEnvironment(
     generator.dispose();
     equirect.dispose();
   }
-  if (signal.aborted) {
-    target.dispose();
-    signal.throwIfAborted();
-  }
   target.texture.name = 'HdriEnvironment';
   return { texture: target.texture, cubeSize: target.height / 4, sky, gain, sunIntensity, dispose: () => target.dispose() };
 }
@@ -168,43 +162,4 @@ export async function loadHdriSky(entry: HdriEntry, signal: AbortSignal, fetcher
       bitmap.close();
     },
   };
-}
-
-/** Both files at once; one failure aborts the other, releases what was made and rejects once. */
-export async function loadHdriPair(
-  renderer: THREE.WebGLRenderer,
-  entry: HdriEntry,
-  signal: AbortSignal,
-  fetcher: Fetch = fetch,
-): Promise<HdriPair> {
-  const both = new AbortController();
-  const forward = (): void => both.abort(signal.reason);
-  // Unhooked when the pair settles, so a long-lived caller's signal keeps no listener.
-  const unhook = new AbortController();
-  if (signal.aborted) forward();
-  else signal.addEventListener('abort', forward, { once: true, signal: unhook.signal });
-  const fail = (error: unknown): never => {
-    both.abort(error);
-    throw error;
-  };
-  const environment = loadHdriEnvironment(renderer, entry, both.signal, fetcher).catch(fail);
-  const sky = loadHdriSky(entry, both.signal, fetcher).catch(fail);
-  try {
-    const [settledEnvironment, settledSky] = await Promise.allSettled([environment, sky]);
-    if (settledEnvironment.status === 'fulfilled' && settledSky.status === 'fulfilled') {
-      const pair = { environment: settledEnvironment.value, sky: settledSky.value };
-      return {
-        ...pair,
-        dispose: () => {
-          pair.environment.dispose();
-          pair.sky.dispose();
-        },
-      };
-    }
-    if (settledEnvironment.status === 'fulfilled') settledEnvironment.value.dispose();
-    if (settledSky.status === 'fulfilled') settledSky.value.dispose();
-    throw settledEnvironment.status === 'rejected' ? settledEnvironment.reason : (settledSky as PromiseRejectedResult).reason;
-  } finally {
-    unhook.abort();
-  }
 }
