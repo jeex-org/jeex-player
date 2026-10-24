@@ -134,8 +134,8 @@ export function exportGraph(root: THREE.Object3D, rows: readonly ElementRow[]): 
   const byOpeningId = new Map<string, number>();
   const byAssetId = new Map<string, number>();
   rows.forEach((row, rowIndex) => {
-    // A face row's own id is a derived GUID; the face it names is spelled out beside it.
-    if (row.class === 'wallFace' && row.wallId !== undefined && row.side !== undefined) {
+    // A face row has no id; it is addressed by its wall, side and room.
+    if (row.class === 'wallFace') {
       byFace.set(faceKey(row.roomId ?? null, row.wallId, row.side), rowIndex);
     } else if (row.class === 'opening') byOpeningId.set(row.id, rowIndex);
     else if (row.class === 'furniture') byAssetId.set(row.id, rowIndex);

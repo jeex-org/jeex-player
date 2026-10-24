@@ -1,8 +1,6 @@
 import * as THREE from 'three';
 import { AssetLoader } from '../src/geometry/asset-loader.js';
 import { listCatalogueObjects } from '../src/assets/asset-catalogue.js';
-import { JEEX_GUID_NAMESPACE } from '../src/scene/guid.js';
-import { uuidV5 } from '../src/shared/uuid.js';
 import type { DemoAsset } from '../src/scene/types.js';
 import { playerLighting } from '../src/render/lighting-engine.js';
 
@@ -33,9 +31,24 @@ const GALLERY_CEILING = 2.7; // metres - the height ceiling fixtures hang from h
 
 type Specimen = { placement: DemoAsset; label: string; width: number; depth: number; height: number; anchor: string };
 
-/** The placement id of the specimen showing `variantId`: a UUID v5 of it, the same on every load. */
-function specimenId(variantId: string): string {
-  return uuidV5(JEEX_GUID_NAMESPACE, `jeex-gallery-specimen:${variantId}`);
+/**
+ * A fresh UUID v7 for one specimen placement (RFC 9562: 48 bits of Unix
+ * milliseconds, version 7, 74 random bits, variant 10). The gallery is the
+ * author of its own throwaway document, so it mints its placement ids, once
+ * per load; nothing looks a specimen up by id. `crypto.randomUUID` would give
+ * a v4, which the scene's id grammar refuses.
+ */
+function specimenId(): string {
+  const bytes = crypto.getRandomValues(new Uint8Array(16));
+  let millis = Date.now();
+  for (let index = 5; index >= 0; index -= 1) {
+    bytes[index] = millis % 256;
+    millis = Math.floor(millis / 256);
+  }
+  bytes[6] = (bytes[6]! & 0x0f) | 0x70;
+  bytes[8] = (bytes[8]! & 0x3f) | 0x80;
+  const hex = Array.from(bytes, (byte) => byte.toString(16).padStart(2, '0')).join('');
+  return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-${hex.slice(12, 16)}-${hex.slice(16, 20)}-${hex.slice(20)}`;
 }
 
 function specimens(): Specimen[] {
@@ -56,10 +69,9 @@ function specimens(): Specimen[] {
     for (const variant of variants) {
       const dims = variant.dims ?? object.dims;
       out.push({
-        // A specimen is derived from its variant, so its id is derived too
-        // (deterministic, like a face GUID): never the variant's own UUID, which
-        // names a different thing, and never minted. The slug is only the label.
-        placement: { id: specimenId(variant.id), type: object.id, asset: object.id, variant: variant.id, position: { x: 0, y: 0, z: 0 } },
+        // The placement's own id, minted here: never the variant's UUID, which
+        // names a different thing, and never derived from it. The slug is only the label.
+        placement: { id: specimenId(), type: object.id, asset: object.id, variant: variant.id, position: { x: 0, y: 0, z: 0 } },
         label: variant.slug,
         width: dims[0],
         depth: dims[2],
