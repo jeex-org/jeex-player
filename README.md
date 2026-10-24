@@ -931,7 +931,7 @@ type LibraryMaterial = {
     averageColour: string;           // #rrggbb
     pbr: {                           // every field optional; colours #rrggbb
       baseColour?: string; roughness?: number; metalness?: number; alphaMode?: 'opaque' | 'blend' | 'mask'; opacity?: number;
-      sheen?: number; sheenColour?: string; clearcoat?: number; clearcoatRoughness?: number; transmission?: number;
+      sheen?: number; sheenColour?: string; sheenRoughness?: number; clearcoat?: number; clearcoatRoughness?: number; transmission?: number;
       ior?: number; thicknessM?: number; attenuationDistanceM?: number; attenuationColour?: string;
       emissive?: string; emissiveIntensity?: number;
     };
@@ -968,7 +968,7 @@ A material is either `pbr` (KTX2 maps inside the folder) or `generator` — a na
 
 A `library` material is the shape a catalogue bake writes for a scanned texture set (`scan`) or a parameter-only material such as a paint (`parameters`). Every object in it is strict, nothing is defaulted while reading (metalness 0, roughness 1, alpha `opaque` and normal strength 1 apply when drawing), and these rules are checked with the rest of the manifest:
 
-- Ranges: roughness, metalness, opacity, sheen, clearcoat, clearcoat roughness and transmission in [0, 1]; `ior` in [1, 2.333]; `thicknessM`, `attenuationDistanceM` and `emissiveIntensity` at least 0; every number finite.
+- Ranges: roughness, metalness, opacity, sheen, sheen roughness, clearcoat, clearcoat roughness and transmission in [0, 1]; `ior` in [1, 2.333]; `thicknessM`, `attenuationDistanceM` and `emissiveIntensity` at least 0; every number finite.
 - A `natural` scan ships `albedo` and no `albedoTint`, a `tintable` one `albedoTint` and no `albedo`; `normal` is optional; a scan has a `tileM`.
 - Surface maps are either `arm` or `roughness` (with `ao` optional), never `arm` beside `roughness` or `ao`; `ao` alone is refused.
 - `albedo` and `albedoTint` are `srgb`, every other role `linear`; `convention` appears only on `normal`.
@@ -1026,7 +1026,7 @@ A `library` material ([its shape](#project-format)) dresses room floors, walls, 
 
 - **First frame.** Every library surface is drawn flat at once, with no network in the first frame: `averageColour` for a natural material, `averageColour` times the tint in linear light for a tintable scan, the tint itself for a tintable paint. The maps are fetched afterwards, and a surface takes them as they arrive. A tintable material is tinted with its finish value's `colour`, else its first suggested colour; a natural one ignores `colour`.
 - **Size by device.** One size per map per document, by the WebGL context's capability class (whether or not telemetry is on): 256 px on a low device, 512 on a mid one, 768 on a high one, or the nearest size the material lists (the smaller on a tie). Without a WebGL context nothing is fetched.
-- **Drawing.** Repeating, mipmapped, trilinear, anisotropy up to 8; colour maps in sRGB, the others as data; one ARM image for ambient occlusion, roughness and metalness; OpenGL normals scaled by `normalStrength`; metres divided by `tileM`, turned by the floor grain (a plank scan follows the room's longest edge) plus the finish value's `rotation`. glTF's defaults apply when drawing: metalness 0, roughness 1, opaque, mask cutoff 0.5; a physical field (sheen, clearcoat, transmission, `ior`, thickness, attenuation) selects three's physical material.
+- **Drawing.** Repeating, mipmapped, trilinear, anisotropy up to 8; colour maps in sRGB, the others as data; one ARM image for ambient occlusion, roughness and metalness; OpenGL normals scaled by `normalStrength`; metres divided by `tileM`, turned by the floor grain (a plank scan follows the room's longest edge) plus the finish value's `rotation`. glTF's defaults apply when drawing: metalness 0, roughness 1, opaque, mask cutoff 0.5; a physical field (sheen, sheen colour, sheen roughness, clearcoat, transmission, `ior`, thickness, attenuation) selects three's physical material. A sheen without a sheen colour is drawn in the tint (the finish colour, else the first suggested colour), or white without a tint; an absent sheen roughness is 1.
 - **Live resolver.** A host that serves its maps itself (an editor signing short-lived URLs, or previewing local files) passes `resolveTexture(path) => url | Promise<url>`: it is called with the logical path, lazily, once per size actually loaded, and must answer an absolute `http(s)` or a `blob:` URL; anything else, a throw or a rejection leaves that surface flat with a `texture-location` warning. Without it every path resolves against the manifest folder. The resolver is a function, so only a host that calls `mountViewer(options)` can pass it: the `<jeex-viewer>` element and the iframe embed have no spelling for it.
 - **Shared and released.** Every surface that draws one map shares one decoded image; repainting a surface releases its maps through the document's texture source and never an image another surface still draws. The encoded bytes are kept for the document, so a lost and restored rendering context draws the maps again without fetching them; unmounting releases everything.
 

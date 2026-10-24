@@ -712,7 +712,16 @@ describe('library member: PBR ranges', () => {
     issuePaths(withLibrary(naturalScan, (library) => void (library['facts']['pbr'][field] = value)));
 
   test('every unit-interval field refuses -0.01 and 1.01 and accepts both ends', () => {
-    for (const field of ['roughness', 'metalness', 'opacity', 'sheen', 'clearcoat', 'clearcoatRoughness', 'transmission']) {
+    for (const field of [
+      'roughness',
+      'metalness',
+      'opacity',
+      'sheen',
+      'sheenRoughness',
+      'clearcoat',
+      'clearcoatRoughness',
+      'transmission',
+    ]) {
       expect({ field, low: pbrIssues(field, -0.01), high: pbrIssues(field, 1.01) }).toEqual({
         field,
         low: [`${AT}.facts.pbr.${field}`],
@@ -739,6 +748,7 @@ describe('library member: PBR ranges', () => {
     for (const value of [Number.NaN, Number.POSITIVE_INFINITY, Number.NEGATIVE_INFINITY]) {
       expect(pbrIssues('roughness', value)).toEqual([`${AT}.facts.pbr.roughness`]);
       expect(pbrIssues('emissiveIntensity', value)).toEqual([`${AT}.facts.pbr.emissiveIntensity`]);
+      expect(pbrIssues('sheenRoughness', value)).toEqual([`${AT}.facts.pbr.sheenRoughness`]);
       expect(issuePaths(withLibrary(naturalScan, (library) => void (library['facts']['tileM'] = [value, 1])))).toEqual([
         `${AT}.facts.tileM.0`,
       ]);
