@@ -65,7 +65,12 @@ function harness(
     callback?.();
   };
 
-  return { runtime, stub, tick, viewport, scheduled: () => handles, cancelled: () => cancelled, pending: () => pending };
+  /** Time passing inside a frame (a draw that costs `ms`). */
+  const advance = (ms: number): void => {
+    clock += ms;
+  };
+
+  return { runtime, stub, tick, advance, viewport, scheduled: () => handles, cancelled: () => cancelled, pending: () => pending };
 }
 
 describe('RenderRuntime construction', () => {
@@ -391,6 +396,22 @@ describe('drawing on demand in walk and tour', () => {
     tick(16);
     tick(16);
     expect(runtime.demand.counters().draws).toBe(3);
+    expect(stub.renders).toBe(2);
+    runtime.dispose();
+  });
+
+  test('a draw slower than the heartbeat still leaves the flat plan a heartbeat, not a draw every tick', () => {
+    const { runtime, stub, tick, advance } = resting('plan2d');
+    runtime.setRenderEnabled(false);
+    // A slow device: every draw costs longer than the keep-warm interval.
+    const render = runtime.renderer.render.bind(runtime.renderer);
+    runtime.renderer.render = (scene, view) => {
+      advance(KEEP_WARM_MS + 100);
+      render(scene, view);
+    };
+    tick(KEEP_WARM_MS);
+    expect(stub.renders).toBe(2);
+    for (let frame = 0; frame < 10; frame += 1) tick(16);
     expect(stub.renders).toBe(2);
     runtime.dispose();
   });
