@@ -25,4 +25,4 @@
 
 - [x] 5.1 Browser checks: «Original» keeps editing-mode frames pixel-identical to main; swatches unchanged; warm/cold chromaticity and luminance within 5 % on a lamp-lit grey card; context restore keeps the value; live and default-state stills and a panorama show the temperature.
 - [x] 5.2 Before/after shots from identical, logged poses (living room with lamps at Original, 2700 K, 6500 K; the sunlit floor in walk before and after the sun factor; the bar with and without the settings button, wide and narrow), saved outside the repository.
-- [ ] 5.3 Fast tier green, then the full gate once through the machine's gate queue.
+- [x] 5.3 Fast tier green, then the full gate once through the machine's gate queue.
