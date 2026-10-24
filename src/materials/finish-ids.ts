@@ -65,6 +65,7 @@ export const FINISH = {
   glass_smoke: '01a12fdf-15ba-7087-824d-158afde43901',
   mirror_silver: '01a12fdf-15bb-7f56-b4a5-fd4225fc161d',
   screen_dark: '01a12fdf-15bc-76cf-8150-ada92a4e1414',
+  screen_tv: '01a16b46-d610-712b-ae1f-43b17c76871f',
   shade_ivory: '01a12fdf-15bd-7baf-87cd-2d38bb111d05',
   shade_ink: '01a12fdf-15be-77dd-9224-13798dca3241',
   shade_opal: '01a12fdf-15bf-70ca-af78-799920d12687',

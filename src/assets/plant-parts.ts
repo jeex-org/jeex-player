@@ -553,7 +553,10 @@ export function potSphere(group: THREE.Group, kit: BuildKit, radius: number, hei
  */
 export function fitCrown(crown: THREE.Group, soilTop: number, targetTop: number, maxWidth: number, maxDepth: number): number {
   crown.name = CROWN_NAME;
-  const box = new THREE.Box3().setFromObject(crown);
+  // Vertex-exact: the default box takes each blade's bounding box through its
+  // lean and scale, which overstates a crown's top and reach by centimetres,
+  // so a crown fitted to it came out up to 9 cm short of its declared height.
+  const box = new THREE.Box3().setFromObject(crown, true);
   const rise = box.max.y - soilTop;
   const lift = rise > 1e-6 ? (targetTop - soilTop) / rise : 1;
   const reachX = Math.max(box.max.x, -box.min.x) * lift;

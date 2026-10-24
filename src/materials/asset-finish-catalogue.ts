@@ -309,6 +309,16 @@ export const ASSET_FINISHES: readonly (FinishDefinition & { readonly slug: strin
     pbr: { color: '#0f1518', roughness: 0.12, metalness: 0.2, emissive: '#16323a', emissiveIntensity: 0.35 },
   },
   {
+    id: FINISH.screen_tv,
+    slug: 'screen_tv',
+    name: 'TV screen',
+    tags: ['glass', 'dark'],
+    apply: ['glass', 'decor'],
+    // A switched-off panel: near-black glass under a hard clear coat, so it
+    // reads black and still catches the room's highlights; no glow of its own.
+    pbr: { color: '#060809', roughness: 0.05, metalness: 0, clearcoat: 1, clearcoatRoughness: 0.03 },
+  },
+  {
     id: FINISH.shade_ivory,
     slug: 'shade_ivory',
     name: 'Ivory shade',

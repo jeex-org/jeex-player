@@ -111,7 +111,9 @@ describe('houseplant builders', () => {
   test.each(VARIANTS)('%s fills the box it declares and never leaves it', (id, _object, variant) => {
     const built = build(_object, variant);
     const dims = variant.dims ?? _object.dims;
-    const box = new THREE.Box3().setFromObject(built.group);
+    // Vertex-exact: the default box of a leaning, scaled blade overstates its
+    // reach, and a crown fitted to that overstatement fell up to 9 cm short.
+    const box = new THREE.Box3().setFromObject(built.group, true);
     const size = box.getSize(new THREE.Vector3());
     expect({ id, sunk: box.min.y < -BOX_TOLERANCE_M / 10 }).toEqual({ id, sunk: false });
     expect(box.max.y).toBeCloseTo(dims[1], 2);

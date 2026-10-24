@@ -229,6 +229,8 @@ const CHAIR_POST_PROFILE: ReadonlyArray<readonly [number, number]> = [
   [0.0105, 0.62],
   [0.0098, 0.9],
 ];
+/** How far a dining chair's back posts lean back out of the vertical, radians. */
+const CHAIR_BACK_LEAN = 0.045;
 const STOOL_LEG_PROFILE: ReadonlyArray<readonly [number, number]> = [
   [0.0165, 0.0],
   [0.0165, 0.007],
@@ -311,18 +313,23 @@ export const buildChair: Builder = (asset, kit) => {
   const seatThickness = 0.045;
   const inset = 0.048;
   const frame = kit.finish('frame');
+  // The rear posts are the back legs too: each rises from the floor to the top
+  // of the back, leaning back by `CHAIR_BACK_LEAN` about its own foot, and the
+  // back slat and rail sit on the posts wherever the lean has carried them.
+  const postFootZ = -(depth / 2 - inset) - 0.012;
+  const postZ = (y: number): number => postFootZ - Math.sin(CHAIR_BACK_LEAN) * y;
+  const postNominal = CHAIR_POST_PROFILE.at(-1)![1];
 
   for (const x of [-1, 1]) {
     turnedLeg(group, kit, CHAIR_LEG_PROFILE, 'leg', x * (width / 2 - inset), depth / 2 - inset, seatHeight - seatThickness);
     const post = put(group, kit.lathe(CHAIR_POST_PROFILE, 12), kit.finish('leg'), {
       x: x * (width / 2 - inset),
-      y: height / 2,
-      z: -(depth / 2 - inset),
+      z: postFootZ,
       ry: Math.PI / 4,
-      sy: height / 0.9,
+      sy: height / postNominal,
     });
-    post.rotation.x = -0.045;
-    post.position.z -= 0.012;
+    post.rotation.x = -CHAIR_BACK_LEAN;
+    post.name = 'chair-post';
   }
   for (const x of [-1, 1]) {
     put(group, kit.box(0.022, 0.022, depth - inset * 2), kit.finish('leg'), { x: x * (width / 2 - inset), y: 0.2, z: 0 });
@@ -338,8 +345,10 @@ export const buildChair: Builder = (asset, kit) => {
   });
 
   const backTop = height - 0.03;
-  put(group, kit.rounded(width - 0.09, 0.19, 0.032, 0.014), frame, { y: backTop - 0.11, z: -(depth / 2 - inset) - 0.024, rx: -0.045 });
-  put(group, kit.rounded(width - 0.09, 0.055, 0.028, 0.012), frame, { y: seatHeight + 0.17, z: -(depth / 2 - inset) - 0.017, rx: -0.045 });
+  const slatY = backTop - 0.11;
+  const railY = seatHeight + 0.17;
+  put(group, kit.rounded(width - 0.09, 0.19, 0.032, 0.014), frame, { y: slatY, z: postZ(slatY) + 0.001, rx: -CHAIR_BACK_LEAN });
+  put(group, kit.rounded(width - 0.09, 0.055, 0.028, 0.012), frame, { y: railY, z: postZ(railY) + 0.0035, rx: -CHAIR_BACK_LEAN });
   return group;
 };
 
