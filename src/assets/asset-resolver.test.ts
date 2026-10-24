@@ -201,7 +201,7 @@ describe('builder options', () => {
 });
 
 describe('baked variants', () => {
-  /** A project object the way a catalogue publishes a baked variant: own part names, no finish bound. */
+  /** A project object the way a catalogue publishes it: a GLB, own part names, no builder. */
   const bakedObject = (extra: Partial<ResolvableObject> = {}): ResolvableObject => ({
     id: LOUNGE,
     name: 'Lounge chair',
@@ -232,17 +232,30 @@ describe('baked variants', () => {
     expect(isResolved(result) && result.asset.baked).toBe(true);
   });
 
-  test('a variant that names a finish is not baked', () => {
+  test('a builder-less GLB variant that names a finish is still baked', () => {
     const object = bakedObject({
       variants: [
         { id: LOUNGE_BLACK, name: 'Black', version: '1.0.0', finishes: { upholstery: UNKNOWN_FINISH }, pricing: { model: 'free' } },
       ],
     });
-    expect(isBakedVariant(object, object.variants[0]!)).toBe(false);
+    expect(isBakedVariant(object, object.variants[0]!)).toBe(true);
   });
 
-  test('an archetype with default finishes is not baked', () => {
+  test('a builder-less GLB archetype with default finishes is still baked', () => {
     const object = bakedObject({ defaultFinishes: { upholstery: FINISH.linen_sand } });
+    expect(isBakedVariant(object, object.variants[0]!)).toBe(true);
+    const result = resolveIn(object);
+    expect(isResolved(result) && result.asset.baked).toBe(true);
+  });
+
+  test("a builder-less variant without its own GLB is baked under the archetype's", () => {
+    const object = bakedObject({ defaultFinishes: { upholstery: FINISH.linen_sand } });
+    expect(object.variants[0]!.model).toBeUndefined();
+    expect(isBakedVariant(object, object.variants[0]!)).toBe(true);
+  });
+
+  test('a builder archetype with a GLB that declares finishes is not baked', () => {
+    const object = bakedObject({ builder: 'armchair', defaultFinishes: { upholstery: FINISH.linen_sand } });
     expect(isBakedVariant(object, object.variants[0]!)).toBe(false);
   });
 
