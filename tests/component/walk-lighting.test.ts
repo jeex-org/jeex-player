@@ -63,6 +63,9 @@ async function centreLuminance(blob: Blob, size = 8): Promise<number> {
   return sum / (data.length / 4);
 }
 
+/** The lighting's own refresh, taken before any test wraps it. */
+const REFRESH = original(WalkLighting.prototype, 'refresh');
+
 /* --------------------------------------------------------------- engine pins */
 
 /** A renderer of its own, with the lighting standard's display transform. */
@@ -520,17 +523,20 @@ describe('room lighting on the demo apartment', { timeout: MOUNT_TIMEOUT_MS }, (
       if (position) captures.push(position.clone());
       return fromScene.apply(this, args);
     });
-    const refresh = original(WalkLighting.prototype, 'refresh');
     let drawsAtRefresh = -1;
+    // Counted here: spying on a method an earlier test spied on hands back that spy, calls included.
+    let refreshes = 0;
     const refreshed = vi.spyOn(WalkLighting.prototype, 'refresh').mockImplementation(function (this: WalkLighting, ...args) {
+      refreshes += 1;
       drawsAtRefresh = debug().renderDemand().draws;
-      refresh.apply(this, args);
+      REFRESH.apply(this, args);
     });
     expect(debug().applyOps([{ op: 'move_object', assetId: asset.id, position: to }]).error).toBeUndefined();
-    await until(() => refreshed.mock.calls.length > 0, 'the refresh after the debounce', 60_000);
+    await until(() => refreshes > 0, 'the refresh after the debounce', 60_000);
     spy.mockRestore();
     refreshed.mockRestore();
-    const lampNow = lampBox();
+    // The moved lamp as the scene now holds it (a move may rebuild the item).
+    const lampNow = new THREE.Box3().setFromObject(livingFloorLamp(lighting.scene));
     const after = internals.volumes.probes.find((p) => p.roomId === ROOM.living)!.position;
     record('livingProbeAfterLampMove', {
       before: probe,
