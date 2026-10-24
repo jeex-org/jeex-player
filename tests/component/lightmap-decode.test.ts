@@ -99,7 +99,7 @@ describe('RGBM decode', () => {
     const root = new THREE.Group();
     root.add(new THREE.Mesh(new THREE.PlaneGeometry(), material));
     expect(installWalkPatch(root, createWalkUniforms())).toBe(1);
-    expect(material.customProgramCacheKey()).toMatch(/\|jeex-walk-lighting@3\|jeex-baked-surface@2\|jeex-lightmap-rgbm-r8@1$/);
+    expect(material.customProgramCacheKey()).toMatch(/\|jeex-walk-lighting@4\|jeex-baked-surface@2\|jeex-lightmap-rgbm-r8@1$/);
     // Marked baked, the lightmap carries the editing gain on top of the decode.
     const gain = LIGHTING_STANDARD.baked.exposure.editing;
     const got = readCentre(material);

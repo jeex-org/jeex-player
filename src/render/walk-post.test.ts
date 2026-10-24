@@ -15,12 +15,16 @@ describe('WALK_POST_TUNING', () => {
       colourType: THREE.HalfFloatType,
       samples: 0,
       denoise: { depthPhi: 0.05, normalPhi: 8, lumaPhi: 10, radius: 6, samples: 16 },
+      // The calibrated values and their measurement are pinned by `tests/component/walk-glossy.test.ts`.
+      whiteBalance: { source: [expect.any(Number), expect.any(Number), expect.any(Number)], degree: expect.any(Number) },
     });
   });
 
   test('is frozen', () => {
     expect(Object.isFrozen(WALK_POST_TUNING)).toBe(true);
     expect(Object.isFrozen(WALK_POST_TUNING.denoise)).toBe(true);
+    expect(Object.isFrozen(WALK_POST_TUNING.whiteBalance)).toBe(true);
+    expect(Object.isFrozen(WALK_POST_TUNING.whiteBalance.source)).toBe(true);
   });
 });
 

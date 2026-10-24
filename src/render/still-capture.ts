@@ -100,32 +100,40 @@ void main() {
  * already declared and a second copy fails to compile; the tone-mapping chunk
  * is in the prefix only when tone mapping is on, which — rendering into a
  * render target — it never is.
+ *
+ * `whiteBalanced`: the texel is first multiplied by the `jeexWhiteBalance`
+ * uniform (a linear 3x3 matrix) and clamped at zero, as the walk chain's
+ * output pass does (`walk-post.ts`).
  */
-export function displayFragment(renderer: THREE.WebGLRenderer, declarations: string, sample: string): string {
+export function displayFragment(renderer: THREE.WebGLRenderer, declarations: string, sample: string, whiteBalanced = false): string {
   const toneMapping = TONE_MAPPING_NAMES.get(renderer.toneMapping);
   return /* glsl */ `
 varying vec2 vUv;
 ${declarations}
+${whiteBalanced ? 'uniform mat3 jeexWhiteBalance;' : ''}
 ${THREE.ShaderChunk.tonemapping_pars_fragment}
 void main() {
   vec4 texel = ${sample};
+  ${whiteBalanced ? 'texel.rgb = max(jeexWhiteBalance * texel.rgb, vec3(0.0));' : ''}
   ${toneMapping === undefined ? '' : `texel = vec4(${toneMapping}(texel.rgb), texel.a);`}
   gl_FragColor = sRGBTransferOETF(texel);
 }
 `;
 }
 
-/** The material of a display pass, carrying the renderer's exposure. */
+/** The material of a display pass, carrying the renderer's exposure and, when given, a white balance (nine numbers, row-major). */
 export function displayMaterial(
   renderer: THREE.WebGLRenderer,
   uniforms: Record<string, THREE.IUniform>,
   declarations: string,
   sample: string,
+  whiteBalance: readonly number[] | null = null,
 ): THREE.ShaderMaterial {
+  const balance = whiteBalance ? { jeexWhiteBalance: { value: new THREE.Matrix3().fromArray(whiteBalance).transpose() } } : {};
   return new THREE.ShaderMaterial({
-    uniforms: { ...uniforms, toneMappingExposure: { value: renderer.toneMappingExposure } },
+    uniforms: { ...uniforms, ...balance, toneMappingExposure: { value: renderer.toneMappingExposure } },
     vertexShader: QUAD_VERTEX,
-    fragmentShader: displayFragment(renderer, declarations, sample),
+    fragmentShader: displayFragment(renderer, declarations, sample, whiteBalance !== null),
     depthTest: false,
     depthWrite: false,
   });

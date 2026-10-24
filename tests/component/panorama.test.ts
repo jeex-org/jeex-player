@@ -10,6 +10,7 @@
 import * as THREE from 'three';
 import { afterEach, describe, expect, test } from 'vitest';
 import { capturePanorama } from '../../src/render/panorama.js';
+import { whiteBalanceMatrix } from '../../src/render/white-balance.js';
 import { closeContainers } from './support.js';
 
 const renderers: THREE.WebGLRenderer[] = [];
@@ -123,5 +124,31 @@ describe('capturePanorama', () => {
     parent.add(root);
     await capturePanorama(renderer, root, { width: 128, position: { x: 0, y: 0, z: 0 }, faceSize: 64 });
     expect(root.parent).toBe(parent);
+  });
+
+  test('a white balance applies once in the display pass, clamped at zero; without one nothing changes', async () => {
+    /** A uniform box of linear colour `rgb` around the camera. */
+    const uniform = (rgb: readonly number[]): THREE.Scene => {
+      const scene = new THREE.Scene();
+      const colour = new THREE.Color().setRGB(rgb[0]!, rgb[1]!, rgb[2]!, THREE.LinearSRGBColorSpace);
+      scene.add(new THREE.Mesh(new THREE.BoxGeometry(6, 3, 6), new THREE.MeshBasicMaterial({ color: colour, side: THREE.BackSide })));
+      return scene;
+    };
+    const centre = (image: ImageData): number[] => {
+      const at = ((image.height >> 1) * image.width + (image.width >> 1)) * 4;
+      return [image.data[at]!, image.data[at + 1]!, image.data[at + 2]!];
+    };
+    const matrix = whiteBalanceMatrix([1, 0.6, 0.35], 0.8);
+    const colour = [0.6, 0.3, 0.05];
+    const balanced = [0, 1, 2].map((r) =>
+      Math.max(0, matrix[r * 3]! * colour[0]! + matrix[r * 3 + 1]! * colour[1]! + matrix[r * 3 + 2]! * colour[2]!),
+    );
+    const spec = { width: 128, position: { x: 0, y: 0, z: 0 }, faceSize: 32 };
+    const renderer = openRenderer();
+    const got = centre(await decode((await capturePanorama(renderer, uniform(colour), { ...spec, whiteBalance: matrix })).blob));
+    const want = centre(await decode((await capturePanorama(renderer, uniform(balanced), spec)).blob));
+    for (let channel = 0; channel < 3; channel += 1) expect(Math.abs(got[channel]! - want[channel]!)).toBeLessThanOrEqual(1);
+    const plain = centre(await decode((await capturePanorama(renderer, uniform(colour), spec)).blob));
+    expect(plain).not.toEqual(got);
   });
 });

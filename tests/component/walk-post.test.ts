@@ -15,7 +15,8 @@
 import * as THREE from 'three';
 import { Reflector } from 'three/addons/objects/Reflector.js';
 import { afterEach, describe, expect, test, vi } from 'vitest';
-import { createWalkPost, WalkPost } from '../../src/render/walk-post.js';
+import { createWalkPost, WalkPost, whiteBalancedOutput } from '../../src/render/walk-post.js';
+import { whiteBalanceMatrix, type Mat3 } from '../../src/render/white-balance.js';
 import { createRenderRuntime, type RenderRuntime } from '../../src/render/render-runtime.js';
 import { loadWalkPost, WalkPostController } from '../../src/app/walk-post-controller.js';
 import { mainPassOnly } from '../../src/assets/mirror-capture.js';
@@ -61,8 +62,16 @@ function renderer(width = WIDTH, height = HEIGHT): THREE.WebGLRenderer {
   return gl;
 }
 
-async function chainOn(gl: THREE.WebGLRenderer, scene: THREE.Scene, camera: THREE.Camera): Promise<WalkPost> {
-  const chain = await createWalkPost(gl, scene, camera);
+/** The white balance that changes nothing: what comparisons with the direct path use. */
+const IDENTITY: Mat3 = [1, 0, 0, 0, 1, 0, 0, 0, 1];
+
+async function chainOn(
+  gl: THREE.WebGLRenderer,
+  scene: THREE.Scene,
+  camera: THREE.Camera,
+  whiteBalance: Mat3 = IDENTITY,
+): Promise<WalkPost> {
+  const chain = await createWalkPost(gl, scene, camera, { whiteBalance });
   disposers.push(() => chain.dispose());
   return chain;
 }
@@ -111,6 +120,45 @@ function room(): { scene: THREE.Scene; camera: THREE.PerspectiveCamera } {
   camera.updateMatrixWorld();
   return { scene, camera };
 }
+
+describe('the white balance in the output pass', () => {
+  /** A flat unlit patch of linear colour `rgb` filling the view. */
+  function patch(rgb: readonly number[]): { scene: THREE.Scene; camera: THREE.PerspectiveCamera } {
+    const scene = new THREE.Scene();
+    const colour = new THREE.Color().setRGB(rgb[0]!, rgb[1]!, rgb[2]!, THREE.LinearSRGBColorSpace);
+    scene.background = colour;
+    scene.add(new THREE.Mesh(new THREE.PlaneGeometry(20, 20), new THREE.MeshBasicMaterial({ color: colour })));
+    const camera = new THREE.PerspectiveCamera(40, WIDTH / HEIGHT, 0.1, 50);
+    camera.position.set(0, 0, 5);
+    camera.updateMatrixWorld();
+    return { scene, camera };
+  }
+
+  test('applies the matrix once, before the display transform, clamped at zero; adds no pass', async () => {
+    const matrix = whiteBalanceMatrix([1, 0.6, 0.35], 0.8);
+    const colour = [0.6, 0.3, 0.05];
+    const balanced = [0, 1, 2].map((r) =>
+      Math.max(0, matrix[r * 3]! * colour[0]! + matrix[r * 3 + 1]! * colour[1]! + matrix[r * 3 + 2]! * colour[2]!),
+    );
+    const gl = renderer();
+    const a = patch(colour);
+    const chain = await chainOn(gl, a.scene, a.camera, matrix);
+    chain.render(a.scene, a.camera, 0);
+    const got = pixel(gl, WIDTH / 2, HEIGHT / 2);
+    const b = patch(balanced);
+    const plain = await chainOn(gl, b.scene, b.camera);
+    plain.render(b.scene, b.camera, 0);
+    const want = pixel(gl, WIDTH / 2, HEIGHT / 2);
+    for (let channel = 0; channel < 3; channel += 1) expect(Math.abs(got[channel]! - want[channel]!)).toBeLessThanOrEqual(1);
+    expect(chain.whiteBalance).toEqual(matrix);
+    expect(chain.composer.passes).toHaveLength(plain.composer.passes.length);
+    expect(chain.composer.passes).toHaveLength(4);
+  });
+
+  test('a shader without the anchor the white balance follows is refused', () => {
+    expect(() => whiteBalancedOutput('void main() { gl_FragColor = vec4(1.0); }')).toThrow();
+  });
+});
 
 describe('the chain over a small room', () => {
   test('darkens the floor-to-wall corner relative to open floor, and leaves the open floor within 2 %', async () => {

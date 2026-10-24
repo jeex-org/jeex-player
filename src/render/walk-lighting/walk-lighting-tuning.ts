@@ -31,6 +31,14 @@ export const WALK_LIGHTING_TUNING = Object.freeze({
   probesPerFrame: 6,
   /** Height of a room's reflection probe above the floor, metres. */
   probeHeightM: 1.5,
+  /**
+   * Clearance a room's reflection probe keeps from every furniture box in 3D,
+   * metres; a target, not a guarantee (a crowded room takes its clearest
+   * point). Measured on the demo living room: a probe 9 cm from the floor
+   * lamp's glowing shade saw the shade fill its whole upward view, and every
+   * glossy floor there reflected one uniform blob instead of the room.
+   */
+  probeClearanceM: 0.5,
   /** Edge of a reflection probe's capture cube, texels; its PMREM output then has the studio environment's layout. */
   probeSize: 128,
   /** Room boxes the apartment may have; more keeps the direct look and reports an error. */
@@ -67,6 +75,19 @@ export const WALK_LIGHTING_TUNING = Object.freeze({
    * (`tests/component/walk-lighting.test.ts`).
    */
   walkSunScale: 1 / 3.5,
+  /**
+   * The brightest channel an emissive term (a lamp shade's glow) may reach in
+   * walk and tour, before tone mapping and after the walk exposure; the chroma
+   * is kept and a term under it passes unchanged. At the walk exposure the
+   * catalogue's shade glows read 0.79-6.66 and blew out against PBR Neutral's
+   * knee (0.76); the shade's lit part adds to this, so the cap sits below it.
+   * Measured 2026-10-24 on an NVIDIA GPU with the demo floor lamp
+   * (`tests/component/lamp-shade-emissive.test.ts`), the shade's mean
+   * brightest channel and its luminance over the unlit shade: ivory 0.667 and
+   * 1.63, opal 0.677 and 1.63, warm lamp 0.716 and 1.50, ink 0.306 and 6.97;
+   * every shade at or under 0.76 and at least 1.25 times its unlit self.
+   */
+  walkEmissiveCap: 0.3,
   /** Quiet time after the last edit in walk before the affected rooms are refreshed, milliseconds. */
   refreshDebounceMs: 1000,
   /** Quiet time after the last change of the artificial light's colour before the room probes are re-captured, milliseconds. */

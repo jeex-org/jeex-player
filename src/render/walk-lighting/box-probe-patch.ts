@@ -47,7 +47,7 @@ import type { RoomBox, RoomProbe } from './room-volumes.js';
 import { WALK_LIGHTING_TUNING as T } from './walk-lighting-tuning.js';
 
 /** The patch's transform: one program variant, whatever the state; the version changes with the shader text. */
-export const WALK_TRANSFORM = Object.freeze({ id: WALK_TRANSFORM_ID, version: 3 });
+export const WALK_TRANSFORM = Object.freeze({ id: WALK_TRANSFORM_ID, version: 4 });
 /** Edge of an atlas tile: the PMREM layout of a 128 px cube (and of the studio environment). */
 export const TILE = Object.freeze({ width: 384, height: 512 });
 /** Tiles per atlas column. */
@@ -78,6 +78,8 @@ export type WalkUniforms = {
   jeexOutside: { value: number };
   /** What direct sunlight inside the rooms is scaled by: the walk sun factor in walk, 1 otherwise. */
   jeexSun: { value: number };
+  /** The brightest channel an emissive term may reach, in shader units: the walk cap over the walk exposure in walk and capture, unbounded otherwise. */
+  jeexEmissiveCap: { value: number };
   jeexBoxProbes: { value: number };
   jeexBoxCount: { value: number };
   jeexSelMin: { value: THREE.Vector3[] };
@@ -109,6 +111,7 @@ export function createWalkUniforms(): WalkUniforms {
     jeexDiffuse: { value: 1 },
     jeexOutside: { value: 1 },
     jeexSun: { value: 1 },
+    jeexEmissiveCap: { value: UNCAPPED },
     jeexBoxProbes: { value: 0 },
     jeexBoxCount: { value: 0 },
     jeexSelMin: { value: vectors() },
@@ -148,6 +151,8 @@ export function setUniformState(uniforms: WalkUniforms, state: UniformState): vo
   uniforms.jeexBoxProbes.value = state === 'walk' ? 1 : 0;
   uniforms.jeexOutside.value = state === 'walk' ? 1 / T.walkExposure : 1;
   uniforms.jeexSun.value = state === 'walk' ? T.walkSunScale : 1;
+  // Captures record what walk shows: a probe sees the capped shade too.
+  uniforms.jeexEmissiveCap.value = state === 'editing' ? UNCAPPED : T.walkEmissiveCap / T.walkExposure;
 }
 
 /** Where each room's tile sits in the atlas, and the atlas size. */
@@ -186,6 +191,7 @@ const PARS = /* glsl */ `
 uniform float jeexDiffuse;
 uniform float jeexOutside;
 uniform float jeexSun;
+uniform float jeexEmissiveCap;
 uniform float jeexBoxProbes;
 uniform int jeexBoxCount;
 uniform vec3 jeexSelMin[ JEEX_MAX_BOXES ];
@@ -371,12 +377,51 @@ const OUTSIDE = /* glsl */ `
  * expanded text and a raw shader both work.
  */
 export function patchFragmentShader(source: string): string {
-  let out = expandOwnedChunks(source);
+  let out = guardBumpNormal(expandOwnedChunks(source));
   out = replaceAnchor(out, '#include <opaque_fragment>', OUTSIDE, WALK_TRANSFORM_ID);
+  const emissive = '#include <emissivemap_fragment>';
+  out = replaceAnchor(out, emissive, `${emissive}${EMISSIVE_CAP}`, WALK_TRANSFORM_ID);
   const pars = '#include <envmap_physical_pars_fragment>';
   out = replaceAnchor(out, pars, `${pars}\n${PARS}`, WALK_TRANSFORM_ID);
   return rewriteMaps(rewriteBegin(out));
 }
+
+/** The line of three r186's bump perturbation that normalises the perturbed normal. */
+const BUMP_NORMALISE = 'return normalize( abs( fDet ) * surf_norm - vGrad );';
+
+/**
+ * `source` with three's bump-map perturbation guarded: where the screen
+ * derivatives vanish (the edge pixels of a cube face on a software
+ * rasteriser), the perturbed normal is the zero vector and three normalised
+ * it into NaN, which a reflection probe's prefilter then spread over the
+ * whole probe; the guard keeps the surface normal there instead. A shader
+ * without a bump map is left alone; a three whose chunk lost the line fails
+ * loudly.
+ */
+export function guardBumpNormal(source: string): string {
+  const include = '#include <bumpmap_pars_fragment>';
+  if (!source.includes(include)) return source;
+  const chunk = THREE.ShaderChunk.bumpmap_pars_fragment;
+  const guarded = replaceAnchor(
+    chunk,
+    BUMP_NORMALISE,
+    'vec3 jeexBumped = abs( fDet ) * surf_norm - vGrad;\n\t\treturn dot( jeexBumped, jeexBumped ) > 1e-20 ? normalize( jeexBumped ) : surf_norm;',
+    WALK_TRANSFORM_ID,
+  );
+  return source.replace(include, () => guarded);
+}
+
+/** The emissive cap outside walk and capture: no material reaches it. */
+const UNCAPPED = 1e9;
+
+/**
+ * Caps the emissive term's brightest channel at `jeexEmissiveCap`, keeping its
+ * chroma; a term under the cap passes as it is.
+ */
+const EMISSIVE_CAP = /* glsl */ `
+#if defined( USE_ENVMAP ) && defined( ENVMAP_TYPE_CUBE_UV )
+	totalEmissiveRadiance *= min( 1.0, jeexEmissiveCap / max( max( totalEmissiveRadiance.r, totalEmissiveRadiance.g ), max( totalEmissiveRadiance.b, 1e-6 ) ) );
+#endif`;
 
 const PATCHED = Symbol('jeex-walk-patch');
 type Patchable = THREE.MeshStandardMaterial & { [PATCHED]?: true };

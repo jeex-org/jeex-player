@@ -4,6 +4,7 @@ import {
   atlasLayout,
   createWalkUniforms,
   ENGINE_CHUNK_ANCHORS,
+  guardBumpNormal,
   installWalkPatch,
   patchFragmentShader,
   WALK_TRANSFORM,
@@ -173,5 +174,18 @@ describe('atlasLayout', () => {
     expect(nine).toMatchObject({ columns: 2, rows: 5, width: 768, height: 2560 });
     expect(nine.tiles[5]).toEqual({ x: 384, y: 0 });
     expect(atlasLayout(16).height).toBeLessThanOrEqual(4096);
+  });
+});
+
+describe('guardBumpNormal', () => {
+  test('replaces the bump perturbation with one that keeps the surface normal where the perturbed one vanishes', () => {
+    const out = guardBumpNormal(THREE.ShaderLib.standard.fragmentShader);
+    expect(out).not.toContain('#include <bumpmap_pars_fragment>');
+    expect(out).not.toContain('return normalize( abs( fDet ) * surf_norm - vGrad );');
+    expect(out).toContain('dot( jeexBumped, jeexBumped ) > 1e-20 ? normalize( jeexBumped ) : surf_norm');
+  });
+
+  test('leaves a shader without the bump chunk alone', () => {
+    expect(guardBumpNormal('void main() {}')).toBe('void main() {}');
   });
 });
