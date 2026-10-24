@@ -9,6 +9,22 @@ as described under [Versioning](#versioning).
 
 ### Added
 
+- **Lamp lights in baked projects.** A project variant may carry `lights`:
+  1 to 4 point lights `{ kind: 'point', position, colour, lumens, cutoff,
+  shadow? }` in the variant's model frame. The player builds each as a
+  three.js `PointLight` under the lamp's body from the first frame (the
+  stand-in included), moves the same lights onto the GLB when it arrives,
+  builds the new variant's lights on a variant swap, and mirrors, tints (light
+  temperature) and bake-marks them like the bank's own lamps. A refused light
+  refuses the manifest (`project-invalid`); `formatVersion` stays 2 and every
+  existing manifest stays valid. `lampLightSchema` and the limits
+  `LAMP_MAX_LUMENS`, `LAMP_MAX_CUTOFF` and `LAMP_MAX_LIGHTS` are exported from
+  the manifest schema module, and `collectLampLights(root)`
+  (`src/render/lamp-lights.ts`) lists every fact light in world space for a
+  lightmap bake.
+- `jeex-viewer/lighting` exports `lampCandela(lumens)` and
+  `blenderPower(candela)`, and `LIGHTING_STANDARD.lamp.exposure` holds the
+  calibration (400 lm read as 1.2 cd). `LIGHTING_STANDARD_VERSION` stays 1.
 - **Light temperature.** The interior's artificial light (the object bank's
   lamps and the walk ambient floor) takes a colour temperature from 2700 K to
   6500 K in steps of 100, or «Original» (the default, today's look). Daylight,
@@ -375,6 +391,11 @@ as described under [Versioning](#versioning).
 
 ### Fixed
 
+- **Ceiling objects of a baked project hang from the ceiling.** A ceiling
+  object's `dims` stand-in and its GLB used to stand UP from the ceiling plane
+  (a 1.052 m pendant under a 2.65 m ceiling was drawn from 2.65 to 3.70 m);
+  both now hang their own height down from it, in the same world box, as the
+  layout rules always assumed. Objects of the built-in bank are unchanged.
 - **Built-in objects match the sizes and facts they declare.** The dining
   chair's rear posts stand on the floor as its back legs; the media unit is
   as tall as its dims (1.366 m, 1.512 m for the 2.2 m variant) and its

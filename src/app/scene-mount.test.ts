@@ -32,6 +32,15 @@ import { resolveViewerOptions } from './viewer-options.js';
 import type { Dollhouse } from '../geometry/dollhouse.js';
 import type { ViewerUI } from '../ui/viewer-ui.js';
 import type { ApartmentRig } from '../lighting/lighting-context.js';
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
+import { parseProjectManifest } from '../assets/project-manifest.schema.js';
+import { registriesFromLibrary } from '../scene/registries.js';
+import { projectLibraryOf } from '../assets/project-manifest.js';
+import { projectContext } from './project-wiring.js';
+import { tintArtificialLights } from '../render/light-temperature.js';
+import { lampLightTag } from '../assets/artificial-light.js';
+import { LAMP_PROJECT_FIXTURE as LAMPS } from '../../tests/fixtures/project/fixture-ids.js';
 
 const SOFA = L_SHAPE.asset.sofa;
 const TABLE = L_SHAPE.asset.table;
@@ -86,7 +95,7 @@ type Rig = {
   invalidations: () => number;
 };
 
-function rig(sunRig?: ApartmentRig): Rig {
+function rig(sunRig?: ApartmentRig, artificialLights?: (root: THREE.Object3D) => void): Rig {
   const scene = new THREE.Scene();
   const downloads: string[] = [];
   const seeded: SceneModel[] = [];
@@ -120,6 +129,7 @@ function rig(sunRig?: ApartmentRig): Rig {
     },
     onAssetsChanged: () => {},
     onModelsSettled: (model, result) => settled.push({ model, upgraded: result.upgraded, failed: result.failed }),
+    ...(artificialLights && { artificialLights }),
     onError: (error) => {
       throw new Error(error.message);
     },
@@ -445,5 +455,85 @@ describe('the bank the document is drawn with answers its floor questions', () =
     r.mount.mountDocument({ model: new SceneModel(lShapePlan, CATALOGUE_REGISTRIES), project: null });
     expect(r.seededFacts.at(-1)).toBe(shippedAssetFacts);
     expect(r.mount.layoutCatalogue()).toBe(shippedFacts);
+  });
+});
+
+/**
+ * A variant swap rebuilds the body through the loader, so it builds the NEW
+ * variant's lamp lights (or none); the mount then applies the current light
+ * temperature to the swapped group, as it does for every asset commit.
+ */
+describe("a variant swap builds the new variant's lamp lights under the current temperature", () => {
+  const LAMP_DIR = join(import.meta.dirname, '..', '..', 'tests', 'fixtures', 'project-lamps');
+  /** Two more variants of the fixture's table lamp: one unlit, one lit in a colder colour. */
+  const UNLIT = '01a16c55-3d04-74c8-846e-8ac9f1c75335';
+  const COLD = '01a16c55-3d04-74c9-9a88-945a30ab597a';
+  const COLD_COLOUR = '#e8eeff';
+
+  function lampManifest() {
+    const raw = JSON.parse(readFileSync(join(LAMP_DIR, 'project.json'), 'utf8')) as {
+      library: { objects: Array<{ variants: Array<Record<string, unknown>> }> };
+    };
+    const table = raw.library.objects[0]!;
+    const base = table.variants[0]!;
+    table.variants.push({ ...base, id: UNLIT, name: 'Table lamp, unlit' });
+    delete table.variants[1]!['lights'];
+    table.variants.push({
+      ...base,
+      id: COLD,
+      name: 'Table lamp, cold',
+      lights: [{ ...(base['lights'] as object[])[0], colour: COLD_COLOUR }],
+    });
+    return parseProjectManifest(raw);
+  }
+
+  function lampDocument(manifest: ReturnType<typeof lampManifest>, variant: string): LoadedDocument {
+    const scene = draftOf(JSON.parse(readFileSync(join(LAMP_DIR, 'scene.json'), 'utf8')) as SceneData);
+    scene.assets.find((asset) => asset.id === LAMPS.placement.tableLamp)!.variant = variant;
+    const context = projectContext({ manifest, baseUrl: 'https://lamps.test/bake/' }, QUIET);
+    const modelSource = (): Promise<ModelOutcome> => {
+      const group = new THREE.Group();
+      group.add(new THREE.Mesh(new THREE.BoxGeometry(0.3, 0.52, 0.3), new THREE.MeshStandardMaterial()));
+      return Promise.resolve({ group, triangles: 12, warnings: [], bytes: 16 });
+    };
+    return {
+      model: new SceneModel(scene, registriesFromLibrary(projectLibraryOf(manifest), CATALOGUE_REGISTRIES)),
+      project: { ...context, key: 'lamp-library', builderOptions: { ...context.builderOptions, modelSource } },
+    };
+  }
+
+  function factLights(group: THREE.Object3D): THREE.PointLight[] {
+    const lights: THREE.PointLight[] = [];
+    group.traverse((child) => {
+      if (lampLightTag(child) !== null) lights.push(child as THREE.PointLight);
+    });
+    return lights;
+  }
+
+  test('to an unlit variant: no light; to a lit one at 3000 K: its light tinted, «Original» restoring its own colour', async () => {
+    const manifest = lampManifest();
+    const subject = rig(undefined, (root) => tintArtificialLights(root, 3000));
+    subject.mount.mountDocument(lampDocument(manifest, LAMPS.variant.tableLamp));
+    await settle();
+    expect(factLights(placementGroup(subject.mount, LAMPS.placement.tableLamp))).toHaveLength(1);
+
+    subject.mount.present(lampDocument(manifest, UNLIT));
+    await settle();
+    const unlit = placementGroup(subject.mount, LAMPS.placement.tableLamp);
+    expect(unlit.userData['variantId']).toBe(UNLIT);
+    expect(factLights(unlit)).toEqual([]);
+
+    subject.mount.present(lampDocument(manifest, COLD));
+    await settle();
+    const cold = placementGroup(subject.mount, LAMPS.placement.tableLamp);
+    expect(cold.userData['variantId']).toBe(COLD);
+    const [light] = factLights(cold);
+    const authored = new THREE.Color(COLD_COLOUR);
+    const expected = new THREE.PointLight(COLD_COLOUR);
+    expected.userData['artificialLight'] = { colour: authored.toArray() };
+    tintArtificialLights(expected, 3000);
+    expect(light!.color.toArray()).toEqual(expected.color.toArray());
+    tintArtificialLights(subject.mount.sceneRoot!, null);
+    expect(light!.color.toArray()).toEqual(authored.toArray());
   });
 });

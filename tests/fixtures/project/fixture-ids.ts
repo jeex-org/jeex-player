@@ -62,3 +62,25 @@ export const LIBRARY_PROJECT_FIXTURE = {
   version: { scan: '01a1683e-d6fd-7e48-b046-25153a9ef95a', paint: '01a1683e-d6fe-7391-887a-d5c0bf074458' },
   room: { living: PROJECT_FIXTURE.room.living, bedroom: PROJECT_FIXTURE.room.bedroom },
 } as const;
+
+/**
+ * `tests/fixtures/project-lamps/`: two lamp archetypes whose variants carry a
+ * `lights` fact (a floor table lamp and a ceiling pendant), one room under a
+ * 2.65 m ceiling floored in the bundled oak, and the two lamp GLBs
+ * `scripts/make-fixture-glb.ts` writes.
+ */
+export const LAMP_PROJECT_FIXTURE = {
+  projectId: '01a16c09-ee6e-778b-9552-c778436584cb',
+  bakeId: '01a16c09-ee71-77a5-b006-5e121565c1bb',
+  workspaceId: '01a16c09-ee73-7268-8f42-856dc8e3dffd',
+  asset: { tableLamp: '01a16c09-ee76-75e7-9634-8e74a70212a9', pendant: '01a16c09-ee7f-7182-8ee4-57a784ebc41d' },
+  variant: { tableLamp: '01a16c09-ee79-7101-bb3d-9aeee94bccf2', pendant: '01a16c09-ee82-75aa-b49b-3898b69063f9' },
+  model: {
+    tableLamp: 'obj/01a16c09-ee8b-7580-aac8-305889675c7e.glb',
+    pendant: 'obj/01a16c09-ee8e-725c-83c3-401d45e70da5.glb',
+  },
+  material: { metal: '01a16c09-ee85-7317-a378-0188e5057913', shade: '01a16c09-ee88-74d2-b387-f53889ce55f1' },
+  scene: '01a16c4d-7294-7134-bdf2-d33b3ad6419b',
+  room: { living: '01a16c4d-7294-713d-beb1-ae2775cdb5d3' },
+  placement: { tableLamp: '01a16c4d-7294-713e-a60c-086555d388ec', pendant: '01a16c4d-7294-713f-a50a-63ce66df2bdd' },
+} as const;

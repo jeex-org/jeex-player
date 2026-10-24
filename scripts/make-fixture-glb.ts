@@ -1,6 +1,6 @@
 /**
- * Generates `tests/fixtures/project/obj/box-sofa@1.0.0.glb`, the only GLB the
- * repository carries.
+ * Generates the GLBs the fixture projects carry: `tests/fixtures/project/obj/box-sofa@1.0.0.glb`
+ * (and its KTX2 twin), and the two lamp bodies of `tests/fixtures/project-lamps/obj/`.
  *
  * It lives INSIDE the fixture project (`tests/fixtures/project/`) rather
  * than in a models folder of its own: a baked project names every file by a
@@ -30,7 +30,11 @@
  * A second, textured file (`BASISU_FIXTURE_OUTPUT`) carries the same box with
  * a `KHR_texture_basisu` base colour, for the KTX2 path.
  *
- * CLI: `bun scripts/make-fixture-glb.ts` (writes both fixtures in place).
+ * The lamp bodies (`LAMP_FIXTURES`) are the same kind of container: two blocks
+ * each, a `metal` stem or rod and a `shade`, measuring the lamp archetypes'
+ * `dims` in the model frame, so the lamp fixture's stand-ins and GLBs agree.
+ *
+ * CLI: `bun scripts/make-fixture-glb.ts` (writes every fixture in place).
  */
 
 import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
@@ -64,15 +68,67 @@ const BACK_DEPTH = 0.2;
 
 type Box = { min: readonly [number, number, number]; max: readonly [number, number, number] };
 
-/** The two blocks: a seat slab on the floor and a backrest along the +Z (rear) edge. */
-function blocks(): readonly Box[] {
+/** A glTF material of a fixture: its name (the slot it binds to), a flat colour and a roughness. */
+type FixtureMaterial = { readonly name: string; readonly colour: readonly [number, number, number, number]; readonly roughness: number };
+
+/** One fixture body: its node name and its blocks, block `i` wearing material `i`. */
+export type FixtureModel = { readonly node: string; readonly blocks: readonly Box[]; readonly materials: readonly FixtureMaterial[] };
+
+/** The box sofa: a seat slab on the floor and a backrest along the +Z (rear) edge. */
+function sofaModel(): FixtureModel {
   const hx = FIXTURE_DIMS[0] / 2;
   const hz = FIXTURE_DIMS[2] / 2;
-  return [
-    { min: [-hx, 0, -hz], max: [hx, SEAT_TOP, hz] },
-    { min: [-hx, SEAT_TOP, hz - BACK_DEPTH], max: [hx, FIXTURE_DIMS[1], hz] },
-  ];
+  return {
+    node: 'box_sofa',
+    blocks: [
+      { min: [-hx, 0, -hz], max: [hx, SEAT_TOP, hz] },
+      { min: [-hx, SEAT_TOP, hz - BACK_DEPTH], max: [hx, FIXTURE_DIMS[1], hz] },
+    ],
+    materials: [
+      { name: 'seat', colour: [0.78, 0.73, 0.64, 1], roughness: 0.9 },
+      { name: 'frame', colour: [0.45, 0.33, 0.22, 1], roughness: 0.6 },
+    ],
+  };
 }
+
+const LAMP_METAL: FixtureMaterial = { name: 'metal', colour: [0.23, 0.21, 0.19, 1], roughness: 0.4 };
+const LAMP_SHADE: FixtureMaterial = { name: 'shade', colour: [0.94, 0.9, 0.83, 1], roughness: 0.9 };
+
+/**
+ * The lamp fixture's two bodies, at the paths its manifest names: a table lamp
+ * (0.30 x 0.52 x 0.30, a stem under a 0.14 m shade) and a pendant (0.36 x
+ * 1.052 x 0.36, a rod above a 0.20 m shade at the model's lowest point).
+ */
+export const LAMP_FIXTURES: readonly {
+  readonly output: string;
+  readonly dims: readonly [number, number, number];
+  readonly model: FixtureModel;
+}[] = [
+  {
+    output: 'tests/fixtures/project-lamps/obj/01a16c09-ee8b-7580-aac8-305889675c7e.glb',
+    dims: [0.3, 0.52, 0.3],
+    model: {
+      node: 'table_lamp',
+      blocks: [
+        { min: [-0.04, 0, -0.04], max: [0.04, 0.38, 0.04] },
+        { min: [-0.15, 0.38, -0.15], max: [0.15, 0.52, 0.15] },
+      ],
+      materials: [LAMP_METAL, LAMP_SHADE],
+    },
+  },
+  {
+    output: 'tests/fixtures/project-lamps/obj/01a16c09-ee8e-725c-83c3-401d45e70da5.glb',
+    dims: [0.36, 1.052, 0.36],
+    model: {
+      node: 'pendant_lamp',
+      blocks: [
+        { min: [-0.01, 0.2, -0.01], max: [0.01, 1.052, 0.01] },
+        { min: [-0.18, 0, -0.18], max: [0.18, 0.2, 0.18] },
+      ],
+      materials: [LAMP_METAL, LAMP_SHADE],
+    },
+  },
+];
 
 /** Face definitions of an axis-aligned box: outward normal plus the four corners, counter-clockwise. */
 const FACES: readonly { normal: readonly [number, number, number]; corners: readonly (readonly [0 | 1, 0 | 1, 0 | 1])[] }[] = [
@@ -197,8 +253,8 @@ export function glbJson(bytes: Uint8Array): Record<string, unknown> {
  * are the model's bounding box — which is what makes the pivot and the
  * dimensions readable from the JSON chunk alone.
  */
-export function buildFixtureGlb(basisu?: Uint8Array): Uint8Array {
-  const mesh = tessellate(blocks());
+export function buildFixtureGlb(basisu?: Uint8Array, model: FixtureModel = sofaModel()): Uint8Array {
+  const mesh = tessellate(model.blocks);
   const box = bounds(mesh.positions);
 
   const positionBytes = mesh.positions.length * 4;
@@ -236,10 +292,10 @@ export function buildFixtureGlb(basisu?: Uint8Array): Uint8Array {
     extras: { jeexFixture: true },
     scene: 0,
     scenes: [{ nodes: [0] }],
-    nodes: [{ name: 'box_sofa', mesh: 0 }],
+    nodes: [{ name: model.node, mesh: 0 }],
     meshes: [
       {
-        name: 'box_sofa',
+        name: model.node,
         primitives: mesh.indices.map((_, index) => ({
           attributes: textured ? { POSITION: 0, NORMAL: 1, TEXCOORD_0: 2 + mesh.indices.length } : { POSITION: 0, NORMAL: 1 },
           indices: 2 + index,
@@ -247,12 +303,18 @@ export function buildFixtureGlb(basisu?: Uint8Array): Uint8Array {
         })),
       },
     ],
-    materials: [
-      { name: 'seat', pbrMetallicRoughness: { baseColorFactor: [0.78, 0.73, 0.64, 1], metallicFactor: 0, roughnessFactor: 0.9 } },
-      textured
-        ? { name: 'frame', pbrMetallicRoughness: { baseColorTexture: { index: 0 }, metallicFactor: 0, roughnessFactor: 0.6 } }
-        : { name: 'frame', pbrMetallicRoughness: { baseColorFactor: [0.45, 0.33, 0.22, 1], metallicFactor: 0, roughnessFactor: 0.6 } },
-    ],
+    // The textured variant samples its image on the LAST material (the sofa's `frame`).
+    materials: model.materials.map((material, index) =>
+      textured && index === model.materials.length - 1
+        ? {
+            name: material.name,
+            pbrMetallicRoughness: { baseColorTexture: { index: 0 }, metallicFactor: 0, roughnessFactor: material.roughness },
+          }
+        : {
+            name: material.name,
+            pbrMetallicRoughness: { baseColorFactor: [...material.colour], metallicFactor: 0, roughnessFactor: material.roughness },
+          },
+    ),
     ...(textured && {
       extensionsUsed: ['KHR_texture_basisu'],
       extensionsRequired: ['KHR_texture_basisu'],
@@ -316,6 +378,7 @@ if (import.meta.main) {
   for (const [output, bytes] of [
     [FIXTURE_OUTPUT, buildFixtureGlb()],
     [BASISU_FIXTURE_OUTPUT, buildBasisuFixtureGlb()],
+    ...LAMP_FIXTURES.map((fixture) => [fixture.output, buildFixtureGlb(undefined, fixture.model)] as const),
   ] as const) {
     const path = resolve(import.meta.dirname, '..', output);
     if (bytes.byteLength > FIXTURE_SIZE_LIMIT) {

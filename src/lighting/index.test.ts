@@ -14,10 +14,12 @@ test('the lighting entry exports exactly the documented values', () => {
     'LIGHTING_STANDARD',
     'LIGHTING_STANDARD_VERSION',
     'LightingError',
+    'blenderPower',
     'colourTemperatureRgb',
     'createLightingContext',
     'fitShadowFrustum',
     'isLightTemperature',
+    'lampCandela',
     'sunDirection',
   ]);
 });

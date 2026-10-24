@@ -24,7 +24,12 @@ import type { SceneData } from '../scene/types.js';
 import { CATALOGUE_REGISTRIES } from './catalogue-registries.js';
 import { isProjectDocument, projectLibraryOf } from './project-manifest.js';
 import { parseProjectManifest, projectManifestIssues } from './project-manifest.schema.js';
-import { INVALID_PROJECT_FIXTURE, LIBRARY_PROJECT_FIXTURE, PROJECT_FIXTURE as FIXTURE } from '../../tests/fixtures/project/fixture-ids.js';
+import {
+  INVALID_PROJECT_FIXTURE,
+  LAMP_PROJECT_FIXTURE as LAMPS,
+  LIBRARY_PROJECT_FIXTURE,
+  PROJECT_FIXTURE as FIXTURE,
+} from '../../tests/fixtures/project/fixture-ids.js';
 
 /** The fixture folder, relative to this module — `src/assets` -> repository root. */
 const FIXTURE_DIR = join(import.meta.dirname, '..', '..', 'tests', 'fixtures', 'project');
@@ -153,5 +158,45 @@ describe('tests/fixtures/project-library', () => {
         }
       }
     }
+  });
+});
+
+describe('tests/fixtures/project-lamps', () => {
+  const dir = join(import.meta.dirname, '..', '..', 'tests', 'fixtures', 'project-lamps');
+  const document = read('project.json', dir);
+
+  test('its manifest passes the schema and agrees with fixture-ids.ts', () => {
+    expect(projectManifestIssues(document)).toEqual([]);
+    const manifest = parseProjectManifest(document);
+    expect({ projectId: manifest.projectId, bakeId: manifest.bakeId, publisher: manifest.library.publisher }).toEqual({
+      projectId: LAMPS.projectId,
+      bakeId: LAMPS.bakeId,
+      publisher: LAMPS.workspaceId,
+    });
+    expect(manifest.library.objects.map((object) => ({ id: object.id, anchor: object.anchor, model: object.model }))).toEqual([
+      { id: LAMPS.asset.tableLamp, anchor: 'floor', model: LAMPS.model.tableLamp },
+      { id: LAMPS.asset.pendant, anchor: 'ceiling', model: LAMPS.model.pendant },
+    ]);
+    expect(manifest.library.objects.map((object) => object.variants.map((variant) => variant.id))).toEqual([
+      [LAMPS.variant.tableLamp],
+      [LAMPS.variant.pendant],
+    ]);
+    expect(manifest.library.materials.map((material) => material.id)).toEqual([LAMPS.material.metal, LAMPS.material.shade]);
+  });
+
+  test('its scene validates against the lamp library and places both lamps in its one room', () => {
+    const manifest = parseProjectManifest(document);
+    const scene = validateScene(read('scene.json', dir), registriesFromLibrary(projectLibraryOf(manifest), CATALOGUE_REGISTRIES));
+    expect(scene.id).toBe(LAMPS.scene);
+    expect(scene.ceilingHeight).toBe(2.65);
+    expect(scene.rooms.map((room) => room.id)).toEqual([LAMPS.room.living]);
+    expect(scene.assets.map((asset) => ({ id: asset.id, asset: asset.asset, variant: asset.variant, room: asset.room }))).toEqual([
+      { id: LAMPS.placement.tableLamp, asset: LAMPS.asset.tableLamp, variant: LAMPS.variant.tableLamp, room: LAMPS.room.living },
+      { id: LAMPS.placement.pendant, asset: LAMPS.asset.pendant, variant: LAMPS.variant.pendant, room: LAMPS.room.living },
+    ]);
+  });
+
+  test('carries the GLB every lamp names', () => {
+    for (const path of Object.values(LAMPS.model)) expect(readFileSync(join(dir, path)).subarray(0, 4).toString('latin1')).toBe('glTF');
   });
 });

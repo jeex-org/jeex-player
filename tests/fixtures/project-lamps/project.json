@@ -1,0 +1,116 @@
+{
+  "format": "jeex-project",
+  "formatVersion": 2,
+  "projectId": "01a16c09-ee6e-778b-9552-c778436584cb",
+  "bakeId": "01a16c09-ee71-77a5-b006-5e121565c1bb",
+  "bakedAt": "2026-10-24T08:00:00.000Z",
+  "title": "Lamp lights fixture",
+  "scene": "scene.json",
+  "library": {
+    "manifestVersion": "1.0",
+    "id": "01a16c09-ee6e-778b-9552-c778436584cb",
+    "name": "Lamp lights fixture library",
+    "publisher": "01a16c09-ee73-7268-8f42-856dc8e3dffd",
+    "license": "CC0-1.0",
+    "objects": [
+      {
+        "id": "01a16c09-ee76-75e7-9634-8e74a70212a9",
+        "name": "Table lamp",
+        "category": "lighting/table",
+        "dims": [0.3, 0.52, 0.3],
+        "anchor": "floor",
+        "wallSnap": false,
+        "clearance": 0.1,
+        "tags": ["bedroom", "living"],
+        "model": "obj/01a16c09-ee8b-7580-aac8-305889675c7e.glb",
+        "slots": ["metal", "shade"],
+        "defaultFinishes": {
+          "metal": "01a16c09-ee85-7317-a378-0188e5057913",
+          "shade": "01a16c09-ee88-74d2-b387-f53889ce55f1"
+        },
+        "primarySlot": "shade",
+        "variants": [
+          {
+            "id": "01a16c09-ee79-7101-bb3d-9aeee94bccf2",
+            "name": "Table lamp, brass",
+            "version": "1.0.0",
+            "dims": [0.3, 0.52, 0.3],
+            "pricing": { "model": "free" },
+            "model": "obj/01a16c09-ee8b-7580-aac8-305889675c7e.glb",
+            "lights": [{ "kind": "point", "position": [0, 0.443, 0], "colour": "#ffd9a4", "lumens": 400, "cutoff": 3 }]
+          }
+        ],
+        "defaultVariant": "01a16c09-ee79-7101-bb3d-9aeee94bccf2",
+        "mirror": { "x": true, "y": false, "z": true },
+        "onSurface": true
+      },
+      {
+        "id": "01a16c09-ee7f-7182-8ee4-57a784ebc41d",
+        "name": "Pendant lamp",
+        "category": "lighting/pendants",
+        "dims": [0.36, 1.052, 0.36],
+        "anchor": "ceiling",
+        "wallSnap": false,
+        "clearance": 0,
+        "tags": ["living", "kitchen"],
+        "model": "obj/01a16c09-ee8e-725c-83c3-401d45e70da5.glb",
+        "slots": ["metal", "shade"],
+        "defaultFinishes": {
+          "metal": "01a16c09-ee85-7317-a378-0188e5057913",
+          "shade": "01a16c09-ee88-74d2-b387-f53889ce55f1"
+        },
+        "primarySlot": "shade",
+        "variants": [
+          {
+            "id": "01a16c09-ee82-75aa-b49b-3898b69063f9",
+            "name": "Pendant, black cone",
+            "version": "1.0.0",
+            "dims": [0.36, 1.052, 0.36],
+            "pricing": { "model": "free" },
+            "model": "obj/01a16c09-ee8e-725c-83c3-401d45e70da5.glb",
+            "lights": [{ "kind": "point", "position": [0, 0.063, 0], "colour": "#ffd9a4", "lumens": 600, "cutoff": 5.2 }]
+          }
+        ],
+        "defaultVariant": "01a16c09-ee82-75aa-b49b-3898b69063f9",
+        "mirror": { "x": true, "y": false, "z": true }
+      }
+    ],
+    "materials": [
+      {
+        "id": "01a16c09-ee85-7317-a378-0188e5057913",
+        "name": "Fixture lamp metal",
+        "tags": ["metal"],
+        "apply": ["furniture", "metal"],
+        "generator": { "kind": "painted_plaster", "tone": "#3a3631", "seed": 1 },
+        "tile": 1
+      },
+      {
+        "id": "01a16c09-ee88-74d2-b387-f53889ce55f1",
+        "name": "Fixture lamp shade",
+        "tags": ["fabric"],
+        "apply": ["furniture", "fabric"],
+        "generator": { "kind": "painted_plaster", "tone": "#efe6d4", "seed": 2 },
+        "tile": 1
+      }
+    ]
+  },
+  "rights": {
+    "workspaceId": "01a16c09-ee73-7268-8f42-856dc8e3dffd",
+    "perpetual": true,
+    "assets": [
+      {
+        "assetId": "01a16c09-ee76-75e7-9634-8e74a70212a9",
+        "variantId": "01a16c09-ee79-7101-bb3d-9aeee94bccf2",
+        "version": "1.0.0",
+        "access": "free"
+      },
+      {
+        "assetId": "01a16c09-ee7f-7182-8ee4-57a784ebc41d",
+        "variantId": "01a16c09-ee82-75aa-b49b-3898b69063f9",
+        "version": "1.0.0",
+        "access": "free"
+      }
+    ]
+  },
+  "generator": { "name": "lamp-lights fixture", "version": "1" }
+}
