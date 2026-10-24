@@ -14,6 +14,7 @@ import type { LightBake } from './light-bake.js';
 import { LightBakeError } from './light-bake-error.js';
 import { bindLightBake } from './lightmap-binding.js';
 import { rgbmRangeOf } from './lightmap-shader.js';
+import { createWalkUniforms, installWalkPatch } from '../render/walk-lighting/box-probe-patch.js';
 
 const DIR = new URL('../../tests/fixtures/lightmap-calibration/', import.meta.url);
 const sidecar = (): LightBake => JSON.parse(readFileSync(new URL('sidecar.json', DIR), 'utf8')) as LightBake;
@@ -121,7 +122,40 @@ describe('bindLightBake', () => {
     clone.onBeforeCompile(shader, undefined as never);
     expect(seen).toEqual(['previous']);
     expect(shader.fragmentShader).toContain('#define lightMapIntensity ( lightMapIntensity * lightMapTexel.a * JEEX_RGBM_RANGE )');
-    expect(clone.customProgramCacheKey()).toBe('previous-key|jeex-lightmap-rgbm-r8@1');
+    // The shader composer leads the key, then the previous key, then its transforms in their fixed order.
+    expect(clone.customProgramCacheKey()).toBe('jeex|previous-key|jeex-baked-surface@1|jeex-lightmap-rgbm-r8@1');
+  });
+
+  test('clones of a walk-patched source and of a plain one, once both walk-patched, share one program key', async () => {
+    const patchedRoot = await shell();
+    installWalkPatch(patchedRoot, createWalkUniforms());
+    bindLightBake(patchedRoot, sidecar(), [page()]);
+    const plainRoot = await shell();
+    bindLightBake(plainRoot, sidecar(), [page()]);
+    installWalkPatch(plainRoot, createWalkUniforms());
+    const patched = materialOf(patchedRoot, CALIBRATION_NODES.floor);
+    const plain = materialOf(plainRoot, CALIBRATION_NODES.floor);
+    expect(plain.customProgramCacheKey()).toBe(patched.customProgramCacheKey());
+    expect(plain.customProgramCacheKey()).toBe('jeex||jeex-walk-lighting@2|jeex-baked-surface@1|jeex-lightmap-rgbm-r8@1');
+  });
+
+  test('a source that already carries the walk lighting gives its clone the patch, the policy and the decode, without touching the source', async () => {
+    const root = await shell();
+    const source = materialOf(root, CALIBRATION_NODES.floor);
+    installWalkPatch(root, createWalkUniforms());
+    bindLightBake(root, sidecar(), [page()]);
+    const clone = materialOf(root, CALIBRATION_NODES.floor);
+    const shader = {
+      fragmentShader: THREE.ShaderLib.physical.fragmentShader,
+      vertexShader: '',
+      uniforms: {},
+    } as unknown as THREE.WebGLProgramParametersWithUniforms;
+    clone.onBeforeCompile(shader, undefined as never);
+    expect(shader.fragmentShader).toContain('#define JEEX_WALK_LIGHTING');
+    expect(shader.fragmentShader).toContain('#define JEEX_BAKED_SURFACE');
+    expect(shader.fragmentShader).toContain('#define lightMapIntensity ( lightMapIntensity * lightMapTexel.a * JEEX_RGBM_RANGE )');
+    expect(clone.customProgramCacheKey()).toMatch(/\|jeex-walk-lighting@2\|jeex-baked-surface@1\|jeex-lightmap-rgbm-r8@1$/);
+    expect(source.customProgramCacheKey()).toMatch(/\|jeex-walk-lighting@2$/);
   });
 
   test('refuses a missing, ambiguous, multi-material or UV-less mesh, and UV1 outside its rect, changing nothing', async () => {

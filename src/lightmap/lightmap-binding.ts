@@ -116,11 +116,16 @@ function preflightShader(clone: THREE.MeshStandardMaterial, node: string): void 
 /** The clone of `source` bound to `texture`: its hooks kept, the lightmap set, decoded and marked. */
 function bakedClone(source: THREE.MeshStandardMaterial, texture: THREE.Texture, bake: LightBake): THREE.MeshStandardMaterial {
   const clone = source.clone();
-  // `Material.clone` copies neither hook; the decode composes onto the source's own, run with the clone as `this`.
+  // `Material.clone` copies neither hook; both are assigned unbound, so three runs them with the clone as
+  // `this`. The shader composer (`render/shader-compose.ts`) resolves its own copied hooks through `this`
+  // and gives the clone its own copy of the source's transforms; a bound copy would lose that identity.
   const identity = source.onBeforeCompile.toString();
-  clone.onBeforeCompile = source.onBeforeCompile.bind(clone);
-  // three's default key (never assigned) names the hook's source, which a bound copy no longer shows.
-  clone.customProgramCacheKey = Object.hasOwn(source, 'customProgramCacheKey') ? source.customProgramCacheKey.bind(clone) : () => identity;
+  const hooks: Record<string, unknown> = { onBeforeCompile: Reflect.get(source, 'onBeforeCompile') };
+  if (Object.hasOwn(source, 'customProgramCacheKey')) hooks['customProgramCacheKey'] = Reflect.get(source, 'customProgramCacheKey');
+  // three's default key names the CURRENT hook's source: pinned to the source's own hook, when it has one.
+  // A source on three's default hook keeps the default key, so its clone keys like any composed material.
+  else if (Object.hasOwn(source, 'onBeforeCompile')) hooks['customProgramCacheKey'] = () => identity;
+  Object.assign(clone, hooks);
   // A shell AO map would darken light the bake already occluded.
   clone.aoMap = null;
   clone.lightMap = texture;

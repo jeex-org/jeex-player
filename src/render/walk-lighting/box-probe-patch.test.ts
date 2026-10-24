@@ -6,11 +6,12 @@ import {
   ENGINE_CHUNK_ANCHORS,
   installWalkPatch,
   patchFragmentShader,
-  PROGRAM_KEY,
+  WALK_TRANSFORM,
   setRoomBoxes,
   setUniformState,
 } from './box-probe-patch.js';
 import type { RoomBox } from './room-volumes.js';
+import { chunkMarker, expandOwnedChunks } from '../shader-compose.js';
 import { WALK_LIGHTING_TUNING } from './walk-lighting-tuning.js';
 
 describe('the r186 chunks the patch rewrites', () => {
@@ -25,10 +26,12 @@ describe('the r186 chunks the patch rewrites', () => {
 describe('patchFragmentShader', () => {
   const physical = patchFragmentShader(THREE.ShaderLib.physical.fragmentShader);
 
-  test('replaces the three lighting includes and keeps everything else', () => {
+  test('rewrites the expanded lighting chunks and keeps everything else', () => {
     expect(physical).not.toContain('#include <lights_fragment_begin>');
-    // Only as the fallback of a material without the environment.
-    expect(physical.split('#include <lights_fragment_maps>')).toHaveLength(2);
+    expect(physical).not.toContain('#include <lights_fragment_maps>');
+    expect(physical).toContain('#define JEEX_WALK_LIGHTING');
+    // Raw and already expanded text give the same shader.
+    expect(patchFragmentShader(expandOwnedChunks(THREE.ShaderLib.physical.fragmentShader))).toBe(physical);
     expect(physical).toContain('#include <lights_fragment_end>');
     expect(physical).toContain('#include <envmap_physical_pars_fragment>');
     expect(physical).toContain('uniform sampler2D jeexAtlas;');
@@ -62,19 +65,29 @@ describe('patchFragmentShader', () => {
     expect(locate).toBeLessThan(physical.indexOf('vec3 geometryPosition = - vViewPosition;'));
     // Once, in the directional loop: point lights (the lamps) and the rest keep their light.
     expect(physical.split('directLight.color *= jeexSunScale;')).toHaveLength(2);
-    expect(physical).toContain('float jeexSunScale = mix( 1.0, jeexSun, jeexInRoom );');
-    // A material without the studio environment has no room lookup: its sun is unscaled.
+    // Declared at fragment scope, 1 for a material without the studio environment (no room lookup).
     expect(physical).toContain('float jeexSunScale = 1.0;');
+    expect(physical).toContain('jeexSunScale = mix( 1.0, jeexSun, jeexInRoom );');
+    expect(physical.indexOf('float jeexSunScale = 1.0;')).toBeLessThan(physical.indexOf(chunkMarker('lights_fragment_begin', 'begin')));
   });
 
   test("keeps the grid's irradiance apart so the walk can hand it to the environment's place", () => {
     expect(physical).toContain('jeexGridIrradiance = getLightProbeGridIrradiance( probeWorldPos, probeWorldNormal );');
     expect(physical).toContain('irradiance -= jeexGridIrradiance * jeexMove;');
   });
+
+  test('a baked surface skips the grid sample, the hand-over and the diffuse scale', () => {
+    const grid = physical.indexOf('jeexGridIrradiance = getLightProbeGridIrradiance');
+    expect(physical.lastIndexOf('#ifndef JEEX_BAKED_SURFACE', grid)).toBeGreaterThan(physical.lastIndexOf('#endif', grid));
+    const move = physical.indexOf('float jeexMove');
+    expect(physical.lastIndexOf('! defined( JEEX_BAKED_SURFACE )', move)).toBeGreaterThan(physical.lastIndexOf('#endif', move));
+    const scale = physical.indexOf('float jeexDiffuseScale = mix(');
+    expect(physical.lastIndexOf('! defined( JEEX_BAKED_SURFACE )', scale)).toBeGreaterThan(physical.lastIndexOf('#endif', scale));
+  });
 });
 
 describe('installWalkPatch', () => {
-  test('patches every standard material once, with one constant program key, and marks compiled ones for an update', () => {
+  test('patches every standard material once through the composer, with one program key, and marks compiled ones for an update', () => {
     const uniforms = createWalkUniforms();
     const shared = new THREE.MeshStandardMaterial();
     const basic = new THREE.MeshBasicMaterial();
@@ -84,8 +97,9 @@ describe('installWalkPatch', () => {
     const version = shared.version;
     expect(installWalkPatch(root, uniforms)).toBe(2);
     expect(shared.version).toBe(version + 1);
-    expect(shared.customProgramCacheKey()).toBe(PROGRAM_KEY);
-    expect(basic.customProgramCacheKey()).not.toBe(PROGRAM_KEY);
+    const key = `jeex||${WALK_TRANSFORM.id}@${WALK_TRANSFORM.version}`;
+    expect(shared.customProgramCacheKey()).toBe(key);
+    expect(basic.customProgramCacheKey()).not.toBe(key);
     expect(installWalkPatch(root, uniforms)).toBe(0);
     const shader = {
       uniforms: {} as Record<string, THREE.IUniform>,
