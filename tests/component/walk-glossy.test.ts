@@ -61,7 +61,8 @@ function rendererString(): string {
 const RENDERER = rendererString();
 const HARDWARE = !/swiftshader|llvmpipe|softpipe|none/i.test(RENDERER);
 
-const results: Record<string, unknown> = { renderer: RENDERER };
+const maskHistograms: Array<Record<string, number>> = [];
+const results: Record<string, unknown> = { renderer: RENDERER, maskHistograms };
 const record = (name: string, value: unknown): void => {
   results[name] = value;
 };
@@ -105,7 +106,7 @@ describe.skipIf(!HARDWARE)(`walk gloss and white balance in the demo living room
   }
 
   /** Which class each pixel belongs to: `classify` names a class per mesh (or `null`); answers class indices, -1 for none. */
-  function mask(view: THREE.Camera, classify: (mesh: THREE.Mesh) => number | null): Int8Array {
+  function mask(view: THREE.Camera, classify: (mesh: THREE.Mesh) => number | null, backgroundClass: number | null = null): Int8Array {
     const { scene } = lighting;
     const swapped = new Map<THREE.Mesh, THREE.Material | THREE.Material[]>();
     const palette = Array.from(
@@ -127,11 +128,14 @@ describe.skipIf(!HARDWARE)(`walk gloss and white balance in the demo living room
       const index = classify(mesh);
       mesh.material = index === null ? none : palette[index]!;
     });
-    scene.background = null;
+    scene.background = backgroundClass === null ? null : new THREE.Color().setRGB(backgroundClass + 1, 0, 0, THREE.LinearSRGBColorSpace);
     try {
       const pixels = linearShot(view);
       const out = new Int8Array(SIZE.w * SIZE.h);
       for (let i = 0; i < out.length; i += 1) out[i] = Math.round(pixels[i * 4]!) - 1;
+      const histogram: Record<string, number> = {};
+      for (let i = 0; i < out.length; i += 1) histogram[pixels[i * 4]!.toFixed(2)] = (histogram[pixels[i * 4]!.toFixed(2)] ?? 0) + 1;
+      maskHistograms.push(histogram);
       return out;
     } finally {
       for (const [mesh, material] of swapped) mesh.material = material;
@@ -226,15 +230,29 @@ describe.skipIf(!HARDWARE)(`walk gloss and white balance in the demo living room
   function windowBand(view: THREE.Camera): { columns: [number, number]; inside: number; beside: number; counts: [number, number] } {
     const restore = blackFloor(0.07);
     try {
-      const classes = mask(view, (mesh) => (isGlass(mesh) ? 1 : LIVING_FLOOR.test(mesh.name) ? 0 : null));
+      const classes = mask(view, (mesh) => (LIVING_FLOOR.test(mesh.name) ? 0 : null));
       const pixels = linearShot(view);
+      // The panes' screen columns, from their projected bounds (glazing draws nothing into a mask).
+      const frustum = new THREE.Frustum().setFromProjectionMatrix(
+        new THREE.Matrix4().multiplyMatrices(view.projectionMatrix, view.matrixWorldInverse),
+      );
       let x0 = SIZE.w;
       let x1 = -1;
-      for (let i = 0; i < classes.length; i += 1) {
-        if (classes[i] !== 1) continue;
-        x0 = Math.min(x0, i % SIZE.w);
-        x1 = Math.max(x1, i % SIZE.w);
-      }
+      lighting.scene.traverse((object) => {
+        const mesh = object as THREE.Mesh;
+        if (!mesh.isMesh || !isGlass(mesh) || !frustum.intersectsObject(mesh)) return;
+        const box = new THREE.Box3().setFromObject(mesh);
+        for (const corner of [0, 1, 2, 3, 4, 5, 6, 7]) {
+          const p = new THREE.Vector3(
+            corner & 1 ? box.max.x : box.min.x,
+            corner & 2 ? box.max.y : box.min.y,
+            corner & 4 ? box.max.z : box.min.z,
+          ).project(view);
+          const x = Math.round(((Math.max(-1, Math.min(1, p.x)) + 1) / 2) * (SIZE.w - 1));
+          x0 = Math.min(x0, x);
+          x1 = Math.max(x1, x);
+        }
+      });
       const inside: number[] = [];
       const beside: number[] = [];
       for (let i = 0; i < classes.length; i += 1) {
@@ -361,25 +379,34 @@ describe.skipIf(!HARDWARE)(`walk gloss and white balance in the demo living room
       );
     };
     // Saturated furniture finishes, each its own class; the one covering most pixels is metered.
+    const frustumAll = new THREE.Frustum().setFromProjectionMatrix(
+      new THREE.Matrix4().multiplyMatrices(view.projectionMatrix, view.matrixWorldInverse),
+    );
     const candidates: THREE.Mesh[] = [];
+    let owned = 0;
     lighting.scene.traverse((object) => {
       const mesh = object as THREE.Mesh;
-      if (!mesh.isMesh || candidates.length >= MASK_CLASSES - FURNITURE_CLASS0) return;
+      if (!mesh.isMesh || candidates.length >= MASK_CLASSES - FURNITURE_CLASS0 || !frustumAll.intersectsObject(mesh)) return;
       let owner: THREE.Object3D | null = mesh;
       while (owner && owner.userData['assetId'] === undefined) owner = owner.parent;
       if (!owner) return;
       const c = ([mesh.material].flat()[0] as THREE.MeshStandardMaterial).color as THREE.Color | undefined;
       if (!c) return;
       const top = Math.max(c.r, c.g, c.b);
-      if (top > 0.05 && (top - Math.min(c.r, c.g, c.b)) / top > 0.3) candidates.push(mesh);
+      owned += 1;
+      if (top > 0.05 && (top - Math.min(c.r, c.g, c.b)) / top > 0.2) candidates.push(mesh);
     });
-    const classes = mask(view, (mesh) => {
-      if (mesh.name === `ceiling-${LIVING}`) return 0;
-      if (neutralWall(mesh)) return 1;
-      if (isGlass(mesh)) return 3;
-      const k = candidates.indexOf(mesh);
-      return k < 0 ? null : FURNITURE_CLASS0 + k;
-    });
+    // The sky is what the background shows (glazing draws nothing into a mask).
+    const classes = mask(
+      view,
+      (mesh) => {
+        if (mesh.name === `ceiling-${LIVING}`) return 0;
+        if (neutralWall(mesh)) return 1;
+        const k = candidates.indexOf(mesh);
+        return k < 0 ? null : FURNITURE_CLASS0 + k;
+      },
+      3,
+    );
     const counts = new Map<number, number>();
     for (const k of classes) if (k >= FURNITURE_CLASS0) counts.set(k, (counts.get(k) ?? 0) + 1);
     const furnitureClass = [...counts.entries()].sort((a, b) => b[1] - a[1])[0]?.[0] ?? -1;
@@ -424,6 +451,7 @@ describe.skipIf(!HARDWARE)(`walk gloss and white balance in the demo living room
       ceilingRbBefore: ceiling[0] / ceiling[2],
       ceilingAfter: tuned,
       ceilingRbAfter: tuned[0] / tuned[2],
+      furnitureMeshes: { owned, candidates: candidates.length },
       furniture: {
         mesh: furniture?.name,
         material: furniture ? ([furniture.material].flat()[0] as THREE.Material).name : null,
