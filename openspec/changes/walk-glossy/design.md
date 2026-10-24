@@ -1,0 +1,98 @@
+# Design
+
+## Context
+
+See proposal.md for the motivation and brainstorm.md for the evidence. The state this design builds on:
+
+1. `src/render/walk-lighting/room-volumes.ts` `probePoint` walks a bounded lattice (`plan/search-lattice.ts`, 0.1 m step, widening with the room) over the room polygon and keeps the point farthest from the room's edges, preferring points outside every furniture footprint. Footprints are plan `Rect`s (`src/app/walk-lighting-wiring.ts` `volumeInput`, from `Box3.setFromObject` of each child of the furniture group); heights are dropped, so a sofa and a floor lamp block the same way, and a point 9 cm beside a lamp shade is "free".
+2. `WalkLighting.load` computes the volumes once; `refresh(scope)` re-captures probes at the positions from that load. `setRoomBoxes` writes each box's `jeexProbe` (the projection centre) from the same positions. The room grids and the box layout depend only on the rooms, never on furniture.
+3. The walk chain (`src/render/walk-post.ts`) ends in three's `OutputPass`, whose `OutputShader` reads the linear half-float buffer, applies the renderer's tone mapping (PBR Neutral, with exposure) and the sRGB transfer, and rebuilds its defines at the first render.
+4. Probe, grid and lightmap captures render the scene directly, never through the chain. Panoramas also take the direct path.
+
+## Goals / Non-Goals
+
+**Goals:**
+
+1. A reflection probe point that keeps a 3D clearance from furniture, with a deterministic fallback.
+2. Probe points that follow furniture edits in walk, in the capture and in the projection uniforms, in the same frame.
+3. A fixed, measured, luminance-preserving white balance in the walk output, at zero extra GPU cost.
+
+**Non-Goals:**
+
+1. Lamp emission shape, lamp lumens, point shadows, emissive shade brightness.
+2. More probes per room, larger probes, probe atlas layout.
+3. The capture background and facade brightness during captures (the host sky change owns them).
+4. White balance in panoramas, in the editing modes, or adaptive per view.
+5. Re-capturing the probe of a room a piece of furniture left when that room's probe point does not move (unchanged from today).
+
+## Decisions
+
+### 1. Furniture boxes and clearance
+
+`room-volumes.ts` gains `export type FurnitureBox = Rect & { minY: number; maxY: number }`; `VolumeInput.furniture` becomes `readonly FurnitureBox[]`. `Rect` itself and `rectilinearBoxes` are unchanged. `volumeInput` fills `minY`/`maxY` from the same `Box3`.
+
+`WALK_LIGHTING_TUNING.probeClearanceM = 0.5`.
+
+For each lattice point inside the polygon, with `p = (x, probeHeightM, z)`:
+
+- `furnitureClearance` = the minimum over furniture boxes of the Euclidean distance from `p` to the box (zero inside it; `+∞` without furniture);
+- `edge` = `edgeDistance(point, polygon)` as today;
+- `qualifies` = `furnitureClearance ≥ probeClearanceM`;
+- `score` = today's score (`edge` minus the small pull towards the room's middle).
+
+Choice, in this order: a qualifying point beats a non-qualifying one; among qualifying points the higher `score` wins (today's rule); among non-qualifying points the higher `min(furnitureClearance, edge)` wins, then the higher `score`; an exact tie keeps the earlier lattice point, and the lattice order is fixed, so the answer is deterministic.
+
+Alternatives: a 2D footprint grown by the clearance (rejected: a low sofa would push the probe away for nothing, and a tall shelf's top would not count); a point on the far side of the lamp only (rejected: special-cases one asset kind); several probes per room (rejected in the brainstorm).
+
+Cost: lattice points times furniture boxes, per room, CPU only, at load and after an edit. The demo apartment has tens of items and rooms of a few hundred to a few thousand lattice points, well under a millisecond per room by estimate; the real figure is measured once on the demo plan and recorded in the report, and no culling is added unless that measurement asks for it.
+
+### 2. Placement refresh after furniture edits
+
+The controller's handle contract becomes `refresh(scope, doc)`: the controller passes `this.deps.document()` (the current furniture) with the merged scope. `WalkLighting.refresh`:
+
+1. When `doc` is present, compute `roomVolumes(doc.volumes)`. If it fails, or its boxes differ from the loaded ones (count or any projection box), the rooms changed under an edit the scope did not call `all`: `load(doc)` and return (a full re-bake, as for a plan change).
+2. Otherwise compare each room's new probe point with the loaded one; `moved` is the set of rooms whose point changed by more than 1 mm. Write the new positions into the loaded `RoomProbe` objects (the `RoomProbes` instance reads them at capture time) and call `setRoomBoxes` again, which rewrites every box's `jeexProbe` from them. Uniform writes only: no program change.
+3. Then the existing path: a full or early refresh restarts (now with current points); a live refresh re-bakes the scope's grids and re-captures `scope.grids ∪ scope.probes ∪ moved`, synchronously in the same frame, so the uniforms and the captured tiles never disagree on screen.
+
+The relight path (light temperature) does not touch placement. The edit in `walk-lighting.ts` is confined to `refresh`; the HDRI branch's changes there are elsewhere in the file, and the rebase resolves any overlap by keeping both.
+
+Alternative: recompute placement inside the lighting from the furniture group it already holds (rejected: duplicates `volumeInput` and its plan reads).
+
+### 3. White balance: matrix, calibration, storage
+
+A pure module `src/render/white-balance.ts` (no `three`, no DOM) exports `whiteBalanceMatrix(source: RGB, degree: number): Mat3` (row-major, linear Rec. 709 primaries, D65 white):
+
+1. Convert the measured source white (linear RGB) to XYZ, then to Bradford cone responses; the target white is the display white, linear RGB (1, 1, 1) at the source's luminance.
+2. Von Kries scaling with partial degree `D`: each cone gain is `D · target / source + (1 − D)`.
+3. Back to linear RGB: `M = RGB←XYZ · B⁻¹ · diag(gains) · B · XYZ←RGB`.
+4. Luminance preservation: with `y` the Rec. 709 luminance row (0.2126, 0.7152, 0.0722) and `u = (1, 1, 1)ᵀ` (`y·u = 1`), `M' = M + u (y − yM)`, so `y M' = y` for every input colour.
+
+Bradford over CAT16: the standard choice for display white points, simplest to verify against published matrices; the difference at this degree is below the measurement noise.
+
+Storage: `WALK_POST_TUNING.whiteBalance = { source: [r, g, b], degree }`, with a comment that records the pose, the date, the meter, the measured ceiling and wall values and the resulting ceiling R/B before and after. The matrix is computed from them when the walk chunk evaluates; a test pins it against a value computed independently in the test from the same inputs (the «Reproducible matrix» scenario). It is a walk value: `LIGHTING_STANDARD` and its version do not change.
+
+Calibration (in the browser, on the GPU, once the walk lighting is live, at the demo apartment's walk start with the default sun preset and lamps):
+
+1. Render with the white balance at identity and the renderer's tone mapping switched to linear at a known fraction of the walk exposure, so a read-back pixel times that fraction's inverse is the pre-tone-map value and nothing clips.
+2. Mask the living-room ceiling and the white walls in view (by mesh), take the luminance-weighted mean linear RGB: that is `source`.
+3. Choose `D` so the ceiling's white-balanced red over blue lands at 1.45, the middle of the warm-white band (1.3–1.6, a 5000–5500 K Planckian white on a D65 display), by bisection on the helper; check red ≥ green ≥ blue.
+4. Re-meter with the matrix on: ceiling R/B in the band; a saturated furniture finish keeps its dominant channel; the sky in the window is not warmer than before. Record before and after.
+
+### 4. Where the matrix sits
+
+`WalkOutputPass extends OutputPass` replaces the material's fragment shader with `OutputShader`'s, inserting, right after `gl_FragColor = texture2D( tDiffuse, vUv );`, the line `gl_FragColor.rgb = max( jeexWhiteBalance * gl_FragColor.rgb, vec3( 0.0 ) );` with a `uniform mat3 jeexWhiteBalance`. The anchor is matched exactly and a missing anchor throws at construction (a three upgrade that changes the shader fails loudly in the tests, not silently in the picture). The matrix applies before tone mapping (exposure is a scalar inside it, so the order against exposure does not matter) and before the sRGB transfer. One multiply per pixel in an existing pass; no pass, target or texture is added; the defines rebuild at the first render is unchanged, so `quadMaterials` keeps excluding the output material.
+
+`WalkPost` takes an optional `whiteBalance` matrix (default: the tuned one); the walk-post component tests that compare the chain with the direct path pass the identity. Captures through the chain (`renderTo`) use the same pass, so stills and video carry the balance. Captures of probes, grids and lightmaps never go through the chain, so they stay unbalanced by construction.
+
+### 5. Versions
+
+`WALK_TRANSFORM.version` is unchanged: the material transform's GLSL is not touched. `LIGHTING_STANDARD` values and version 1 are unchanged.
+
+## Risks / Trade-offs
+
+1. [The white balance changes every walk and tour screenshot] → expected; walk baselines that change are listed and re-shot only on the owner's word; editing-mode and chrome baselines must stay unchanged.
+2. [Panoramas keep the direct path and so the warmer look] → recorded as a known difference; adding the matrix to the panorama path is a separate change if wanted.
+3. [The fixed matrix is calibrated on one pose and one sun preset] → partial adaptation keeps it moderate; the window and coloured furniture are checked; an evening preset is looked at during calibration and its readings recorded.
+4. [Luminance projection can push a very saturated colour slightly negative in one channel] → clamped at zero before tone mapping; the luminance scenarios meter neutral patches and view means.
+5. [A crowded room leaves no 0.5 m clear point] → the largest-clearance fallback; the 0.5 m is a target.
+6. [Rebase with the HDRI branch in `walk-lighting.ts`] → this change edits only `refresh` there; conflicts resolved by keeping both.
