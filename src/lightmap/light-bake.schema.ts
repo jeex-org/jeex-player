@@ -9,6 +9,9 @@
  *   bake's input), `shellHash` (the shell GLB the bake was made for) and,
  *   for an apartment, `shellInputsHash` (the scene inputs that shell was
  *   built from, `shell-inputs.ts`; a calibration room has no scene);
+ * - `lights`, for an apartment: the recipe of the lights the bake took
+ *   (`bake-lights.schema.ts`), the lighting standard's version they were
+ *   read from, and the sky recipe; a calibration room has its own lights;
  * - `sun` (the direction light travels, glTF frame +Y up, unit; linear
  *   Rec.709 colour; irradiance in W/m²): the sun the bake left out of its
  *   direct term, which the player keeps live;
@@ -29,6 +32,7 @@
 
 import { z } from 'zod/mini';
 import { UUID_V7_PATTERN } from '../scene/types.js';
+import { BAKE_LIGHTS_RECIPE, BAKE_SKY_HEMISPHERE_RECIPE, standardVersionSchema } from './bake-lights.schema.js';
 import { LIVE_DISABLED, LIVE_KEPT, type LightBake } from './light-bake.js';
 
 const uuid = z.string().check(z.regex(UUID_V7_PATTERN, { error: 'not a UUID v7' }));
@@ -98,6 +102,13 @@ export const lightBakeSchema = z
       color: z.readonly(z.tuple([nonNegative, nonNegative, nonNegative])),
       strength: nonNegative,
     }),
+    lights: z.optional(
+      z.strictObject({
+        recipe: z.literal(BAKE_LIGHTS_RECIPE),
+        standardVersion: standardVersionSchema,
+        skyRecipe: z.literal(BAKE_SKY_HEMISPHERE_RECIPE),
+      }),
+    ),
     sky: z.optional(z.looseObject({})),
     calibration: z.optional(z.looseObject({})),
     pages: z.readonly(z.array(pageSchema).check(z.minLength(1, { error: 'needs at least one page' }))),

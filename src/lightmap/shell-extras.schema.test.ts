@@ -8,11 +8,12 @@ import { describe, expect, test } from 'bun:test';
 import { apartmentScene } from '../demo/scene-data.js';
 import { glbJson } from '../fixtures/shell-unwrap.js';
 import { judgeShellGltf } from './shell-extras.schema.js';
-import { exportShellForBake } from './shell-export.js';
+import { exportShellForBake, SHIPPED_FINISHES } from './shell-export.js';
 
 let n = 0;
 const exported = await exportShellForBake(apartmentScene, {
   mintId: () => `01a1e000-0000-7000-8000-${(n++).toString(16).padStart(12, '0')}`,
+  finishes: SHIPPED_FINISHES,
 });
 const json = (): Record<string, any> => structuredClone(glbJson(exported.glb)) as Record<string, any>;
 

@@ -14,6 +14,8 @@ import * as THREE from 'three';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { writeGlb, type GlbMaterial, type GlbMesh } from '../lightmap/glb-write.js';
 import type { LightBake } from '../lightmap/light-bake.js';
+import { BAKE_LIGHTS_RECIPE, BAKE_SKY_HEMISPHERE_RECIPE } from '../lightmap/bake-lights.schema.js';
+import { LIGHTING_STANDARD_VERSION } from '../lighting/lighting-standard.js';
 import type { ShellGltf, ShellNodeExtras } from '../lightmap/shell-extras.schema.js';
 
 export type UnwrapRect = { readonly x: number; readonly y: number; readonly w: number; readonly h: number };
@@ -108,8 +110,10 @@ export async function standInUnwrap(
 
 /**
  * A sidecar for an unwrapped file: `calibration`'s contract and page (the
- * page stretched to `page` texels), one binding per lit mesh, no lamps, and
- * the digests of this file and scene.
+ * page stretched to `page` texels), one binding per lit mesh, no lamps, the
+ * lights recipe of an apartment bake, and the digests of this file and scene.
+ * Its sun and sky stay the calibration's: the page's light means nothing for
+ * the apartment, the fixture exercises the shell path only.
  */
 export async function standInSidecar(
   file: Unwrapped,
@@ -124,6 +128,7 @@ export async function standInSidecar(
     sceneId,
     shellHash: `sha256:${Array.from(digest, (byte) => byte.toString(16).padStart(2, '0')).join('')}`,
     shellInputsHash,
+    lights: { recipe: BAKE_LIGHTS_RECIPE, standardVersion: LIGHTING_STANDARD_VERSION, skyRecipe: BAKE_SKY_HEMISPHERE_RECIPE },
     pages: [{ ...calibration.pages[0]!, width: page, height: page }],
     bindings: [...file.rects].map(([node, rect]) => ({ node, page: 0, rect })),
     lamps: [],
