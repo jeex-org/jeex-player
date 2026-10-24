@@ -296,6 +296,8 @@ describe('lighting.hdri in the published viewer options', () => {
     ['blob URL', { noon: entry({}, { skyUrl: 'blob:https://a.test/0f6d2c1e' }) }],
     ['relative URL', { noon: entry({}, { skyUrl: 'sky.avif' }) }],
     ['ftp URL', { noon: entry({}, { environmentUrl: 'ftp://a.test/noon.jpg' }) }],
+    ['upper-case scheme', { noon: entry({}, { skyUrl: 'HTTPS://a.test/noon.avif' }) }],
+    ['leading space', { noon: entry({}, { skyUrl: ' https://a.test/noon.avif' }) }],
     ['elevation 0', { noon: entry({ elevationDeg: 0 }) }],
     ['elevation 91', { noon: entry({ elevationDeg: 91 }) }],
     ['share 1', { noon: entry({ horizontalIrradianceShare: 1 }) }],

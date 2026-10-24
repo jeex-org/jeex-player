@@ -33,7 +33,15 @@ describe('judgeHdriOption', () => {
     for (const url of ['http://localhost:3700/a.jpg', 'https://a.test/b.jpg', 'blob:https://a.test/0f6d2c1e']) {
       expect(judgeHdriOption({ noon: entry({ environmentUrl: url, skyUrl: url }) }).refused).toEqual([]);
     }
-    for (const url of ['sky.avif', '/sky.avif', 'ftp://a.test/b.jpg', 'data:image/avif;base64,AAAA', '']) {
+    for (const url of [
+      'sky.avif',
+      '/sky.avif',
+      'ftp://a.test/b.jpg',
+      'data:image/avif;base64,AAAA',
+      '',
+      'HTTPS://a.test/b.jpg',
+      ' https://a.test/b.jpg',
+    ]) {
       const verdict = judgeHdriOption({ morning: entry({ skyUrl: url }), noon: entry() });
       expect(verdict.refused.map((item) => item.path)).toEqual(['lighting.hdri.morning']);
       expect(Object.keys(verdict.value)).toEqual(['noon']);
