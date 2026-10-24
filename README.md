@@ -876,8 +876,10 @@ type ProjectObject = {                // `CatalogueObject` with `model` required
   slots: SlotName[]; defaultFinishes: Partial<Record<SlotName, string>>; primarySlot: SlotName;
   // SlotName: an open identifier /^[A-Za-z0-9][A-Za-z0-9_-]{0,63}$/, not only the shipped FinishSlot names;
   // slot names are words, the finishes they name are material UUIDs.
-  // A variant with a GLB whose archetype `defaultFinishes` and own `finishes` name no finish is BAKED:
-  // its GLB renders with the materials it shipped and placement `finishes` are ignored for it.
+  // Every project variant is BAKED: its GLB renders with the materials it shipped. The finishes it
+  // declares describe it (the Replace picker lists them) and never replace a GLB material;
+  // placement `finishes` and `material` have no effect on it, and neither has `materialSlots`,
+  // which only binds GLB materials of an archetype that has a builder.
   variants: ProjectVariant[]; defaultVariant: string; layout?: AssetLayout;
 };
 

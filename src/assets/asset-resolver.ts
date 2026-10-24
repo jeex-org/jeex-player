@@ -124,9 +124,10 @@ export type ResolvedAsset = {
   materialSlots?: Readonly<Record<string, string>> | undefined;
   lods?: readonly string[] | undefined;
   /**
-   * The variant is a BAKED GLB: its materials render as shipped, nothing is
-   * swapped by slot and nothing is reported unbound (`isBakedVariant`).
-   * Absent means not baked.
+   * The variant's GLB renders with the materials it shipped: nothing is
+   * swapped by slot and nothing is reported unbound (`isBakedVariant`). It
+   * governs GLB material replacement only, not the light bake. Absent means
+   * not baked.
    */
   baked?: boolean | undefined;
   /** Mirror axes the archetype allows (`CatalogueObject.mirror`); absent allows none. */
@@ -150,15 +151,22 @@ export function isResolved(result: ResolveResult): result is { asset: ResolvedAs
 }
 
 /**
- * Whether a variant is a baked asset: it has a GLB (its own `model` or the
- * archetype's) and neither the archetype's `defaultFinishes` nor the variant's
- * `finishes` names a single finish. Such a variant has nothing a slot could be
- * re-dressed with, which is exactly the shape a catalogue publishes for baked
- * variants (`defaultFinishes: {}`, `finishes: {}`). Decided from the record's
- * fields, never from the shape of an id.
+ * Whether a variant renders with the materials its GLB ships, never re-dressed
+ * by slot: it has a GLB (its own `model` or the archetype's) and EITHER its
+ * archetype has no builder OR no finish is declared on either layer.
+ *
+ * A builder-less GLB is the whole product (every project object, by format):
+ * the finishes it declares describe it and stay in `ResolvedAsset.finishes`,
+ * but they never replace a material of its GLB, and neither do a placement's
+ * `finishes` or `material`, and its `materialSlots` bind nothing. A GLB
+ * served for an archetype WITH a builder keeps the slot dressing
+ * (`materialSlots` and the name convention) unless it declares no finish at
+ * all. Decided from the record's fields, never from the
+ * shape of an id or from which bank answered.
  */
 export function isBakedVariant(object: ResolvableObject, variant: ResolvableVariant): boolean {
   if ((variant.model ?? object.model) === undefined) return false;
+  if (object.builder === undefined) return true;
   const declares = (finishes: SlotFinishes | undefined): boolean =>
     Object.values(finishes ?? {}).some((id) => typeof id === 'string' && id.length > 0);
   return !declares(object.defaultFinishes) && !declares(variant.finishes);
