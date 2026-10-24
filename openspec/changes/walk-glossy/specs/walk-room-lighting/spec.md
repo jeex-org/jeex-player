@@ -38,10 +38,10 @@ On entry to `walk` or `tour` the grids and probes SHALL be built after the walk 
 
 ### Requirement: Reflection probe placement
 
-Each room SHALL have one reflection probe point at 1.5 m above the floor, inside the room, at least 0.5 m in 3D from every furniture item's bounding box; among such points the one farthest from the room's edges SHALL be used. When none qualifies, the point with the largest clearance from furniture boxes and room edges SHALL be used. Equal candidates SHALL be decided the same way every time.
+Each room SHALL have one probe point at 1.5 m, chosen among bounded lattice candidates inside the room. Candidates at least 0.5 m in 3D from every furniture box qualify; among them the highest wall-distance score (distance to the room's edges, slightly biased to its centre) wins. Without one, the highest min(furniture clearance, edge distance) wins, then the score. Ties keep the first in the fixed traversal order.
 
 #### Scenario: Floor lamp in the middle of the room
-- **WHEN** a floor lamp whose shade reaches the probe height stands at the centre of a room
+- **WHEN** a floor lamp whose shade reaches the probe height stands at the centre of a room that has a qualifying candidate
 - **THEN** the probe point is at least 0.5 m from the lamp's box
 
 #### Scenario: Low furniture does not push the probe
@@ -50,7 +50,7 @@ Each room SHALL have one reflection probe point at 1.5 m above the floor, inside
 
 #### Scenario: No point clears the furniture
 - **WHEN** furniture leaves no point of a room 0.5 m clear
-- **THEN** the probe point is the point with the largest clearance from furniture boxes and room edges, inside the room
+- **THEN** the probe point is the candidate inside the room with the largest min(furniture clearance, edge distance), ties decided by the score and then the traversal order
 
 #### Scenario: Deterministic
 - **WHEN** the placement runs twice on the same rooms and furniture
@@ -65,8 +65,24 @@ Each room SHALL have one reflection probe point at 1.5 m above the floor, inside
 After a furniture edit in walk the probe points SHALL be recomputed from the current furniture; a room whose probe point changed SHALL be captured at its new point, and every room box of that room SHALL project its reflections from the new point.
 
 #### Scenario: Lamp moved next to the probe
-- **WHEN** a floor lamp is moved in walk to within 0.2 m of its room's probe point and the debounce passes
-- **THEN** the room's probe is captured at a point at least 0.5 m from the lamp's new box, and every box of that room uses that point for its reflections
+- **WHEN** a floor lamp is moved in walk to within 0.2 m of its room's probe point, the room still has a qualifying candidate, and the debounce passes
+- **THEN** the room's probe is captured at a point at least 0.5 m from the lamp's new box, every box of that room uses that point for its reflections, the refresh causes a display draw and the view then rests
+
+#### Scenario: Another room's point moves
+- **WHEN** a furniture edit in walk changes the probe point of a room other than the edited one
+- **THEN** that room's probe is re-captured at its new point in the same refresh
+
+#### Scenario: Edit during the initial bake
+- **WHEN** furniture is moved in walk before the bake is done
+- **THEN** the bake restarts and captures every probe at the points computed from the current furniture
+
+#### Scenario: Room boxes changed
+- **WHEN** a refresh finds that the current rooms give different projection boxes than the loaded ones
+- **THEN** the lighting reloads the document and re-bakes everything
+
+#### Scenario: With a host sky
+- **WHEN** a probe placement refresh happens in walk with a host sky (HDRI) installed
+- **THEN** the re-captured probe keeps the atlas's fixed sampling and tile size and the rig returns to the state it had before the capture
 
 #### Scenario: Edit that does not change placement
 - **WHEN** a piece of furniture is moved in walk and no room's probe point changes
@@ -74,12 +90,12 @@ After a furniture edit in walk the probe points SHALL be recomputed from the cur
 
 ### Requirement: Glossy finishes read as glossy
 
-In walk, a floor's reflection SHALL show its roughness in its contrast: inside a room, the specular contrast (99th percentile over median of the floor's specular, with its colour, normal and roughness maps off) of roughness 0.07 SHALL be at least 2.5 times that of roughness 0.6; where geometry puts the window's mirror image on the floor, a polished floor SHALL show the window.
+In walk, on the demo living-room fixture (recorded pose, resolution and floor mask), the floor's specular contrast (99th percentile over median of linear specular luminance, floor black, non-metal, map-free) at roughness 0.07 SHALL be at least 2.5 times that at 0.6; where geometry puts the window's mirror image on that floor, it SHALL show the window.
 
 #### Scenario: Contrast by roughness
-- **WHEN** the demo living-room floor is metered in walk at roughness 0.07 and at 0.6, with the room lighting live
-- **THEN** the 0.07 floor's specular contrast is at least 2.5 times the 0.6 floor's
+- **WHEN** the demo living-room floor (black, non-metal, map-free) is metered in walk at the recorded pose and resolution, at roughness 0.07 and at 0.6, with the room lighting live on a hardware renderer
+- **THEN** the 0.07 floor's contrast of linear specular luminance in the recorded floor mask is at least 2.5 times the 0.6 floor's
 
 #### Scenario: Window in a polished floor
-- **WHEN** a pose sees the floor band where the living room window's mirror image falls, at roughness 0.07, with the room lighting live
+- **WHEN** a recorded pose sees the floor band where the living room window's mirror image falls, the floor black, non-metal, map-free at roughness 0.07, with the room lighting live on a hardware renderer
 - **THEN** that band is brighter than the floor beside it, in the window's screen column

@@ -7,7 +7,7 @@ See proposal.md for the motivation and brainstorm.md for the evidence. The state
 1. `src/render/walk-lighting/room-volumes.ts` `probePoint` walks a bounded lattice (`plan/search-lattice.ts`, 0.1 m step, widening with the room) over the room polygon and keeps the point farthest from the room's edges, preferring points outside every furniture footprint. Footprints are plan `Rect`s (`src/app/walk-lighting-wiring.ts` `volumeInput`, from `Box3.setFromObject` of each child of the furniture group); heights are dropped, so a sofa and a floor lamp block the same way, and a point 9 cm beside a lamp shade is "free".
 2. `WalkLighting.load` computes the volumes once; `refresh(scope)` re-captures probes at the positions from that load. `setRoomBoxes` writes each box's `jeexProbe` (the projection centre) from the same positions. The room grids and the box layout depend only on the rooms, never on furniture.
 3. The walk chain (`src/render/walk-post.ts`) ends in three's `OutputPass`, whose `OutputShader` reads the linear half-float buffer, applies the renderer's tone mapping (PBR Neutral, with exposure) and the sRGB transfer, and rebuilds its defines at the first render.
-4. Probe, grid and lightmap captures render the scene directly, never through the chain. Panoramas also take the direct path.
+4. Probe, grid and lightmap captures render the scene directly, never through the chain. Panoramas also take the direct path: a cube camera into a half-float cube, then one display pass (`still-capture.ts` `displayMaterial`) that tone-maps and encodes.
 
 ## Goals / Non-Goals
 
@@ -22,7 +22,7 @@ See proposal.md for the motivation and brainstorm.md for the evidence. The state
 1. Lamp emission shape, lamp lumens, point shadows, emissive shade brightness.
 2. More probes per room, larger probes, probe atlas layout.
 3. The capture background and facade brightness during captures (the host sky change owns them).
-4. White balance in panoramas, in the editing modes, or adaptive per view.
+4. White balance in a panorama's cube faces, in the editing modes, or adaptive per view.
 5. Re-capturing the probe of a room a piece of furniture left when that room's probe point does not move (unchanged from today).
 
 ## Decisions
@@ -65,7 +65,7 @@ A pure module `src/render/white-balance.ts` (no `three`, no DOM) exports `whiteB
 1. Convert the measured source white (linear RGB) to XYZ, then to Bradford cone responses; the target white is the display white, linear RGB (1, 1, 1) at the source's luminance.
 2. Von Kries scaling with partial degree `D`: each cone gain is `D · target / source + (1 − D)`.
 3. Back to linear RGB: `M = RGB←XYZ · B⁻¹ · diag(gains) · B · XYZ←RGB`.
-4. Luminance preservation: with `y` the Rec. 709 luminance row (0.2126, 0.7152, 0.0722) and `u = (1, 1, 1)ᵀ` (`y·u = 1`), `M' = M + u (y − yM)`, so `y M' = y` for every input colour.
+4. Luminance preservation: with `y` the Rec. 709 luminance row (0.2126, 0.7152, 0.0722) and `u = (1, 1, 1)ᵀ` (`y·u = 1`), `M' = M + u (y − yM)`, so `y M' = y` for every input colour, and `M' s = M s` for the source white (since `y M s = y s`). The guarantee is exact before clipping only: the shader clamps negative channels to zero afterwards, which raises the luminance of a very saturated colour (for source (2, 1.5, 1) at degree 0.5, pure blue gains about 23 %). The tests state the matrix's preservation on the matrix, and the on-screen tolerance on neutral patches and view means, with the clamp in every expected value.
 
 Bradford over CAT16: the standard choice for display white points, simplest to verify against published matrices; the difference at this degree is below the measurement noise.
 
@@ -73,16 +73,18 @@ Storage: `WALK_POST_TUNING.whiteBalance = { source: [r, g, b], degree }`, with a
 
 Calibration (in the browser, on the GPU, once the walk lighting is live, at the demo apartment's walk start with the default sun preset and lamps):
 
-1. Render with the white balance at identity and the renderer's tone mapping switched to linear at a known fraction of the walk exposure, so a read-back pixel times that fraction's inverse is the pre-tone-map value and nothing clips.
+1. Meter in the linear domain with the white balance at identity: preferably read the chain's linear half-float colour buffer before the output pass directly (scene linear times nothing: the output pass applies the exposure). Where a byte read-back is used instead (renderer tone mapping switched to linear, exposure lowered so nothing clips), the output pass still applies the sRGB transfer, so each byte is decoded with the sRGB EOTF and divided by the exposure actually set. The domain and the exposure are recorded with the numbers.
 2. Mask the living-room ceiling and the white walls in view (by mesh), take the luminance-weighted mean linear RGB: that is `source`.
-3. Choose `D` so the ceiling's white-balanced red over blue lands at 1.45, the middle of the warm-white band (1.3–1.6, a 5000–5500 K Planckian white on a D65 display), by bisection on the helper; check red ≥ green ≥ blue.
+3. Choose `D` so the ceiling's white-balanced red over blue lands at 1.45, the middle of the acceptance band 1.3–1.6, by bisection on the helper; check red ≥ green ≥ blue.
 4. Re-meter with the matrix on: ceiling R/B in the band; a saturated furniture finish keeps its dominant channel; the sky in the window is not warmer than before. Record before and after.
 
 ### 4. Where the matrix sits
 
 `WalkOutputPass extends OutputPass` replaces the material's fragment shader with `OutputShader`'s, inserting, right after `gl_FragColor = texture2D( tDiffuse, vUv );`, the line `gl_FragColor.rgb = max( jeexWhiteBalance * gl_FragColor.rgb, vec3( 0.0 ) );` with a `uniform mat3 jeexWhiteBalance`. The anchor is matched exactly and a missing anchor throws at construction (a three upgrade that changes the shader fails loudly in the tests, not silently in the picture). The matrix applies before tone mapping (exposure is a scalar inside it, so the order against exposure does not matter) and before the sRGB transfer. One multiply per pixel in an existing pass; no pass, target or texture is added; the defines rebuild at the first render is unchanged, so `quadMaterials` keeps excluding the output material.
 
-`WalkPost` takes an optional `whiteBalance` matrix (default: the tuned one); the walk-post component tests that compare the chain with the direct path pass the identity. Captures through the chain (`renderTo`) use the same pass, so stills and video carry the balance. Captures of probes, grids and lightmaps never go through the chain, so they stay unbalanced by construction.
+`WalkPost` takes an optional `whiteBalance` matrix (default: the tuned one) and exposes it read-only; the `PostProcessor` contract gains `readonly whiteBalance: readonly number[]` (nine numbers, row-major). The walk-post component tests that compare the chain with the direct path (open floor, mirror) pass the identity. Captures through the chain (`renderTo`) use the same pass, so stills and video carry the balance. Captures of probes, grids and lightmaps never go through the chain, so they stay unbalanced by construction.
+
+Panoramas: `displayFragment`/`displayMaterial` take an optional matrix; with one they declare `uniform mat3 jeexWhiteBalance` and apply the same line before the tone mapping. `capturePanorama` takes an optional `whiteBalance` in its spec. The panorama command asks `deps.postChain()` like the still command does and passes the chain's matrix when there is one (walk and tour); outside them, or without a chain, the panorama is unchanged. The cube faces are still rendered directly, unbalanced; only the final display pass changes. Stills on the direct path (no chain) stay unbalanced, as today's direct path is the editing look.
 
 ### 5. Versions
 
@@ -91,8 +93,8 @@ Calibration (in the browser, on the GPU, once the walk lighting is live, at the 
 ## Risks / Trade-offs
 
 1. [The white balance changes every walk and tour screenshot] → expected; walk baselines that change are listed and re-shot only on the owner's word; editing-mode and chrome baselines must stay unchanged.
-2. [Panoramas keep the direct path and so the warmer look] → recorded as a known difference; adding the matrix to the panorama path is a separate change if wanted.
+2. [A panorama waits for the chain to load, as a still already does] → the same wait and the same fallback; without a chain it is captured unbalanced.
 3. [The fixed matrix is calibrated on one pose and one sun preset] → partial adaptation keeps it moderate; the window and coloured furniture are checked; an evening preset is looked at during calibration and its readings recorded.
-4. [Luminance projection can push a very saturated colour slightly negative in one channel] → clamped at zero before tone mapping; the luminance scenarios meter neutral patches and view means.
+4. [Luminance projection can push a very saturated colour negative in one channel, and the clamp then raises its luminance] → preservation is promised before the clamp only; the on-screen scenarios meter neutral patches and view means, and the expected values include the clamp.
 5. [A crowded room leaves no 0.5 m clear point] → the largest-clearance fallback; the 0.5 m is a target.
-6. [Rebase with the HDRI branch in `walk-lighting.ts`] → this change edits only `refresh` there; conflicts resolved by keeping both.
+6. [Rebase with the HDRI branch in `walk-lighting.ts`] → this change edits only `refresh` there; conflicts resolved by keeping both. The «With a host sky» scenario is tested after that branch is on main: the refresh must keep its fixed atlas mip, its tile-size check and its rig transitions.
