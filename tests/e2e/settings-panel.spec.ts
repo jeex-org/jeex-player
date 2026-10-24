@@ -11,7 +11,7 @@
  */
 
 import { expect, test, type Locator } from '@playwright/test';
-import { expectNoNewA11yViolations, waitForBoot } from './support.js';
+import { expectNoNewA11yViolations, waitForBoot, waitForChromeIdle } from './support.js';
 
 type Box = { x: number; y: number; width: number; height: number };
 
@@ -38,6 +38,7 @@ test('demo page: the panel opens by keyboard, steps the temperature, closes on E
 }, testInfo) => {
   await page.goto('/');
   await waitForBoot(page, 'window.__appReady === true');
+  await waitForChromeIdle(page);
   const button = page.locator('[data-jeex="settings-button"]');
   await expect(button).toBeVisible();
   await button.focus();
@@ -62,6 +63,7 @@ test("demo page with `?settingsSide=start`: the button on the bar's start, opene
 }, testInfo) => {
   await page.goto('/?settingsSide=start');
   await waitForBoot(page, 'window.__appReady === true');
+  await waitForChromeIdle(page);
   const button = page.locator('[data-jeex="settings-button"]');
   await expect(button).toBeVisible();
   await expectOnStart(page.locator('body'));
