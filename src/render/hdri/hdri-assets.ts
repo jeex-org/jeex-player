@@ -179,8 +179,10 @@ export async function loadHdriPair(
 ): Promise<HdriPair> {
   const both = new AbortController();
   const forward = (): void => both.abort(signal.reason);
+  // Unhooked when the pair settles, so a long-lived caller's signal keeps no listener.
+  const unhook = new AbortController();
   if (signal.aborted) forward();
-  else signal.addEventListener('abort', forward, { once: true });
+  else signal.addEventListener('abort', forward, { once: true, signal: unhook.signal });
   const fail = (error: unknown): never => {
     both.abort(error);
     throw error;
@@ -203,6 +205,6 @@ export async function loadHdriPair(
     if (settledSky.status === 'fulfilled') settledSky.value.dispose();
     throw settledEnvironment.status === 'rejected' ? settledEnvironment.reason : (settledSky as PromiseRejectedResult).reason;
   } finally {
-    signal.removeEventListener('abort', forward);
+    unhook.abort();
   }
 }
