@@ -6,7 +6,7 @@
  */
 
 import * as THREE from 'three';
-import { afterAll, describe, expect, test } from 'vitest';
+import { afterAll, describe, expect, test, vi } from 'vitest';
 import { commands } from 'vitest/browser';
 // Static, so Vite pre-bundles the chunk before the first test.
 import { loadHdriEnvironment, loadHdriSky } from '../../src/render/walk-post.js';
@@ -152,5 +152,44 @@ describe('loading a host sky', () => {
     expect(uncaught).toEqual([]);
     expect(gl.info.memory.textures).toBe(before);
     gl.dispose();
+  });
+
+  test('a plain JPEG served as the environment is refused at parse: one rejection, nothing left behind', async () => {
+    const entry = await entryOf();
+    const canvas = new OffscreenCanvas(64, 32);
+    canvas.getContext('2d')!.fillRect(0, 0, 64, 32);
+    const jpeg = await canvas.convertToBlob({ type: 'image/jpeg' });
+    const uncaught: unknown[] = [];
+    const listen = (event: PromiseRejectionEvent): void => {
+      uncaught.push(event.reason);
+    };
+    window.addEventListener('unhandledrejection', listen);
+    const gl = renderer();
+    const before = gl.info.memory.textures;
+    const fetcher = (): Promise<Response> => Promise.resolve(new Response(jpeg));
+    await expect(loadHdriEnvironment(gl, entry, new AbortController().signal, fetcher)).rejects.toThrow(/UltraHDR/);
+    await new Promise((resolve) => {
+      setTimeout(resolve, 50);
+    });
+    window.removeEventListener('unhandledrejection', listen);
+    expect(uncaught).toEqual([]);
+    expect(gl.info.memory.textures).toBe(before);
+    gl.dispose();
+  });
+
+  test('an abort that lands while the sky decodes rejects and closes the decoded bitmap', async () => {
+    const entry = await entryOf();
+    const abort = new AbortController();
+    let closed = 0;
+    vi.stubGlobal('createImageBitmap', () => {
+      abort.abort(new Error('left walk'));
+      return Promise.resolve({ width: 256, height: 128, close: () => (closed += 1) } as unknown as ImageBitmap);
+    });
+    try {
+      await expect(loadHdriSky(entry, abort.signal)).rejects.toThrow('left walk');
+      expect(closed).toBe(1);
+    } finally {
+      vi.unstubAllGlobals();
+    }
   });
 });
