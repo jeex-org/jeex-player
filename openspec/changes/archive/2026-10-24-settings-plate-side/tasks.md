@@ -18,7 +18,7 @@
 ## 4. Integration
 
 - [x] 4.1 `scripts/check.sh fast` green; self-review of the diff (no Tailwind, English only, no references to workspace documents, no commit hashes).
-- [ ] 4.2 The full gate once through the machine's gate queue; on red, only the failed files are re-run.
+- [x] 4.2 The full gate once through the machine's gate queue; on red, only the failed files are re-run.
 
 ## Workflow follow-up
 
