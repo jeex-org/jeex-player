@@ -126,6 +126,19 @@ describe('bindLightBake', () => {
     expect(clone.customProgramCacheKey()).toBe('jeex|previous-key|jeex-baked-surface@1|jeex-lightmap-rgbm-r8@1');
   });
 
+  test('clones of a walk-patched source and of a plain one, once both walk-patched, share one program key', async () => {
+    const patchedRoot = await shell();
+    installWalkPatch(patchedRoot, createWalkUniforms());
+    bindLightBake(patchedRoot, sidecar(), [page()]);
+    const plainRoot = await shell();
+    bindLightBake(plainRoot, sidecar(), [page()]);
+    installWalkPatch(plainRoot, createWalkUniforms());
+    const patched = materialOf(patchedRoot, CALIBRATION_NODES.floor);
+    const plain = materialOf(plainRoot, CALIBRATION_NODES.floor);
+    expect(plain.customProgramCacheKey()).toBe(patched.customProgramCacheKey());
+    expect(plain.customProgramCacheKey()).toBe('jeex||jeex-walk-lighting@2|jeex-baked-surface@1|jeex-lightmap-rgbm-r8@1');
+  });
+
   test('a source that already carries the walk lighting gives its clone the patch, the policy and the decode, without touching the source', async () => {
     const root = await shell();
     const source = materialOf(root, CALIBRATION_NODES.floor);

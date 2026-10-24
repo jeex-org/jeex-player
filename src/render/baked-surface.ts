@@ -41,13 +41,13 @@ const MASKS = {
   jeexDirDirect: { value: [] as number[] },
 };
 
-/** The (render, scene, camera) the masks were last computed for. */
-let computed: { frame: number; scene: THREE.Object3D | null; camera: THREE.Camera | null } = { frame: -1, scene: null, camera: null };
+/** The (render, scene, camera) the masks were last computed for, by id: no reference keeps a released scene alive. */
+const computed = { frame: -1, scene: -1, camera: -1 };
 
 function updateMasks(renderer: THREE.WebGLRenderer, scene: THREE.Object3D, camera: THREE.Camera): void {
   const frame = renderer.info.render.frame;
-  if (computed.frame === frame && computed.scene === scene && computed.camera === camera) return;
-  computed = { frame, scene, camera };
+  if (computed.frame === frame && computed.scene === scene.id && computed.camera === camera.id) return;
+  Object.assign(computed, { frame, scene: scene.id, camera: camera.id });
   const masks = lightMasks(scene, camera);
   MASKS.jeexPointDiffuse.value = masks.point;
   MASKS.jeexSpotDiffuse.value = masks.spot;

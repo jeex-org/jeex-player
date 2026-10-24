@@ -1,6 +1,7 @@
 import { describe, expect, test } from 'bun:test';
 import * as THREE from 'three';
-import { FILL_LIGHT_NAME, lightMasks } from './light-order.js';
+import { APARTMENT_FILL_LIGHT_NAME } from '../lighting/lighting-context.js';
+import { lightMasks } from './light-order.js';
 
 const baked = <T extends THREE.Light>(light: T, value = true): T => {
   light.userData['jeexBaked'] = value;
@@ -55,7 +56,7 @@ describe('lightMasks (three r186.1 WebGLLights order)', () => {
   test('directional: the fill is 0, the sun and the rest 1, whatever casts shadows', () => {
     const scene = new THREE.Scene();
     const fill = new THREE.DirectionalLight();
-    fill.name = FILL_LIGHT_NAME;
+    fill.name = APARTMENT_FILL_LIGHT_NAME;
     fill.castShadow = true;
     const sun = new THREE.DirectionalLight();
     sun.name = 'jeex-lighting-sun';

@@ -24,7 +24,14 @@
  * (`this`): a material with no list of its own adopts a copy of the list of
  * the material the hooks were installed for, on first use, and the two then
  * diverge. A copy of a baked surface must still be marked baked again
- * (`render/baked-surface.ts`), since its draw hook is not copied.
+ * (`render/baked-surface.ts`), since its draw hook is not copied. A copy of
+ * a copy adopts the list of the material the hooks were installed for, never
+ * the intermediate copy's. A wrapped or bound copy of a composer hook is not
+ * supported: the composer cannot recognise it and would call itself.
+ *
+ * A missing anchor throws at compile rather than drawing a half-patched
+ * shader: the anchors are pinned to the installed three, so a throw means a
+ * foreign hook removed an owned include, which must be seen, not hidden.
  */
 
 import * as THREE from 'three';
@@ -91,12 +98,19 @@ const rank = (id: string): number => (id === WALK_TRANSFORM_ID ? 0 : id === BAKE
 /** The entries in the order of application; the sort is stable, so the others keep their registration order. */
 const ordered = (entries: readonly Entry[]): Entry[] => [...entries].sort((a, b) => rank(a.id) - rank(b.id));
 
+/** The state `material` would use, without adopting anything: its own, or that of its copied hook's owner. */
+function peekState(material: THREE.Material): Compose | undefined {
+  const own = COMPOSE.get(material);
+  if (own) return own;
+  const owner = OWNER.get(hooksOf(material).onBeforeCompile);
+  return owner ? COMPOSE.get(owner) : undefined;
+}
+
 /** The composer state of `material`, adopted from the hook's owner when it carries a copied hook. */
 function stateOf(material: THREE.Material): Compose | undefined {
   const own = COMPOSE.get(material);
   if (own) return own;
-  const owner = OWNER.get(hooksOf(material).onBeforeCompile);
-  const source = owner ? COMPOSE.get(owner) : undefined;
+  const source = peekState(material);
   if (!source) return undefined;
   const adopted: Compose = { entries: [...source.entries], foreign: source.foreign, foreignKey: source.foreignKey };
   COMPOSE.set(material, adopted);
@@ -146,8 +160,8 @@ export function addShaderTransform(material: THREE.Material, id: string, version
   material.needsUpdate = true;
 }
 
-/** Whether `material` carries the transform `id` (at `version`, when given). */
+/** Whether `material` carries the transform `id` (at `version`, when given). A pure read: a copy adopts nothing here. */
 export function hasShaderTransform(material: THREE.Material, id: string, version?: number): boolean {
-  const entry = stateOf(material)?.entries.find((candidate) => candidate.id === id);
+  const entry = peekState(material)?.entries.find((candidate) => candidate.id === id);
   return entry !== undefined && (version === undefined || entry.version === version);
 }

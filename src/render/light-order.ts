@@ -17,9 +17,7 @@
  */
 
 import type * as THREE from 'three';
-
-/** The apartment rig's fill light (`lighting/lighting-context.ts`): its light is in every bake. */
-export const FILL_LIGHT_NAME = 'jeex-lighting-fill';
+import { APARTMENT_FILL_LIGHT_NAME } from '../lighting/lighting-context.js';
 /** The light `userData` key a lamp is marked baked by (`render/baked-surface.ts`). */
 export const LAMP_BAKED_KEY = 'jeexBaked';
 
@@ -51,7 +49,7 @@ export function lightMasks(scene: THREE.Object3D, camera: THREE.Camera): LightMa
     const live = light.userData[LAMP_BAKED_KEY] === true ? 0 : 1;
     // The same branch order as WebGLLights: a sun light is not a directional light there.
     if (light.isSunLight) continue;
-    if (light.isDirectionalLight) masks.directional.push(light.name === FILL_LIGHT_NAME ? 0 : 1);
+    if (light.isDirectionalLight) masks.directional.push(light.name === APARTMENT_FILL_LIGHT_NAME ? 0 : 1);
     else if (light.isSpotLight) masks.spot.push(live);
     else if (light.isPointLight) masks.point.push(live);
   }

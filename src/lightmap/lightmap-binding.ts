@@ -120,11 +120,12 @@ function bakedClone(source: THREE.MeshStandardMaterial, texture: THREE.Texture, 
   // `this`. The shader composer (`render/shader-compose.ts`) resolves its own copied hooks through `this`
   // and gives the clone its own copy of the source's transforms; a bound copy would lose that identity.
   const identity = source.onBeforeCompile.toString();
-  Object.assign(clone, {
-    onBeforeCompile: Reflect.get(source, 'onBeforeCompile'),
-    // three's default key (never assigned) names the CURRENT hook's source; it is pinned to the source's.
-    customProgramCacheKey: Object.hasOwn(source, 'customProgramCacheKey') ? Reflect.get(source, 'customProgramCacheKey') : () => identity,
-  });
+  const hooks: Record<string, unknown> = { onBeforeCompile: Reflect.get(source, 'onBeforeCompile') };
+  if (Object.hasOwn(source, 'customProgramCacheKey')) hooks['customProgramCacheKey'] = Reflect.get(source, 'customProgramCacheKey');
+  // three's default key names the CURRENT hook's source: pinned to the source's own hook, when it has one.
+  // A source on three's default hook keeps the default key, so its clone keys like any composed material.
+  else if (Object.hasOwn(source, 'onBeforeCompile')) hooks['customProgramCacheKey'] = () => identity;
+  Object.assign(clone, hooks);
   // A shell AO map would darken light the bake already occluded.
   clone.aoMap = null;
   clone.lightMap = texture;

@@ -16,7 +16,8 @@ import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
 import { afterEach, describe, expect, test } from 'vitest';
 import { decorateRgbm } from '../../src/lightmap/lightmap-shader.js';
 import { markBakedSurface, setLampBaked } from '../../src/render/baked-surface.js';
-import { FILL_LIGHT_NAME } from '../../src/render/light-order.js';
+import { APARTMENT_FILL_LIGHT_NAME, createLightingContext } from '../../src/lighting/lighting-context.js';
+import { lightMasks } from '../../src/render/light-order.js';
 import { packAtlas, type Rgb } from '../../src/render/walk-lighting/exterior-sh.js';
 import { RoomGrid } from '../../src/render/walk-lighting/room-grid.js';
 import { createWalkUniforms, installWalkPatch } from '../../src/render/walk-lighting/box-probe-patch.js';
@@ -157,7 +158,7 @@ function addEverythingElse(gl: THREE.WebGLRenderer, scene: THREE.Scene, fill = 1
   const probe = new THREE.LightProbe();
   probe.sh.coefficients[0]!.set(0.5, 0.5, 0.5);
   const fillLight = new THREE.DirectionalLight(0xbbddee, fill);
-  fillLight.name = FILL_LIGHT_NAME;
+  fillLight.name = APARTMENT_FILL_LIGHT_NAME;
   fillLight.position.set(0, 0, 5);
   scene.add(sky, new THREE.AmbientLight(0xffffff, 0.3), probe, fillLight, fillLight.target);
   addGrid(scene);
@@ -212,6 +213,17 @@ describe('indirect and directional light on a baked surface', () => {
       const want = sun.at(x, y).map((v, c) => v + map.at(x, y)[c]!);
       expect({ x, y, ok: close(got.at(x, y), want) }).toMatchObject({ ok: true });
     }
+  });
+
+  test("the real apartment rig's fill is the light the policy drops, and its sun the one it keeps", () => {
+    const gl = renderer();
+    const lighting = createLightingContext(THREE, gl);
+    const scene = new THREE.Scene();
+    lighting.createApartmentRig().attach(scene);
+    expect((scene.getObjectByName(APARTMENT_FILL_LIGHT_NAME) as THREE.DirectionalLight | undefined)?.isDirectionalLight).toBe(true);
+    // Sorted as three does: the shadow-casting sun first, then the fill.
+    expect(lightMasks(scene, camera()).directional).toEqual([1, 0]);
+    lighting.dispose();
   });
 
   test('doubling the fill changes nothing on a baked surface and something on an unbaked one', () => {

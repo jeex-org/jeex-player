@@ -36,6 +36,9 @@ import type { LightingRenderer, LightingScene, LightingThree } from './lighting-
 import { finiteTriple, unitSunDirection, type ShadowFit } from './shadow-fit.js';
 
 /** Which rig: material review or the player's apartment. */
+/** The apartment rig's fill light's name: the walk rig and the baked-surface policy find the fill by it. */
+export const APARTMENT_FILL_LIGHT_NAME = 'jeex-lighting-fill';
+
 export type LightingRigKind = 'reference' | 'apartment';
 
 /** A set of lights and the standard environment, attachable to one scene at a time. */
@@ -320,7 +323,7 @@ class Context implements LightingContext {
     group.add(sunLight, sunLight.target);
 
     const fillLight = new this.three.DirectionalLight(fill.colour, fill.intensity);
-    fillLight.name = 'jeex-lighting-fill';
+    fillLight.name = APARTMENT_FILL_LIGHT_NAME;
     fillLight.castShadow = false;
     place(fillLight, fill.position);
     group.add(fillLight, fillLight.target);
