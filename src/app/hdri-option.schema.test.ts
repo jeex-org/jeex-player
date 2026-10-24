@@ -1,7 +1,7 @@
 import { describe, expect, test } from 'bun:test';
 import type { z } from 'zod/mini';
 import { hdriEntrySchema, judgeHdriOption } from './hdri-option.schema.js';
-import type { HdriEntry } from './viewer-options.js';
+import type { HdriEntry } from '../lighting/hdri-entry.js';
 
 const entry = (patch: Record<string, unknown> = {}, sun: Record<string, unknown> = {}): Record<string, unknown> => ({
   environmentUrl: 'https://cdn.example.test/sky/noon.jpg',

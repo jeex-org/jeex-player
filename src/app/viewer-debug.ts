@@ -117,10 +117,9 @@ type ViewerDebugApi = {
   /** The walk and tour room lighting: its phase and the last full bake's measurement (`walk-lighting-controller.ts`). */
   walkLighting: () => WalkLightingDebug;
   /**
-   * The host sky (`lighting.hdri`): `off`, `loading`, `ready` (installed,
-   * waiting for the room lighting's swap), `live`, `sky-only` (over a light
-   * bake) or `failed`, with the active preset, the environment's cube size
-   * and the analytic sun's intensity (`walk-lighting-controller.ts`).
+   * The host sky (`lighting.hdri`): `off`, `loading`, `ready` (installed, waiting for the room
+   * lighting's swap), `live`, `sky-only` (over a light bake) or `failed`, with the active preset,
+   * the environment's cube size and the analytic sun's intensity (`walk-lighting-controller.ts`).
    */
   hdri: () => HdriDebug;
   /**

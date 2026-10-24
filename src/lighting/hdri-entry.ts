@@ -54,3 +54,6 @@ export type HdriEntry = {
     horizontalIrradianceShare: number;
   };
 };
+
+/** `lighting.hdri`: one entry per sun preset, every preset optional. */
+export type HdriOption = { readonly morning?: HdriEntry; readonly noon?: HdriEntry; readonly evening?: HdriEntry };

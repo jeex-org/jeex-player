@@ -22,6 +22,7 @@ export { VIEWER_VERSION } from '../shared/version.js';
 
 export type { TourControls, TourDebugControls, TourProgress, TourState } from '../camera/tour-controls.js';
 export type { DeepPartial, ViewerOptions, ViewerOptionsInput, TourStartMode } from './viewer-options.js';
+export type { HdriEntry, HdriOption } from '../lighting/hdri-entry.js';
 export type { AnchorPoint, AnchorTarget, NewCheckpoint, ViewerHandle, ViewerSlots, ViewerState } from './viewer-handle.js';
 export type { SelectionDescription, SelectionDescriptionKind, SelectionOption, SelectionScope } from '../ui/selection-options.js';
 export type { ViewerError, ViewerErrorCode, ViewerEventMap, ViewerEventName } from './viewer-events.js';
