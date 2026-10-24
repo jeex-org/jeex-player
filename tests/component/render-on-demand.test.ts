@@ -17,6 +17,7 @@ import * as THREE from 'three';
 import { InlineSceneRepository, mountViewer } from '../../src/app/viewer-api.js';
 import type { ViewerHandle } from '../../src/app/viewer-handle.js';
 import { RenderDemand, type DemandCounters } from '../../src/render/render-demand.js';
+import { RenderRuntime } from '../../src/render/render-runtime.js';
 import { WalkLighting } from '../../src/render/walk-post.js';
 import { FloorRing } from '../../src/camera/floor-ring.js';
 import { ViewerEditor } from '../../src/app/viewer-editor.js';
@@ -466,7 +467,7 @@ describe('the editing modes draw on demand', { timeout: MOUNT_TIMEOUT_MS }, () =
     }
   }
 
-  async function verifyNothingSkipped(what: string, tail = 0): Promise<void> {
+  async function verifyNothingSkipped(what: string, tail = 0, afterKeep?: () => void): Promise<void> {
     await rest(what);
     // Longer than `rest`: a sub-tolerance tail must have stopped adding up before the comparison.
     await ticks(REST_TICKS);
@@ -474,6 +475,7 @@ describe('the editing modes draw on demand', { timeout: MOUNT_TIMEOUT_MS }, () =
     const clock = vi.spyOn(performance, 'now').mockReturnValue(frozen);
     try {
       const retained = await canvasShot();
+      afterKeep?.();
       const start = counters();
       demandOf().invalidate();
       await until(() => counters().draws > start.draws, `${what}: the forced frame`, TICKS_TIMEOUT_MS);
@@ -506,7 +508,17 @@ describe('the editing modes draw on demand', { timeout: MOUNT_TIMEOUT_MS }, () =
     return result;
   }
 
+  /** The runtime's scene, as the frame loop draws it. */
+  let sceneOf: () => THREE.Scene = () => {
+    throw new Error('no runtime yet');
+  };
+
   beforeAll(async () => {
+    const addFrameHook = Object.getOwnPropertyDescriptor(RenderRuntime.prototype, 'addFrameHook')!.value as RenderRuntime['addFrameHook'];
+    vi.spyOn(RenderRuntime.prototype, 'addFrameHook').mockImplementation(function (this: RenderRuntime, hook) {
+      sceneOf = () => this.scene;
+      return addFrameHook.call(this, hook);
+    });
     const shouldDraw = Object.getOwnPropertyDescriptor(RenderDemand.prototype, 'shouldDraw')!.value as RenderDemand['shouldDraw'];
     vi.spyOn(RenderDemand.prototype, 'shouldDraw').mockImplementation(function (this: RenderDemand, live, mode) {
       demandOf = () => this;
@@ -557,6 +569,22 @@ describe('the editing modes draw on demand', { timeout: MOUNT_TIMEOUT_MS }, () =
     if (handle.getMode() !== 'orbit') handle.setMode('orbit');
     await rest('a clean resting orbit');
   }, TICKS_TIMEOUT_MS);
+
+  test('a visible change that asks for its frame inside the verifier window is a rest not yet reached, not a skipped draw', async () => {
+    // A late library map does this: it lands while the kept picture is taken and
+    // asks for a frame (`LibrarySurface.load` → `attached` → `invalidate`).
+    const scene = sceneOf();
+    const before = scene.environmentIntensity;
+    try {
+      await verifyNothingSkipped('a late landing inside the window', 0, () => {
+        scene.environmentIntensity = before * 1.5;
+        demandOf().invalidate();
+      });
+    } finally {
+      scene.environmentIntensity = before;
+      demandOf().invalidate();
+    }
+  });
 
   test('a resting orbit ticks on with no draw over 60 ticks and over two seconds, and keeps its picture', async () => {
     const before = await canvasShot();
