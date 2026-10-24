@@ -75,6 +75,15 @@ export const WALK_LIGHTING_TUNING = Object.freeze({
    * (`tests/component/walk-lighting.test.ts`).
    */
   walkSunScale: 1 / 3.5,
+  /**
+   * The brightest channel an emissive term (a lamp shade's glow) may reach in
+   * walk and tour, before tone mapping and after the walk exposure; the chroma
+   * is kept and a term under it passes unchanged. At the walk exposure the
+   * catalogue's shade glows read 0.79-6.66 and blew out against PBR Neutral's
+   * knee (0.76); the shade's lit part adds to this, so the cap sits below it.
+   * Chosen by measurement (`tests/component/lamp-shade-emissive.test.ts`).
+   */
+  walkEmissiveCap: 0.3,
   /** Quiet time after the last edit in walk before the affected rooms are refreshed, milliseconds. */
   refreshDebounceMs: 1000,
   /** Quiet time after the last change of the artificial light's colour before the room probes are re-captured, milliseconds. */
