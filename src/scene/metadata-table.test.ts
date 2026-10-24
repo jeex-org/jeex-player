@@ -4,17 +4,21 @@ import { lShapePlan } from '../fixtures/plan-l-shape.js';
 import { L_SHAPE } from '../fixtures/plan-l-shape-ids.js';
 import { FINISH } from '../materials/finish-ids.js';
 import { ifcGuid } from '../shared/uuid.js';
-import { faceGuid } from './guid.js';
-import { metadataTable, structuralMetadataExtension, type ElementRow } from './metadata-table.js';
+import { metadataTable, structuralMetadataExtension, type ElementRow, type EntityRow } from './metadata-table.js';
 import type { SceneData } from './types.js';
 import { ARCHETYPE } from '../assets/catalogue-ids.js';
 
 const plan = solvePlan(lShapePlan);
 
+/** The rows that carry an id: every class but `wallFace`. */
+function entities(rows: readonly ElementRow[]): EntityRow[] {
+  return rows.filter((row): row is EntityRow => row.class !== 'wallFace');
+}
+
 describe('metadataTable', () => {
   test('one row per wall, face, room, opening and asset', () => {
     const rows = metadataTable(lShapePlan, plan);
-    const byClass = (cls: ElementRow['class']): ElementRow[] => rows.filter((row) => row.class === cls);
+    const byClass = (cls: EntityRow['class']): EntityRow[] => entities(rows).filter((row) => row.class === cls);
 
     expect(
       byClass('wall')
@@ -37,11 +41,7 @@ describe('metadataTable', () => {
         .map((row) => row.id)
         .sort(),
     ).toEqual(openingIds.sort());
-    expect(
-      byClass('wallFace')
-        .map((row) => row.id)
-        .sort(),
-    ).toEqual([...plan.faces.keys()].map((face) => faceGuid(face)).sort());
+    expect(rows.filter((row) => row.class === 'wallFace').length).toBe(plan.faces.size);
   });
 
   test('an entity row is keyed by its own UUID, and ifcGuid is that UUID compressed', () => {
@@ -56,18 +56,28 @@ describe('metadataTable', () => {
     expect(rows.find((row) => row.class === 'opening' && row.id === L_SHAPE.opening.doorEntry)).toBeDefined();
   });
 
-  test('a wall-face row is keyed by the GUID derived from its face, and spells the face out', () => {
+  test('a wall-face row has no id of its own: it is addressed by its wall and side, and names its room', () => {
     const rows = metadataTable(lShapePlan, plan);
+    const faceRows = rows.filter((candidate) => candidate.class === 'wallFace');
+    expect(faceRows.length).toBe(plan.faces.size);
+    for (const row of faceRows) {
+      expect('guid' in row).toBe(false);
+      expect('ifcGuid' in row).toBe(false);
+      expect('id' in row).toBe(false);
+    }
     for (const face of plan.faces.values()) {
-      const id = faceGuid(face.key);
-      const row = rows.find((candidate) => candidate.class === 'wallFace' && candidate.id === id)!;
-      expect(row.guid).toBe(id);
-      expect(row.ifcGuid).toBe(ifcGuid(id));
-      expect(row.wallId).toBe(face.wallId);
-      expect(row.side).toBe(face.side);
-      expect(row.roomId).toBe(face.roomId ?? undefined);
-      expect('roomId' in row).toBe(face.roomId !== null);
-      expect('faceId' in row).toBe(false);
+      const matches = faceRows.filter(
+        (candidate) => candidate.wallId === face.wallId && candidate.side === face.side && candidate.roomId === (face.roomId ?? undefined),
+      );
+      expect(matches.length).toBe(1);
+      expect('roomId' in matches[0]!).toBe(face.roomId !== null);
+    }
+  });
+
+  test('no row carries an id the viewer derived: every guid is a UUID v7 the document already holds', () => {
+    const V7 = /^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/;
+    for (const row of metadataTable(lShapePlan, plan)) {
+      if ('guid' in row) expect(row.guid).toMatch(V7);
     }
   });
 
@@ -76,7 +86,13 @@ describe('metadataTable', () => {
       (candidate) => candidate.wallId === L_SHAPE.wall.wPart && candidate.roomId === L_SHAPE.room.a,
     )!;
     const painted: SceneData = { ...lShapePlan, finishes: { faces: [{ ...face.key, finish: FINISH.sage }] } };
-    const row = metadataTable(painted, solvePlan(painted)).find((candidate) => candidate.id === faceGuid(face.key))!;
+    const row = metadataTable(painted, solvePlan(painted)).find(
+      (candidate) =>
+        candidate.class === 'wallFace' &&
+        candidate.wallId === face.wallId &&
+        candidate.side === face.side &&
+        candidate.roomId === face.roomId,
+    )!;
     expect(row.finish).toBe(FINISH.sage);
   });
 
@@ -85,20 +101,30 @@ describe('metadataTable', () => {
     const second = metadataTable(lShapePlan, plan);
     expect(second).toEqual(first);
     // Sorted within a class.
-    const wallIds = first.filter((row) => row.class === 'wall').map((row) => row.id);
+    const wallIds = entities(first)
+      .filter((row) => row.class === 'wall')
+      .map((row) => row.id);
     expect(wallIds).toEqual([...wallIds].sort());
+  });
+
+  test('face rows are ordered by wall, then side, and no two share a wall side', () => {
+    const faceRows = metadataTable(lShapePlan, plan).filter((row) => row.class === 'wallFace');
+    const address = (row: (typeof faceRows)[number]): string => `${row.wallId}/${row.side}`;
+    const addresses = faceRows.map((row) => address(row));
+    expect(addresses).toEqual([...addresses].sort());
+    expect(new Set(addresses).size).toBe(addresses.length);
   });
 
   test('cross-references: an opening names its wall and type; a face names its wall and room', () => {
     const rows = metadataTable(lShapePlan, plan);
-    const door = rows.find((row) => row.class === 'opening' && row.id === L_SHAPE.opening.doorEntry)!;
+    const door = entities(rows).find((row) => row.class === 'opening' && row.id === L_SHAPE.opening.doorEntry)!;
     expect(door.wallId).toBe(L_SHAPE.wall.wSA);
     expect(door.openingType).toBe('door');
 
     const interiorFace = rows.find((row) => row.class === 'wallFace' && row.wallId === L_SHAPE.wall.wPart && row.roomId !== undefined)!;
     expect(interiorFace.roomId === L_SHAPE.room.a || interiorFace.roomId === L_SHAPE.room.b).toBe(true);
 
-    const furniture = rows.find((row) => row.class === 'furniture' && row.id === L_SHAPE.asset.table)!;
+    const furniture = entities(rows).find((row) => row.class === 'furniture' && row.id === L_SHAPE.asset.table)!;
     expect(furniture.variantId).toBeUndefined();
   });
 
@@ -112,14 +138,14 @@ describe('metadataTable', () => {
         { ...lShapePlan.assets[1]!, asset: ARCHETYPE.table_dining },
       ],
     };
-    const furniture = (id: string): ElementRow | undefined =>
-      metadataTable(scene, plan).find((row) => row.class === 'furniture' && row.id === id);
+    const furniture = (id: string): EntityRow | undefined =>
+      entities(metadataTable(scene, plan)).find((row) => row.class === 'furniture' && row.id === id);
 
     expect(furniture(L_SHAPE.asset.sofa)).toMatchObject({ assetId: ARCHETYPE.sofa_3s, libraryId: own });
     expect(furniture(L_SHAPE.asset.table)).toMatchObject({ assetId: ARCHETYPE.table_dining });
     expect(furniture(L_SHAPE.asset.table)?.libraryId).toBeUndefined();
 
-    const inLibrary = metadataTable({ ...scene, assetLibrary: shared }, plan);
+    const inLibrary = entities(metadataTable({ ...scene, assetLibrary: shared }, plan));
     expect(inLibrary.find((row) => row.id === L_SHAPE.asset.table)?.libraryId).toBe(shared);
     expect(inLibrary.find((row) => row.id === L_SHAPE.asset.sofa)?.libraryId).toBe(own);
   });
@@ -145,6 +171,23 @@ describe('structuralMetadataExtension', () => {
     expect(declared).toContain('side');
     expect(declared).not.toContain('faceId');
     expect(Object.keys(extension.propertyTables[0]!.properties)).toEqual(declared);
+  });
+
+  test('the id columns are optional and null exactly at the wall-face rows', () => {
+    const rows = metadataTable(lShapePlan, plan);
+    const extension = structuralMetadataExtension(rows) as {
+      schema: { classes: { jeexElement: { properties: Record<string, { required?: boolean }> } } };
+      propertyTables: Array<{ properties: Record<string, Array<string | null>> }>;
+    };
+    const declared = extension.schema.classes.jeexElement.properties;
+    const columns = extension.propertyTables[0]!.properties;
+    for (const key of ['guid', 'ifcGuid', 'id']) {
+      expect({ key, required: declared[key]?.required }).toEqual({ key, required: false });
+      rows.forEach((row, index) => {
+        expect({ key, index, isNull: columns[key]![index] === null }).toEqual({ key, index, isNull: row.class === 'wallFace' });
+      });
+    }
+    expect(declared['class']?.required).toBeUndefined();
   });
 
   test('an empty table still produces a valid shape', () => {

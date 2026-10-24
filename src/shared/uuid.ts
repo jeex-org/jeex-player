@@ -1,33 +1,20 @@
 /**
- * Name-based UUIDs (RFC 4122 §4.3, version 5) and the 22-character form IFC
- * writes them in.
+ * The 22-character form IFC writes a UUID in.
  *
- * The rule this module serves: every id that leaves the viewer in an exchange
- * format is DERIVED from a stable semantic path, never handed out by a counter
- * or by `randomUUID`. Two exports of the same document, on two machines, in two
- * years, must name the same wall the same thing — that is what makes a
- * re-import an UPDATE instead of a duplicate, and it is what an IFC or IFCX
- * consumer keys its own overrides on. `scene/guid.ts` owns the seeds; this
- * module owns the arithmetic.
+ * An exported entity row (`scene/metadata-table.ts`) carries the entity's own
+ * UUID, minted by the document's author, and its IFC compression beside it.
+ * This module only re-encodes a UUID it is given; it derives and mints none.
  *
  * The compression to IFC's alphabet is re-implemented from a description of
  * the algorithm — after OpenGeometry `export/ifc.rs` `ifc_guid` (MPL-2.0),
  * read for its description only; no code is copied.
  *
- * Invariant: `uuidV5` is a pure function of `(namespace, name)` and nothing
- * else — no clock, no randomness, no locale.
+ * Invariant: `ifcGuid` is a pure, injective function of its UUID.
  *
  * Pure module: no `three`, no DOM.
  */
 
 import { ViewerLibError } from './errors.js';
-import { sha1 } from './sha1.js';
-
-/** RFC 4122 Appendix C: the namespace for fully-qualified domain names. */
-export const UUID_NAMESPACE_DNS = '6ba7b810-9dad-11d1-80b4-00c04fd430c8';
-
-/** RFC 4122 Appendix C: the namespace for URLs — the one JEEX derives its own from. */
-export const UUID_NAMESPACE_URL = '6ba7b811-9dad-11d1-80b4-00c04fd430c8';
 
 /** The canonical 8-4-4-4-12 form, case-insensitive; braces are tolerated on input. */
 const UUID_PATTERN = /^\{?([0-9a-f]{8})-([0-9a-f]{4})-([0-9a-f]{4})-([0-9a-f]{4})-([0-9a-f]{12})\}?$/i;
@@ -49,32 +36,6 @@ function uuidBytes(uuid: string, field: string): Uint8Array {
   const bytes = new Uint8Array(16);
   for (let index = 0; index < 16; index += 1) bytes[index] = Number.parseInt(hex.slice(index * 2, index * 2 + 2), 16);
   return bytes;
-}
-
-/** The sixteen bytes back as lowercase 8-4-4-4-12. */
-function formatUuid(bytes: Uint8Array): string {
-  let hex = '';
-  for (const byte of bytes) hex += byte.toString(16).padStart(2, '0');
-  return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-${hex.slice(12, 16)}-${hex.slice(16, 20)}-${hex.slice(20, 32)}`;
-}
-
-/**
- * RFC 4122 §4.3: SHA-1 over the namespace's sixteen bytes followed by the
- * UTF-8 name, the first sixteen bytes of the digest taken, then the version
- * (5) written into the high nibble of byte 6 and the variant (10x) into the
- * top bits of byte 8.
- */
-export function uuidV5(namespace: string, name: string): string {
-  const namespaceBytes = uuidBytes(namespace, 'uuidV5 namespace');
-  const nameBytes = new TextEncoder().encode(name);
-  const seed = new Uint8Array(namespaceBytes.length + nameBytes.length);
-  seed.set(namespaceBytes);
-  seed.set(nameBytes, namespaceBytes.length);
-
-  const digest = sha1(seed).slice(0, 16);
-  digest[6] = (digest[6]! & 0x0f) | 0x50;
-  digest[8] = (digest[8]! & 0x3f) | 0x80;
-  return formatUuid(digest);
 }
 
 /**

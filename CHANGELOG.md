@@ -30,6 +30,16 @@ as described under [Versioning](#versioning).
 
 ### Changed
 
+- **Breaking for readers of `exportGlb` metadata: a wall face is addressed,
+  not identified.** In the `EXT_structural_metadata` table `jeexElements`, a
+  `wallFace` row no longer carries a GUID the viewer derived from its room,
+  wall and side: its `guid`, `ifcGuid` and `id` are `null`, and the class
+  declares those three properties `required: false`. Find a face by `wallId`
+  and `side` (one face per wall side); `roomId` still names the room it is seen
+  from and is `null` on the facade. Face rows are now ordered by `wallId`, then
+  `side`, so wall meshes point at different row indexes than before;
+  wall, room, opening and furniture rows keep their UUIDs and their order. The
+  scene document and its schema do not change.
 - **Direct sunlight inside rooms in walk and tour** is scaled to the walk
   exposure, so sunlit floors keep their texture; facades and the editing modes
   keep their sun.
