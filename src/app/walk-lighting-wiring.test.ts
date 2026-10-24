@@ -33,6 +33,8 @@ describe('volumeInput furniture', () => {
     root.add(group);
     root.updateMatrixWorld(true);
     const [box] = volumeInput(model, root).furniture;
-    expect(box).toEqual({ minX: 1.8, maxX: 2.2, minY: 0, maxY: 1.7, minZ: 6.8, maxZ: 7.2 });
+    const expected = { minX: 1.8, maxX: 2.2, minY: 0, maxY: 1.7, minZ: 6.8, maxZ: 7.2 };
+    // Float32 geometry: to a micrometre.
+    for (const [key, value] of Object.entries(expected)) expect(box![key as keyof typeof expected]).toBeCloseTo(value, 6);
   });
 });

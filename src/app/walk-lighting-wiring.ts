@@ -10,7 +10,7 @@
 import * as THREE from 'three';
 import type { SceneModel } from '../scene/scene-model.js';
 import type { WalkDocument } from '../render/walk-lighting/walk-lighting.js';
-import type { Rect, VolumeInput } from '../render/walk-lighting/room-volumes.js';
+import type { FurnitureBox, VolumeInput } from '../render/walk-lighting/room-volumes.js';
 import { doorSwings } from '../plan/door-swing.js';
 import { openingFrameWidth } from '../assets/opening-frame.js';
 import { FURNITURE_GROUP_NAME } from '../geometry/scene-builder.js';
@@ -48,7 +48,7 @@ function lookupsOf(model: SceneModel): ScopeLookups {
   };
 }
 
-/** The rooms, the doors and the furniture footprints of `model` built under `root`, as the volumes read them. */
+/** The rooms, the doors and the furniture bounds of `model` built under `root`, as the volumes read them. */
 export function volumeInput(model: SceneModel, root: THREE.Object3D): VolumeInput {
   const { plan, scene } = model;
   const thickness = new Map(plan.centrelines.map((line) => [line.wallId, line.thickness]));
@@ -73,11 +73,11 @@ export function volumeInput(model: SceneModel, root: THREE.Object3D): VolumeInpu
     const other = (roomsOfWall.get(swing.wallId) ?? []).find((room) => room !== swing.roomId) ?? null;
     return [{ into: swing.roomId, other }];
   });
-  const furniture: Rect[] = [];
+  const furniture: FurnitureBox[] = [];
   const box = new THREE.Box3();
   for (const item of root.getObjectByName(FURNITURE_GROUP_NAME)?.children ?? []) {
     box.setFromObject(item);
-    if (!box.isEmpty()) furniture.push({ minX: box.min.x, maxX: box.max.x, minZ: box.min.z, maxZ: box.max.z });
+    if (!box.isEmpty()) furniture.push({ minX: box.min.x, maxX: box.max.x, minY: box.min.y, maxY: box.max.y, minZ: box.min.z, maxZ: box.max.z });
   }
   return { rooms, ceilingHeight: scene.ceilingHeight, doors, furniture };
 }
