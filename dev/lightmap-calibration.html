@@ -1,0 +1,83 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>JEEX dev — light bake calibration</title>
+    <style>
+      /*
+        The light-bake calibration room with its bake applied, for a person to
+        look at. Not under test itself: `tests/component/lightmap-*.test.ts`
+        measure the same scene.
+      */
+      :root {
+        color-scheme: dark;
+      }
+      body {
+        margin: 0;
+        background: #0d1111;
+        color: #dfe7e7;
+        font:
+          13px/1.5 system-ui,
+          sans-serif;
+      }
+      canvas {
+        position: fixed;
+        inset: 0 0 64px 0;
+        width: 100%;
+        height: calc(100% - 64px);
+      }
+      #bar {
+        position: fixed;
+        inset: auto 0 0 0;
+        min-height: 64px;
+        display: flex;
+        flex-wrap: wrap;
+        gap: 6px 12px;
+        align-items: center;
+        padding: 6px 10px;
+        background: #0a0e0e;
+        box-sizing: border-box;
+      }
+      #bar fieldset {
+        display: flex;
+        gap: 4px;
+        border: 0;
+        margin: 0;
+        padding: 0;
+      }
+      #bar button {
+        font: inherit;
+        color: inherit;
+        background: #1b2424;
+        border: 1px solid #2f3d3d;
+        border-radius: 4px;
+        padding: 2px 8px;
+      }
+      #bar button[aria-pressed='true'] {
+        background: #2f5050;
+      }
+      #readout {
+        font-variant-numeric: tabular-nums;
+      }
+    </style>
+  </head>
+  <body>
+    <canvas id="view"></canvas>
+    <div id="bar">
+      <fieldset aria-label="View">
+        <button type="button" data-view="window" aria-pressed="true">Room, towards the window</button>
+        <button type="button" data-view="lamp">Room, towards the lamp</button>
+        <button type="button" data-view="floor">Floor from above</button>
+        <button type="button" data-view="raw">Atlas, raw RGBM</button>
+        <button type="button" data-view="decoded">Atlas, decoded</button>
+      </fieldset>
+      <fieldset aria-label="Light">
+        <button type="button" data-toggle="lightmap" aria-pressed="true">Lightmap</button>
+        <button type="button" data-toggle="sun" aria-pressed="true">Live sun</button>
+      </fieldset>
+      <span id="readout">loading…</span>
+    </div>
+    <script type="module" src="/dev/lightmap-calibration.ts"></script>
+  </body>
+</html>

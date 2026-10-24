@@ -46,6 +46,7 @@ const SCHEMA_MODULES: readonly string[] = [
   'embed/frame-page.schema',
   'telemetry/telemetry.schema',
   'lighting/lighting-options.schema',
+  'lightmap/light-bake.schema',
 ];
 
 /** Modules the architecture declares pure: no `three`, no DOM. */
