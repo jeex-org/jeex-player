@@ -1,10 +1,10 @@
 /**
  * The settings button and panel in a real browser, on real viewers: hidden by
- * default, attached to the control bar's end without moving any control (on
- * both sides of the narrow breakpoints, each viewer narrow inside a wide
- * page), and the panel's behaviour: the slider at rest on «Original», the
- * keyboard, Escape, presses outside, the other panel, the chrome, the locale
- * and two viewers on one page.
+ * default, attached to the control bar's end or start without moving any
+ * control (on both sides of the narrow breakpoints, each viewer narrow inside
+ * a wide page, and under a right-to-left bar), and the panel's behaviour: the
+ * slider at rest on «Original», the keyboard, Escape, presses outside, the
+ * other panel, the chrome, the locale and two viewers on one page.
  */
 
 import { afterEach, describe, expect, test } from 'vitest';
@@ -37,48 +37,64 @@ async function mount(width: number, options: ViewerOptionsInput = {}, height = 4
 const node = <T extends HTMLElement = HTMLElement>(viewer: ViewerHandle, name: string): T | null =>
   viewer.element.querySelector<T>(`[data-jeex="${name}"]`);
 
-/** Every control of the bar and the bar itself, as rectangles. */
-/** Every control of the bar and the bar itself, as rectangles relative to the viewer's own box. */
+/**
+ * Every control of the bar and the bar itself, as rectangles relative to the
+ * viewer's own box. Keyed by name, never by position: a start-side settings
+ * plate is the bar's first child and would shift positional keys.
+ */
 function barLayout(viewer: ViewerHandle): Record<string, number[]> {
   const origin = viewer.element.getBoundingClientRect();
   const at = (rect: DOMRect): number[] =>
     [rect.x - origin.x, rect.y - origin.y, rect.width, rect.height].map((v) => Math.round(v * 10) / 10);
   const bar = node(viewer, 'control-bar')!;
   const out: Record<string, number[]> = { bar: at(bar.getBoundingClientRect()) };
-  bar.querySelectorAll<HTMLElement>('button').forEach((button, i) => {
-    if (button.dataset['jeex'] === 'settings-button') return;
-    out[button.dataset['jeex'] ?? `button-${i}`] = at(button.getBoundingClientRect());
+  const unnamed = [...bar.querySelectorAll<HTMLElement>('button')].filter((button) => button.dataset['jeex'] !== 'settings-button');
+  unnamed.forEach((button, i) => {
+    const key = button.dataset['jeex'] ?? (button.dataset['mode'] ? `mode-${button.dataset['mode']}` : `button-${i}`);
+    out[key] = at(button.getBoundingClientRect());
   });
   return out;
 }
 
 describe('the settings button', { timeout: MOUNT_TIMEOUT_MS }, () => {
-  test('does not exist unless the host enables it', async () => {
-    const viewer = await mount(900);
+  test('does not exist unless the host enables it, whatever side it names', async () => {
+    const viewer = await mount(900, { settings: { side: 'start' } });
     expect(node(viewer, 'settings-button')).toBeNull();
     expect(node(viewer, 'settings-panel')).toBeNull();
   });
 
-  for (const width of [900, 560, 400]) {
-    test(`at ${width} px it is attached to the bar's end and no control moves`, async () => {
-      // The bar pinned open in both: a boot slower than the chrome's idle would otherwise compare a collapsed bar with an open one.
+  for (const width of [1280, 560, 400, 360]) {
+    test(`at ${width} px it is attached to the bar's end or start, inside the viewer, and no control moves`, async () => {
+      // The bar pinned open in all three: a boot slower than the chrome's idle would otherwise compare a collapsed bar with an open one.
       const plain = await mount(width, { chrome: { autoHide: false } });
       const before = barLayout(plain);
       plain.dispose();
-      const viewer = await mount(width, { settings: { show: true }, chrome: { autoHide: false } });
-      expect(barLayout(viewer)).toEqual(before);
-      const button = node(viewer, 'settings-button')!.getBoundingClientRect();
-      const bar = node(viewer, 'control-bar')!.getBoundingClientRect();
-      const box = viewer.element.getBoundingClientRect();
-      // Inside the viewer, whatever its width.
-      expect(button.left).toBeGreaterThanOrEqual(box.left);
-      expect(button.right).toBeLessThanOrEqual(box.right);
-      if (width > 600) {
-        expect(button.left).toBeGreaterThan(bar.right);
-        expect(Math.abs((button.top + button.bottom) / 2 - (bar.top + bar.bottom) / 2)).toBeLessThan(1.5);
-      } else {
-        expect(button.top).toBeGreaterThan(bar.bottom);
-        expect(Math.abs(node(viewer, 'settings-extension')!.getBoundingClientRect().right - bar.right)).toBeLessThan(1.5);
+      for (const side of ['end', 'start'] as const) {
+        const viewer = await mount(width, { settings: { show: true, side }, chrome: { autoHide: false } });
+        expect(barLayout(viewer)).toEqual(before);
+        const extension = node(viewer, 'settings-extension')!;
+        // Decided by the first resize report after the bar has a box.
+        await until(() => extension.dataset['placement'] !== undefined, 'the plate placed');
+        const plate = extension.getBoundingClientRect();
+        const button = node(viewer, 'settings-button')!.getBoundingClientRect();
+        const bar = node(viewer, 'control-bar')!.getBoundingClientRect();
+        const box = viewer.element.getBoundingClientRect();
+        // Inside the viewer, whatever its width.
+        expect(plate.left).toBeGreaterThanOrEqual(box.left);
+        expect(plate.right).toBeLessThanOrEqual(box.right);
+        if (width > 600) {
+          expect(
+            extension.dataset['placement'],
+            `${side} bar ${bar.left}..${bar.right} plate ${plate.left}..${plate.right} box ${box.left}..${box.right}`,
+          ).toBe('beside');
+          // The same gap on either side (4 px from the bar's padding box, 3 px from its 1 px border), centred on the bar's height.
+          expect(side === 'end' ? plate.left - bar.right : bar.left - plate.right).toBeCloseTo(3, 0);
+          expect(Math.abs((button.top + button.bottom) / 2 - (bar.top + bar.bottom) / 2)).toBeLessThan(1.5);
+        } else {
+          expect(button.top).toBeGreaterThan(bar.bottom);
+          expect(Math.abs(side === 'end' ? plate.right - bar.right : plate.left - bar.left)).toBeLessThan(1.5);
+        }
+        viewer.dispose();
       }
     });
   }
@@ -103,6 +119,28 @@ describe('the settings button', { timeout: MOUNT_TIMEOUT_MS }, () => {
     expect(plate.right).toBeLessThanOrEqual(box.right);
     expect(plate.top).toBeGreaterThan(bar.bottom);
     expect(Math.abs(plate.right - bar.right)).toBeLessThan(1.5);
+  });
+
+  test("at 1280 px with a long scene name the start-side button goes under the bar's start, inside the viewer", async () => {
+    const scene = {
+      ...demoScene(),
+      name: 'A two-bedroom apartment with a very long name that a listing editor pasted in full, '.repeat(2),
+    };
+    const viewer = mountViewer(openContainer(1280, 520), {
+      scene: { repository: new InlineSceneRepository(scene) },
+      tour: { mode: 'off' },
+      settings: { show: true, side: 'start' },
+    });
+    viewers.push(viewer);
+    await viewer.ready;
+    const extension = node(viewer, 'settings-extension')!;
+    await until(() => extension.dataset['placement'] === 'under', 'the button under the bar');
+    const bar = node(viewer, 'control-bar')!.getBoundingClientRect();
+    const plate = extension.getBoundingClientRect();
+    const box = viewer.element.getBoundingClientRect();
+    expect(plate.left).toBeGreaterThanOrEqual(box.left);
+    expect(plate.top).toBeGreaterThan(bar.bottom);
+    expect(Math.abs(plate.left - bar.left)).toBeLessThan(1.5);
   });
 
   test('stays with edits off and with no Interior styles, and hides with the control bar', async () => {
@@ -180,25 +218,6 @@ describe('the settings panel', { timeout: MOUNT_TIMEOUT_MS }, () => {
     expect(() => viewer.setLightTemperature(2750)).toThrow(expect.objectContaining({ code: 'bad-params', path: 'lightTemperature' }));
   });
 
-  test('follows its button when the viewer resizes while it is open, and stays inside the viewer', async () => {
-    const container = openContainer(900, 420);
-    const viewer = mountViewer(container, {
-      scene: { repository: new InlineSceneRepository(demoScene()) },
-      tour: { mode: 'off' },
-      settings: { show: true },
-    });
-    viewers.push(viewer);
-    await viewer.ready;
-    const { button, panel } = await open(viewer);
-    const aligned = (): boolean => Math.abs(panel.getBoundingClientRect().right - button.getBoundingClientRect().right) < 1.5;
-    expect(aligned()).toBe(true);
-    // Still above the narrow breakpoint, so the panel stays anchored rather than becoming a sheet.
-    container.style.width = '700px';
-    await until(aligned, 'the panel’s end edge on the button’s after the resize');
-    expect(panel.hidden).toBe(false);
-    expect(panel.getBoundingClientRect().right).toBeLessThanOrEqual(viewer.element.getBoundingClientRect().right);
-  });
-
   test('a press outside closes it: inside the viewer focus goes back to the button, outside it does not', async () => {
     const viewer = await mount(900, { settings: { show: true } });
     const { button, panel } = await open(viewer);
@@ -252,4 +271,225 @@ describe('the settings panel', { timeout: MOUNT_TIMEOUT_MS }, () => {
     expect(two.getState().lightTemperature).toBeNull();
     expect(node(two, 'settings-panel')!.hidden).toBe(true);
   });
+  test("on the start side Tab reaches the button before the bar's controls, Shift+Tab comes back, Escape returns focus", async () => {
+    const viewer = await mount(1280, { settings: { show: true, side: 'start' }, chrome: { autoHide: false } });
+    const bar = node(viewer, 'control-bar')!;
+    const button = node<HTMLButtonElement>(viewer, 'settings-button')!;
+    expect(bar.firstElementChild).toBe(node(viewer, 'settings-extension'));
+    const first = [...bar.querySelectorAll<HTMLElement>('button, a[href], input, [tabindex]')].find(
+      (control) => control !== button && control.tabIndex >= 0 && control.checkVisibility(),
+    )!;
+    button.focus();
+    await userEvent.keyboard('{Tab}');
+    expect(document.activeElement).toBe(first);
+    await userEvent.keyboard('{Shift>}{Tab}{/Shift}');
+    expect(document.activeElement).toBe(button);
+    const { panel, slider } = await open(viewer);
+    expect(document.activeElement).toBe(slider);
+    expect(panel.hidden).toBe(false);
+    await userEvent.keyboard('{Escape}');
+    expect(panel.hidden).toBe(true);
+    expect(document.activeElement).toBe(button);
+  });
+
+  for (const side of ['start', 'end'] as const) {
+    test(`on the ${side} side the open panel follows its button above 430 px and is the same bottom sheet at or below it`, async () => {
+      const container = openContainer(1280, 420);
+      const viewer = mountViewer(container, {
+        scene: { repository: new InlineSceneRepository(demoScene()) },
+        tour: { mode: 'off' },
+        settings: { show: true, side },
+      });
+      viewers.push(viewer);
+      await viewer.ready;
+      const { button, panel } = await open(viewer);
+      const edge = (rect: DOMRect): number => (side === 'start' ? rect.left : rect.right);
+      const aligned = (): boolean => Math.abs(edge(panel.getBoundingClientRect()) - edge(button.getBoundingClientRect())) < 1.5;
+      const inside = (): boolean => {
+        const at = panel.getBoundingClientRect();
+        const box = viewer.element.getBoundingClientRect();
+        return at.left >= box.left - 0.5 && at.right <= box.right + 0.5 && at.bottom <= box.bottom + 0.5;
+      };
+      const sheet = (): boolean => {
+        const at = panel.getBoundingClientRect();
+        const box = viewer.element.getBoundingClientRect();
+        return (
+          Math.abs(at.left - box.left - 10) < 1.5 &&
+          Math.abs(box.right - at.right - 10) < 1.5 &&
+          Math.abs(box.bottom - at.bottom - 10) < 1.5
+        );
+      };
+      expect(aligned()).toBe(true);
+      expect(inside()).toBe(true);
+      container.style.width = '560px';
+      await until(() => aligned() && inside(), 'the panel on its button after the resize to 560 px');
+      container.style.width = '420px';
+      await until(sheet, 'the bottom sheet at 420 px');
+      container.style.width = '560px';
+      await until(() => aligned() && inside() && !sheet(), 'the popover again at 560 px');
+      expect(panel.hidden).toBe(false);
+    });
+  }
+
+  // The bar's own centring is physical (`translateX(-50%)`), so a right-to-left bar sits off-centre, partly outside the viewer:
+  // these checks cover what this side option owns, the mirrored attachment and the panel's anchoring, not the bar.
+  test('under a right-to-left bar the start side is the right and the end side the left, the panel inside the viewer', async () => {
+    for (const side of ['start', 'end'] as const) {
+      const container = openContainer(1280, 420);
+      container.dir = 'rtl';
+      const viewer = mountViewer(container, {
+        scene: { repository: new InlineSceneRepository(demoScene()) },
+        tour: { mode: 'off' },
+        settings: { show: true, side },
+        chrome: { autoHide: false },
+      });
+      viewers.push(viewer);
+      await viewer.ready;
+      const extension = node(viewer, 'settings-extension')!;
+      await until(() => extension.dataset['placement'] !== undefined, 'the plate placed');
+      const bar = node(viewer, 'control-bar')!.getBoundingClientRect();
+      const plate = extension.getBoundingClientRect();
+      const box = viewer.element.getBoundingClientRect();
+      const where = `${side} ${extension.dataset['placement']} bar ${bar.left}..${bar.right} plate ${plate.left}..${plate.right} box ${box.left}..${box.right}`;
+      // The bar sits off-centre to the left here, so the room differs by side: the fit check of the chosen side puts the
+      // start (right) plate beside the bar and the end (left) plate, with no room left of the bar, under it.
+      expect(extension.dataset['placement'], where).toBe(side === 'start' ? 'beside' : 'under');
+      // Beside the mirrored edge, or under it when there is no room beside it.
+      if (extension.dataset['placement'] === 'under') {
+        expect(Math.abs(side === 'start' ? plate.right - bar.right : plate.left - bar.left), where).toBeLessThan(1.5);
+      } else if (side === 'start') expect(plate.left, where).toBeGreaterThan(bar.right);
+      else expect(plate.right, where).toBeLessThan(bar.left);
+      // Pressed directly: the bar itself may sit partly outside the viewer here (see above), so `open()`'s reach check does not apply.
+      const button = node<HTMLButtonElement>(viewer, 'settings-button')!;
+      press(button);
+      const panel = node(viewer, 'settings-panel')!;
+      const at = panel.getBoundingClientRect();
+      const mark = button.getBoundingClientRect();
+      expect(at.left >= box.left && at.right <= box.right, `${where} panel ${at.left}..${at.right}`).toBe(true);
+      // The panel's start edge on the button's start edge (the right in a right-to-left bar), or clamped 8 px inside the viewer.
+      if (side === 'start') expect(Math.abs(at.right - mark.right), where).toBeLessThan(1.5);
+      else if (mark.left >= box.left + 8) expect(Math.abs(at.left - mark.left), where).toBeLessThan(1.5);
+      else expect(Math.abs(at.left - box.left - 8), where).toBeLessThan(1.5);
+      viewer.dispose();
+    }
+  });
+});
+
+/**
+ * Viewer content that keeps its place in the row under the bar: the producer's
+ * mark (top start, from a project manifest) and the minimap a narrow walk
+ * lifts under the bar (top end). The plate moves past them; neither moves.
+ * `elementFromPoint` at the button's centre is the real tap check: a covered
+ * button answers with whatever covers it.
+ */
+describe('the plate under the bar and its neighbours', () => {
+  const PROJECT_URL = '/tests/fixtures/project/project.json';
+  const PROJECT_BASE = new URL('/tests/fixtures/project/', window.location.origin).href;
+  /** One bake build per case on a shared software GPU. */
+  const PROJECT_TIMEOUT_MS = 180_000;
+
+  async function markedProject(): Promise<ViewerOptionsInput> {
+    const manifest = (await (await fetch(PROJECT_URL)).json()) as { scene: string };
+    const scene = (await (await fetch(new URL(manifest.scene, PROJECT_BASE).href)).json()) as unknown;
+    return {
+      scene: { document: scene, library: { manifest: { ...manifest, mark: { href: 'https://example.org/' } }, baseUrl: PROJECT_BASE } },
+    };
+  }
+
+  /** Two tour cameras (fixed UUID v7 ids), so walk shows its camera stepper and a narrow viewer lifts the minimap under the bar. */
+  const withCameras = (): ViewerOptionsInput => ({
+    scene: {
+      repository: new InlineSceneRepository({
+        ...demoScene(),
+        tourCheckpoints: [
+          { id: '01a16c02-9b31-7261-9c3a-694f043f09f7', position: { x: 4.4, y: 1.55, z: 2.4 }, yaw: 0.5, pitch: -0.3 },
+          { id: '01a16c02-9b32-77d7-91ee-b847aa52bf0f', position: { x: 1.1, y: 1.5, z: 5.2 }, yaw: -Math.PI / 2, pitch: -0.4 },
+        ],
+      }),
+    },
+  });
+
+  const apart = (a: DOMRect, b: DOMRect): boolean => a.right <= b.left || b.right <= a.left || a.bottom <= b.top || b.bottom <= a.top;
+
+  function tappable(button: HTMLElement): boolean {
+    // `elementFromPoint` sees only what is inside the window, and the containers of one test stack down the page.
+    button.scrollIntoView({ block: 'center', inline: 'center' });
+    const at = button.getBoundingClientRect();
+    const hit = document.elementFromPoint(at.left + at.width / 2, at.top + at.height / 2);
+    return hit !== null && button.contains(hit);
+  }
+
+  for (const width of [400, 560]) {
+    test(
+      `at ${width} px the start-side plate sits after the producer's mark in its row; the mark stays and the button takes the tap`,
+      async () => {
+        const viewer = await mount(
+          width,
+          { ...(await markedProject()), settings: { show: true, side: 'start' }, chrome: { autoHide: false } },
+          640,
+        );
+        const mark = node(viewer, 'project-mark')!;
+        const extension = node(viewer, 'settings-extension')!;
+        const button = node(viewer, 'settings-button')!;
+        await until(() => apart(extension.getBoundingClientRect(), mark.getBoundingClientRect()), 'the plate past the mark');
+        const box = viewer.element.getBoundingClientRect();
+        const at = mark.getBoundingClientRect();
+        const plate = extension.getBoundingClientRect();
+        const bar = node(viewer, 'control-bar')!.getBoundingClientRect();
+        // The mark where its own rule puts it: 10 px in, 78 px down.
+        expect([at.left - box.left, at.top - box.top]).toEqual([10, 78]);
+        // Same row under the bar, 8 px after the mark, inside the viewer.
+        expect(plate.top).toBeGreaterThan(bar.bottom);
+        expect(plate.left - at.right).toBeCloseTo(8, 0);
+        expect(plate.right).toBeLessThanOrEqual(box.right);
+        expect(tappable(button)).toBe(true);
+      },
+      PROJECT_TIMEOUT_MS,
+    );
+  }
+
+  for (const width of [400, 560]) {
+    test(
+      `at ${width} px in a 330 px high walk the end-side plate moves past the lifted minimap; the minimap stays and the button takes the tap`,
+      async () => {
+        // 330 px high: the stepper lifts the card until its top reaches 8 px under the bar (a short embed, `styles/viewer.css`).
+        const plain = await mount(width, { ...withCameras(), view: { mode: 'walk' }, chrome: { autoHide: false } }, 330);
+        await until(() => node(plain, 'walk-cameras')?.hidden === false, 'the camera stepper shown');
+        await until(
+          () => node(plain, 'minimap')!.getBoundingClientRect().top - plain.element.getBoundingClientRect().top < 120,
+          'the minimap lifted',
+        );
+        const minimapBefore = node(plain, 'minimap')!.getBoundingClientRect();
+        // Lifted under the bar: this is the row the plate shares.
+        expect(minimapBefore.top - plain.element.getBoundingClientRect().top).toBeLessThan(120);
+        const origin = plain.element.getBoundingClientRect();
+        const expected = [minimapBefore.left - origin.left, minimapBefore.top - origin.top, minimapBefore.width, minimapBefore.height];
+        plain.dispose();
+        const viewer = await mount(
+          width,
+          { ...withCameras(), view: { mode: 'walk' }, settings: { show: true }, chrome: { autoHide: false } },
+          330,
+        );
+        await until(() => node(viewer, 'walk-cameras')?.hidden === false, 'the camera stepper shown');
+        const minimap = node(viewer, 'minimap')!;
+        const extension = node(viewer, 'settings-extension')!;
+        const button = node(viewer, 'settings-button')!;
+        // The card glides up when the stepper appears: wait for its lifted place, then for the plate to clear it.
+        await until(
+          () => minimap.getBoundingClientRect().top - viewer.element.getBoundingClientRect().top === expected[1],
+          'the minimap lifted',
+        );
+        await until(() => apart(extension.getBoundingClientRect(), minimap.getBoundingClientRect()), 'the plate past the minimap');
+        const box = viewer.element.getBoundingClientRect();
+        const at = minimap.getBoundingClientRect();
+        expect([at.left - box.left, at.top - box.top, at.width, at.height]).toEqual(expected);
+        const plate = extension.getBoundingClientRect();
+        expect(plate.top).toBeGreaterThan(node(viewer, 'control-bar')!.getBoundingClientRect().bottom);
+        expect(at.left - plate.right).toBeCloseTo(8, 0);
+        expect(plate.left).toBeGreaterThanOrEqual(box.left);
+        expect(tappable(button)).toBe(true);
+      },
+      MOUNT_TIMEOUT_MS,
+    );
+  }
 });

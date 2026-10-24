@@ -115,7 +115,7 @@ describe('resolveViewerOptions', () => {
       debug: DEFAULT_VIEWER_OPTIONS.debug,
       scene: { url: undefined },
       analytics: { mode: 'on', endpoint: undefined },
-      settings: { show: false },
+      settings: { show: false, side: 'end' },
       lighting: { temperature: null },
       onLog: logged.sink,
     });
@@ -179,7 +179,7 @@ describe('resolveViewerOptions', () => {
       debug: DEFAULT_VIEWER_OPTIONS.debug,
       scene: { url: undefined },
       analytics: { mode: 'on', endpoint: undefined },
-      settings: { show: false },
+      settings: { show: false, side: 'end' },
       lighting: { temperature: null },
       onLog: logged.sink,
     });
@@ -742,6 +742,7 @@ describe('OPTION_SCHEMA', () => {
         'analytics.mode',
         'analytics.endpoint',
         'settings.show',
+        'settings.side',
         'lighting.temperature',
       ].sort(),
     );
@@ -1059,7 +1060,7 @@ describe('resolveTexture: a host object', () => {
 describe('settings.show and lighting.temperature', () => {
   test('the settings button is off and the temperature «Original» by default', () => {
     const options = resolve();
-    expect(options.settings).toEqual({ show: false });
+    expect(options.settings).toEqual({ show: false, side: 'end' });
     expect(options.lighting).toEqual({ temperature: null });
   });
 
@@ -1095,5 +1096,37 @@ describe('settings.show and lighting.temperature', () => {
     });
     expect(OPTION_SCHEMA['settings.show'].attr).toBe('settings');
     expect(OPTION_SCHEMA['lighting.temperature'].attr).toBe('light-temperature');
+  });
+});
+
+describe('settings.side', () => {
+  test("the plate attaches to the bar's end by default, and to its start on request", () => {
+    expect(resolve().settings.side).toBe('end');
+    expect(resolve({ settings: { show: true, side: 'start' } }).settings).toEqual({ show: true, side: 'start' });
+    expect(resolve({ settings: { side: 'end' } }).settings).toEqual({ show: false, side: 'end' });
+    expect(warnings()).toEqual([]);
+  });
+
+  test('a side alone never turns the button on', () => {
+    expect(resolve({ settings: { side: 'start' } }).settings.show).toBe(false);
+    expect(resolve(optionsFromQuery('?settingsSide=start') as ViewerOptionsInput).settings).toEqual({ show: false, side: 'start' });
+  });
+
+  test('?settingsSide= and settings-side are the spellings, for both values', () => {
+    for (const side of ['start', 'end'] as const) {
+      expect(optionsFromQuery(`?settings=1&settingsSide=${side}`)).toEqual({ settings: { show: true, side } });
+      expect(optionsFromDataset({ settings: 'true', settingsSide: side })).toEqual({ settings: { show: true, side } });
+    }
+    expect(OPTION_SCHEMA['settings.side'].query).toBe('settingsSide');
+    expect(OPTION_SCHEMA['settings.side'].attr).toBe('settings-side');
+  });
+
+  test('any other value keeps the end with one warning', () => {
+    for (const bad of ['left', 'START', '', 1]) {
+      logged.clear();
+      expect(resolve({ settings: { side: bad as never } }).settings.side).toBe('end');
+      expect(warnings()).toHaveLength(1);
+      expect(warnings()[0]).toContain('settings.side');
+    }
   });
 });

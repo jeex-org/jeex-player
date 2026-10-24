@@ -1,12 +1,37 @@
 /**
  * The settings panel on real pages: the demo page (light DOM, the settings
- * button on) with the panel open, and a second `<jeex-viewer settings>` on the
- * element page (inside a shadow root), each with no accessibility finding and
- * driven by the keyboard alone.
+ * button on) with the panel open, on the bar's end and, by `?settingsSide=start`,
+ * on its start; and a second `<jeex-viewer settings settings-side="start">` on
+ * the element page (inside a shadow root). Each with no accessibility finding.
+ * Presses are keyboard activation or an evaluated DOM click, never a
+ * Playwright pointer click: a live viewer on the software rasteriser keeps the
+ * page busy every frame and pointer actions stall over it. The visibility and
+ * in-viewer geometry checks stay, so a dispatched press cannot hide an
+ * unreachable button.
  */
 
-import { expect, test } from '@playwright/test';
+import { expect, test, type Locator } from '@playwright/test';
 import { expectNoNewA11yViolations, waitForBoot } from './support.js';
+
+type Box = { x: number; y: number; width: number; height: number };
+
+async function box(locator: Locator): Promise<Box> {
+  const rect = await locator.boundingBox();
+  expect(rect).not.toBeNull();
+  return rect!;
+}
+
+/** The plate attached to the bar's start (beside it, or under it in a narrow viewer) and inside the viewer. */
+async function expectOnStart(viewer: Locator): Promise<void> {
+  const bar = await box(viewer.locator('[data-jeex="control-bar"]'));
+  const plate = await box(viewer.locator('[data-jeex="settings-extension"]'));
+  const frame = await box(viewer.locator('.jeex-viewer').first());
+  expect(plate.x).toBeGreaterThanOrEqual(frame.x);
+  expect(plate.x + plate.width).toBeLessThanOrEqual(frame.x + frame.width);
+  const beside = plate.x + plate.width <= bar.x;
+  const under = Math.abs(plate.x - bar.x) < 1.5 && plate.y >= bar.y + bar.height;
+  expect(beside || under).toBe(true);
+}
 
 test('demo page: the panel opens by keyboard, steps the temperature, closes on Escape, and axe finds nothing', async ({
   page,
@@ -32,7 +57,31 @@ test('demo page: the panel opens by keyboard, steps the temperature, closes on E
   await expect(button).toBeFocused();
 });
 
-test('element page: a second viewer with `settings` in a shadow root, independent of the first, and axe finds nothing', async ({
+test("demo page with `?settingsSide=start`: the button on the bar's start, opened by keyboard, and axe finds nothing", async ({
+  page,
+}, testInfo) => {
+  await page.goto('/?settingsSide=start');
+  await waitForBoot(page, 'window.__appReady === true');
+  const button = page.locator('[data-jeex="settings-button"]');
+  await expect(button).toBeVisible();
+  await expectOnStart(page.locator('body'));
+  await button.focus();
+  await page.keyboard.press('Enter');
+  const panel = page.locator('[data-jeex="settings-panel"]');
+  await expect(panel).toBeVisible();
+  await expect(panel.locator('input[type="range"]')).toBeFocused();
+  const opened = await box(panel);
+  const plate = await box(page.locator('[data-jeex="settings-extension"]'));
+  // The popover's start edge under the plate's, not pushed out of the viewer.
+  expect(opened.x).toBeGreaterThanOrEqual(0);
+  expect(opened.x).toBeLessThanOrEqual(plate.x + plate.width);
+  await expectNoNewA11yViolations(page, testInfo, 0);
+  await page.keyboard.press('Escape');
+  await expect(panel).toBeHidden();
+  await expect(button).toBeFocused();
+});
+
+test('element page: a second viewer with `settings` and `settings-side="start"` in a shadow root, independent of the first, and axe finds nothing', async ({
   page,
 }, testInfo) => {
   await page.goto('/dev/embed-element.html');
@@ -46,6 +95,7 @@ test('element page: a second viewer with `settings` in a shadow root, independen
     }
     second.id = 'second';
     second.setAttribute('settings', '');
+    second.setAttribute('settings-side', 'start');
     second.setAttribute('loading', 'eager');
     second.setAttribute('light-temperature', '3000');
     first.after(second);
@@ -54,7 +104,8 @@ test('element page: a second viewer with `settings` in a shadow root, independen
   const button = second.locator('[data-jeex="settings-button"]');
   await expect(button).toBeVisible({ timeout: 60_000 });
   await expect(page.locator('#viewer [data-jeex="settings-button"]')).toHaveCount(0);
-  await button.click();
+  await expectOnStart(second);
+  await button.evaluate((element: HTMLElement) => element.click());
   const panel = second.locator('[data-jeex="settings-panel"]');
   await expect(panel).toBeVisible();
   await expect(panel.locator('output')).toHaveText('3000 K · warm');
