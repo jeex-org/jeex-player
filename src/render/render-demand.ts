@@ -89,10 +89,19 @@ export class RenderDemand {
     );
   }
 
-  /** The tick drew successfully with `camera`: that is the picture on screen now. */
+  /**
+   * The tick drew successfully with `camera`: that is the picture on screen now.
+   *
+   * The first picture after the render camera itself changed (a mode switch to
+   * or from the top view) is not the steady one: in a real browser the top
+   * view's first frame differed on wall tops and glazing from the next frame
+   * drawn from identical inputs, in 7 runs of 10. So a draw with another camera
+   * object leaves the demand set for exactly one more frame, which converges.
+   */
   commit(camera: DemandCamera): void {
     this.draws += 1;
-    this.dirty = false;
+    const switched = this.shown !== null && this.shown.camera !== camera;
+    this.dirty = switched;
     this.shown = {
       camera,
       world: Array.from(camera.matrixWorld.elements),
