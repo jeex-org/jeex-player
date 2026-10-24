@@ -1,0 +1,41 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>JEEX dev — light bake hook</title>
+    <style>
+      /*
+        The demo flat in the player, live or with an offline light bake, at one
+        camera pose, so two tabs can be compared. Not under test itself:
+        `tests/component/light-bake-hook.test.ts` covers the same wiring.
+      */
+      body {
+        margin: 0;
+        background: #0d1111;
+        color: #dfe7e7;
+        font:
+          13px/1.5 system-ui,
+          sans-serif;
+      }
+      #stage {
+        position: fixed;
+        inset: 0 0 26px 0;
+      }
+      #readout {
+        position: fixed;
+        inset: auto 0 0 0;
+        height: 26px;
+        padding: 0 16px;
+        display: flex;
+        align-items: center;
+        font-variant-numeric: tabular-nums;
+      }
+    </style>
+  </head>
+  <body>
+    <div id="stage"></div>
+    <p id="readout">loading…</p>
+    <script type="module" src="/dev/light-bake-hook.ts"></script>
+  </body>
+</html>

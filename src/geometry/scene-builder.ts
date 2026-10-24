@@ -565,6 +565,11 @@ export class SceneBuilder {
     return { unhandled: ctx.unhandled, failed: ctx.failed };
   }
 
+  /** Resolves once every library map of the current shell has attached or given up (`ShellPaint.mapsSettled`). */
+  mapsSettled(): Promise<void> {
+    return this.shell.paint.mapsSettled();
+  }
+
   /** True when a batch changed the plan itself and needs `rebuildAll`. */
   static needsRebuild(touched: readonly TouchedEntity[]): boolean {
     return touched.some((entity) => entity.kind === 'shell');

@@ -80,6 +80,10 @@ describe('constants', () => {
   test('the lighting entry keeps a budget of its own: no three.js fits in it', () => {
     expect(LIGHTING_BUDGET_FAIL_BYTES).toBe(12_085 + 1024);
     expect(limitFor('jeex-viewer-lighting.js')).toBe(LIGHTING_BUDGET_FAIL_BYTES);
+    // Shared `es` chunks named after a lighting MODULE (`jeex-viewer-lighting-context-<hash>.js`,
+    // `jeex-viewer-lighting-standard-<hash>.js`) are viewer code, not the entry: the viewer's budget.
+    expect(limitFor('jeex-viewer-lighting-context-Cgcm6Bjz.js')).toBe(BUDGET_FAIL_BYTES);
+    expect(limitFor('jeex-viewer-lighting-standard-Ddnc_dKo.js')).toBe(BUDGET_FAIL_BYTES);
   });
 });
 

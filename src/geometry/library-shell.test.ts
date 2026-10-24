@@ -342,3 +342,32 @@ describe('unmount', () => {
     expect(network.images.every((image) => image.closed)).toBe(true);
   });
 });
+
+describe('mapsSettled', () => {
+  test('resolves only once every library map of the shell has attached', async () => {
+    const network = stubTextures();
+    const release = network.holdFetches();
+    const document = dressed();
+    const builder = new SceneBuilder(document, solvePlan(document), { ...PROJECT, textures: network.textures });
+    const { root } = builder.build();
+    const floor = (root.getObjectByName(`floor-${ROOM.a}`) as THREE.Mesh).material as THREE.MeshStandardMaterial;
+    let settled = false;
+    void builder.mapsSettled().then(() => (settled = true));
+    await flush();
+    expect(settled).toBe(false);
+    release();
+    await flush();
+    expect(settled).toBe(true);
+    expect(floor.map).not.toBeNull();
+  });
+
+  test('resolves at once for a shell without library materials', async () => {
+    const builder = new SceneBuilder(lShapePlan, solvePlan(lShapePlan));
+    builder.build();
+    let settled = false;
+    void builder.mapsSettled().then(() => (settled = true));
+    await Promise.resolve();
+    await Promise.resolve();
+    expect(settled).toBe(true);
+  });
+});

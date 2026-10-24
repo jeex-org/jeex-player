@@ -57,6 +57,7 @@ export function debugHostFor(model: SceneModel, deps: DebugPartsDeps): ViewerDeb
       return lighting ? { state: lighting.state(), stats: lighting.stats() } : undefined;
     },
     renderDemand: () => stage()?.runtime.demand.counters(),
+    lightBake: () => deps.mount.lightBake.state(),
     furnitureVisible: () => deps.furnitureVisible(),
     messages: () => deps.messages(),
     projectLibrary: () => deps.projectLibrary(),

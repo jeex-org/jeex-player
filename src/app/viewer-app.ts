@@ -233,6 +233,7 @@ export class ViewerApp {
       usage: this.usage,
       textureEnv: () => textureEnvOf(this.stage?.runtime.renderer, this.options.resolveTexture, this.log, this.ktx2),
       artificialLights: (root) => this.handle.lightTemperature.apply(root),
+      log: this.log,
     });
     this.telemetry = telemetryWiring({
       ...embedding,
@@ -316,11 +317,10 @@ export class ViewerApp {
         ui,
         tour,
         setMode: (mode) => this.handle.setMode(mode),
-        engageTour: () => void this.stage?.director?.engageTour(),
+        director: () => this.stage?.director,
       });
-      // The map's own state must be right BEFORE the first frame: `__appReady`
-      // is already set, and an embedding page (or a browser check) may read
-      // the card's `data-visible` in the same task.
+      // The map's state must be right BEFORE the first frame: `__appReady` is already
+      // set, and an embedding page may read the card's `data-visible` in the same task.
       this.stage?.syncMinimap();
       this.ui.wakeControls();
       const { dollhouse, animator, doors, mount } = this;

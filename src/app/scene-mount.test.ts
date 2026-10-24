@@ -41,6 +41,9 @@ import { projectContext } from './project-wiring.js';
 import { tintArtificialLights } from '../render/light-temperature.js';
 import { lampLightTag } from '../assets/artificial-light.js';
 import { LAMP_PROJECT_FIXTURE as LAMPS } from '../../tests/fixtures/project/fixture-ids.js';
+import type { BakeTarget, LightBakeWiring } from '../lightmap/light-bake-wiring.js';
+import { FINISH } from '../materials/finish-ids.js';
+import { isApplyOk } from '../scene/scene-model.js';
 
 const SOFA = L_SHAPE.asset.sofa;
 const TABLE = L_SHAPE.asset.table;
@@ -95,7 +98,7 @@ type Rig = {
   invalidations: () => number;
 };
 
-function rig(sunRig?: ApartmentRig, artificialLights?: (root: THREE.Object3D) => void): Rig {
+function rig(sunRig?: ApartmentRig, artificialLights?: (root: THREE.Object3D) => void, lightBake?: LightBakeWiring): Rig {
   const scene = new THREE.Scene();
   const downloads: string[] = [];
   const seeded: SceneModel[] = [];
@@ -133,6 +136,7 @@ function rig(sunRig?: ApartmentRig, artificialLights?: (root: THREE.Object3D) =>
     onError: (error) => {
       throw new Error(error.message);
     },
+    ...(lightBake && { lightBake }),
   });
   const modelSource = (request: { url: string }): Promise<ModelOutcome> => {
     downloads.push(request.url);
@@ -535,5 +539,114 @@ describe("a variant swap builds the new variant's lamp lights under the current 
     expect(light!.color.toArray()).toEqual(expected.color.toArray());
     tintArtificialLights(subject.mount.sceneRoot!, null);
     expect(light!.color.toArray()).toEqual(authored.toArray());
+  });
+});
+
+/** A wiring that records what the mount tells it, and what was on screen at that moment. */
+function recordingBake(scene: () => THREE.Scene, root: () => THREE.Object3D | undefined, floor: () => THREE.Material | undefined) {
+  const events: Array<{ call: string; attached: boolean; floor?: THREE.Material | undefined }> = [];
+  const targets: BakeTarget[] = [];
+  /** Whether the mount's current shell (if it has one yet) is still in the scene graph. */
+  const attached = (): boolean => {
+    const current = root();
+    return current === undefined || current.parent === scene();
+  };
+  const wiring: LightBakeWiring = {
+    mounted: (target) => {
+      targets.push(target);
+      events.push({ call: 'mounted', attached: attached() });
+    },
+    revision: () => events.push({ call: 'revision', attached: attached(), floor: floor() }),
+    drop: () => events.push({ call: 'drop', attached: attached() }),
+    state: () => ({ state: 'off' }),
+    idle: () => Promise.resolve(),
+  };
+  return { wiring, events, targets };
+}
+
+describe('the light bake follows the mounted document', () => {
+  function baked() {
+    let subject: Rig | undefined;
+    const floorOf = (): THREE.Material | undefined =>
+      (subject?.mount.sceneRoot?.getObjectByName(`floor-${L_SHAPE.room.a}`) as THREE.Mesh | undefined)?.material as
+        | THREE.Material
+        | undefined;
+    const bake = recordingBake(
+      () => subject!.scene,
+      () => subject?.mount.sceneRoot,
+      floorOf,
+    );
+    subject = rig(undefined, undefined, bake.wiring);
+    return { subject, bake, floorOf };
+  }
+
+  test('a mount hands the wiring its root and document, settled only after the first model pass', async () => {
+    const { subject, bake } = baked();
+    subject.mount.mountDocument(subject.load(lShapePlan));
+    expect(bake.targets).toHaveLength(1);
+    const target = bake.targets[0]!;
+    expect(target.root).toBe(subject.mount.sceneRoot!);
+    expect(target.document).toBe(subject.mount.model!);
+    expect(target.scene).toBe(subject.mount.model!.scene);
+    let settled = false;
+    void target.settled.then(() => (settled = true));
+    await Promise.resolve();
+    expect(settled).toBe(false);
+    await settle();
+    expect(settled).toBe(true);
+    expect(subject.settled).toHaveLength(1);
+  });
+
+  test('settled also waits for every library map of the shell', async () => {
+    let release: () => void = () => undefined;
+    const held = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    const maps = spyOn(SceneBuilder.prototype, 'mapsSettled').mockImplementation(() => held);
+    try {
+      const { subject, bake } = baked();
+      subject.mount.mountDocument(subject.load(lShapePlan));
+      let settled = false;
+      void bake.targets[0]!.settled.then(() => (settled = true));
+      await settle();
+      expect(subject.settled).toHaveLength(1);
+      expect(settled).toBe(false);
+      release();
+      await settle();
+      expect(settled).toBe(true);
+    } finally {
+      maps.mockRestore();
+    }
+  });
+
+  test('a repaint reaches the wiring before the builder repaints the shell', async () => {
+    const { subject, bake, floorOf } = baked();
+    subject.mount.mountDocument(subject.load(lShapePlan));
+    await settle();
+    const before = floorOf();
+    const model = subject.mount.model!;
+    const result = model.apply({
+      baseRev: model.rev,
+      ops: [{ op: 'set_material', surface: 'floor', room: L_SHAPE.room.a, material: FINISH.walnut }],
+    });
+    expect(isApplyOk(result)).toBe(true);
+    const revision = bake.events.find((event) => event.call === 'revision');
+    expect(revision?.floor).toBe(before);
+    expect(floorOf()).not.toBe(before);
+  });
+
+  test('a plan rebuild, a release and a remount drop the bake while the old shell is still attached', async () => {
+    const { subject, bake } = baked();
+    subject.mount.mountDocument(subject.load(lShapePlan));
+    await settle();
+    subject.mount.present(subject.load({ ...lShapePlan, ceilingHeight: lShapePlan.ceilingHeight + 0.2 }));
+    subject.mount.remount();
+    subject.mount.release();
+    const drops = bake.events.filter((event) => event.call === 'drop');
+    // The first mount (nothing yet), the plan rebuild, the remount, the release.
+    expect(drops).toHaveLength(4);
+    expect(drops.every((event) => event.attached)).toBe(true);
+    expect(bake.events.filter((event) => event.call === 'mounted')).toHaveLength(2);
+    expect(bake.targets[1]!.document).toBe(bake.targets[0]!.document);
   });
 });
