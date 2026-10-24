@@ -432,6 +432,8 @@ describe('the demo apartment with its shell baked, in walk', { timeout: MOUNT_TI
     });
     await handle.ready;
     await until(() => live !== null, 'the live scene', 60_000);
+    // As the light-bake binding does: the shell is marked once its library maps settled.
+    await until(() => maps.pending() === 0, 'the library maps settled', 60_000);
     expect(bakeShell(live!)).toBeGreaterThan(0);
   }, MOUNT_TIMEOUT_MS);
 
@@ -490,6 +492,7 @@ describe('the demo apartment with its shell baked, in walk', { timeout: MOUNT_TI
   });
 
   test('a context restore in walk comes back to the same frame once the bake is done', async () => {
+    await until(() => maps.pending() === 0, 'the library maps settled before', 60_000);
     const before = await still();
     const canvas = handle.element.querySelector('canvas')!;
     const context = (canvas.getContext('webgl2') ?? canvas.getContext('webgl'))!;
@@ -510,7 +513,11 @@ describe('the demo apartment with its shell baked, in walk', { timeout: MOUNT_TI
     extension.restoreContext();
     await ready;
     await until(() => live !== null, 'the re-mounted scene', 60_000);
-    // The light-bake binding marks the re-mounted shell; this test stands in for it.
+    // The light-bake binding marks the re-mounted shell once its models and
+    // library maps have settled (`scene-mount.ts`, `settled`); this test stands
+    // in for it, so it waits for the same: the maps reload after the restore.
+    await until(() => maps.pending() === 0, 'the re-mounted library maps settled', 60_000);
+    maps.delay(0);
     expect(bakeShell(live!)).toBeGreaterThan(0);
     if (handle.getState().mode !== 'walk') handle.setMode('walk');
     await until(() => debug().walkLighting().state === 'live', 'room lighting live after the restore', MOUNT_TIMEOUT_MS - 60_000);
