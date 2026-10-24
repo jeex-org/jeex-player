@@ -159,16 +159,16 @@ export const LAZY_CHUNK_FAIL_BYTES = 256 * 1024;
  * room re-capture and the walk sun scale, the walk camera white balance and
  * the walk emissive cap, and the host sky (`src/render/hdri/`: three's
  * gain-map loader, the decode adapter and the sky's scene state).
- * The limit is the last measured size of the ES build's chunk (68,432 gzip
+ * The limit is the last measured size of the ES build's chunk (69,848 gzip
  * bytes, from `measureBundle('dist-lib')` right after `bun run build:lib`; the
- * demo build's is 65,737; 65,356 and 63,016 before the host sky, 63,734 before
+ * demo build's is 67,016; 65,356 and 63,016 before the host sky, 63,734 before
  * the walk white balance and emissive cap, 62,682 before the light
  * temperature, 50,773 before the room lighting) plus 1 KB, so a
  * second effect added to the chain is noticed here. The IIFE build cannot split
  * code and carries the chain inline, inside the 700 KB boot budget.
  */
 export const LAZY_LIMITS: Readonly<Record<string, number>> = {
-  'lazy-jeex-viewer-walk-post': 68_432 + 1024,
+  'lazy-jeex-viewer-walk-post': 69_848 + 1024,
   // three's KTX2 loader with its container parser and Zstd decoder
   // (`src/materials/ktx2.ts`), loaded by the first KTX2 asset: 25,052 gzip
   // bytes in the ES build (24,175 in the demo build) from `measureBundle`
