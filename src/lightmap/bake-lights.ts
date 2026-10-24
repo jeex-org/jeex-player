@@ -16,6 +16,15 @@
  *   over the scene built by the player's own `SceneBuilder` as a live view
  *   builds it: the lights the placements declare, never a bank builder's
  *   procedural bulb (those stay live). three's cut-off distance is not baked.
+ *   The power is the lighting module's `blenderPower` of the intensity, the
+ *   one conversion the player and the bake share.
+ *
+ * Ceiling lamps: the scene is built without model URLs, so a ceiling-anchored
+ * lamp's body is its stand-in, hung by the catalogue height (`dims[1]`), and
+ * its bulb sits there. The live view hangs the model by its MEASURED top
+ * once it arrives and moves the same lights onto it, so the two agree as long
+ * as the catalogue keeps `dims` equal to the model's overall box (its top at
+ * `dims[1]` in the model frame). Nothing here checks that at run time.
  *
  * The bank is a required argument: the caller names the bank the live view of
  * the same scene resolves against (`SHIPPED_BANK`, or a project's
@@ -29,20 +38,14 @@
 import * as THREE from 'three';
 import type { CatalogueLookup } from '../assets/asset-resolver.js';
 import { SceneBuilder } from '../geometry/scene-builder.js';
+import { blenderPower } from '../lighting/lamp-units.js';
 import { LIGHTING_STANDARD, LIGHTING_STANDARD_VERSION } from '../lighting/lighting-standard.js';
 import { sunDirection } from '../lighting/sun-direction.js';
 import { solvePlan } from '../plan/plan-solver.js';
 import { collectLampLights, type CollectedLampLight } from '../render/lamp-lights.js';
 import type { SceneData } from '../scene/types.js';
 import { ViewerLibError } from '../shared/errors.js';
-import {
-  BAKE_LAMP_WATTS_PER_CANDELA,
-  BAKE_LIGHTS_RECIPE,
-  BAKE_SKY_HEMISPHERE_RECIPE,
-  judgeBakeLights,
-  type BakeLamp,
-  type BakeLights,
-} from './bake-lights.schema.js';
+import { BAKE_LIGHTS_RECIPE, BAKE_SKY_HEMISPHERE_RECIPE, judgeBakeLights, type BakeLamp, type BakeLights } from './bake-lights.schema.js';
 
 /** The shipped bank, for a scene the live view draws without a project. */
 export const SHIPPED_BANK = Object.freeze({ shipped: true } as const);
@@ -60,14 +63,6 @@ export type BakeBank =
 export type LampCollector = (root: THREE.Object3D) => readonly CollectedLampLight[];
 
 type Rgb = readonly [number, number, number];
-
-/**
- * Blender watts of a three point light of `candela`. Local until the lighting
- * module publishes its own conversion, which then replaces this one.
- */
-function blenderPower(candela: number): number {
-  return BAKE_LAMP_WATTS_PER_CANDELA * candela;
-}
 
 /** A standard hex as three reads it: sRGB, linearised into the working space. */
 function linear(hex: string, scale = 1): Rgb {

@@ -17,6 +17,7 @@ import { judgeShellGltf, type ShellNodeExtras } from './shell-extras.schema.js';
 import { exportShellForBake, SHIPPED_FINISHES } from './shell-export.js';
 import { projectFinishes } from '../materials/project-finishes.js';
 import { liveShellEntries } from './baked-shell.js';
+import { unseenTriangles } from '../geometry/shell-unseen.js';
 import { shellInputsHash } from './shell-inputs.js';
 import { NATURAL_SCAN } from '../fixtures/library-materials.js';
 import { DEFAULT_WALL_FINISH } from '../scene/scene-ops.js';
@@ -33,6 +34,27 @@ const exported = await exportShellForBake(apartmentScene, { mintId: A, finishes:
 const json = glbJson(exported.glb);
 const extras = json.nodes.map((node) => node.extras.jeex);
 
+/** The triangles of `mesh` under `matrix`, in index order, each as nine numbers. */
+function worldTriangles(mesh: THREE.Mesh, matrix: THREE.Matrix4): number[][] {
+  const position = mesh.geometry.getAttribute('position');
+  const index = mesh.geometry.index;
+  const count = index ? index.count : position.count;
+  const point = new THREE.Vector3();
+  const out: number[][] = [];
+  for (let i = 0; i < count; i += 3) {
+    const triangle: number[] = [];
+    for (let k = 0; k < 3; k++)
+      triangle.push(
+        ...point
+          .fromBufferAttribute(position, index ? index.getX(i + k) : i + k)
+          .applyMatrix4(matrix)
+          .toArray(),
+      );
+    out.push(triangle);
+  }
+  return out;
+}
+
 function liveRoot(scene: SceneData): THREE.Group {
   const root = new SceneBuilder(scene, solvePlan(scene)).build().root;
   root.updateMatrixWorld(true);
@@ -40,10 +62,27 @@ function liveRoot(scene: SceneData): THREE.Group {
 }
 
 describe('exportShellForBake', () => {
-  test('writes a file the shell contract accepts, one node per live shell mesh', () => {
+  test('writes a file the shell contract accepts: per live shell mesh its seen part, then its unseen part when it has one', () => {
     const verdict = judgeShellGltf(json);
     expect(verdict.ok ? 'ok' : verdict.message).toBe('ok');
-    expect(json.nodes.length).toBe(liveShellEntries(liveRoot(apartmentScene), apartmentScene).length);
+    const expected = liveShellEntries(liveRoot(apartmentScene), apartmentScene).flatMap((entry) => {
+      const flags = [...(unseenTriangles(entry.mesh.geometry) ?? [0])];
+      return [...(flags.includes(0) ? [entry.extras] : []), ...(flags.includes(1) ? [{ ...entry.extras, unseen: true }] : [])];
+    });
+    // Through JSON, as the file carries them (`-0` becomes `0`).
+    expect(extras).toEqual(JSON.parse(JSON.stringify(expected)) as ShellNodeExtras[]);
+    expect(extras.some((entry) => 'unseen' in entry)).toBe(true);
+  });
+
+  test('gives both parts of a mesh the same material, and the same bytes for the same scene and minter', async () => {
+    for (const [i, node] of json.nodes.entries()) {
+      if (!('unseen' in node.extras.jeex)) continue;
+      const seen = json.nodes[i - 1]!;
+      expect(json.meshes[node.mesh]!.primitives[0].material).toBe(json.meshes[seen.mesh]!.primitives[0].material);
+    }
+    const again = await exportShellForBake(apartmentScene, { mintId: minter('01a1b000'), finishes: SHIPPED_FINISHES });
+    expect(new Uint8Array(again.glb)).toEqual(new Uint8Array(exported.glb));
+    expect(again.shellInputsHash).toBe(await shellInputsHash(apartmentScene));
   });
 
   test('names every node and mesh with the minted ids, in order, and gives them identity transforms', () => {
@@ -100,24 +139,61 @@ describe('exportShellForBake', () => {
     expect(extras.filter((entry) => entry.kind === 'ceiling').every((entry) => entry.visible)).toBe(true);
   });
 
-  test('writes each mesh’s world-space vertices, so a node at the identity stands where the live mesh stands', async () => {
+  test('writes each part’s world-space triangles: a mesh’s seen then unseen triangles, as the builder recorded them', async () => {
     const { GLTFLoader } = await import('three/addons/loaders/GLTFLoader.js');
     const shipped = (await new GLTFLoader().parseAsync(exported.glb.slice(0), '')).scene.children as THREE.Mesh[];
     const entries = liveShellEntries(liveRoot(apartmentScene), apartmentScene);
-    for (const [i, { mesh }] of entries.entries()) {
-      const local = mesh.geometry.getAttribute('position');
-      const file = shipped[i]!.geometry.getAttribute('position');
-      expect(file.count).toBe(local.count);
-      let worst = 0;
-      const point = new THREE.Vector3();
-      for (let k = 0; k < local.count; k++) {
-        mesh.localToWorld(point.fromBufferAttribute(local, k));
-        worst = Math.max(worst, Math.abs(file.getX(k) - point.x), Math.abs(file.getY(k) - point.y), Math.abs(file.getZ(k) - point.z));
+    const fileTriangles = (mesh: THREE.Mesh): number[][] => worldTriangles(mesh, new THREE.Matrix4());
+    let node = 0;
+    for (const { mesh } of entries) {
+      const live = worldTriangles(mesh, mesh.matrixWorld);
+      const flags = unseenTriangles(mesh.geometry);
+      const parts = [0, 1].map((flag) => live.filter((_, t) => (flags?.[t] ?? 0) === flag)).filter((part) => part.length > 0);
+      for (const part of parts) {
+        const file = fileTriangles(shipped[node++]!);
+        expect(file.length).toBe(part.length);
+        let worst = 0;
+        part.forEach((triangle, t) => triangle.forEach((value, k) => (worst = Math.max(worst, Math.abs(value - file[t]![k]!)))));
+        expect(worst).toBeLessThan(1e-5);
       }
-      expect(worst).toBeLessThan(1e-5);
     }
+    expect(node).toBe(shipped.length);
     // The origin is real: most shell meshes stand inside their rooms, not at (0, 0, 0).
     expect(extras.filter((entry) => entry.origin.some((value) => value !== 0)).length).toBeGreaterThan(extras.length / 2);
+  });
+
+  test('marks about half of the area the bake would chart as unseen on the demo apartment', async () => {
+    const { GLTFLoader } = await import('three/addons/loaders/GLTFLoader.js');
+    const shipped = (await new GLTFLoader().parseAsync(exported.glb.slice(0), '')).scene.children as THREE.Mesh[];
+    const area = (mesh: THREE.Mesh): number =>
+      worldTriangles(mesh, new THREE.Matrix4()).reduce((sum, [ax, ay, az, bx, by, bz, cx, cy, cz]) => {
+        const u = new THREE.Vector3(bx! - ax!, by! - ay!, bz! - az!);
+        return sum + u.cross(new THREE.Vector3(cx! - ax!, cy! - ay!, cz! - az!)).length() / 2;
+      }, 0);
+    const charted = (entry: ShellNodeExtras): boolean =>
+      entry.kind !== 'site' && !(entry.kind === 'opening' && entry.opening === 'glass') && entry.visible;
+    const byKind: Record<string, { nodes: number; area: number }> = {};
+    let total = 0;
+    let unseen = 0;
+    shipped.forEach((mesh, i) => {
+      const entry = extras[i]!;
+      if (!charted(entry)) return;
+      const a = area(mesh);
+      total += a;
+      if (!('unseen' in entry)) return;
+      unseen += a;
+      const slot = (byKind[entry.kind] ??= { nodes: 0, area: 0 });
+      slot.nodes += 1;
+      slot.area += a;
+    });
+    // Measured: 650.5 of 1472.5 m² (44.17 %), against about half of the charted area the real bake found at zero.
+    expect(Object.fromEntries(Object.entries(byKind).map(([kind, { nodes }]) => [kind, nodes]))).toEqual({
+      floor: 9,
+      wall: 62,
+      skirting: 46,
+      joint: 23,
+    });
+    expect(unseen / total).toBeCloseTo(0.4417, 3);
   });
 
   test('refuses a minted id that is not a UUID v7, and one minted twice', async () => {

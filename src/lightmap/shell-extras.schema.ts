@@ -21,6 +21,10 @@
  *   reads a mesh's identity from its name, only from `extras.jeex`.
  * - Each mesh has exactly one primitive with `POSITION`, `NORMAL`,
  *   `TEXCOORD_0` and optionally `TEXCOORD_1`, and one material.
+ * - A shell mesh with triangles no walk can see is written as two nodes: its
+ *   seen part, then its unseen part with the same extras plus `unseen: true`
+ *   (`geometry/shell-unseen.ts` says which triangles). The bake tool gives an
+ *   unseen part no `TEXCOORD_1` and no binding and keeps it as an occluder.
  * - `node.extras.jeex` (`ShellNodeExtras`): the mesh's structured identity
  *   (`kind` and the scene ids it belongs to), its run-time origin (`origin`,
  *   world metres; the player moves the node there and the vertices by the
@@ -57,12 +61,21 @@ const flags = {
   receiveShadow: z.boolean(),
 };
 
+/**
+ * Present on the part of a mesh whose triangles no walk can see (written right
+ * after the mesh's seen part, with the same extras otherwise): the bake gives
+ * it no `TEXCOORD_1` and no binding, keeps it as an occluder, and the viewer
+ * draws it with live lighting. Only floors, walls, skirtings and junction
+ * cores have such parts.
+ */
+const unseen = z.optional(z.literal(true));
+
 /** A part of a wall that the dollhouse cuts away by height: the band it spans, metres. */
 const band = z.strictObject({ bottom: finite, height: nonNegative });
 
 /** The structured identity and run-time contract of one shell mesh, by kind. */
 export const shellNodeExtrasSchema = z.discriminatedUnion('kind', [
-  z.strictObject({ kind: z.literal('floor'), roomId: uuid, ...flags }),
+  z.strictObject({ kind: z.literal('floor'), roomId: uuid, unseen, ...flags }),
   z.strictObject({ kind: z.literal('ceiling'), roomId: uuid, ...flags }),
   z.strictObject({
     kind: z.literal('wall'),
@@ -70,10 +83,11 @@ export const shellNodeExtrasSchema = z.discriminatedUnion('kind', [
     exterior: z.boolean(),
     /** Plan direction out of the wall body on the room's side (out of the building on the facade). */
     outward: z.readonly(z.tuple([finite, finite])),
+    unseen,
     ...flags,
   }),
-  z.strictObject({ kind: z.literal('skirting'), face: faceKeySchema, ...flags }),
-  z.strictObject({ kind: z.literal('joint'), nodeId: uuid, wallIds: z.readonly(z.array(uuid)), ...flags }),
+  z.strictObject({ kind: z.literal('skirting'), face: faceKeySchema, unseen, ...flags }),
+  z.strictObject({ kind: z.literal('joint'), nodeId: uuid, wallIds: z.readonly(z.array(uuid)), unseen, ...flags }),
   z.strictObject({ kind: z.literal('site'), part: z.enum(['slab', 'ground']), ...flags }),
   z.strictObject({
     kind: z.literal('opening'),

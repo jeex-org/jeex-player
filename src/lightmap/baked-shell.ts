@@ -9,7 +9,8 @@
  * 2. the shell file's bytes must hash to the sidecar's `shellHash`
  *    (`light-bake-load.ts`), and the file's own `asset.extras.jeex` must name
  *    the same scene and digest; the file is judged against its contract
- *    (`shell-extras.schema.ts`), it must give no UV1 to the site or glazing,
+ *    (`shell-extras.schema.ts`), it must give no UV1 to the site, glazing or
+ *    the parts no walk sees,
  *    and the bindings must name exactly the file's meshes that have UV1 (a
  *    lit mesh left unbound would show live light inside a baked room);
  * 3. only then are the atlas pages fetched;
@@ -24,10 +25,11 @@
  * bake is never half-applied and never applied to a revision it was not made
  * for. Errors that are not refusals (a defect) propagate.
  *
- * Shell meshes the bake does not bind (the site, glazing) carry no
- * `TEXCOORD_1` and keep their live material: a shell file that gives one of
- * them UV1 is refused before any page is fetched, and a binding that names
- * one of them is refused.
+ * Shell meshes the bake does not bind (the site, glazing, the unseen parts
+ * of floors, walls, skirtings and junction cores) carry no `TEXCOORD_1` and
+ * keep their live material: a shell file that gives one of them UV1 is
+ * refused before any page is fetched, and a binding that names one of them
+ * is refused.
  *
  * Internal: no public option reaches this module yet.
  */
@@ -117,13 +119,17 @@ export async function verifiedShellFile(bake: LightBake, bytes: ArrayBuffer, sce
   const litNodes = shipped.gltf.nodes.filter((node) => shipped.gltf.meshes[node.mesh]!.primitives[0].attributes.TEXCOORD_1 !== undefined);
   const lit = litNodes.map((node) => node.name);
   const stayLive = litNodes
-    .filter(({ extras: { jeex } }) => jeex.kind === 'site' || (jeex.kind === 'opening' && jeex.opening === 'glass'))
+    .filter(({ extras: { jeex } }) => jeex.kind === 'site' || (jeex.kind === 'opening' && jeex.opening === 'glass') || 'unseen' in jeex)
     .map((node) => node.name);
   if (stayLive.length > 0) {
     shipped.dispose();
-    throw new LightBakeError('shell', `light bake ${bake.bakeId}: its shell gives UV1 to the site or glazing, which stay live`, {
-      detail: { nodes: stayLive.slice(0, 8) },
-    });
+    throw new LightBakeError(
+      'shell',
+      `light bake ${bake.bakeId}: its shell gives UV1 to the site, glazing or unseen parts, which stay live`,
+      {
+        detail: { nodes: stayLive.slice(0, 8) },
+      },
+    );
   }
   const bound = new Set(bake.bindings.map((binding) => binding.node));
   const unbound = lit.filter((name) => !bound.has(name));
