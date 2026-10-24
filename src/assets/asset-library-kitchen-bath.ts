@@ -46,7 +46,8 @@ export const kitchenBathObjects: CatalogueObject[] = [
     primarySlot: 'front',
     mirror: { x: true, y: false, z: true },
     defaultVariant: VARIANT.island_kitchen_ink,
-    layout: { blockingHeight: 0.92 },
+    // The worktop's top, under the hob trim and the mixer tap.
+    layout: { blockingHeight: 0.94 },
     variants: [
       v(
         VARIANT.island_kitchen_ink,
@@ -345,7 +346,8 @@ export const kitchenBathObjects: CatalogueObject[] = [
     primarySlot: 'front',
     mirror: { x: true, y: false, z: false },
     defaultVariant: VARIANT.vanity_sink_walnut,
-    layout: { caseGood: true },
+    // The stone top the vessel basin and the tap stand on.
+    layout: { caseGood: true, blockingHeight: 0.88 },
     variants: [
       v(VARIANT.vanity_sink_walnut, 'vanity_sink_walnut', 'Vanity, walnut with stone top', {
         carcass: FINISH.plaster_white,
@@ -445,6 +447,8 @@ export const kitchenBathObjects: CatalogueObject[] = [
     primarySlot: 'ceramic',
     mirror: { x: true, y: false, z: true },
     defaultVariant: VARIANT.bathtub_white,
+    // The rim (0.56 m on the compact bath), under the mixer tap.
+    layout: { blockingHeight: 0.58 },
     variants: [
       v(VARIANT.bathtub_white, 'bathtub_white', 'Bath, white', { ceramic: FINISH.ceramic_white, metal: FINISH.chrome_polished }),
       v(VARIANT.bathtub_brass, 'bathtub_brass', 'Bath, white with brass mixer', {

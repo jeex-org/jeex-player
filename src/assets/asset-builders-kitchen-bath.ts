@@ -55,7 +55,7 @@ export const buildIsland: Builder = (asset, kit) => {
   put(group, kit.rounded(width + 0.06, topThickness, depth + overhang, 0.01), kit.finish('top'), {
     y: height - topThickness / 2,
     z: overhang / 2,
-  });
+  }).name = 'island-worktop';
   // Doubled edge under the seating overhang: a bare 45 mm slab reads thin from the sofa side.
   put(group, kit.box(width + 0.06, 0.028, overhang - 0.02), kit.finish('top'), {
     y: height - topThickness - 0.014,
@@ -573,11 +573,13 @@ export const buildVanity: Builder = (asset, kit) => {
     });
     barHandle(group, kit, 'metal', 0.14, side * width * 0.12, base + bodyHeight - 0.08, depth / 2 + frontDepth);
   }
-  put(group, kit.rounded(width + 0.02, topThickness, depth + 0.02, 0.008), kit.finish('top'), { y: height - topThickness / 2 });
+  put(group, kit.rounded(width + 0.02, topThickness, depth + 0.02, 0.008), kit.finish('top'), { y: height - topThickness / 2 }).name =
+    'vanity-top';
 
-  // Vessel basin: an open cylinder with a rim, squashed into an oval.
+  // Vessel basin: an open cylinder with a rim, squashed into an oval. Open at
+  // both ends: the stone top is its floor, and a capped one read as a full bowl.
   const ceramic = kit.finishDouble('ceramic');
-  put(group, kit.cylinder(0.185, 0.15, 0.13, 24), ceramic, { y: height + 0.062, sx: 1.45 });
+  put(group, kit.cylinderOpen(0.185, 0.15, 0.13, 24), ceramic, { y: height + 0.062, sx: 1.45 }).name = 'vanity-basin';
   put(group, kit.torus(0.185, 0.011, 24), kit.finish('ceramic'), { y: height + 0.127, rx: Math.PI / 2, sx: 1.45, sz: 1.45 });
   mixerTap(group, kit, 'metal', 0, height + 0.02, -depth / 2 + 0.17, 0.24, 0.015);
   return group;
@@ -607,7 +609,7 @@ export const buildBathtub: Builder = (asset, kit) => {
     kit.ring({ width, height: depth, radius: 0.16 }, { width: width - wall * 2, height: depth - wall * 2, radius: 0.12 }, height),
     kit.finish('ceramic'),
     { rx: -Math.PI / 2 },
-  );
+  ).name = 'bath-shell';
   put(group, kit.rounded(width - wall * 2 + 0.02, 0.09, depth - wall * 2 + 0.02, 0.05), kit.finish('ceramic'), { y: 0.06 });
   // Drain disc at the tap end, on the tub floor.
   put(group, kit.cylinder(0.024, 0.024, 0.012, 12), kit.finish('metal'), { x: -width / 2 + 0.15, y: 0.111, z: 0.02 });

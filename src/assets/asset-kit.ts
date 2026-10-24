@@ -625,10 +625,17 @@ export function mixerTap(
   const material = kit.finish(slot);
   const radius = reach / 2;
   const columnHeight = radius * 0.85;
-  put(group, kit.cylinder(tube, tube * 1.3, columnHeight, 10), material, { x, y: deck + columnHeight / 2, z: z - radius });
+  const column = put(group, kit.cylinder(tube, tube * 1.3, columnHeight, 10), material, { x, y: deck + columnHeight / 2, z: z - radius });
   const arc = put(group, kit.torus(radius, tube, 14, Math.PI), material, { x, y: deck + columnHeight, z });
   arc.rotation.y = Math.PI / 2;
-  put(group, kit.cylinder(tube * 0.85, tube * 0.85, 0.03, 10), material, { x, y: deck + columnHeight - 0.015, z: z + radius });
+  const spout = put(group, kit.cylinder(tube * 0.85, tube * 0.85, 0.03, 10), material, {
+    x,
+    y: deck + columnHeight - 0.015,
+    z: z + radius,
+  });
+  // Named so a fixture's facts can be checked against its body without the
+  // tap: the arc is the one thing that rises above a basin or a rim.
+  for (const part of [column, arc, spout]) part.name = 'tap';
 }
 
 /**
