@@ -25,6 +25,7 @@ import { WalkLighting, WalkPost, WALK_POST_TUNING, WALK_WHITE_BALANCE } from '..
 import { atlasLayout, setRoomBoxes, type WalkUniforms } from '../../src/render/walk-lighting/box-probe-patch.js';
 import type { RoomBox, RoomProbe } from '../../src/render/walk-lighting/room-volumes.js';
 import { whiteBalanceMatrix, type Mat3, type Rgb } from '../../src/render/white-balance.js';
+import { openingMaterialFacts } from '../../src/geometry/opening-kinds.js';
 import { closeContainers, demoScene, nextFrame, openContainer, until } from './support.js';
 
 const MOUNT_TIMEOUT_MS = 300_000;
@@ -41,6 +42,10 @@ const PROBE_BEFORE = { x: 2.7, y: 1.5, z: 7.13 };
 /** Pose fA of the gloss metering: across the living room towards its west wall. */
 const POSE_GLOSS = { position: new THREE.Vector3(5.6, 1.6, 6.2), target: new THREE.Vector3(0.3, 0.9, 7.7) };
 const SIZE = { w: 480, h: 300 };
+/** Classes a mask can tell apart. */
+const MASK_CLASSES = 64;
+/** Mask classes from here on are candidate furniture meshes. */
+const FURNITURE_CLASS0 = 10;
 
 /** The renderer string of a fresh WebGL2 context, and whether it is a hardware one. */
 function rendererString(): string {
@@ -67,9 +72,9 @@ type Internals = {
   refresh: WalkLighting['refresh'];
 };
 
-/** Window glass: a transmissive material (the opening builder names no pane). */
+/** Window glass: the opening builder's glazing material (it names no pane). */
 const isGlass = (mesh: THREE.Mesh): boolean =>
-  ([mesh.material].flat() as THREE.MeshPhysicalMaterial[]).some((material) => (material.transmission ?? 0) > 0.5);
+  [mesh.material].flat().some((material) => openingMaterialFacts.get(material)?.glass === true);
 
 const luminance = (r: number, g: number, b: number): number => 0.2126 * r + 0.7152 * g + 0.0722 * b;
 const times = (m: Mat3, c: Rgb): Rgb =>
@@ -101,10 +106,11 @@ describe.skipIf(!HARDWARE)(`walk gloss and white balance in the demo living room
   function mask(view: THREE.Camera, classify: (mesh: THREE.Mesh) => number | null): Int8Array {
     const { scene } = lighting;
     const swapped = new Map<THREE.Mesh, THREE.Material | THREE.Material[]>();
-    const palette = [0, 1, 2, 3].map(
-      (i) =>
+    const palette = Array.from(
+      { length: MASK_CLASSES },
+      (_, k) =>
         new THREE.MeshBasicMaterial({
-          color: new THREE.Color().setRGB(i + 1, 0, 0),
+          color: new THREE.Color().setRGB(k + 1, 0, 0),
           toneMapped: false,
           fog: false,
           side: THREE.DoubleSide,
@@ -365,34 +371,36 @@ describe.skipIf(!HARDWARE)(`walk gloss and white balance in the demo living room
         Math.max(c.r, c.g, c.b) - Math.min(c.r, c.g, c.b) < 0.08 * Math.max(c.r, c.g, c.b)
       );
     };
-    // The most saturated furniture finish in view.
-    const frustum = new THREE.Frustum().setFromProjectionMatrix(
-      new THREE.Matrix4().multiplyMatrices(view.projectionMatrix, view.matrixWorldInverse),
-    );
-    let furniture: THREE.Mesh | null = null;
-    let best = 0;
+    // Saturated furniture finishes, each its own class; the one covering most pixels is metered.
+    const candidates: THREE.Mesh[] = [];
     lighting.scene.traverse((object) => {
       const mesh = object as THREE.Mesh;
-      if (!mesh.isMesh || !mesh.visible || !frustum.intersectsObject(mesh)) return;
+      if (!mesh.isMesh || candidates.length >= MASK_CLASSES - FURNITURE_CLASS0) return;
       let owner: THREE.Object3D | null = mesh;
       while (owner && owner.userData['assetId'] === undefined) owner = owner.parent;
       if (!owner) return;
-      const c = ([mesh.material].flat()[0] as THREE.MeshStandardMaterial).color;
+      const c = ([mesh.material].flat()[0] as THREE.MeshStandardMaterial).color as THREE.Color | undefined;
       if (!c) return;
-      const saturation = (Math.max(c.r, c.g, c.b) - Math.min(c.r, c.g, c.b)) / Math.max(1e-3, Math.max(c.r, c.g, c.b));
-      if (saturation > best) {
-        best = saturation;
-        furniture = mesh;
-      }
+      const top = Math.max(c.r, c.g, c.b);
+      if (top > 0.05 && (top - Math.min(c.r, c.g, c.b)) / top > 0.3) candidates.push(mesh);
     });
-    const classes = mask(view, (mesh) =>
-      mesh.name === `ceiling-${LIVING}` ? 0 : neutralWall(mesh) ? 1 : mesh === furniture ? 2 : isGlass(mesh) ? 3 : null,
-    );
+    const classes = mask(view, (mesh) => {
+      if (mesh.name === `ceiling-${LIVING}`) return 0;
+      if (neutralWall(mesh)) return 1;
+      if (isGlass(mesh)) return 3;
+      const k = candidates.indexOf(mesh);
+      return k < 0 ? null : FURNITURE_CLASS0 + k;
+    });
+    const counts = new Map<number, number>();
+    for (const k of classes) if (k >= FURNITURE_CLASS0) counts.set(k, (counts.get(k) ?? 0) + 1);
+    const furnitureClass = [...counts.entries()].sort((a, b) => b[1] - a[1])[0]?.[0] ?? -1;
+    const furniture = furnitureClass < 0 ? null : candidates[furnitureClass - FURNITURE_CLASS0]!;
     const pixels = linearShot(view);
     const sums = [0, 1, 2, 3].map(() => [0, 0, 0, 0]);
     for (let i = 0; i < classes.length; i += 1) {
-      const k = classes[i]!;
-      if (k < 0) continue;
+      const raw = classes[i]!;
+      const k = raw === furnitureClass ? 2 : raw;
+      if (k < 0 || k > 3) continue;
       for (let c = 0; c < 3; c += 1) sums[k]![c]! += pixels[i * 4 + c]!;
       sums[k]![3]! += 1;
     }
@@ -427,7 +435,12 @@ describe.skipIf(!HARDWARE)(`walk gloss and white balance in the demo living room
       ceilingRbBefore: ceiling[0] / ceiling[2],
       ceilingAfter: tuned,
       ceilingRbAfter: tuned[0] / tuned[2],
-      furniture: { mesh: (furniture as THREE.Mesh | null)?.name, before: fabric, after: fabricAfter },
+      furniture: {
+        mesh: furniture?.name,
+        material: furniture ? ([furniture.material].flat()[0] as THREE.Material).name : null,
+        before: fabric,
+        after: fabricAfter,
+      },
       sky: { before: sky, after: skyAfter },
     });
     expect(Math.abs(ceiling[0] / ceiling[2] - CEILING_RB_MEASURED) / CEILING_RB_MEASURED).toBeLessThan(0.05);
@@ -435,6 +448,7 @@ describe.skipIf(!HARDWARE)(`walk gloss and white balance in the demo living room
     expect(tuned[0] / tuned[2]).toBeLessThanOrEqual(1.6);
     expect(tuned[0]).toBeGreaterThanOrEqual(tuned[1]);
     expect(tuned[1]).toBeGreaterThanOrEqual(tuned[2]);
+    expect(furniture).not.toBeNull();
     expect(argmax(fabricAfter)).toBe(argmax(fabric));
     if (sums[3]![3]! > 0) expect(skyAfter[2] / skyAfter[0]).toBeGreaterThanOrEqual((sky[2] / sky[0]) * 0.999);
   });
