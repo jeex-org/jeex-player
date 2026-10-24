@@ -8,7 +8,8 @@
  * walls, are dimmed to zero rather than removed, so no program changes; the
  * environment's diffuse goes off inside the rooms through the patch's
  * uniforms. `walk` adds a small ambient floor and the walk exposure, and
- * divides the sky background's intensity by that exposure.
+ * divides the sky background's intensity by that exposure. Baked surfaces
+ * take the walk's baked-interior gain in `capture` and `walk`.
  *
  * Invariant: `editing` puts back exactly the values it found, the light
  * intensities and the renderer's exposure. The lights are looked up by name
@@ -21,6 +22,7 @@ import { setUniformState, type UniformState, type WalkUniforms } from './box-pro
 import { WALK_LIGHTING_TUNING as T } from './walk-lighting-tuning.js';
 import { tagArtificialLight } from '../../assets/artificial-light.js';
 import { APARTMENT_FILL_LIGHT_NAME } from '../../lighting/lighting-context.js';
+import { setBakedLightMode } from '../baked-surface.js';
 
 /** The apartment rig's lights that ignore walls, by the names the lighting context gives them. */
 const WALL_BLIND_LIGHTS = ['jeex-lighting-sky', APARTMENT_FILL_LIGHT_NAME] as const;
@@ -89,6 +91,8 @@ export class WalkRig {
     }
     this.ambient.intensity = this.current === 'walk' ? T.ambientFloor : 0;
     setUniformState(uniforms, this.current);
+    // Grid and probe captures record what walk shows, so they take the walk gain too.
+    setBakedLightMode(scene, editing ? 'editing' : 'walk');
   }
 
   dispose(): void {

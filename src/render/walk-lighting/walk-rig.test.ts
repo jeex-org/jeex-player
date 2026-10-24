@@ -4,6 +4,8 @@ import { WalkRig } from './walk-rig.js';
 import { createWalkUniforms } from './box-probe-patch.js';
 import { WALK_LIGHTING_TUNING as T } from './walk-lighting-tuning.js';
 import { isArtificialLight } from '../../assets/artificial-light.js';
+import { bakedLightGain } from '../baked-surface.js';
+import { LIGHTING_STANDARD } from '../../lighting/lighting-standard.js';
 
 function setup() {
   const scene = new THREE.Scene();
@@ -21,6 +23,21 @@ function setup() {
 }
 
 describe('WalkRig', () => {
+  test('baked surfaces take the walk gain in walk and capture, the editing gain otherwise and after dispose', () => {
+    const { scene, rig } = setup();
+    const { editing, walk } = LIGHTING_STANDARD.baked.exposure;
+    expect(bakedLightGain(scene)).toBe(editing);
+    rig.setState('capture');
+    expect(bakedLightGain(scene)).toBe(walk);
+    rig.setState('walk');
+    expect(bakedLightGain(scene)).toBe(walk);
+    rig.setState('editing');
+    expect(bakedLightGain(scene)).toBe(editing);
+    rig.setState('walk');
+    rig.dispose();
+    expect(bakedLightGain(scene)).toBe(editing);
+  });
+
   test('starts in the editing state with an ambient light at zero and everything else untouched', () => {
     const { scene, sky, fill, renderer, rig } = setup();
     expect(rig.state).toBe('editing');

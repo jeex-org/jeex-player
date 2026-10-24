@@ -7,6 +7,7 @@
 
 import * as THREE from 'three';
 import { afterEach, describe, expect, test } from 'vitest';
+import { LIGHTING_STANDARD } from '../../src/lighting/lighting-standard.js';
 import { rgbmDecode } from '../../src/lightmap/rgbm.js';
 import { decorateRgbm } from '../../src/lightmap/lightmap-shader.js';
 import { addShaderTransform, markBakedSurface } from '../../src/render/baked-surface.js';
@@ -98,8 +99,10 @@ describe('RGBM decode', () => {
     const root = new THREE.Group();
     root.add(new THREE.Mesh(new THREE.PlaneGeometry(), material));
     expect(installWalkPatch(root, createWalkUniforms())).toBe(1);
-    expect(material.customProgramCacheKey()).toMatch(/\|jeex-walk-lighting@2\|jeex-baked-surface@1\|jeex-lightmap-rgbm-r8@1$/);
+    expect(material.customProgramCacheKey()).toMatch(/\|jeex-walk-lighting@2\|jeex-baked-surface@2\|jeex-lightmap-rgbm-r8@1$/);
+    // Marked baked, the lightmap carries the editing gain on top of the decode.
+    const gain = LIGHTING_STANDARD.baked.exposure.editing;
     const got = readCentre(material);
-    for (let c = 0; c < 3; c++) expect(Math.abs(got[c]! / expected[c]! - 1)).toBeLessThan(0.005);
+    for (let c = 0; c < 3; c++) expect(Math.abs(got[c]! / (gain * expected[c]!) - 1)).toBeLessThan(0.005);
   });
 });

@@ -29,9 +29,9 @@
  *   retroreflection branches keep the studio environment;
  * - on a baked surface (`JEEX_BAKED_SURFACE`, `render/baked-surface.ts`)
  *   the grid is not sampled, the grid hand-over is off and the environment
- *   diffuse scale is 1; the interior sun factor `jeexSunScale` is declared at
- *   fragment scope and `JEEX_WALK_LIGHTING` defined, so the baked policy can
- *   scale the lightmap by it.
+ *   diffuse scale is 1; its lightmap is indirect light and never takes the
+ *   interior sun factor (`jeexSunScale`, declared at fragment scope beside
+ *   `JEEX_WALK_LIGHTING`), only the baked-interior gain of the mode.
  *
  * Invariant: with `jeexDiffuse` 1, `jeexSun` 1 and `jeexBoxProbes` 0 the output of a
  * material that is not baked equals the unpatched shader's (pinned in `tests/component/walk-lighting.test.ts`), and

@@ -148,7 +148,7 @@ describe('bindLightBake', () => {
     expect(seen).toEqual(['previous']);
     expect(shader.fragmentShader).toContain('#define lightMapIntensity ( lightMapIntensity * lightMapTexel.a * JEEX_RGBM_RANGE )');
     // The shader composer leads the key, then the previous key, then its transforms in their fixed order.
-    expect(clone.customProgramCacheKey()).toBe('jeex|previous-key|jeex-baked-surface@1|jeex-lightmap-rgbm-r8@1');
+    expect(clone.customProgramCacheKey()).toBe('jeex|previous-key|jeex-baked-surface@2|jeex-lightmap-rgbm-r8@1');
   });
 
   test('clones of a walk-patched source and of a plain one, once both walk-patched, share one program key', async () => {
@@ -161,7 +161,7 @@ describe('bindLightBake', () => {
     const patched = materialOf(patchedRoot, CALIBRATION_NODES.floor);
     const plain = materialOf(plainRoot, CALIBRATION_NODES.floor);
     expect(plain.customProgramCacheKey()).toBe(patched.customProgramCacheKey());
-    expect(plain.customProgramCacheKey()).toBe('jeex||jeex-walk-lighting@2|jeex-baked-surface@1|jeex-lightmap-rgbm-r8@1');
+    expect(plain.customProgramCacheKey()).toBe('jeex||jeex-walk-lighting@2|jeex-baked-surface@2|jeex-lightmap-rgbm-r8@1');
   });
 
   test('a source that already carries the walk lighting gives its clone the patch, the policy and the decode, without touching the source', async () => {
@@ -179,7 +179,7 @@ describe('bindLightBake', () => {
     expect(shader.fragmentShader).toContain('#define JEEX_WALK_LIGHTING');
     expect(shader.fragmentShader).toContain('#define JEEX_BAKED_SURFACE');
     expect(shader.fragmentShader).toContain('#define lightMapIntensity ( lightMapIntensity * lightMapTexel.a * JEEX_RGBM_RANGE )');
-    expect(clone.customProgramCacheKey()).toMatch(/\|jeex-walk-lighting@2\|jeex-baked-surface@1\|jeex-lightmap-rgbm-r8@1$/);
+    expect(clone.customProgramCacheKey()).toMatch(/\|jeex-walk-lighting@2\|jeex-baked-surface@2\|jeex-lightmap-rgbm-r8@1$/);
     expect(source.customProgramCacheKey()).toMatch(/\|jeex-walk-lighting@2$/);
   });
 

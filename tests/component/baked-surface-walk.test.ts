@@ -1,8 +1,8 @@
 /**
- * Baked surfaces in walk and tour, in a real WebGL context: the lightmap
- * scaled by the walk's interior sun factor inside rooms (so a baked wall
- * displays as in the editing modes) and unscaled outside them and in grid
- * captures, no grid light on a baked surface, the environment's specular and
+ * Baked surfaces in walk and tour, in a real WebGL context: the lightmap is
+ * indirect light, scaled by the baked-interior gain of the mode and never by
+ * the walk's interior sun factor (inside rooms, outside them and in grid
+ * captures), no grid light on a baked surface, the environment's specular and
  * the room probes' reflections kept; then, on the mounted demo apartment with
  * its shell marked baked, no compile after the walk warm-up and a context
  * restore that comes back to the same walk frame once the bake is done.
@@ -17,7 +17,8 @@ import { InlineSceneRepository, mountViewer } from '../../src/app/viewer-api.js'
 import type { ViewerHandle } from '../../src/app/viewer-handle.js';
 // Static, so Vite pre-bundles the chunk's three addons before the first test instead of reloading mid-test.
 import { WalkLighting } from '../../src/render/walk-post.js';
-import { markBakedSurface, setLampBaked } from '../../src/render/baked-surface.js';
+import { markBakedSurface, setBakedLightMode, setLampBaked } from '../../src/render/baked-surface.js';
+import { LIGHTING_STANDARD } from '../../src/lighting/lighting-standard.js';
 import {
   atlasLayout,
   createWalkUniforms,
@@ -25,6 +26,7 @@ import {
   setRoomBoxes,
   setUniformState,
   TILE,
+  type UniformState,
   type WalkUniforms,
 } from '../../src/render/walk-lighting/box-probe-patch.js';
 import { packAtlas, type Rgb } from '../../src/render/walk-lighting/exterior-sh.js';
@@ -86,6 +88,17 @@ function grey(options: THREE.MeshPhysicalMaterialParameters = {}): THREE.MeshPhy
     ...options,
   });
 }
+
+const GAIN = LIGHTING_STANDARD.baked.exposure;
+
+/** Puts the walk uniforms and the scene's baked-interior gain in a state, as the walk rig does. */
+function enter(scene: THREE.Scene, uniforms: WalkUniforms, state: UniformState): void {
+  setUniformState(uniforms, state);
+  setBakedLightMode(scene, state === 'editing' ? 'editing' : 'walk');
+}
+
+/** The value an 8-bit lightmap texel holds for `value`. */
+const texel = (value: number): number => Math.round(value * 255) / 255;
 
 function lightmap(value: number): THREE.DataTexture {
   const byte = Math.round(value * 255);
@@ -152,42 +165,74 @@ function plane(material: THREE.Material, x = 0): THREE.Mesh {
 }
 
 describe('the lightmap of a baked surface in walk', () => {
-  test('inside a room: scaled by the walk sun factor, so it displays as in the editing modes', () => {
+  test('inside a room: the walk gain, never the walk sun factor; captures carry what walk shows', () => {
     const gl = renderer();
     const box = room(-3, 3);
     const { scene, uniforms } = walkScene(gl, box);
-    scene.add(plane(baked(0.5)), constantGrid(box, 0.4));
+    scene.add(plane(baked(0.05)), constantGrid(box, 0.4));
     installWalkPatch(scene, uniforms);
     const view = camera();
-    setUniformState(uniforms, 'editing');
+    enter(scene, uniforms, 'editing');
     const editing = centre(gl, scene, view);
-    setUniformState(uniforms, 'walk');
+    enter(scene, uniforms, 'walk');
     const walk = centre(gl, scene, view);
-    setUniformState(uniforms, 'capture');
+    enter(scene, uniforms, 'capture');
     const capture = centre(gl, scene, view);
     expect(luminance(editing)).toBeGreaterThan(0.03);
-    expect(near(ratio(walk, editing), T.walkSunScale)).toBe(true);
-    // Displayed under the walk exposure, the wall reads as in editing.
-    expect(near(luminance(walk) * T.walkExposure, luminance(editing))).toBe(true);
-    // The capture state of the grid and probe bake sees the lightmap unscaled.
-    expect(near(luminance(capture), luminance(editing))).toBe(true);
+    expect(near(ratio(walk, editing), GAIN.walk / GAIN.editing)).toBe(true);
+    // The grid and probe bake records what walk shows.
+    expect(near(luminance(capture), luminance(walk))).toBe(true);
   });
 
-  test('outside every room: lightmap factor 1 under the existing outside compensation, no grid light', () => {
+  test('a baked wall in walk reads like the grid-lit treatment of a live wall, not divided by the walk exposure', () => {
+    const gl = renderer();
+    const box = room(-3, 3);
+    const map = 0.05;
+    // A live wall lit by a room grid of the irradiance the baked wall's lightmap carries in walk.
+    const read = (material: THREE.Material, level: number): number => {
+      const { scene, uniforms } = walkScene(gl, box);
+      scene.add(plane(material), constantGrid(box, level));
+      installWalkPatch(scene, uniforms);
+      enter(scene, uniforms, 'walk');
+      return luminance(centre(gl, scene, camera()));
+    };
+    const level = texel(map) * GAIN.walk;
+    const bakedWall = read(baked(map), 0);
+    const liveWall = read(grey(), level);
+    expect(liveWall).toBeGreaterThan(0.03);
+    expect(near(bakedWall, liveWall)).toBe(true);
+    // The old factor would have read a 3.5th of it.
+    expect(bakedWall).toBeGreaterThan(2 * T.walkSunScale * liveWall);
+  });
+
+  test('a surface that is not baked does not move with the gains', () => {
     const gl = renderer();
     const box = room(-3, 3);
     const { scene, uniforms } = walkScene(gl, box);
-    scene.add(plane(baked(0.5), 10), constantGrid(room(7, 13), 0.4));
+    scene.add(plane(grey({ lightMap: lightmap(0.5), lightMapIntensity: 1 })), constantGrid(box, 0.4));
+    installWalkPatch(scene, uniforms);
+    setUniformState(uniforms, 'walk');
+    setBakedLightMode(scene, 'editing');
+    const asEditing = centre(gl, scene, camera());
+    setBakedLightMode(scene, 'walk');
+    expect(near(luminance(centre(gl, scene, camera())), luminance(asEditing))).toBe(true);
+  });
+
+  test('outside every room: the outside compensation times the gain ratio, no grid light', () => {
+    const gl = renderer();
+    const box = room(-3, 3);
+    const { scene, uniforms } = walkScene(gl, box);
+    scene.add(plane(baked(0.05), 10), constantGrid(room(7, 13), 0.4));
     installWalkPatch(scene, uniforms);
     const view = camera(10);
-    setUniformState(uniforms, 'editing');
+    enter(scene, uniforms, 'editing');
     const editing = centre(gl, scene, view);
-    setUniformState(uniforms, 'walk');
+    enter(scene, uniforms, 'walk');
     const walk = centre(gl, scene, view);
-    expect(near(ratio(walk, editing), uniforms.jeexOutside.value)).toBe(true);
-    // What the editing reading holds is the lightmap alone: the grid and the environment add nothing.
+    expect(near(ratio(walk, editing), (uniforms.jeexOutside.value * GAIN.walk) / GAIN.editing)).toBe(true);
+    // What the editing reading holds is the lightmap alone, times the editing gain: the grid and the environment add nothing.
     const alone = new THREE.Scene();
-    alone.add(plane(grey({ lightMap: lightmap(0.5), lightMapIntensity: 1 }), 10));
+    alone.add(plane(grey({ lightMap: lightmap(0.05), lightMapIntensity: GAIN.editing }), 10));
     expect(near(luminance(editing), luminance(centre(gl, alone, view)))).toBe(true);
   });
 
@@ -258,7 +303,7 @@ describe('reflections on a baked surface in walk', () => {
 });
 
 describe('a real grid capture', () => {
-  test('sees the baked walls’ lightmap unscaled in the capture state, scaled in the walk state', () => {
+  test('sees the baked walls’ lightmap times the walk gain, in the capture state as in walk', () => {
     const gl = renderer();
     const box = room(-2, 2);
     const bakeWith = (walls: THREE.Material, state: 'capture' | 'walk'): number => {
@@ -268,9 +313,9 @@ describe('a real grid capture', () => {
       const grid = new RoomGrid(box);
       scene.add(grid);
       installWalkPatch(scene, uniforms);
-      setUniformState(uniforms, state);
+      enter(scene, uniforms, state);
       grid.bake(gl, scene, { start: 0, count: 8, pass: 0, cubemapSize: 8 });
-      setUniformState(uniforms, 'editing');
+      enter(scene, uniforms, 'editing');
       shell.visible = false;
       const card = plane(grey());
       card.scale.setScalar(0.25);
@@ -278,12 +323,13 @@ describe('a real grid capture', () => {
       return luminance(centre(gl, scene, camera()));
     };
     const side = { side: THREE.BackSide };
-    const reference = bakeWith(grey({ lightMap: lightmap(0.5), lightMapIntensity: 1, ...side }), 'capture');
-    const capture = bakeWith(baked(0.5, side), 'capture');
-    const walk = bakeWith(baked(0.5, side), 'walk');
+    const map = 0.05;
+    const reference = bakeWith(grey({ lightMap: lightmap(map), lightMapIntensity: GAIN.walk, ...side }), 'capture');
+    const capture = bakeWith(baked(map, side), 'capture');
+    const walk = bakeWith(baked(map, side), 'walk');
     expect(reference).toBeGreaterThan(0.01);
     expect(near(capture, reference, 0.02)).toBe(true);
-    expect(near(walk / capture, T.walkSunScale, 0.05)).toBe(true);
+    expect(near(walk, capture, 0.02)).toBe(true);
   });
 });
 
