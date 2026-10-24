@@ -216,6 +216,24 @@ export const LIGHTING_STANDARD = deepFreeze({
    * surface looks and raises `LIGHTING_STANDARD_VERSION`.
    */
   baked: { exposure: { editing: 80, walk: 6.4 } },
+  /**
+   * A host's sky (`lighting.hdri`) lighting the apartment rig in walk and
+   * tour. `environmentGain` times `loaderCompensation` is the
+   * `scene.environmentIntensity` of the HDRI; `loaderCompensation` undoes the
+   * darkening of three's `UltraHDRLoader` against the reference decode (it
+   * multiplies in sRGB-encoded space with a display-boost weight): re-measure
+   * it on every three upgrade that touches the loader. `sunConeDeg` is the half
+   * angle of the cone around the stored sun whose residual light the analytic
+   * sun does not repeat. `skyBrightness` is the displayed brightness of the
+   * window sky at exposure 1, before the walk chain's output pass.
+   * Additions only, no existing value changed: the version stays 1.
+   */
+  hdri: {
+    environmentGain: 1,
+    loaderCompensation: 1 / 0.952,
+    skyBrightness: 3,
+    sunConeDeg: 6,
+  },
 });
 
 export type LightingStandard = typeof LIGHTING_STANDARD;

@@ -16,9 +16,9 @@ Every task starts with a test that fails for the right reason; the implementatio
 
 ## 3. Standard values and calibration math
 
-- [ ] 3.1 Extend `src/lighting/lighting-standard.test.ts` for `LIGHTING_STANDARD.hdri` (four positive values, frozen, recipe values unchanged, version 1) and see it fail; add the values with provisional numbers from the research (loader compensation 1/0.95, sky brightness 3), finalised in task 9; verify the test passes and `scripts/lighting-entry-check.ts` stays green
-- [ ] 3.2 Write `src/lighting/hdri-calibration.test.ts`: rotation formula (north 30, noon, stored 54 → 156°), storage conversion `90 − a`, irradiance integration on a uniform synthetic buffer (π·L horizontal within 1 %), cone residual, sun normal irradiance for share 0.5 at 30°, threefold intensity from share 0.5 to 0.75 with zero residual, the expected `max(0, A·s/(1−s) − R) / sin E` with a non-zero residual and its floor at 0, refusal of share 1, luminance of the colour; see it fail; then write the pure module; verify the tests pass and `purity.test.ts` accepts it
-- [ ] 3.3 Add a bun test that rotates the fixture's stored sun direction by the computed `rotationY` with three's `Euler` and compares with `sunDirection`'s azimuth; verify it passes
+- [x] 3.1 Extend `src/lighting/lighting-standard.test.ts` for `LIGHTING_STANDARD.hdri` (four positive values, frozen, recipe values unchanged, version 1) and see it fail; add the values with provisional numbers from the research (loader compensation 1/0.95, sky brightness 3), finalised in task 9; verify the test passes and `scripts/lighting-entry-check.ts` stays green
+- [x] 3.2 Write `src/lighting/hdri-calibration.test.ts`: rotation formula (north 30, noon, stored 54 → 156°), storage conversion `90 − a`, irradiance integration on a uniform synthetic buffer (π·L horizontal within 1 %), cone residual, sun normal irradiance for share 0.5 at 30°, threefold intensity from share 0.5 to 0.75 with zero residual, the expected `max(0, A·s/(1−s) − R) / sin E` with a non-zero residual and its floor at 0, refusal of share 1, luminance of the colour; see it fail; then write the pure module; verify the tests pass and `purity.test.ts` accepts it
+- [x] 3.3 Add a bun test that rotates the fixture's stored sun direction by the computed `rotationY` with three's `Euler` and compares with `sunDirection`'s azimuth; verify it passes
 
 ## 4. Probe atlas independent of the environment
 

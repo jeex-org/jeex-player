@@ -43,6 +43,18 @@ describe('LIGHTING_STANDARD', () => {
     for (const gain of [editing, walk]) expect(Number.isFinite(gain) && gain > 0).toBe(true);
   });
 
+  test('publishes the HDRI calibration values as positive numbers, with the recipe untouched', () => {
+    const hdri = LIGHTING_STANDARD.hdri;
+    expect(Object.keys(hdri).sort()).toEqual(['environmentGain', 'loaderCompensation', 'skyBrightness', 'sunConeDeg']);
+    for (const value of Object.values(hdri)) expect(Number.isFinite(value) && value > 0).toBe(true);
+    expect(Object.isFrozen(hdri)).toBe(true);
+    // The recipe's own values are those the standard was frozen with.
+    expect(LIGHTING_STANDARD.environment.normalisation).toBe(0.543);
+    expect(LIGHTING_STANDARD.apartment.environmentScale).toBe(1.8);
+    expect(LIGHTING_STANDARD.apartment.sun.intensity).toBe(3);
+    expect(LIGHTING_STANDARD_VERSION).toBe(1);
+  });
+
   test('a write at any depth changes nothing', () => {
     const before = JSON.stringify(LIGHTING_STANDARD);
     const write = (run: () => void): void => {
