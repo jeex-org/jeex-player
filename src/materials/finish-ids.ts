@@ -1,6 +1,7 @@
 /**
  * The fixed ids of the finishes this build bundles: one UUID v7 literal per
- * row of `finish-catalogue.ts` (room floors and walls) and of
+ * row of `finish-catalogue.ts` (room floors and walls, and the retired ids
+ * that read as another floor or wall finish) and of
  * `asset-finish-catalogue.ts` (the object bank).
  *
  * Literals, written once offline and never computed: the viewer validates ids
@@ -15,7 +16,7 @@
  * Pure data: no imports, no `three`, no DOM.
  */
 export const FINISH = {
-  // Room floors (`FLOOR_FINISHES`).
+  // Room floors (`FLOOR_FINISHES`); `ash` is a retired alias (`RETIRED_FINISHES`).
   oak: '01a12fdf-158e-7748-adfe-d397dde469ba',
   walnut: '01a12fdf-158f-702d-8070-693ed21d3b05',
   ash: '01a12fdf-1590-7754-92f4-5912a4ff24a2',
@@ -25,7 +26,9 @@ export const FINISH = {
   stone: '01a12fdf-1594-715c-a2ec-7257f0ac0434',
   ceramic_light: '01a12fdf-1595-71e8-be84-9227216ac42d',
   ceramic_graphite: '01a12fdf-1596-7992-9061-a9a730fd7840',
-  // Room walls (`WALL_FINISHES`).
+  herringbone: '01a16edb-fb93-7729-93ff-3b4ea71ae797',
+  herringbone_dark: '01a16edb-fb93-7729-93ff-3b4f73d7f368',
+  // Room walls (`WALL_FINISHES`); the two `wallpaper_*` ids are retired aliases.
   sand: '01a12fdf-1597-7e0c-8b3e-f091fb6af634',
   white: '01a12fdf-1598-7b82-807b-83d8a5effde3',
   sage: '01a12fdf-1599-7b1d-99dd-48f13cb98f0a',
@@ -34,6 +37,15 @@ export const FINISH = {
   wallpaper_cream: '01a12fdf-159c-78e6-97c2-8b635635ce85',
   wallpaper_sage: '01a12fdf-159d-770d-b5ab-64b41de36f30',
   tiles_white: '01a12fdf-159e-7413-8248-0060d7df7693',
+  pure_white: '01a16edb-fb92-7387-b95c-f3449aacc0d6',
+  ink: '01a16edb-fb93-7729-93ff-3b46ec778305',
+  venetian: '01a16edb-fb93-7729-93ff-3b47d1496fa3',
+  microcement: '01a16edb-fb93-7729-93ff-3b48a65a96fd',
+  microcement_grey: '01a16edb-fb93-7729-93ff-3b49fff2b2de',
+  travertine: '01a16edb-fb93-7729-93ff-3b4a562bba6d',
+  marble: '01a16edb-fb93-7729-93ff-3b4b552be9f0',
+  porcelain_grey: '01a16edb-fb93-7729-93ff-3b4cf444d9bf',
+  zellige: '01a16edb-fb93-7729-93ff-3b4d4290edb5',
   // Object-bank finishes (`asset-finish-catalogue.ts`).
   oak_natural: '01a12fdf-159f-719f-87ad-8a1ab59bb73b',
   walnut_dark: '01a12fdf-15a0-7bba-ab44-242ca5f929f4',
@@ -89,4 +101,6 @@ export const FINISH = {
   pigment_sage: '01a12fdf-15d1-72ad-b36f-a6c843f7e49a',
   pigment_ochre: '01a12fdf-15d2-7171-95fd-052be28332de',
   pigment_indigo: '01a12fdf-15d3-7d4e-9078-e581aba5e6ae',
+  // Opening frame finishes (`frame-finishes.ts`).
+  frame_graphite: '01a16f65-52cd-7066-8e5f-4ffbd54a7290',
 } as const;

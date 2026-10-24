@@ -307,7 +307,10 @@ export type { SceneReport, SceneReportEntry, SceneReportSeverity } from '../scen
  * that writes it (types only); `NewIdRefusal` names the two
  * `OpError.detail.reason` values a creating op refuses an id with.
  * `CATALOGUE_ID_BY_SLUG` is the shipped bank's readable slug -> UUID table
- * per kind, for a host translating a 1.x document; the structural ids (walls, nodes, rooms, openings,
+ * per kind, for a host translating a 1.x document. `FINISH_ALIASES` (retired
+ * bundled room finish id -> the id it reads as) and `FINISH_NAMES` (bundled
+ * room finish id -> the name the picker shows) let a host's finish picker
+ * follow the viewer's without copying ids; the structural ids (walls, nodes, rooms, openings,
  * placements, checkpoints) have no table — the host mints new UUIDs for them.
  */
 export { UUID_V7_PATTERN, isUuidV7, faceKey, sameFace, isFaceKey } from '../scene/types.js';
@@ -321,7 +324,7 @@ export type {
   TopologyRemapEntry,
 } from '../scene/types.js';
 export type { NewIdRefusal, TouchedEntity } from '../scene/scene-ops.js';
-export { CATALOGUE_ID_BY_SLUG } from '../assets/catalogue-slugs.js';
+export { CATALOGUE_ID_BY_SLUG, FINISH_ALIASES, FINISH_NAMES } from '../assets/catalogue-slugs.js';
 export type { CatalogueIdBySlug, CatalogueSlugTable } from '../assets/catalogue-slugs.js';
 
 /**

@@ -34,6 +34,9 @@ import { L_SHAPE } from '../fixtures/plan-l-shape-ids.js';
 import { EDITOR } from '../fixtures/editor-scenario-ids.js';
 import { OPENING_VARIANT, VARIANT } from '../assets/catalogue-ids.js';
 import { FINISH } from '../materials/finish-ids.js';
+import { findFinish } from '../materials/finish-catalogue.js';
+import { resolveRoomFinish } from '../materials/room-finish.js';
+import { BUILTIN_FINISHES } from '../materials/builtin-library.js';
 import { LIBRARY_FINISH as LIB, LIBRARY_REGISTRIES } from '../fixtures/library-finishes.js';
 import type { Draft } from '../shared/committed.js';
 
@@ -265,6 +268,20 @@ describe('onRevision', () => {
 });
 
 describe('toJSON round trip', () => {
+  test('a retired finish is kept as written through an edit and an export, and still draws its target', () => {
+    const scene = draftOf(lShapePlan) as SceneData & { schemaVersion: string; finishes?: unknown };
+    scene.schemaVersion = '2.3';
+    scene.finishes = { rooms: { [ROOM_B]: { walls: FINISH.wallpaper_cream } } };
+    const subject = new SceneModel(scene, CATALOGUE_REGISTRIES);
+    ok(subject.apply({ baseRev: 0, ops: [{ op: 'set_material', target: ROOM_A, material: FINISH.walnut }, RAISE_CEILING] }));
+    const exported = JSON.parse(JSON.stringify(subject.toJSON())) as SceneData;
+    expect(roomWallFinishOf(exported, ROOM_B)).toBe(FINISH.wallpaper_cream);
+    const reloaded = SceneModel.load(draftOf(exported), CATALOGUE_REGISTRIES);
+    expect(roomWallFinishOf(reloaded.scene, ROOM_B)).toBe(FINISH.wallpaper_cream);
+    const drawn = resolveRoomFinish(FINISH.wallpaper_cream, undefined, findFinish);
+    expect(drawn?.kind === 'library' && drawn.draw.material).toBe(BUILTIN_FINISHES.get(FINISH.white)!.material);
+  });
+
   test('a plan-mutating batch exports to a document that reloads to the same faces', () => {
     const subject = model();
     const ops: SceneOp[] = [

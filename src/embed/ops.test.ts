@@ -56,6 +56,32 @@ const PROJECT = {
 /** Ids a host minted for the operations below. */
 const MINTED = { placement: '01a12ff4-09a3-7621-bbc8-b076ff8252e9' } as const;
 
+describe('the bundled room finish tables', () => {
+  test('FINISH_ALIASES maps each retired id to its target, frozen with a null prototype', async () => {
+    const { FINISH_ALIASES } = await import('./ops.js');
+    expect({ ...FINISH_ALIASES }).toEqual({
+      [FINISH.wallpaper_cream]: FINISH.white,
+      [FINISH.wallpaper_sage]: FINISH.sage,
+      [FINISH.ash]: FINISH.oak,
+    });
+    expect(Object.isFrozen(FINISH_ALIASES)).toBe(true);
+    expect(Object.getPrototypeOf(FINISH_ALIASES)).toBeNull();
+  });
+
+  test('FINISH_NAMES names every floor and wall finish as the picker does, and no retired id', async () => {
+    const { FINISH_NAMES } = await import('./ops.js');
+    const { FLOOR_FINISHES, WALL_FINISHES } = await import('../materials/finish-catalogue.js');
+    expect({ ...FINISH_NAMES }).toEqual(
+      Object.fromEntries([...FLOOR_FINISHES, ...WALL_FINISHES].map((finish) => [finish.id, finish.name])),
+    );
+    expect(FINISH_NAMES[FINISH.graphite]).toBe('Mocha');
+    expect(FINISH_NAMES[FINISH.zellige]).toBe('Teal zellige');
+    expect(FINISH_NAMES[FINISH.ash]).toBeUndefined();
+    expect(Object.isFrozen(FINISH_NAMES)).toBe(true);
+    expect(Object.getPrototypeOf(FINISH_NAMES)).toBeNull();
+  });
+});
+
 describe('jeex-viewer/ops entry', () => {
   test('SceneModel.apply commits a set_ceiling op through the entry and advances the revision', () => {
     const model = new SceneModel(apartmentScene, CATALOGUE_REGISTRIES);
@@ -258,6 +284,9 @@ describe('jeex-viewer/ops entry', () => {
       'sameFace',
       'isFaceKey',
       'CATALOGUE_ID_BY_SLUG',
+      // The bundled room finishes for a host's picker: retired id -> target id, and id -> display name.
+      'FINISH_ALIASES',
+      'FINISH_NAMES',
       // What a host editor takes from the viewer for the plan underlay:
       // the fit margin and the conversion of plan metres to canvas pixels.
       'fitTransform',

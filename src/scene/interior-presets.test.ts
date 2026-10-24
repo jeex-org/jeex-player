@@ -248,7 +248,7 @@ describe('the four demo interiors', () => {
   });
 
   test('the bedroom walls follow the preset, not the living room', () => {
-    const expected = [FINISH.sand, FINISH.white, FINISH.terra, FINISH.wallpaper_sage];
+    const expected = [FINISH.sand, FINISH.white, FINISH.terra, FINISH.venetian];
     presets.forEach((preset, index) => {
       const model = new SceneModel(apartmentScene, CATALOGUE_REGISTRIES);
       applyPresetBatch(model, preset.id);

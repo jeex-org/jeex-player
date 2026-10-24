@@ -1,5 +1,7 @@
 import { describe, expect, test } from 'bun:test';
 import { findFinish } from '../materials/finishes.js';
+import { FINISH } from '../materials/finish-ids.js';
+import { frameFinish } from '../materials/frame-finishes.js';
 import {
   DOOR_VARIANTS,
   ENTRY_DOOR_VARIANTS,
@@ -45,8 +47,8 @@ describe('opening variant catalogue', () => {
 
   test('every frame.material and leaf.material resolves against the finish catalogue', () => {
     for (const variant of ALL_SETS.flat()) {
-      expect(findFinish(variant.frame.material)).not.toBeNull();
-      if (variant.leaf) expect(findFinish(variant.leaf.material)).not.toBeNull();
+      expect(findFinish(variant.frame.material) ?? frameFinish(variant.frame.material) ?? null).not.toBeNull();
+      if (variant.leaf) expect(findFinish(variant.leaf.material) ?? frameFinish(variant.leaf.material) ?? null).not.toBeNull();
     }
   });
 
@@ -103,6 +105,21 @@ describe('opening variant catalogue', () => {
     expect(typeof document).toBe('undefined');
     for (const variant of ALL_SETS.flat()) {
       expect(openingVariantSwatchDataURL(variant)).toBeNull();
+    }
+  });
+});
+
+describe('graphite metal frames', () => {
+  /** The graphite powder-coat frame finish (`FINISH.frame_graphite`). */
+  const FRAME_GRAPHITE = '01a16f65-52cd-7066-8e5f-4ffbd54a7290';
+
+  test('the four graphite frames and leaves take the powder-coat frame finish, never a room paint', () => {
+    const all = [...WINDOW_VARIANTS, ...DOOR_VARIANTS, ...ENTRY_DOOR_VARIANTS];
+    const framed = all.filter((variant) => variant.frame.material === FRAME_GRAPHITE);
+    expect(framed.length).toBe(4);
+    for (const variant of all) {
+      expect(variant.frame.material).not.toBe(FINISH.graphite);
+      if (variant.leaf) expect(variant.leaf.material).not.toBe(FINISH.graphite);
     }
   });
 });

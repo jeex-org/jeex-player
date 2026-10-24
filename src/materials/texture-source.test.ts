@@ -327,6 +327,30 @@ describe('texture decode', () => {
     expect(logger.codes()).toEqual(['texture-size-mismatch']);
   });
 
+  test('the map of a rectangular tile, its longer side at the named size, is drawn', async () => {
+    for (const [width, height] of [
+      [256, 128],
+      [128, 256],
+      [256, 64],
+    ] as const) {
+      const { source, logger } = harness({
+        decode: async () => ({ width, height, close: () => undefined }),
+      });
+      expect({ width, height, drawn: (await source.acquire(request('albedo', '256'), {})) !== null }).toEqual({
+        width,
+        height,
+        drawn: true,
+      });
+      expect(logger.codes()).toEqual([]);
+    }
+  });
+
+  test('a shorter side that is not the named size over a power of two is refused', async () => {
+    const { source, logger } = harness({ decode: async () => ({ width: 256, height: 100, close: () => undefined }) });
+    expect(await source.acquire(request('albedo', '256'), {})).toBeNull();
+    expect(logger.codes()).toEqual(['texture-size-mismatch']);
+  });
+
   test('a decode failure leaves the map unloaded with a warning', async () => {
     const { source, logger } = harness({ decode: () => Promise.reject(new Error('not a webp')) });
     expect(await source.acquire(request(), {})).toBeNull();

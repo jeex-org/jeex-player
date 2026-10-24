@@ -17,7 +17,8 @@ import { L_SHAPE } from '../fixtures/plan-l-shape-ids.js';
 import { effectiveOpening } from '../plan/plan-openings.js';
 import { OPENING_BUILDERS, openingMaterialFacts } from './opening-kinds.js';
 import { createBuilderContext } from './builder-context.js';
-import { defaultOpeningVariant } from '../assets/opening-variants.js';
+import { defaultOpeningVariant, findOpeningVariant } from '../assets/opening-variants.js';
+import { OPENING_VARIANT } from '../assets/catalogue-ids.js';
 import { FINISH } from '../materials/finish-ids.js';
 import type { Opening, OpeningType, SceneData } from '../scene/types.js';
 
@@ -171,5 +172,27 @@ describe('an opening variant whose finish is unknown', () => {
     });
     const finishes = built.materials.map((material) => openingMaterialFacts.get(material)?.finish);
     expect(finishes).toContain(FINISH.white);
+  });
+});
+
+describe('a graphite metal window frame', () => {
+  test('draws the powder-coat frame finish in its graphite grey, not the Mocha wall paint', () => {
+    const wall = lShapePlan.walls.find((candidate) => candidate.openings?.some((opening) => opening.id === L_SHAPE.opening.windowASouth))!;
+    const opening = wall.openings!.find((candidate) => candidate.id === L_SHAPE.opening.windowASouth)!;
+    const variant = findOpeningVariant(OPENING_VARIANT.window_graphite_grid)!;
+    const built = OPENING_BUILDERS.window.build({
+      builder: createBuilderContext(lShapePlan, solvePlan(lShapePlan)),
+      wall,
+      opening,
+      placement: { point: { x: 0, z: 0 }, angleY: 0, normal: { x: 0, z: 1 }, sill: opening.sill ?? 0.9, head: opening.head ?? 2.1 },
+      variant,
+      handleMaterial: new THREE.MeshStandardMaterial(),
+    });
+    const frames = built.materials.filter((material) => openingMaterialFacts.get(material)?.glass !== true);
+    expect(frames.length).toBeGreaterThan(0);
+    for (const frame of frames) {
+      expect(openingMaterialFacts.get(frame)?.finish).toBe('01a16f65-52cd-7066-8e5f-4ffbd54a7290');
+      expect((frame as THREE.MeshStandardMaterial).color.getHexString(THREE.SRGBColorSpace)).toBe('6a6862');
+    }
   });
 });

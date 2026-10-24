@@ -1,7 +1,7 @@
 /**
  * Swatches of the bundled room finishes: a bound finish shows its shipped
- * albedo (natural scan) or a flat chip, never a generated picture; a kept one
- * keeps its generated picture; a project option under a bundled id is listed
+ * albedo (natural scan) or a flat chip, never a generated picture (no
+ * bundled finish is kept any more); a project option under a bundled id is listed
  * once. The two canvas swatch painters are spied on, so "never generated" is
  * observed directly, without a DOM.
  */
@@ -61,11 +61,11 @@ describe('bundled finish swatches', () => {
     expect(generated).not.toContain(FINISH.sand);
   });
 
-  test('a kept finish keeps its generated swatch', () => {
-    const core = finishCore(lShapePlan, { surface: 'wall', roomId: ROOM }, EN)!;
-    const stripes = core.options.find((option) => option.id === FINISH.wallpaper_sage)!;
-    expect(stripes.thumbnail).toBe('data:image/png;base64,GENERATED');
-    expect(generated).toContain(FINISH.wallpaper_sage);
+  test('no bundled finish is kept, so no bundled swatch is generated', () => {
+    const walls = finishCore(lShapePlan, { surface: 'wall', roomId: ROOM }, EN)!;
+    const floors = finishCore(lShapePlan, { surface: 'floor', roomId: ROOM }, EN)!;
+    for (const option of [...walls.options, ...floors.options]) expect(option.thumbnail).toBeNull();
+    expect(generated).toEqual([]);
   });
 
   test('the order and the names of the bank stay as they were', () => {
@@ -114,8 +114,11 @@ describe('interior preset chips', () => {
     expect(generated).toEqual([]);
   });
 
-  test('a preset on two kept finishes keeps its generated chip', () => {
-    expect(request([FINISH.wallpaper_sage, FINISH.wallpaper_cream]).items[0]!.thumbnail).toBe('data:image/png;base64,GENERATED');
-    expect(generated).toEqual([`${FINISH.wallpaper_sage}+${FINISH.wallpaper_cream}`]);
+  test('a preset on two retired finishes shows the flat colours of their targets', () => {
+    const item = request([FINISH.ash, FINISH.wallpaper_cream]).items[0]!;
+    expect(item.thumbnail).toBeNull();
+    expect(item.background).toContain(finishes.findFinish(FINISH.oak)!.base);
+    expect(item.background).toContain(finishes.findFinish(FINISH.white)!.base);
+    expect(generated).toEqual([]);
   });
 });

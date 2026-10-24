@@ -8,8 +8,9 @@
  * touches geometry, and it reaches a canvas only through `createCanvas2D`
  * (`materials/canvas-2d.ts`), which answers `null` where there is no DOM.
  * `frame.material` (and `leaf.material`
- * when present) must resolve through `findFinish` in `./finishes` (enforced
- * by this module's tests) — this module stays pure and never imports `three`.
+ * when present) must resolve through `findFinish` in `./finishes` or name a
+ * frame finish (`materials/frame-finishes.ts`), enforced by this module's
+ * tests — this module stays pure and never imports `three`.
  */
 
 import { createCanvas2D } from '../materials/canvas-2d.js';
@@ -71,7 +72,7 @@ export const WINDOW_VARIANTS: OpeningVariant[] = [
     slug: 'window-graphite-grid',
     name: 'Graphite aluminium grid',
     for: 'window',
-    frame: { material: FINISH.graphite, width: FRAME_WIDTH_SLIM_M + 0.01, depth: FRAME_DEPTH_STANDARD_M },
+    frame: { material: FINISH.frame_graphite, width: FRAME_WIDTH_SLIM_M + 0.01, depth: FRAME_DEPTH_STANDARD_M },
     glazing: { panes: 2, mullions: 'grid', tint: '#9fc4c9' },
     sillBoard: true,
     preview: { base: '#6a6862', accent: '#9fc4c9' },
@@ -81,7 +82,7 @@ export const WINDOW_VARIANTS: OpeningVariant[] = [
     slug: 'window-black-slim-triple',
     name: 'Slim black frame, triple pane',
     for: 'window',
-    frame: { material: FINISH.graphite, width: FRAME_WIDTH_SLIM_M, depth: FRAME_DEPTH_SLIM_M + 0.01 },
+    frame: { material: FINISH.frame_graphite, width: FRAME_WIDTH_SLIM_M, depth: FRAME_DEPTH_SLIM_M + 0.01 },
     glazing: { panes: 3, mullions: 'none', tint: '#87b3ba' },
     sillBoard: false,
     preview: { base: '#232322', accent: '#87b3ba' },
@@ -114,8 +115,8 @@ export const DOOR_VARIANTS: OpeningVariant[] = [
     slug: 'door-glass-slim',
     name: 'Glass leaf, slim frame',
     for: 'door',
-    frame: { material: FINISH.graphite, width: FRAME_WIDTH_SLIM_M, depth: FRAME_DEPTH_SLIM_M },
-    leaf: { style: 'glass', material: FINISH.graphite, handle: 'bar' },
+    frame: { material: FINISH.frame_graphite, width: FRAME_WIDTH_SLIM_M, depth: FRAME_DEPTH_SLIM_M },
+    leaf: { style: 'glass', material: FINISH.frame_graphite, handle: 'bar' },
     swing: 'in',
     preview: { base: '#6a6862', accent: '#bcdcdc' },
   },
@@ -149,8 +150,8 @@ export const ENTRY_DOOR_VARIANTS: OpeningVariant[] = [
     name: 'Graphite steel',
     for: 'door',
     entrance: true,
-    frame: { material: FINISH.graphite, width: FRAME_WIDTH_WIDE_M, depth: FRAME_DEPTH_WIDE_M },
-    leaf: { style: 'flat', material: FINISH.graphite, handle: 'bar' },
+    frame: { material: FINISH.frame_graphite, width: FRAME_WIDTH_WIDE_M, depth: FRAME_DEPTH_WIDE_M },
+    leaf: { style: 'flat', material: FINISH.frame_graphite, handle: 'bar' },
     swing: 'in',
     preview: { base: '#4c4c4a', accent: '#b9bec2' },
   },

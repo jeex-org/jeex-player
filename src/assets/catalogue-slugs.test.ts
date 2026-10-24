@@ -11,7 +11,8 @@
 
 import { describe, expect, test } from 'bun:test';
 import { ASSET_FINISHES } from '../materials/asset-finish-catalogue.js';
-import { FLOOR_FINISHES, WALL_FINISHES, findFinish } from '../materials/finish-catalogue.js';
+import { FRAME_FINISHES, frameFinish } from '../materials/frame-finishes.js';
+import { FLOOR_FINISHES, RETIRED_FINISHES, WALL_FINISHES, findFinish } from '../materials/finish-catalogue.js';
 import { FINISH } from '../materials/finish-ids.js';
 import { isUuidV7 } from '../scene/types.js';
 import { LEGACY_TYPE_ALIASES, findCatalogueEntry, findObject, listCatalogueObjects } from './asset-catalogue.js';
@@ -22,7 +23,7 @@ import { DOOR_VARIANTS, ENTRY_DOOR_VARIANTS, WINDOW_VARIANTS } from './opening-v
 
 const objects = listCatalogueObjects();
 const variants = objects.flatMap((object) => object.variants);
-const finishes = [...FLOOR_FINISHES, ...WALL_FINISHES, ...ASSET_FINISHES];
+const finishes = [...FLOOR_FINISHES, ...WALL_FINISHES, ...RETIRED_FINISHES, ...ASSET_FINISHES, ...FRAME_FINISHES];
 const openings = [...WINDOW_VARIANTS, ...DOOR_VARIANTS, ...ENTRY_DOOR_VARIANTS];
 
 /** A source constant keyed the way its module spells keys: the slug with `-` as `_`. */
@@ -104,9 +105,21 @@ describe('the bundled catalogue ids', () => {
       expect(findCatalogueEntry(type)?.object.id).toBe(alias.archetype);
     }
     for (const opening of openings) {
-      expect({ opening: opening.slug, frame: findFinish(opening.frame.material) !== null }).toEqual({ opening: opening.slug, frame: true });
+      expect({
+        opening: opening.slug,
+        frame: (findFinish(opening.frame.material) ?? frameFinish(opening.frame.material) ?? null) !== null,
+      }).toEqual({
+        opening: opening.slug,
+        frame: true,
+      });
       if (opening.leaf)
-        expect({ opening: opening.slug, leaf: findFinish(opening.leaf.material) !== null }).toEqual({ opening: opening.slug, leaf: true });
+        expect({
+          opening: opening.slug,
+          leaf: (findFinish(opening.leaf.material) ?? frameFinish(opening.leaf.material) ?? null) !== null,
+        }).toEqual({
+          opening: opening.slug,
+          leaf: true,
+        });
     }
   });
 });

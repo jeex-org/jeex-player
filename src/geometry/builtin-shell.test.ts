@@ -100,19 +100,22 @@ describe('a bare scene on bundled finishes', () => {
     expect(materialOf(root, `floor-${ROOM.a}`).map).not.toBeNull();
   });
 
-  test('a kept wall finish still draws through the legacy path', () => {
+  test("walls on a retired finish draw its target's library material, named by the retired id", () => {
     const scene = draftOf(lShapePlan) as SceneData & { schemaVersion: string; finishes?: unknown };
     scene.schemaVersion = '2.3';
     scene.finishes = { rooms: { [ROOM.b]: { walls: FINISH.wallpaper_cream } } };
     const { root } = bare(scene);
-    expect(BUILTIN_FINISHES.has(FINISH.wallpaper_cream)).toBe(false);
     const walls: THREE.MeshStandardMaterial[] = [];
     root.traverse((object) => {
       if (object instanceof THREE.Mesh && object.userData['surface'] === 'wall') walls.push(object.material as THREE.MeshStandardMaterial);
     });
-    const striped = walls.filter((wall) => !isLibrary(wall, DEFAULT_WALL_FINISH));
-    expect(striped.length).toBeGreaterThan(0);
-    for (const wall of striped) expect(isLibrary(wall, FINISH.wallpaper_cream)).toBe(false);
+    const retired = walls.filter((wall) => !isLibrary(wall, DEFAULT_WALL_FINISH));
+    expect(retired.length).toBeGreaterThan(0);
+    for (const wall of retired) {
+      expect(isLibrary(wall, FINISH.wallpaper_cream)).toBe(true);
+      expect(hexOf(wall)).toBe(firstFrameHex(FINISH.white));
+      expect(wall.map).toBeNull();
+    }
   });
 
   test('the default walls draw their library material in its tinted first-frame colour', () => {

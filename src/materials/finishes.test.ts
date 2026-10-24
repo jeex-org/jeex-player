@@ -45,7 +45,7 @@ describe('finish catalogue', () => {
 
   test('the current wall colour matches a wall finish', () => {
     expect(WALL_FINISHES.some((finish) => finish.id === FINISH.sand)).toBe(true);
-    expect(findFinish(FINISH.sand)!.base).toBe('#b1a395');
+    expect(findFinish(FINISH.sand)!.base).toBe('#d4c7b3');
   });
 
   test('applyFinishToMaterial falls back to flat colour without a DOM canvas', () => {
@@ -92,7 +92,6 @@ describe('finish world scale', () => {
     expect(module(FINISH.ceramic_light)).toBeCloseTo(0.625, 3);
     expect(module(FINISH.stone)).toBeCloseTo(0.62, 3);
     expect(module(FINISH.tiles_white)).toBeCloseTo(0.3, 3);
-    expect(module(FINISH.wallpaper_cream)).toBeCloseTo(0.1375, 4);
   });
 
   test('finishTile falls back to a per-kind default', () => {

@@ -31,6 +31,20 @@ export type TextureRequest = {
 /** The part of `fetch` the source calls. */
 export type TextureFetch = (url: string, init: RequestInit) => Promise<Response>;
 
+/**
+ * Whether a decoded map has the shape its named size allows: its longer side
+ * is the size, and its shorter side the size over a power of two. The map of
+ * a rectangular tile (a 3.6 by 1.8 m porcelain) is rectangular, 256 by 128 at
+ * size 256; UVs divide by the tile per axis, so one image still covers one tile.
+ */
+function isMapShape(width: number, height: number, size: number): boolean {
+  const long = Math.max(width, height);
+  const short = Math.min(width, height);
+  if (long !== size || short < 1) return false;
+  const ratio = long / short;
+  return Number.isInteger(ratio) && (ratio & (ratio - 1)) === 0;
+}
+
 /** What a decoder hands back: an image of a known size the source may close. */
 export type DecodedImage = { readonly width: number; readonly height: number; close(): void };
 
@@ -365,11 +379,11 @@ export class TextureSource {
       return null;
     }
     const size = Number(request.size);
-    if (image.width !== size || image.height !== size) {
+    if (!isMapShape(image.width, image.height, size)) {
       image.close();
       log.warn(
         'texture-size-mismatch',
-        `Texture ${request.path} is ${image.width} x ${image.height}, not ${size} x ${size}; the surface stays flat`,
+        `Texture ${request.path} is ${image.width} x ${image.height}, not ${size} on its longer side with the other a power-of-two fraction of it; the surface stays flat`,
         {
           path: request.path,
           width: image.width,

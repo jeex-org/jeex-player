@@ -10,6 +10,9 @@
  *
  * Invariant: floor and wall finish ids are disjoint, which is what lets
  * `finishKind` route a `set_material` on a room to its floor or to its walls.
+ * A retired id (`RETIRED_FINISHES`) answers with its target's row and family;
+ * the `Finish.id` such a lookup returns is the target's and is never written
+ * back into a document.
  */
 
 import { FINISH } from './finish-ids.js';
@@ -76,27 +79,16 @@ export const DEFAULT_FLOOR_FINISH = FINISH.oak;
 
 export const FLOOR_FINISHES: BankFinish[] = [
   { id: FINISH.oak, slug: 'oak', name: 'Natural oak', kind: 'planks', base: '#83654c', roughness: 0.54, tile: 3.2, bump: 0.035, seed: 1 },
-  {
-    id: FINISH.walnut,
-    slug: 'walnut',
-    name: 'Dark walnut',
-    kind: 'planks',
-    base: '#745224',
-    roughness: 0.5,
-    tile: 3.2,
-    bump: 0.035,
-    seed: 2,
-  },
-  { id: FINISH.ash, slug: 'ash', name: 'Bleached ash', kind: 'planks', base: '#e1c59c', roughness: 0.6, tile: 3.2, bump: 0.03, seed: 3 },
-  { id: FINISH.teak, slug: 'teak', name: 'Honey teak', kind: 'planks', base: '#ab8256', roughness: 0.52, tile: 3.2, bump: 0.035, seed: 4 },
-  { id: FINISH.chevron, slug: 'chevron', name: 'Chevron parquet', kind: 'chevron', base: '#917258', roughness: 0.48, tile: 2.4, seed: 5 },
-  { id: FINISH.terrazzo, slug: 'terrazzo', name: 'Sage terrazzo', kind: 'terrazzo', base: '#a8b6a7', roughness: 0.62, tile: 2.4, seed: 6 },
+  { id: FINISH.walnut, slug: 'walnut', name: 'Walnut', kind: 'planks', base: '#745224', roughness: 0.5, tile: 3.2, bump: 0.035, seed: 2 },
+  { id: FINISH.teak, slug: 'teak', name: 'Honey oak', kind: 'planks', base: '#ab8256', roughness: 0.52, tile: 3.2, bump: 0.035, seed: 4 },
+  { id: FINISH.chevron, slug: 'chevron', name: 'Chevron oak', kind: 'chevron', base: '#917258', roughness: 0.48, tile: 2.4, seed: 5 },
+  { id: FINISH.terrazzo, slug: 'terrazzo', name: 'White terrazzo', kind: 'terrazzo', base: '#ccc6c2', roughness: 0.62, tile: 2.4, seed: 6 },
   {
     id: FINISH.stone,
     slug: 'stone',
-    name: 'Warm limestone',
+    name: 'Cream limestone',
     kind: 'tiles',
-    base: '#dab58e',
+    base: '#d5cbb9',
     accent: '#8f877b',
     roughness: 0.7,
     tile: 2.48,
@@ -108,9 +100,9 @@ export const FLOOR_FINISHES: BankFinish[] = [
   {
     id: FINISH.ceramic_light,
     slug: 'ceramic-light',
-    name: 'Light ceramic',
+    name: 'Warm stone porcelain',
     kind: 'tiles',
-    base: '#eae6dd',
+    base: '#b6ad9f',
     accent: '#b8b4aa',
     roughness: 0.35,
     tile: 2.5,
@@ -122,9 +114,9 @@ export const FLOOR_FINISHES: BankFinish[] = [
   {
     id: FINISH.ceramic_graphite,
     slug: 'ceramic-graphite',
-    name: 'Graphite ceramic',
+    name: 'Graphite porcelain',
     kind: 'tiles',
-    base: '#4c4c4a',
+    base: '#5e5b56',
     accent: '#33332f',
     roughness: 0.4,
     tile: 2.5,
@@ -133,44 +125,30 @@ export const FLOOR_FINISHES: BankFinish[] = [
     bump: 0.05,
     seed: 9,
   },
+  { id: FINISH.herringbone, slug: 'herringbone', name: 'Herringbone oak', kind: 'planks', base: '#9a7a5e', roughness: 0.5, seed: 19 },
+  {
+    id: FINISH.herringbone_dark,
+    slug: 'herringbone-dark',
+    name: 'Dark oak herringbone',
+    kind: 'planks',
+    base: '#513b2a',
+    roughness: 0.5,
+    seed: 20,
+  },
 ];
 
 export const WALL_FINISHES: BankFinish[] = [
-  { id: FINISH.sand, slug: 'sand', name: 'Warm sand', kind: 'plaster', base: '#b1a395', roughness: 0.85, tile: 2.4, seed: 11 },
-  { id: FINISH.white, slug: 'white', name: 'Cotton white', kind: 'plaster', base: '#ebe5d7', roughness: 0.85, tile: 2.4, seed: 12 },
-  { id: FINISH.sage, slug: 'sage', name: 'Sage green', kind: 'plaster', base: '#a9b6a5', roughness: 0.85, tile: 2.4, seed: 13 },
-  { id: FINISH.terra, slug: 'terra', name: 'Terracotta', kind: 'plaster', base: '#c18b70', roughness: 0.85, tile: 2.4, seed: 14 },
-  { id: FINISH.graphite, slug: 'graphite', name: 'Graphite', kind: 'plaster', base: '#6a6862', roughness: 0.85, tile: 2.4, seed: 15 },
-  {
-    id: FINISH.wallpaper_cream,
-    slug: 'wallpaper-cream',
-    name: 'Cream stripes',
-    kind: 'stripes',
-    base: '#e7ddc8',
-    accent: '#d9cbae',
-    roughness: 0.92,
-    tile: 0.55,
-    grid: 4,
-    seed: 16,
-  },
-  {
-    id: FINISH.wallpaper_sage,
-    slug: 'wallpaper-sage',
-    name: 'Sage stripes',
-    kind: 'stripes',
-    base: '#dde4d6',
-    accent: '#c3ceb9',
-    roughness: 0.92,
-    tile: 0.42,
-    grid: 3,
-    seed: 17,
-  },
+  { id: FINISH.sand, slug: 'sand', name: 'Oat limewash', kind: 'plaster', base: '#d4c7b3', roughness: 0.85, tile: 2.4, seed: 11 },
+  { id: FINISH.white, slug: 'white', name: 'Warm white', kind: 'plaster', base: '#ede7db', roughness: 0.85, tile: 2.4, seed: 12 },
+  { id: FINISH.sage, slug: 'sage', name: 'Olive limewash', kind: 'plaster', base: '#8f9574', roughness: 0.85, tile: 2.4, seed: 13 },
+  { id: FINISH.terra, slug: 'terra', name: 'Clay limewash', kind: 'plaster', base: '#b98570', roughness: 0.85, tile: 2.4, seed: 14 },
+  { id: FINISH.graphite, slug: 'graphite', name: 'Mocha', kind: 'plaster', base: '#6b5d53', roughness: 0.85, tile: 2.4, seed: 15 },
   {
     id: FINISH.tiles_white,
     slug: 'tiles-white',
-    name: 'White wall tiles',
+    name: 'Stacked white tile',
     kind: 'tiles',
-    base: '#e7e3d9',
+    base: '#cfc8ba',
     accent: '#bcb8ac',
     roughness: 0.3,
     tile: 0.6,
@@ -179,6 +157,66 @@ export const WALL_FINISHES: BankFinish[] = [
     bump: 0.04,
     seed: 18,
   },
+  { id: FINISH.pure_white, slug: 'pure-white', name: 'Pure white', kind: 'plaster', base: '#f4f4f2', roughness: 0.85, tile: 2.4, seed: 21 },
+  { id: FINISH.ink, slug: 'ink', name: 'Ink blue', kind: 'plaster', base: '#3a4a5e', roughness: 0.85, tile: 2.4, seed: 22 },
+  {
+    id: FINISH.venetian,
+    slug: 'venetian',
+    name: 'Polished lime plaster',
+    kind: 'plaster',
+    base: '#d7cec0',
+    roughness: 0.55,
+    tile: 2.4,
+    seed: 23,
+  },
+  { id: FINISH.microcement, slug: 'microcement', name: 'Sand microcement', kind: 'plaster', base: '#c9baa4', roughness: 0.85, seed: 24 },
+  {
+    id: FINISH.microcement_grey,
+    slug: 'microcement-grey',
+    name: 'Warm grey microcement',
+    kind: 'plaster',
+    base: '#b8b8b8',
+    roughness: 0.85,
+    seed: 25,
+  },
+  {
+    id: FINISH.travertine,
+    slug: 'travertine',
+    name: 'Honed travertine',
+    kind: 'tiles',
+    base: '#dfccac',
+    roughness: 0.7,
+    style: 'stone',
+    seed: 26,
+  },
+  { id: FINISH.marble, slug: 'marble', name: 'White marble', kind: 'tiles', base: '#f4f2f1', roughness: 0.4, style: 'stone', seed: 27 },
+  {
+    id: FINISH.porcelain_grey,
+    slug: 'porcelain-grey',
+    name: 'Stone porcelain 60x60',
+    kind: 'tiles',
+    base: '#b7b5b3',
+    roughness: 0.8,
+    style: 'ceramic',
+    seed: 28,
+  },
+  { id: FINISH.zellige, slug: 'zellige', name: 'Teal zellige', kind: 'tiles', base: '#234f59', roughness: 0.3, style: 'ceramic', seed: 29 },
+];
+
+/** A retired bundled finish: valid in documents, read as `target`, never offered by the picker. */
+export type RetiredFinish = { readonly id: string; readonly slug: string; readonly target: string };
+
+/**
+ * The retired bundled finishes. Each one is an alias: a document may keep its
+ * id forever, and every lookup answers with the TARGET's own row and family
+ * (never a copy), so it draws the target's current look. The player never
+ * rewrites the stored id. `slug` is the retired row's historical slug, kept
+ * for the 1.x translation table.
+ */
+export const RETIRED_FINISHES: readonly RetiredFinish[] = [
+  { id: FINISH.wallpaper_cream, slug: 'wallpaper-cream', target: FINISH.white },
+  { id: FINISH.wallpaper_sage, slug: 'wallpaper-sage', target: FINISH.sage },
+  { id: FINISH.ash, slug: 'ash', target: FINISH.oak },
 ];
 
 /**
@@ -224,6 +262,15 @@ type CatalogueEntry = { finish: Finish; family: 'floor' | 'wall' };
 const catalogue = new Map<string, CatalogueEntry>();
 for (const finish of FLOOR_FINISHES) catalogue.set(finish.id, { finish, family: 'floor' });
 for (const finish of WALL_FINISHES) catalogue.set(finish.id, { finish, family: 'wall' });
+for (const retired of RETIRED_FINISHES) {
+  const target = catalogue.get(retired.target);
+  if (target !== undefined) catalogue.set(retired.id, target);
+}
+
+/** The bundled finish a retired id reads as, or `undefined` when `id` is not a retired bundled finish. */
+export function bundledAliasTarget(id: string): string | undefined {
+  return RETIRED_FINISHES.find((retired) => retired.id === id)?.target;
+}
 
 /**
  * One project material as a surface `Finish`.

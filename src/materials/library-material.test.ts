@@ -4,6 +4,8 @@ import { attachLibraryMaps, createLibraryMaterial, libraryMapFormat } from './li
 import type { LibraryDraw } from './room-finish.js';
 import type { LibraryMaterial, LibraryPbr, ProjectMaterial } from './finish-types.js';
 import { NATURAL_SCAN, PAINT, TINTABLE_SCAN } from '../fixtures/library-materials.js';
+import { BUILTIN_FINISHES } from './builtin-library.js';
+import { FINISH } from './finish-ids.js';
 
 /** The library member of a fixture material. */
 const libraryOf = (material: ProjectMaterial): LibraryMaterial => (material as Extract<ProjectMaterial, { library: unknown }>).library;
@@ -289,5 +291,18 @@ describe('the diagnostic switches', () => {
     attachLibraryMaps(material, draw(NATURAL_SCAN), { arm: new THREE.Texture() });
     expect([material.aoMap, material.roughnessMap, material.metalnessMap]).toEqual([null, null, null]);
     expect([material.roughness, material.aoMapIntensity, material.metalness]).toEqual(scalars);
+  });
+});
+
+describe('a glazed bundled tile', () => {
+  test('the zellige draws on the physical model with its clear coat', () => {
+    const binding = BUILTIN_FINISHES.get(FINISH.zellige)!;
+    const material = createLibraryMaterial({ id: FINISH.zellige, material: binding.material, rotation: binding.rotation, builtin: true });
+    expect(material).toBeInstanceOf(THREE.MeshPhysicalMaterial);
+    const physical = material as THREE.MeshPhysicalMaterial;
+    expect({ clearcoat: physical.clearcoat, clearcoatRoughness: physical.clearcoatRoughness }).toEqual({
+      clearcoat: 1,
+      clearcoatRoughness: 0.08,
+    });
   });
 });
