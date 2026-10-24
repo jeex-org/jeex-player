@@ -1,0 +1,17 @@
+# Tasks
+
+TDD: every behaviour change writes or extends its test first, sees it fail, then makes it pass.
+
+## 1. Walk factor and gain
+
+- [ ] 1.1 Standard data `LIGHTING_STANDARD.baked.exposure` (design 2). Test first in `src/lighting/lighting-standard.test.ts`: positive gains, frozen, version stays 1.
+- [ ] 1.2 Baked policy (design 1, 3, 4). Tests first in `src/render/baked-surface.test.ts`: the shader multiplies by `jeexBakedGain` after the maps chunk and never by `jeexSunScale`; the mode per scene gives the editing gain by default and the walk gain once set, back to editing when reset.
+- [ ] 1.3 Walk rig (design 5). Test first in `src/render/walk-lighting/walk-rig.test.ts`: walk and capture set the walk mode, editing and dispose set it back.
+- [ ] 1.4 Component test `tests/component/baked-surface-walk.test.ts`: a baked wall in walk reads its editing reading times the walk gain over the editing gain, not times the walk sun factor; a capture carries the walk gain; an unbaked card does not move with the gains. Program keys in `src/lightmap/lightmap-binding.test.ts` follow the new transform version.
+- [ ] 1.5 Comments: `box-probe-patch.ts`, `walk-lighting-tuning.ts` no longer say the lightmap takes the sun factor.
+
+## 2. Calibration
+
+- [ ] 2.1 Meter live and baked, orbit and walk, before and after (design 6); set both gains; check the floor R/B and clipping.
+- [ ] 2.2 CHANGELOG entry.
+- [ ] 2.3 Acceptance: `bun run typecheck`, `bun run lint`, `bun run format:check`, `bash scripts/check.sh fast`, `build:lib` for the lighting entry budget.
