@@ -1,0 +1,153 @@
+{
+  "format": 1,
+  "bakeId": "01a1683b-4859-72aa-b408-f88e2149d01a",
+  "sceneId": "01a1681e-1f19-7149-8293-31c2f3eee74d",
+  "contentHash": "sha256:20f42dc51cadefa1d10d4e81989b7b1bfacfd43edbc7e9593fe09b0a1191aa0b",
+  "shellHash": "sha256:285bdf8972685da46d6a8dfbe214ab65be26fdcedf0ef0c710840cff8065a874",
+  "baker": {
+    "blender": "5.2.3 LTS",
+    "script": "1.0.0",
+    "samples": 512,
+    "bounces": 4,
+    "devices": ["gpu"],
+    "cpu": false
+  },
+  "sun": {
+    "direction": [0.24207598141534162, -0.573576436351046, 0.7825658380511084],
+    "color": [1, 0.95, 0.88],
+    "strength": 3
+  },
+  "sky": {
+    "radiance": 1
+  },
+  "calibration": {
+    "factor": 3.141592593483728,
+    "factorDenoised": 3.1399229539044504,
+    "factorEncoded": 3.1403894338356695
+  },
+  "pages": [
+    {
+      "width": 512,
+      "height": 512,
+      "levels": 10,
+      "ktx2": "lightmap.ktx2",
+      "webp": [
+        "lightmap-level0.webp",
+        "lightmap-level1.webp",
+        "lightmap-level2.webp",
+        "lightmap-level3.webp",
+        "lightmap-level4.webp",
+        "lightmap-level5.webp",
+        "lightmap-level6.webp",
+        "lightmap-level7.webp",
+        "lightmap-level8.webp",
+        "lightmap-level9.webp"
+      ]
+    }
+  ],
+  "bindings": [
+    {
+      "node": "01a1681e-1f1b-77dc-bf9e-f33804e97334",
+      "page": 0,
+      "rect": {
+        "x": 8,
+        "y": 8,
+        "w": 160,
+        "h": 120
+      }
+    },
+    {
+      "node": "01a1681e-1f1d-7486-9997-fceaa8573e1d",
+      "page": 0,
+      "rect": {
+        "x": 176,
+        "y": 8,
+        "w": 160,
+        "h": 120
+      }
+    },
+    {
+      "node": "01a1681e-1f1f-7705-946c-06cf96ac0f9f",
+      "page": 0,
+      "rect": {
+        "x": 344,
+        "y": 8,
+        "w": 160,
+        "h": 104
+      }
+    },
+    {
+      "node": "01a1681e-1f21-75df-af9d-54123b4b300f",
+      "page": 0,
+      "rect": {
+        "x": 8,
+        "y": 136,
+        "w": 160,
+        "h": 104
+      }
+    },
+    {
+      "node": "01a1681e-1f23-7008-a579-f712dbe15836",
+      "page": 0,
+      "rect": {
+        "x": 176,
+        "y": 136,
+        "w": 120,
+        "h": 104
+      }
+    },
+    {
+      "node": "01a1681e-1f26-7403-86a8-b6cc9802c4dd",
+      "page": 0,
+      "rect": {
+        "x": 304,
+        "y": 136,
+        "w": 120,
+        "h": 104
+      }
+    },
+    {
+      "node": "01a1681e-1f28-7402-afeb-55cf05fba85a",
+      "page": 0,
+      "rect": {
+        "x": 8,
+        "y": 248,
+        "w": 80,
+        "h": 80
+      }
+    }
+  ],
+  "contract": {
+    "uv": {
+      "channel": 1,
+      "mode": "atlas"
+    },
+    "rows": "top-down",
+    "encoding": {
+      "kind": "rgbm",
+      "range": 8,
+      "alpha": "straight-m",
+      "colour": "linear-non-colour",
+      "decode": "rgb * m * range, before intensity"
+    },
+    "intensity": 3.141592653589793,
+    "mips": {
+      "lodLimit": 3,
+      "webp": "per-level files"
+    },
+    "upload": {
+      "flipY": false,
+      "premultiplyAlpha": false,
+      "colorSpace": "none"
+    },
+    "live": {
+      "keep": ["direct sun", "specular", "live-lamp light"],
+      "disable": ["baked-lamp diffuse", "fill", "hemisphere", "ambient", "probe-grid diffuse", "environment diffuse"]
+    }
+  },
+  "lamps": [
+    {
+      "id": "01a16825-acf5-7011-8f24-6e96e2c80636"
+    }
+  ]
+}

@@ -1227,6 +1227,6 @@ The gate has three nested tiers:
 
 Requirements: Node ≥ 22.12 (`.node-version` pins the version used in development), Bun (`.bun-version`), `bunx playwright install chromium` once. CI runs the full tier's steps except `code-ranker` and the screenshot comparisons, which run only locally: `.github/workflows/ci.yml` runs every step that needs no browser on each push and pull request, and the browser levels (component and e2e tests) run in the local gate (`bash scripts/check.sh`) and on demand in the hand-started `.github/workflows/browser.yml`.
 
-Dev pages under `dev/` also include `embed-two.html` (two independent viewers), `embed-element.html` (custom element), `embed-iframe.html` (iframe host) and `embed-tt.html` (a Trusted Types host), all covered by the e2e suite.
+Dev pages under `dev/` also include `embed-two.html` (two independent viewers), `embed-element.html` (custom element), `embed-iframe.html` (iframe host) and `embed-tt.html` (a Trusted Types host), all covered by the e2e suite. `lightmap-calibration.html` shows the light-bake calibration room with its bake applied (the lit room, the floor from above, the atlas raw and decoded); the component tests `tests/component/lightmap-*.test.ts` measure the same scene.
 
 Contributing: see `CONTRIBUTING.md`. Security reports: see `SECURITY.md`.
