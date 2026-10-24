@@ -88,6 +88,23 @@ as described under [Versioning](#versioning).
   room finish id to the id it reads as, and bundled floor and wall finish id
   to its picker name.
 
+- **A real sky in walk and tour.** `lighting.hdri` takes one sky per sun
+  preset: a gain-map (Ultra HDR) JPEG environment, a display sky the browser
+  decodes (AVIF recommended) and the sun facts measured when the panorama was
+  prepared (azimuth, elevation, linear colour, share of horizontal irradiance).
+  On the first entry into walk or tour the active preset's pair is fetched,
+  both files at once; once ready, the windows show the sky, turned so its sun
+  stands at the preset's azimuth from the scene's north, and the exterior, the
+  room light probes and reflections and an analytic sun with the sky's
+  elevation and colour are lit from it, all in one frame. The editing modes
+  never load it and look as before. A scene without a `site` or a preset
+  without an entry keeps the standard look; an invalid entry is dropped with
+  one `option-invalid` warning; a failed file warns once (`hdri-unavailable`).
+  A light-baked apartment shows the sky through its windows and keeps the
+  daylight its bake recorded (`hdri-bake-daylight`). The decoder travels in
+  the walk chunk. `LIGHTING_STANDARD.hdri` (`jeex-viewer/lighting`) publishes
+  the calibration (environment gain, decoder compensation, sky brightness, sun
+  cone); `LIGHTING_STANDARD_VERSION` stays 1.
 - **Baked rooms read like live rooms.** `LIGHTING_STANDARD.baked.exposure`
   (`jeex-viewer/lighting`) holds two gains on the lightmap of a baked surface
   and on nothing else: `editing` (80) in the editing modes and `walk` (6.4) in

@@ -7,8 +7,8 @@
  * The browser has no gain-map or AVIF encoder, so the tests cannot make these
  * on the fly: the files are committed, and this script is how they were made.
  * It is NOT part of any check tier; run it by hand after changing the
- * panorama below, with libultrahdr's `ultrahdr_app` and ImageMagick 7 built
- * with AVIF support:
+ * panorama below, with libultrahdr's `ultrahdr_app` built with
+ * `-DUHDR_WRITE_XMP=ON` and ImageMagick 7 built with AVIF support:
  *
  *   bun scripts/make-fixture-hdri.ts <path-to-ultrahdr_app> <path-to-magick>
  *
@@ -25,6 +25,12 @@
  * Mapping: three's equirectangular convention, `u = atan2(z, x) / 2π + 0.5`,
  * `v = asin(y) / π + 0.5`, the first row of the file at the top. Sun azimuths
  * are clockwise from +Z towards +X (`90° − atan2(z, x)`).
+ *
+ * Metadata: three r186's `UltraHDRLoader` reads the gain-map parameters from
+ * the `hdrgm` XMP packet; it does not recognise libultrahdr 2's ISO 21496-1
+ * block (it compares the namespace two bytes too early), so the encoder must
+ * write XMP, which takes a single-channel gain map (`-M 0`). The same holds
+ * for every environment file a host serves.
  *
  * `scripts/make-fixture-hdri.test.ts` keeps the committed files honest.
  */
@@ -220,9 +226,9 @@ if (import.meta.main) {
     const raw = join(scratch, 'sky.raw');
     writeFileSync(raw, toHalf(facts.radiance));
     const environment = join(scratch, HDRI_FIXTURE_FILES.environment);
-    // Linear half-float input, BT.709 both intents, base and gain map quality 85, gain map at half size.
+    // Linear half-float input, BT.709 both intents, base and gain map quality 85, gain map at half size, one channel (XMP).
     const uhdrArgs = [
-      ...['-m', '0', '-p', raw, '-a', '4', '-t', '0', '-C', '0', '-c', '0'],
+      ...['-m', '0', '-p', raw, '-a', '4', '-t', '0', '-C', '0', '-c', '0', '-M', '0'],
       ...['-w', String(WIDTH), '-h', String(HEIGHT), '-q', '85', '-Q', '85', '-s', '2', '-z', environment],
     ];
     run(ultrahdr, uhdrArgs);

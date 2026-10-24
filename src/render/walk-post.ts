@@ -45,6 +45,7 @@ import { whiteBalanceMatrix, type Mat3 } from './white-balance.js';
 export { WalkLighting } from './walk-lighting/walk-lighting.js';
 // A host's sky (`lighting.hdri`): its decoder and its scene state travel here too.
 export { loadHdriEnvironment, loadHdriPair, loadHdriSky } from './hdri/hdri-assets.js';
+export { HdriSky } from './hdri/hdri-sky.js';
 
 /** The chain's tuning, in one place. */
 export const WALK_POST_TUNING = Object.freeze({
