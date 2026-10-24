@@ -58,7 +58,7 @@ Every task starts with a test that fails for the right reason; the implementatio
 
 - [x] 10.1 Re-measure the walk chunk after `bun run build:lib` and the demo build, set `lazy-jeex-viewer-walk-post` to the new size plus 1 KB in `scripts/budget-check.ts` and its test with before/after in the comment; measure boot ES and IIFE before/after; verify `scripts/budget-check.test.ts` and the budget step pass and the lighting entry's limit is unchanged
 - [x] 10.2 Update the repository's architecture notes for the HDRI path (where the decoder lives, the `HdriSky` states, the background ownership rule, the atlas define) and add the user-facing CHANGELOG entry; verify the spelling and no-docs-refs checks pass
-- [ ] 10.3 Run `scripts/check.sh fast` and the chrome and canvas end-to-end baselines unchanged on the GPU; verify both are green with no baseline re-shot
+- [x] 10.3 Run `scripts/check.sh fast` and the chrome and canvas end-to-end baselines unchanged on the GPU; verify both are green with no baseline re-shot
 
 ## Workflow follow-up
 
