@@ -34,6 +34,7 @@ import { RoomGrid } from '../../src/render/walk-lighting/room-grid.js';
 import type { RoomBox } from '../../src/render/walk-lighting/room-volumes.js';
 import { WALK_LIGHTING_TUNING as T } from '../../src/render/walk-lighting/walk-lighting-tuning.js';
 import { closeContainers, demoScene, nextFrame, openContainer, until } from './support.js';
+import { trackLibraryMaps, type LibraryMaps } from './library-maps.js';
 
 const SIZE = 32;
 const CENTRE = [16, 16] as const;
@@ -408,8 +409,10 @@ describe('the demo apartment with its shell baked, in walk', { timeout: MOUNT_TI
   let live: THREE.Scene | null = null;
   let lighting: { renderer: THREE.WebGLRenderer } | null = null;
   const view = { position: { x: 0.6, y: 1.3, z: 7.6 }, target: { x: 1.6, y: 1.3, z: 7.6 } };
+  let maps: LibraryMaps;
 
   beforeAll(async () => {
+    maps = trackLibraryMaps();
     const add = Object.getOwnPropertyDescriptor(THREE.Object3D.prototype, 'add')!.value as THREE.Object3D['add'];
     vi.spyOn(THREE.Object3D.prototype, 'add').mockImplementation(function (this: THREE.Object3D, ...objects) {
       if ((this as THREE.Scene).isScene && objects.some((object) => object.name === 'jeex-lighting-apartment-rig'))
@@ -498,6 +501,8 @@ describe('the demo apartment with its shell baked, in walk', { timeout: MOUNT_TI
       });
     });
     live = null;
+    // The re-mounted shell's library maps land late, as they do on a loaded machine.
+    maps.delay(4000);
     extension.loseContext();
     await new Promise((resolve) => {
       setTimeout(resolve, 50);
