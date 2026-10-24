@@ -39,7 +39,8 @@ export type WalkLightingHandle<Doc = WalkDocument> = {
   readonly stats: WalkLightingStats | null;
   load(doc: Doc): void;
   frame(eligible: boolean): void;
-  refresh(scope: LightingScope): void;
+  /** Refreshes what `scope` names; `doc` is the document on screen now, whose furniture the probe points follow. */
+  refresh(scope: LightingScope, doc: Doc | null): void;
   /** Queues every room's probe for a re-capture, one per live frame. */
   relight(): void;
   /** Whether a relight still has probes to write. */
@@ -109,7 +110,7 @@ export class WalkLightingController<Doc = WalkDocument> {
       if (eligible && this.scope && !this.failed && this.deps.now() - this.lastEdit >= WALK_LIGHTING_TUNING.refreshDebounceMs) {
         const scope = this.scope;
         this.scope = null;
-        lighting.refresh(scope);
+        lighting.refresh(scope, this.deps.document());
         refreshed = true;
       }
       if (eligible && this.relitAt !== null && !this.failed && this.deps.now() - this.relitAt >= WALK_LIGHTING_TUNING.relightSettleMs) {
