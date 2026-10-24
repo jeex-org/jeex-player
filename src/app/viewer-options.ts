@@ -236,8 +236,13 @@ export type ViewerOptions = {
    * the default endpoint.
    */
   analytics: { mode: 'on' | 'off'; endpoint?: string | undefined };
-  /** The viewer's settings button, next to «Interior style»: off by default, so visitors see none. */
-  settings: { show: boolean };
+  /**
+   * The viewer's settings button: off by default, so visitors see none. `side`
+   * is the control bar's inline edge it attaches to, by the bar's writing
+   * direction: `'end'` (the default, next to «Interior style») or `'start'`.
+   * Read once at mount; a side alone shows no button.
+   */
+  settings: { show: boolean; side: 'start' | 'end' };
   lighting: {
     /**
      * Colour temperature of the interior's artificial light (the lamps and the
@@ -309,7 +314,7 @@ export const DEFAULT_VIEWER_OPTIONS: ViewerOptions = {
   // the demo page is the one that passes the fixture (`main.ts`).
   scene: {},
   analytics: { mode: 'on' },
-  settings: { show: false },
+  settings: { show: false, side: 'end' },
   lighting: { temperature: null },
 };
 
@@ -329,6 +334,7 @@ const VIEW_MODES = closedSet<ViewerMode>()(['plan2d', 'plan3d', 'orbit', 'walk',
 const MOTION_MODES = closedSet<ViewerOptions['motion']>()(['auto', 'full', 'reduced']);
 const INTERACTION_MODES = closedSet<ViewerOptions['interaction']>()(['full', 'none', 'passive']);
 const EDITS_MODES = closedSet<ViewerOptions['edits']>()(['local', 'emit', 'off']);
+const SETTINGS_SIDES = closedSet<ViewerOptions['settings']['side']>()(['start', 'end']);
 const ANALYTICS_MODES = closedSet<ViewerOptions['analytics']['mode']>()(['on', 'off']);
 
 /** Every dotted (or top-level) path `OPTION_SCHEMA` declares a row for. */
@@ -368,6 +374,7 @@ export type OptionPath =
   | 'analytics.mode'
   | 'analytics.endpoint'
   | 'settings.show'
+  | 'settings.side'
   | 'lighting.temperature';
 
 /**
@@ -451,6 +458,13 @@ export const OPTION_SCHEMA = {
   'analytics.mode': { kind: 'switch', values: ANALYTICS_MODES, default: 'on', query: 'analytics', attr: 'analytics' },
   'analytics.endpoint': { kind: 'endpoint', default: undefined, query: 'analyticsEndpoint', attr: 'analytics-endpoint' },
   'settings.show': { kind: 'flag', default: DEFAULT_VIEWER_OPTIONS.settings.show, query: 'settings', attr: 'settings' },
+  'settings.side': {
+    kind: 'enum',
+    values: SETTINGS_SIDES,
+    default: DEFAULT_VIEWER_OPTIONS.settings.side,
+    query: 'settingsSide',
+    attr: 'settings-side',
+  },
   'lighting.temperature': { kind: 'temperature', default: null, query: 'lightTemperature', attr: 'light-temperature' },
 } as const satisfies Record<OptionPath, OptionSpec>;
 

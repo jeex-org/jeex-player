@@ -187,6 +187,7 @@ const SLOT_VALUES = [
   'selection-anchor',
 ] as const;
 const EDITS_VALUES = ['local', 'emit', 'off'] as const;
+const SETTINGS_SIDE_VALUES = ['start', 'end'] as const;
 const TOUR_MODE_VALUES = ['play', 'paused', 'off'] as const;
 const MOTION_VALUES = ['auto', 'full', 'reduced'] as const;
 const INTERACTION_VALUES = ['full', 'none', 'passive'] as const;
@@ -237,6 +238,6 @@ export const viewerOptionsSchema = z.object({
   edits: z.enum(EDITS_VALUES),
   debug: z.boolean(),
   analytics: z.object({ mode: z.enum(['on', 'off']), endpoint: z.optional(z.string()) }),
-  settings: z.object({ show: z.boolean() }),
+  settings: z.object({ show: z.boolean(), side: z.enum(SETTINGS_SIDE_VALUES) }),
   lighting: z.object({ temperature: lightTemperatureSchema }),
 });
