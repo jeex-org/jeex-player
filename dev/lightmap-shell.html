@@ -1,0 +1,64 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>JEEX dev — shipped shell</title>
+    <style>
+      /*
+        The demo apartment's shell three ways, for a person to compare: as
+        built live, as adopted from a shipped shell file without its lightmap,
+        and adopted with a lightmap bound. Not under test itself:
+        `tests/component/baked-shell.test.ts` measures the same round trip.
+      */
+      :root {
+        color-scheme: dark;
+      }
+      body {
+        margin: 0;
+        background: #0d1111;
+        color: #dfe7e7;
+        font:
+          13px/1.5 system-ui,
+          sans-serif;
+      }
+      main {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(min(100%, 360px), 1fr));
+        gap: 8px;
+        padding: 8px 16px;
+      }
+      figure {
+        margin: 0;
+      }
+      canvas {
+        width: 100%;
+        aspect-ratio: 1;
+        display: block;
+        background: #000;
+      }
+      #readout {
+        padding: 0 16px 8px;
+        font-variant-numeric: tabular-nums;
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <figure>
+        <canvas id="live"></canvas>
+        <figcaption>Live shell</figcaption>
+      </figure>
+      <figure>
+        <canvas id="adopted"></canvas>
+        <figcaption>Shipped shell, adopted, no lightmap</figcaption>
+      </figure>
+      <figure>
+        <canvas id="baked"></canvas>
+        <figcaption>Shipped shell with a lightmap bound (calibration page, stand-in charts)</figcaption>
+      </figure>
+    </main>
+    <p id="readout">loading…</p>
+    <script type="module" src="/dev/lightmap-shell.ts"></script>
+  </body>
+</html>

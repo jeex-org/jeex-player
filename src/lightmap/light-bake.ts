@@ -71,6 +71,8 @@ export type LightBake = {
   readonly sceneId: string;
   readonly contentHash: string;
   readonly shellHash: string;
+  /** The digest of the scene inputs the shell was built from (`shell-inputs.ts`); absent for a calibration room. */
+  readonly shellInputsHash?: string | undefined;
   readonly baker?: Readonly<Record<string, unknown>> | undefined;
   /**
    * The sun the bake's direct term left out: the unit direction the light

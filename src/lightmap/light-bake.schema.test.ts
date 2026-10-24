@@ -38,6 +38,11 @@ describe('judgeLightBake', () => {
     }
   });
 
+  test('accepts an apartment bake that names its shell inputs, and refuses a digest of another grammar', () => {
+    expect(judgeLightBake(edited((d) => (d.shellInputsHash = `sha256:${'a'.repeat(64)}`))).ok).toBe(true);
+    expect(refusal(edited((d) => (d.shellInputsHash = 'a'.repeat(64))))).toContain('shellInputsHash: not a sha256 digest');
+  });
+
   test('refuses a contract the player does not know, naming the field', () => {
     expect(refusal(edited((d) => (d.contract.uv.channel = 0)))).toContain('contract.uv.channel');
     expect(refusal(edited((d) => (d.contract.rows = 'bottom-up')))).toContain('contract.rows');
