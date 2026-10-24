@@ -48,15 +48,15 @@ The standard SHALL define the gain of an HDRI environment on the apartment rig a
 
 #### Scenario: Loader compensation measured
 - **WHEN** the gain-map fixture of known linear radiance is decoded by the shipped decoder in the browser
-- **THEN** the decoded mean times `loaderCompensation` equals the known radiance within 2 %
+- **THEN** the decoded mean, which may be darker, times `loaderCompensation` equals the known radiance within 2 %
 
 ### Requirement: HDRI sun intensity
 
-The sun's normal irradiance SHALL be the decoded sky's horizontal irradiance outside a `sunConeDeg` cone around the stored sun times `share / (1 − share)`, minus the residual horizontal irradiance inside the cone, over the sine of the stored elevation; its intensity SHALL be that irradiance times the HDRI environment gain over the stored colour's luminance. A share of 1 SHALL be refused.
+The sun's normal irradiance SHALL be `max(0, A · share / (1 − share) − R) / sin(elevation)`, with A the decoded sky's horizontal irradiance outside a `sunConeDeg` cone around the stored sun and R the residual inside it; its intensity SHALL be that irradiance times the HDRI environment gain over the stored colour's luminance. A share of 1 SHALL be refused.
 
 #### Scenario: Calibration on a known sky
 - **WHEN** the calibration is applied to a synthetic sky of uniform radiance with share 0.5 and elevation 30°
-- **THEN** the sun's normal irradiance equals the sky's horizontal irradiance outside the cone minus the cone residual, over sin 30°, within 1 %
+- **THEN** the sun's normal irradiance equals max(0, A − R) / sin 30° within 1 %
 
 #### Scenario: Share of 1
 - **WHEN** an entry's share is 1

@@ -54,11 +54,11 @@ The active preset SHALL be the scene's `site.sun` (`noon` when `site` is present
 
 ### Requirement: Loading on demand
 
-The pair of the active preset SHALL be fetched only on the first entry into walk or tour, both files concurrently, after the walk chain's code has loaded; the decoder SHALL travel only in the walk chain's chunk. Boot, the editing modes and other presets SHALL fetch nothing. A pair already installed SHALL be reused across walk and tour switches without a new fetch.
+The pair of the active preset SHALL be fetched only on the first entry into walk or tour, both files concurrently, after the walk chain's code has loaded; in the ES and demo builds the decoder SHALL travel only in the walk chain's lazy chunk (the IIFE build carries it inline). Boot, the editing modes and other presets SHALL fetch nothing. A pair already installed SHALL be reused across walk and tour switches without a new fetch.
 
 #### Scenario: Boot fetches nothing
 - **WHEN** the viewer is mounted with the option and stays in orbit
-- **THEN** no request for either URL is made and the boot bundle contains no gain-map decoder
+- **THEN** no request for either URL is made, and the ES and demo boot graphs contain no gain-map decoder
 
 #### Scenario: Concurrent pair
 - **WHEN** the viewer first enters walk
@@ -82,7 +82,11 @@ Until both files are decoded and prefiltered, walk and tour SHALL keep the curre
 
 #### Scenario: Empty plan
 - **WHEN** a scene with no closed room is walked with an entry for its preset
-- **THEN** the HDRI sky is shown once the pair is ready, although no room lighting exists
+- **THEN** the HDRI sky is shown once the pair is ready, although no room lighting exists, the hemisphere and fill lights contribute nothing, the renderer exposure stays the editing one, and a grey card outside reads the HDRI-lit value within 5 % (not that value plus the recipe's hemisphere and fill)
+
+#### Scenario: Empty plan back to orbit
+- **WHEN** the viewer leaves walk after the empty-plan HDRI was live
+- **THEN** the hemisphere and fill have their editing intensities again
 
 ### Requirement: Visible sky
 
@@ -94,7 +98,7 @@ While the HDRI is live in walk or tour the scene background SHALL be the display
 
 ### Requirement: HDRI environment and exterior light
 
-While the HDRI is installed, in walk and tour display and capture states, the environment SHALL be the prefiltered HDRI at the standard's HDRI environment gain. Room probes SHALL keep lighting reflections inside rooms; outside every room box the HDRI SHALL supply diffuse and specular light and the exterior grid SHALL add no light.
+In the full-lighting states (walk and tour `display`, and `capture` during the room lighting bake; not while waiting for the swap, not in the editing modes, not on a baked apartment) the environment SHALL be the prefiltered HDRI at the standard's HDRI environment gain. Room probes SHALL keep lighting reflections inside rooms; outside every room box the HDRI SHALL supply diffuse and specular light and the exterior grid SHALL add no light.
 
 #### Scenario: Facade under the HDRI
 - **WHEN** a facade outside every room box is read in walk with the HDRI live, with the exterior grid's coefficients doubled
@@ -106,15 +110,23 @@ While the HDRI is installed, in walk and tour display and capture states, the en
 
 ### Requirement: Sun from the HDRI
 
-While the HDRI is installed in walk and tour the analytic sun SHALL shine from world azimuth `northDeg + presetAzimuth` at the entry's elevation, in the entry's colour, with the intensity the standard's calibration derives from the decoded sky's measured irradiance and the entry's share; its shadow frustum SHALL be refitted. Leaving walk and tour SHALL restore the preset's sun and frustum.
+In the full-lighting states the analytic sun SHALL shine from world azimuth `northDeg + presetAzimuth` at the entry's elevation, in the entry's colour, with the intensity the standard's calibration derives from the decoded sky's measured irradiance and the entry's share; its shadow frustum SHALL be refitted. Leaving walk and tour SHALL restore the preset's sun and frustum.
 
 #### Scenario: Elevation from the entry
 - **WHEN** the noon entry says elevation 43 and the site says north 30
 - **THEN** in walk the sun shines from world azimuth 210° at 43°, and in orbit again from 210° at 55°
 
 #### Scenario: Intensity follows the share
-- **WHEN** two entries with the same images differ only in share, 0.5 and 0.75
+- **WHEN** two entries with the same images and no residual sun-cone irradiance differ only in share, 0.5 and 0.75
 - **THEN** the second sun's intensity is three times the first's within 1 %
+
+#### Scenario: Intensity with a residual
+- **WHEN** the sky outside the cone gives horizontal irradiance A, the cone residual R, share s and elevation E
+- **THEN** the sun's normal irradiance is max(0, A·s/(1−s) − R) / sin E within 1 %
+
+#### Scenario: Sun survives edits while live
+- **WHEN** a caster is moved and then the site's north alone is changed while the HDRI is live in walk, and the viewer returns to orbit
+- **THEN** in walk the sun keeps the entry's elevation at the new world azimuth with a frustum holding the moved caster, and in orbit it is the preset sun at the new north with its preset fit
 
 ### Requirement: Rotation of sky and environment
 
@@ -150,11 +162,15 @@ Leaving walk and tour SHALL restore exactly what the editing modes showed before
 
 ### Requirement: HDRI failure
 
-A fetch, decode or prefilter failure of either file SHALL log one `hdri-unavailable` warning naming the preset, release whatever part was made, and keep the recipe look; the same pair SHALL NOT be fetched again during this mount until another document is loaded.
+A fetch, decode (including a corrupt embedded image) or prefilter failure of either file SHALL settle the load as one failure, log one `hdri-unavailable` warning naming the preset, release whatever part was made, and keep the recipe look; the same pair SHALL NOT be fetched again during this mount until another document is loaded.
 
 #### Scenario: Missing sky
 - **WHEN** the sky URL answers 404
 - **THEN** one warning is logged, walk keeps the recipe look and the gradient, and re-entering walk makes no new request
+
+#### Scenario: Corrupt gain map
+- **WHEN** the environment file's embedded gain-map image cannot be decoded
+- **THEN** the load settles as a failure, no texture or bitmap is left, and exactly one warning is logged
 
 ### Requirement: HDRI lifetime
 
@@ -170,11 +186,19 @@ A change of the active preset SHALL detach and release the previous pair before 
 
 ### Requirement: Baked apartments
 
-With a light bake applied, walk and tour SHALL show the display sky, rotated as above, and turn the gradient fog off, while the environment, the sun and the grids stay on the existing daylight path; the viewer SHALL log one `hdri-bake-daylight` warning per applied bake saying the HDRI lighting is not applied to it, and SHALL fetch only the sky.
+While a light bake is pending or applied, only the sky SHALL be fetched; with it applied, walk and tour SHALL show the rotated sky with the fog off while environment, sun and grids keep the daylight path, and log one `hdri-bake-daylight` warning per applied bake. A dropped or refused bake SHALL release the hold: the environment is fetched and full HDRI lighting follows.
 
 #### Scenario: Baked room in walk
 - **WHEN** a baked apartment with an entry for its preset is walked
 - **THEN** the windows show the panorama, a baked floor reads as without the option within the walk tolerance, only the sky URL is requested, and one warning is logged
+
+#### Scenario: Bake arrives late
+- **WHEN** walk is entered while the bake is still loading and the bake is then applied
+- **THEN** the environment URL is never requested and full HDRI lighting is never installed
+
+#### Scenario: Bake dropped
+- **WHEN** an applied bake is dropped by an edit while in walk
+- **THEN** the environment URL is requested and full HDRI lighting goes live with the next room lighting swap
 
 ### Requirement: HDRI diagnostics
 

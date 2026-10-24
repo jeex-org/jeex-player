@@ -2,7 +2,7 @@
 
 ### Requirement: Room grids in walk and tour
 
-In `walk` and `tour` everything in a room (shell, furniture, fixtures, door leaves, window parts) SHALL be lit indirectly by that room's light-probe grid, with one bounce through doorways; everything outside the rooms by a fixed hemisphere-equivalent grid, or, while an HDRI is installed (capability `hdri-sky`), by the HDRI environment with that grid adding nothing. Grids SHALL be baked before they light the view. A baked surface SHALL take no light from any grid: its lightmap is its indirect light.
+In `walk` and `tour` everything in a room (shell, furniture, fixtures, door leaves, window parts) SHALL be lit indirectly by that room's light-probe grid, with one bounce through doorways; everything outside the rooms by a fixed hemisphere-equivalent grid, or, in the HDRI full-lighting states (capability `hdri-sky`), by the HDRI environment with that grid adding nothing. Grids SHALL be baked before they light the view. A baked surface SHALL take no light from any grid: its lightmap is its indirect light.
 
 #### Scenario: Windowless room darker
 - **WHEN** a closed room without a window and a room with a window are compared in walk on a 0.18 grey patch
@@ -25,12 +25,12 @@ In `walk` and `tour` everything in a room (shell, furniture, fixtures, door leav
 - **THEN** a grey zero-specular baked floor in that room does not change, while an unbaked card beside it does
 
 #### Scenario: Exterior grid silent under the HDRI
-- **WHEN** an HDRI is installed in walk and the exterior grid's coefficients are doubled
+- **WHEN** the HDRI is live in walk and the exterior grid's coefficients are doubled
 - **THEN** a grey card outside every room box does not change
 
 ### Requirement: Room reflection probes
 
-In `walk` and `tour` glossy surfaces SHALL reflect their own room from a probe captured at the room's interior point at 1.5 m height, box-projected onto the room's box, blended with the neighbouring room within 0.4 m of a shared boundary. Probes SHALL be captured without feedback from earlier probes and without mirrors; a fragment outside every room box SHALL reflect the scene's environment: the studio environment, or the HDRI while one is installed.
+In `walk` and `tour` glossy surfaces SHALL reflect their own room from a probe captured at the room's interior point at 1.5 m height, box-projected onto the room's box, blended with the neighbouring room within 0.4 m of a shared boundary. Probes SHALL be captured without feedback from earlier probes and without mirrors; a fragment outside every room box SHALL reflect the scene's environment: the studio environment, or the HDRI in its full-lighting states.
 
 #### Scenario: Reflections line up with walls
 - **WHEN** a mirror-like floor reflects a stripe on the far wall
@@ -45,7 +45,7 @@ In `walk` and `tour` glossy surfaces SHALL reflect their own room from a probe c
 - **THEN** its reflection contains no window of another room
 
 #### Scenario: Outside reflects the HDRI
-- **WHEN** a mirror-like card outside every room box faces the HDRI's sun spot with the HDRI installed
+- **WHEN** a mirror-like card outside every room box faces the HDRI's sun spot with the HDRI live
 - **THEN** it reflects the spot
 
 ## ADDED Requirements
