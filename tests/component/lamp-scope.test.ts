@@ -567,8 +567,10 @@ describe('receiver room of the parts in a wall', { timeout: TIMEOUT_MS }, () => 
       [0.6, 1.2, 2.8],
     );
     try {
-      const inside = onOff(lights(), () => w.read([0, 1.2, 3.1], [0, 1.2, 2], 12));
-      const beyond = onOff(lights(), () => w.read([0, 1.2, 3.1], [0, 1.2, 2], -12));
+      // 96 px span 0.59 m at 1.1 m: 30 px off the centre is 0.18 m, the 16 px mask 0.1 m wide, so each mask
+      // lies wholly on its side of the box face at x = -0.05.
+      const inside = onOff(lights(), () => w.read([0, 1.2, 3.1], [0, 1.2, 2], 30));
+      const beyond = onOff(lights(), () => w.read([0, 1.2, 3.1], [0, 1.2, 2], -30));
       const capture = onOff(lights(), () => w.readCube([0.3, 1.2, 2.5], 5));
       record('window-reveal', { inside, beyond, capture });
       expect(change(inside.off, inside.on)).toBeGreaterThan(LIT);
