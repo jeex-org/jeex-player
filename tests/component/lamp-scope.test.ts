@@ -205,3 +205,39 @@ describe('lamps feed the room grids', { timeout: TIMEOUT_MS }, () => {
     });
   }
 });
+
+const B: Box = { x0: 4, x1: 8, z0: 0, z1: 4 };
+
+describe('source rooms', { timeout: TIMEOUT_MS }, () => {
+  test('every tagged lamp, fact-like or bank, carries its room after the load; a lamp outside every room carries -2; an untagged light none', () => {
+    const lights: Record<string, THREE.PointLight> = {};
+    const w = world(
+      [
+        { id: 'a', box: A },
+        { id: 'b', box: B },
+      ],
+      (scene, furniture) => {
+        shell(scene, A, GREY());
+        shell(scene, B, GREY());
+        lights['a'] = lamp(furniture, 'mesh', [1, 1, 1], 5, 2)[0]!;
+        lights['b'] = lamp(furniture, 'bank', [6, 1, 2], 5, 2)[0]!;
+        lights['outside'] = lamp(furniture, 'transmissive', [-1, 1, 2], 5, 2)[0]!;
+        const plain = new THREE.PointLight('#ffffff', 1, 2, 2);
+        plain.position.set(2, 1, 2);
+        scene.add(plain);
+        lights['plain'] = plain;
+      },
+    );
+    try {
+      w.bake();
+      const room = (name: string): unknown => lights[name]!.userData['jeexLampRoom'];
+      expect([0, 1]).toContain(room('a'));
+      expect([0, 1]).toContain(room('b'));
+      expect(room('a')).not.toBe(room('b'));
+      expect(room('outside')).toBe(-2);
+      expect(room('plain')).toBeUndefined();
+    } finally {
+      w.dispose();
+    }
+  });
+});
