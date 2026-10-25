@@ -22,18 +22,26 @@
  * document on screen, a refresh first moves the probe points to where the
  * current furniture puts them (every room whose point moved is re-captured
  * too, and its boxes project from the new point); rooms that no longer give
- * the loaded boxes reload the document.
+ * the loaded boxes reload the document. A scope that asks for the lamp
+ * check (`lamps`, every asset edit) starts the bake over when any lamp
+ * moved, went, came or changed since the bake started (`lampSignature`).
  *
- * Relight: a new colour of the artificial light re-captures every room's
- * probe in place, one room per live frame; the grids stay, since their bake
- * sees neither the lamps nor the ambient floor.
+ * Lamps: every artificial point light (a fact light or a bank bulb) gets a
+ * source room on each bake start (`lamp-rooms.ts`), written to its
+ * `userData`; the walk transform gates its direct light by it
+ * (`box-probe-patch.ts`). The lamps feed the grids: the grid bake takes the
+ * furniture off every layer, so the lights under it stay in the scene.
+ *
+ * Relight: a new colour of the artificial light changes the lamps' bounce in
+ * the grids, so it starts the bake over; the colour it was baked with changes
+ * nothing.
  */
 
 import { ViewerLibError } from '../../shared/errors.js';
 import * as THREE from 'three';
 import { LIGHTING_STANDARD } from '../../lighting/lighting-standard.js';
 import { roomVolumes, type RoomBox, type RoomVolumes, type Vec3, type VolumeInput, type VolumeRoom } from './room-volumes.js';
-import { assignLampRoom, type LampEntry } from './lamp-rooms.js';
+import { assignLampRoom, lampSignature, type LampEntry } from './lamp-rooms.js';
 import { isArtificialLight } from '../../assets/artificial-light.js';
 import { LAMP_ROOM_KEY } from '../light-order.js';
 import { createExteriorGrid, RoomGrid } from './room-grid.js';
@@ -52,7 +60,7 @@ import type { LightProbeGridWebGL } from 'three/addons/lighting/LightProbeGridWe
  */
 export type WalkDocument = { volumes: VolumeInput; furniture: THREE.Object3D | null };
 /** What an edit asks to refresh: everything, or the grids and probes of some rooms. */
-export type RefreshScope = { all: boolean; grids: readonly string[]; probes: readonly string[] };
+export type RefreshScope = { all: boolean; grids: readonly string[]; probes: readonly string[]; lamps?: true };
 /** `empty`: the plan has no closed room, nothing is baked and the view keeps the direct look. */
 export type WalkLightingPhase = 'baking' | 'probes' | 'live' | 'empty';
 
@@ -175,6 +183,8 @@ export class WalkLighting {
   private furniture: THREE.Object3D | null = null;
   /** The rooms of the loaded document, whose polygons the lamps are assigned by. */
   private rooms: readonly VolumeRoom[] = [];
+  /** The lamps' signature when their rooms were last assigned and the bake started. */
+  private lampsSigned = '';
   private grids: RoomGrid[] = [];
   private exterior: LightProbeGridWebGL | null = null;
   private atlas: ProbeAtlas | null = null;
@@ -297,9 +307,19 @@ export class WalkLighting {
     this.show(true);
   }
 
-  /** Queues every room's probe for a re-capture (the artificial light changed colour); the grids stay. */
+  /**
+   * The artificial light changed colour: the grids hold the lamps' tinted bounce, so a change re-bakes
+   * everything (grids, then probes), the initial bake included; the colour the lighting was baked with
+   * re-bakes nothing.
+   */
   relight(): void {
-    if (this.volumes && this.probes) this.probes.recapture(this.volumes.probes.map((probe) => probe.roomId));
+    if (this.volumes && this.lampsChanged()) this.restart();
+  }
+
+  /** Whether a lamp moved, went, came or changed colour or strength since the bake started. */
+  private lampsChanged(): boolean {
+    this.scene.updateMatrixWorld();
+    return lampSignature(lampEntries(runtimeLamps(this.scene))) !== this.lampsSigned;
   }
 
   /** Whether a relight still has probes to write while live. */
@@ -319,7 +339,7 @@ export class WalkLighting {
       this.load(doc!);
       return;
     }
-    if (scope.all || this.current !== 'live') {
+    if (scope.all || this.current !== 'live' || (scope.lamps === true && this.lampsChanged())) {
       this.restart();
       return;
     }
@@ -366,7 +386,7 @@ export class WalkLighting {
     this.sky.dispose();
   }
 
-  /** Gives every lamp its source room: an index in the probe order, or `NO_ROOM`. */
+  /** Gives every lamp its source room (an index in the probe order, or `NO_ROOM`) and records the lamps' signature. */
   private assignLamps(): void {
     this.scene.updateMatrixWorld();
     const order = this.volumes!.probes.map((probe) => probe.roomId);
@@ -377,6 +397,7 @@ export class WalkLighting {
       const room = assignLampRoom({ x, z }, this.rooms, order);
       light.userData[LAMP_ROOM_KEY] = room >= 0 ? room : NO_ROOM;
     });
+    this.lampsSigned = lampSignature(entries);
   }
 
   private restart(): void {
