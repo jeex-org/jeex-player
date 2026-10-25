@@ -32,7 +32,10 @@
 import { ViewerLibError } from '../../shared/errors.js';
 import * as THREE from 'three';
 import { LIGHTING_STANDARD } from '../../lighting/lighting-standard.js';
-import { roomVolumes, type RoomBox, type RoomVolumes, type Vec3, type VolumeInput } from './room-volumes.js';
+import { roomVolumes, type RoomBox, type RoomVolumes, type Vec3, type VolumeInput, type VolumeRoom } from './room-volumes.js';
+import { assignLampRoom, type LampEntry } from './lamp-rooms.js';
+import { isArtificialLight } from '../../assets/artificial-light.js';
+import { LAMP_ROOM_KEY } from '../light-order.js';
 import { createExteriorGrid, RoomGrid } from './room-grid.js';
 import { GridBake } from './grid-bake.js';
 import { ProbeAtlas, RoomProbes } from './room-probes.js';
@@ -119,6 +122,34 @@ export function furnitureRenderables(furniture: THREE.Object3D | null): THREE.Ob
   return out;
 }
 
+/** The room value of a lamp outside every room: it lights nothing inside the rooms. */
+export const NO_ROOM = -2;
+
+/** Every lamp of `scene`: each point light tagged as artificial light, a fact light or a bank bulb alike. */
+export function runtimeLamps(scene: THREE.Object3D): THREE.PointLight[] {
+  const out: THREE.PointLight[] = [];
+  scene.traverse((object) => {
+    if ((object as Partial<THREE.PointLight>).isPointLight && isArtificialLight(object)) out.push(object as THREE.PointLight);
+  });
+  return out;
+}
+
+/** What the lamps' signature reads of each lamp, in world space. */
+function lampEntries(lamps: readonly THREE.PointLight[]): LampEntry[] {
+  const world = new THREE.Vector3();
+  return lamps.map((light) => {
+    light.getWorldPosition(world);
+    return {
+      id: light.uuid,
+      position: [world.x, world.y, world.z],
+      colour: [light.color.r, light.color.g, light.color.b],
+      intensity: light.intensity,
+      distance: light.distance,
+      decay: light.decay,
+    };
+  });
+}
+
 function mirrorsOf(scene: THREE.Object3D): THREE.Object3D[] {
   const out: THREE.Object3D[] = [];
   scene.traverse((object) => {
@@ -142,6 +173,8 @@ export class WalkLighting {
   private readonly parent = new THREE.Group();
   private volumes: RoomVolumes | null = null;
   private furniture: THREE.Object3D | null = null;
+  /** The rooms of the loaded document, whose polygons the lamps are assigned by. */
+  private rooms: readonly VolumeRoom[] = [];
   private grids: RoomGrid[] = [];
   private exterior: LightProbeGridWebGL | null = null;
   private atlas: ProbeAtlas | null = null;
@@ -213,6 +246,7 @@ export class WalkLighting {
     }
     this.volumes = volumes;
     this.furniture = doc.furniture;
+    this.rooms = doc.volumes.rooms;
     this.grids = volumes.boxes.map((box) => new RoomGrid(box));
     this.exterior = createExteriorGrid(LIGHTING_STANDARD.apartment, volumes.bounds);
     for (const grid of [...this.grids, this.exterior]) {
@@ -327,8 +361,22 @@ export class WalkLighting {
     this.sky.dispose();
   }
 
+  /** Gives every lamp its source room: an index in the probe order, or `NO_ROOM`. */
+  private assignLamps(): void {
+    this.scene.updateMatrixWorld();
+    const order = this.volumes!.probes.map((probe) => probe.roomId);
+    const lamps = runtimeLamps(this.scene);
+    const entries = lampEntries(lamps);
+    lamps.forEach((light, i) => {
+      const [x, , z] = entries[i]!.position;
+      const room = assignLampRoom({ x, z }, this.rooms, order);
+      light.userData[LAMP_ROOM_KEY] = room >= 0 ? room : NO_ROOM;
+    });
+  }
+
   private restart(): void {
     this.show(false);
+    this.assignLamps();
     this.current = 'baking';
     this.bake = this.gridBake(this.grids, T.probesPerFrame);
     const scene = this.scene;
