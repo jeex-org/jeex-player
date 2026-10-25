@@ -27,8 +27,9 @@
  * moved, went, came or changed since the bake started (`lampSignature`).
  *
  * Lamps: every artificial point light (a fact light or a bank bulb) gets a
- * source room on each bake start (`lamp-rooms.ts`), written to its
- * `userData`; the walk transform gates its direct light by it
+ * source room on each bake start and again on every walk frame, so a lamp
+ * built or moved in walk is gated before it draws (`lamp-rooms.ts`), written
+ * to its `userData`; the walk transform gates its direct light by it
  * (`box-probe-patch.ts`). The lamps feed the grids: the grid bake takes the
  * furniture off every layer, so the lights under it stay in the scene.
  *
@@ -292,6 +293,9 @@ export class WalkLighting {
     this.uniforms.jeexLampScope.value = 1;
     // Materials made since the last frame (a paint, a model upgrade, a rebuild) get the patch too.
     installWalkPatch(this.scene, this.uniforms);
+    // A lamp built or moved since the last frame takes its room before this frame draws; the re-bake its
+    // light needs stays on the debounced refresh.
+    this.placeLamps();
     if (this.current === 'baking') {
       if (this.bake.step()) this.current = 'probes';
       return;
@@ -388,6 +392,11 @@ export class WalkLighting {
 
   /** Gives every lamp its source room (an index in the probe order, or `NO_ROOM`) and records the lamps' signature. */
   private assignLamps(): void {
+    this.lampsSigned = lampSignature(this.placeLamps());
+  }
+
+  /** Gives every lamp the room its bulb stands in now; answers the lamps as the signature reads them. */
+  private placeLamps(): LampEntry[] {
     this.scene.updateMatrixWorld();
     const order = this.volumes!.probes.map((probe) => probe.roomId);
     const lamps = runtimeLamps(this.scene);
@@ -397,7 +406,7 @@ export class WalkLighting {
       const room = assignLampRoom({ x, z }, this.rooms, order);
       light.userData[LAMP_ROOM_KEY] = room >= 0 ? room : NO_ROOM;
     });
-    this.lampsSigned = lampSignature(entries);
+    return entries;
   }
 
   private restart(): void {

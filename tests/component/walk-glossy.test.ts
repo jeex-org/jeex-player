@@ -396,8 +396,12 @@ describe.skipIf(!HARDWARE)(`walk gloss and white balance in the demo living room
     // Diagnostic: the default lamps on, their bounce in the probes (it lifts the floor's specular median).
     const lampsOn = measure();
     const restoreLamps = await lampsOff();
-    const daylight = measure();
-    await restoreLamps();
+    let daylight: ReturnType<typeof measure>;
+    try {
+      daylight = measure();
+    } finally {
+      await restoreLamps();
+    }
     record('glossContrast', {
       pose: { position: POSE_GLOSS.position.toArray(), target: POSE_GLOSS.target.toArray(), fov: 60, size: SIZE },
       before: daylight.before,
@@ -424,8 +428,12 @@ describe.skipIf(!HARDWARE)(`walk gloss and white balance in the demo living room
     // Diagnostic: the default lamps on.
     const lampsOn = measure();
     const restoreLamps = await lampsOff();
-    const daylight = measure();
-    await restoreLamps();
+    let daylight: ReturnType<typeof measure>;
+    try {
+      daylight = measure();
+    } finally {
+      await restoreLamps();
+    }
     record('windowBand', {
       pose: { position: POSE_WINDOW.position.toArray(), target: POSE_WINDOW.target.toArray(), fov: 60, size: SIZE },
       panes,
