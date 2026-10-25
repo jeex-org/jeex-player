@@ -1,0 +1,337 @@
+{
+  "manifestVersion": "1.0",
+  "id": "01a1f5aa-1000-7308-9743-2d1026706d7e",
+  "name": "Offers fixture",
+  "publisher": "01a1f5aa-1001-7805-ba84-6a32c3bb81e3",
+  "license": "CC0-1.0",
+  "objects": [
+    {
+      "id": "01a1f5aa-1003-7682-975e-c87a171ac826",
+      "name": "Long sofa",
+      "category": "furniture/sofas",
+      "dims": [2.1, 0.85, 0.95],
+      "anchor": "floor",
+      "wallSnap": true,
+      "clearance": 0.6,
+      "tags": ["living"],
+      "model": "obj/box-sofa.glb",
+      "slots": ["frame"],
+      "defaultFinishes": {
+        "frame": "01a1f5aa-1002-7c29-a621-79273c8eb5bb"
+      },
+      "primarySlot": "frame",
+      "variants": [
+        {
+          "id": "01a1f5aa-1010-74d4-89b1-b673bd4755d0",
+          "name": "Long sofa, sand",
+          "version": "1.0.0",
+          "pricing": {
+            "model": "free"
+          },
+          "model": "obj/box-sofa.glb"
+        },
+        {
+          "id": "01a1f5aa-1011-75ad-9853-c1f76eb97706",
+          "name": "Long sofa, moss",
+          "version": "1.0.0",
+          "pricing": {
+            "model": "free"
+          },
+          "model": "obj/box-sofa.glb"
+        },
+        {
+          "id": "01a1f5aa-1012-7ca8-88bc-a0385813dbad",
+          "name": "Long sofa, rust",
+          "version": "1.0.0",
+          "pricing": {
+            "model": "free"
+          },
+          "model": "obj/box-sofa.glb"
+        },
+        {
+          "id": "01a1f5aa-1013-73c6-a1d0-6bd2aa399dac",
+          "name": "Long sofa, slate",
+          "version": "1.0.0",
+          "pricing": {
+            "model": "free"
+          },
+          "model": "obj/box-sofa.glb"
+        },
+        {
+          "id": "01a1f5aa-1014-7946-bc59-c0996daeee6f",
+          "name": "Long sofa, ink",
+          "version": "1.0.0",
+          "pricing": {
+            "model": "free"
+          },
+          "model": "obj/box-sofa.glb"
+        },
+        {
+          "id": "01a1f5aa-1015-7529-a279-764017f2ed6c",
+          "name": "Long sofa, clay",
+          "version": "1.0.0",
+          "pricing": {
+            "model": "free"
+          },
+          "model": "obj/box-sofa.glb"
+        },
+        {
+          "id": "01a1f5aa-1016-7fc7-903d-75e173e4eaed",
+          "name": "Long sofa, fern",
+          "version": "1.0.0",
+          "pricing": {
+            "model": "free"
+          },
+          "model": "obj/box-sofa.glb"
+        },
+        {
+          "id": "01a1f5aa-1017-7e5f-b878-f78e2978aa24",
+          "name": "Long sofa, plum",
+          "version": "1.0.0",
+          "pricing": {
+            "model": "free"
+          },
+          "model": "obj/box-sofa.glb"
+        },
+        {
+          "id": "01a1f5aa-1018-747c-962d-daed16dc0cf0",
+          "name": "Long sofa, ochre",
+          "version": "1.0.0",
+          "pricing": {
+            "model": "free"
+          },
+          "model": "obj/box-sofa.glb"
+        },
+        {
+          "id": "01a1f5aa-1019-7b9c-b7f7-8df0cac5e40c",
+          "name": "Long sofa, stone",
+          "version": "1.0.0",
+          "pricing": {
+            "model": "free"
+          },
+          "model": "obj/box-sofa.glb"
+        },
+        {
+          "id": "01a1f5aa-101a-702d-9e51-8ca6eaac8d82",
+          "name": "Long sofa, teal",
+          "version": "1.0.0",
+          "pricing": {
+            "model": "free"
+          },
+          "model": "obj/box-sofa.glb"
+        },
+        {
+          "id": "01a1f5aa-101b-7f01-a721-0760474f36e8",
+          "name": "Long sofa, coral",
+          "version": "1.0.0",
+          "pricing": {
+            "model": "free"
+          },
+          "model": "obj/box-sofa.glb"
+        },
+        {
+          "id": "01a1f5aa-101c-7b53-9930-9cc6273931bd",
+          "name": "Long sofa, pine",
+          "version": "1.0.0",
+          "pricing": {
+            "model": "free"
+          },
+          "model": "obj/box-sofa.glb"
+        },
+        {
+          "id": "01a1f5aa-101d-7b2a-8df3-dbe4d58fed8a",
+          "name": "Long sofa, ash",
+          "version": "1.0.0",
+          "pricing": {
+            "model": "free"
+          },
+          "model": "obj/box-sofa.glb"
+        },
+        {
+          "id": "01a1f5aa-101e-7728-b7ec-a0fa5f6b8a88",
+          "name": "Long sofa, berry",
+          "version": "1.0.0",
+          "pricing": {
+            "model": "free"
+          },
+          "model": "obj/box-sofa.glb"
+        },
+        {
+          "id": "01a1f5aa-101f-7062-9df7-ffe0297c79bf",
+          "name": "Long sofa, dune",
+          "version": "1.0.0",
+          "pricing": {
+            "model": "free"
+          },
+          "model": "obj/box-sofa.glb"
+        },
+        {
+          "id": "01a1f5aa-1020-7bda-ae89-8736a3566f89",
+          "name": "Long sofa, lake",
+          "version": "1.0.0",
+          "pricing": {
+            "model": "free"
+          },
+          "model": "obj/box-sofa.glb"
+        },
+        {
+          "id": "01a1f5aa-1021-7369-9b59-0481194f309f",
+          "name": "Long sofa, mint",
+          "version": "1.0.0",
+          "pricing": {
+            "model": "free"
+          },
+          "model": "obj/box-sofa.glb"
+        },
+        {
+          "id": "01a1f5aa-1022-7fea-918f-32cf21449273",
+          "name": "Long sofa, smoke",
+          "version": "1.0.0",
+          "pricing": {
+            "model": "free"
+          },
+          "model": "obj/box-sofa.glb"
+        },
+        {
+          "id": "01a1f5aa-1023-7d7c-be9d-913668257525",
+          "name": "Long sofa, honey",
+          "version": "1.0.0",
+          "pricing": {
+            "model": "free"
+          },
+          "model": "obj/box-sofa.glb"
+        }
+      ],
+      "defaultVariant": "01a1f5aa-1010-74d4-89b1-b673bd4755d0",
+      "mirror": {
+        "x": true,
+        "y": false,
+        "z": false
+      }
+    },
+    {
+      "id": "01a1f5aa-1004-7a6f-be48-478dcb74f213",
+      "name": "Hall bench",
+      "category": "furniture/benches_and-stools",
+      "dims": [1.2, 0.45, 0.4],
+      "anchor": "floor",
+      "wallSnap": true,
+      "clearance": 0.4,
+      "tags": ["hall"],
+      "model": "obj/box-sofa.glb",
+      "slots": ["frame"],
+      "defaultFinishes": {
+        "frame": "01a1f5aa-1002-7c29-a621-79273c8eb5bb"
+      },
+      "primarySlot": "frame",
+      "variants": [
+        {
+          "id": "01a1f5aa-1009-7fd6-83db-dde131ca3766",
+          "name": "Hall bench",
+          "version": "1.0.0",
+          "pricing": {
+            "model": "free"
+          },
+          "model": "obj/box-sofa.glb"
+        }
+      ],
+      "defaultVariant": "01a1f5aa-1009-7fd6-83db-dde131ca3766",
+      "mirror": {
+        "x": false,
+        "y": false,
+        "z": false
+      }
+    },
+    {
+      "id": "01a1f5aa-1005-745d-8cce-8038a39d5e08",
+      "name": "Bud vase",
+      "category": "decor/vases",
+      "dims": [0.14, 0.3, 0.14],
+      "anchor": "floor",
+      "wallSnap": false,
+      "clearance": 0.05,
+      "tags": ["decor"],
+      "model": "obj/table-lamp.glb",
+      "slots": ["body"],
+      "defaultFinishes": {
+        "body": "01a1f5aa-1002-7c29-a621-79273c8eb5bb"
+      },
+      "primarySlot": "body",
+      "variants": [
+        {
+          "id": "01a1f5aa-1006-7539-94b5-0af03b971722",
+          "name": "Bud vase",
+          "version": "1.0.0",
+          "pricing": {
+            "model": "free"
+          },
+          "model": "obj/table-lamp.glb"
+        }
+      ],
+      "defaultVariant": "01a1f5aa-1006-7539-94b5-0af03b971722",
+      "mirror": {
+        "x": true,
+        "y": false,
+        "z": true
+      },
+      "onSurface": true
+    },
+    {
+      "id": "01a1f5aa-1007-7f24-9f58-d669cbee3772",
+      "name": "Table lamp",
+      "category": "lighting/table",
+      "dims": [0.3, 0.52, 0.3],
+      "anchor": "floor",
+      "wallSnap": false,
+      "clearance": 0.1,
+      "tags": ["living"],
+      "model": "obj/table-lamp.glb",
+      "slots": ["shade"],
+      "defaultFinishes": {
+        "shade": "01a1f5aa-1002-7c29-a621-79273c8eb5bb"
+      },
+      "primarySlot": "shade",
+      "variants": [
+        {
+          "id": "01a1f5aa-1008-7a07-9021-721a278f64f7",
+          "name": "Table lamp",
+          "version": "1.0.0",
+          "pricing": {
+            "model": "free"
+          },
+          "model": "obj/table-lamp.glb",
+          "lights": [
+            {
+              "kind": "point",
+              "position": [0, 0.443, 0],
+              "colour": "#ffd9a4",
+              "lumens": 400,
+              "cutoff": 3
+            }
+          ]
+        }
+      ],
+      "defaultVariant": "01a1f5aa-1008-7a07-9021-721a278f64f7",
+      "mirror": {
+        "x": true,
+        "y": false,
+        "z": true
+      },
+      "onSurface": true
+    }
+  ],
+  "materials": [
+    {
+      "id": "01a1f5aa-1002-7c29-a621-79273c8eb5bb",
+      "name": "Offers walnut",
+      "tags": ["wood"],
+      "apply": ["furniture"],
+      "generator": {
+        "kind": "plank_floor",
+        "tone": "#6b4a32",
+        "seed": 7
+      },
+      "tile": 3.2
+    }
+  ]
+}

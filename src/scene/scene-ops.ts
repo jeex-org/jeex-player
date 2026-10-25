@@ -61,6 +61,7 @@ import {
   applyRemoveObject,
   applyMirrorObject,
   applyReplaceAssetVariant,
+  applyReplaceAsset,
   applyRotateObject,
   applySetObject,
 } from './ops/assets.js';
@@ -253,6 +254,8 @@ function dispatchOp(scene: Draft<SceneData>, op: SceneOp, registries: SceneRegis
       return applySetMaterial(scene, op, registries);
     case 'replace_asset_variant':
       return applyReplaceAssetVariant(scene, op, registries);
+    case 'replace_asset':
+      return applyReplaceAsset(scene, op, registries);
     case 'replace_opening_variant':
       return applyReplaceOpeningVariant(scene, op, registries);
     case 'set_ceiling':

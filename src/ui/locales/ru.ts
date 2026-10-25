@@ -105,6 +105,10 @@ export const RU: Record<MessageKey, string> = {
   'panel.applyAllRoomWalls': 'Применить ко всем стенам помещений',
   'panel.applyAllWalls': 'Применить ко всем стенам',
   'panel.standardVariant': 'Стандартный вариант',
+  'panel.replaceWithAnother': 'Заменить на другой…',
+  'replacePopup.title': 'Заменить «{name}» на',
+  'replacePopup.close': 'Закрыть список',
+  'replacePopup.empty': 'На место этого объекта больше ничего не подходит.',
   'panel.ownerFacade': 'Фасад',
   'panel.ownerExterior': 'Снаружи',
 

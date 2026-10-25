@@ -81,6 +81,8 @@ export type SceneBuilderOptions = {
   catalogue?: CatalogueLookup | undefined;
   /** The library id `catalogue` answers for: a baked project's `library.id`. */
   catalogueLibrary?: string | undefined;
+  /** More library ids `catalogue` answers for: a layered bank's project and offers (`assets/library-stack.ts`). */
+  catalogueLibraries?: readonly string[] | undefined;
   /** How a finish id is canonicalised on a furniture slot. */
   resolveFinish?: FinishIdResolver | undefined;
   /** The project's `library.materials`: furniture finishes AND, through `findFinish`, room surfaces. */
@@ -208,6 +210,7 @@ export class SceneBuilder {
       modelSource: this.options.modelSource,
       catalogue: this.options.catalogue,
       catalogueLibrary: this.options.catalogueLibrary,
+      catalogueLibraries: this.options.catalogueLibraries,
       resolveFinish: this.options.resolveFinish,
       projectMaterials: this.options.projectMaterials,
       credentials: this.options.credentials,

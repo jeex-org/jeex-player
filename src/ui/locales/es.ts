@@ -95,6 +95,10 @@ export const ES: Record<MessageKey, string> = {
   'panel.applyAllRoomWalls': 'Aplicar a todos los muros de la habitación',
   'panel.applyAllWalls': 'Aplicar a todos los muros',
   'panel.standardVariant': 'Variante estándar',
+  'panel.replaceWithAnother': 'Sustituir por otro…',
+  'replacePopup.title': 'Sustituir {name} por',
+  'replacePopup.close': 'Cerrar la lista',
+  'replacePopup.empty': 'Nada más encaja donde está este objeto.',
   'panel.ownerFacade': 'Fachada',
   'panel.ownerExterior': 'Exterior',
 

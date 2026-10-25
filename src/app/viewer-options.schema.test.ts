@@ -156,14 +156,14 @@ describe('viewerOptionsSchema', () => {
 
   /**
    * The schema's inferred type and the public
-   * `ViewerOptions` contract (minus `onLog` and `scene`, which no schema can
+   * `ViewerOptions` contract (minus `onLog`, `scene` and `offers`, which no schema can
    * usefully describe — the module header) must accept each other. A drift
    * fails `tsc`, not the assertion: `BothWays` collapses to `false` and the
    * `const agree: BothWays = true` line stops compiling.
    */
   test('the schema and the public contract type-check as the same shape', () => {
     type SchemaShape = z.infer<typeof viewerOptionsSchema>;
-    type PublicShape = Omit<ViewerOptions, 'onLog' | 'scene'>;
+    type PublicShape = Omit<ViewerOptions, 'onLog' | 'scene' | 'offers'>;
     type BothWays = SchemaShape extends PublicShape ? (PublicShape extends SchemaShape ? true : false) : false;
     const agree: BothWays = true;
     expect(agree).toBe(true);

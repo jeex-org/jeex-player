@@ -23,6 +23,7 @@ import type { SlotName } from '../ui/host-slots.js';
 import { SLOT_VALUES, closedSet } from './option-sets.js';
 import type { Locale } from '../ui/messages.js';
 import type { SceneSource } from '../scene/scene-repository.js';
+import type { OffersSource } from '../assets/offers.js';
 import { createLogger, type Logger, type LogSink } from '../shared/logger.js';
 import { resolveBySpec, resolveHdri, warnInvalid, withOptionSink, type OptionSpec } from './option-resolvers.js';
 import { blankRecord, containerFor, descend, split, toDatasetKey, type SectionShorthands } from './option-paths.js';
@@ -202,19 +203,18 @@ export type ViewerOptions = {
    */
   debug: boolean;
   /**
-   * Where the first scene comes from (`scene-repository.ts`). Only `url` is in
-   * `OPTION_SCHEMA`: the other two carry a live object and a live loader, and
-   * neither survives a query string or an HTML attribute, so they are passed
-   * as fields and copied through verbatim.
+   * Where the first scene comes from (`scene-repository.ts`), and the extra
+   * library "Replace with another…" offers (`assets/offers.ts`). Only their
+   * `url` is in `OPTION_SCHEMA`: the other fields carry live objects, which
+   * survive neither a query string nor an HTML attribute, so they are copied
+   * through verbatim.
    */
   scene: SceneSource;
+  offers?: OffersSource | undefined;
   /**
-   * Where the viewer's warnings and errors go. Absent means the console,
-   * prefixed `[jeex-viewer]` (`shared/logger.ts`).
-   *
-   * Like `scene.document` and `scene.repository` this is a HOST OBJECT: it is
-   * not in `OPTION_SCHEMA`, has no query or attribute spelling, and is copied
-   * through verbatim.
+   * Where the viewer's warnings and errors go; absent, the console, prefixed
+   * `[jeex-viewer]` (`shared/logger.ts`). A HOST OBJECT like `scene.document`:
+   * not in `OPTION_SCHEMA`, no query or attribute spelling, copied verbatim.
    */
   onLog?: LogSink | undefined;
   /**
@@ -322,13 +322,11 @@ export const DEFAULT_VIEWER_OPTIONS: ViewerOptions = {
 };
 
 /**
- * Option paths whose value is a HOST OBJECT — a scene document, a repository,
- * a project manifest the host already holds — and therefore cannot be
- * validated, spelled in a query string or written in an attribute. They are
- * copied through verbatim; `resolveSceneSource` and the mount are what decide
- * whether what arrived is usable.
+ * Option paths whose value is a HOST OBJECT (a scene document, a repository, a library the host holds): never validated, spelled
+ * in a query string or written in an attribute, but copied through verbatim; the loaders decide whether what arrived is usable.
  */
-const OPAQUE_PATHS: readonly string[] = ['scene.document', 'scene.repository', 'scene.library', 'onLog', 'resolveTexture'];
+const OFFERS_HOST = ['offers.library', 'offers.baseUrl'];
+const OPAQUE_PATHS: readonly string[] = ['scene.document', 'scene.repository', 'scene.library', ...OFFERS_HOST, 'onLog', 'resolveTexture'];
 
 // Each closed set is proved complete against its union (`closedSet`, `option-sets.ts`).
 const TOUR_MODES = closedSet<TourStartMode>()(['play', 'paused', 'off']);
@@ -374,6 +372,7 @@ export type OptionPath =
   | 'edits'
   | 'debug'
   | 'scene.url'
+  | 'offers.url'
   | 'analytics.mode'
   | 'analytics.endpoint'
   | 'settings.show'
@@ -458,6 +457,7 @@ export const OPTION_SCHEMA = {
   edits: { kind: 'enum', values: EDITS_MODES, default: DEFAULT_VIEWER_OPTIONS.edits, query: 'edits', attr: 'edits' },
   debug: { kind: 'flag', default: DEFAULT_VIEWER_OPTIONS.debug, query: 'debug', attr: 'debug' },
   'scene.url': { kind: 'string', default: undefined, query: 'scene', attr: 'src' },
+  'offers.url': { kind: 'string', default: undefined, query: 'offers', attr: 'offers' },
   'analytics.mode': { kind: 'switch', values: ANALYTICS_MODES, default: 'on', query: 'analytics', attr: 'analytics' },
   'analytics.endpoint': { kind: 'endpoint', default: undefined, query: 'analyticsEndpoint', attr: 'analytics-endpoint' },
   'settings.show': { kind: 'flag', default: DEFAULT_VIEWER_OPTIONS.settings.show, query: 'settings', attr: 'settings' },

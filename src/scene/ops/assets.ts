@@ -1,7 +1,7 @@
 /**
  * The furniture operations: what a placement is and what may be done to it —
  * `place_object`, `move_object`, `rotate_object`, `set_object`,
- * `remove_object`, `replace_asset_variant` and `mirror_object`.
+ * `remove_object`, `replace_asset_variant`, `replace_asset` and `mirror_object`.
  *
  * What they all have in common is the REGISTRIES: whether an archetype, a
  * variant or a finish exists is a question for the bank the caller injected,
@@ -30,6 +30,7 @@ import type {
   MoveObjectOp,
   PlaceObjectOp,
   RemoveObjectOp,
+  ReplaceAssetOp,
   ReplaceAssetVariantOp,
   RotateObjectOp,
   SceneData,
@@ -71,7 +72,11 @@ function findAsset(scene: Draft<SceneData>, assetId: string): Draft<DemoAsset> {
  * `assetLibrary`, then in the registries' default — exactly as the validator
  * will read the placement it writes.
  */
-function requireArchetype(scene: Draft<SceneData>, registries: SceneRegistries, op: PlaceObjectOp): CatalogueArchetype {
+function requireArchetype(
+  scene: Draft<SceneData>,
+  registries: SceneRegistries,
+  op: { readonly asset: string; readonly library?: string | undefined },
+): CatalogueArchetype {
   const ref = assetRefOf({ type: op.asset, library: op.library }, scene.assetLibrary ?? registries.defaultLibrary);
   const object = findArchetype(registries, ref);
   if (!object)
@@ -232,6 +237,64 @@ export function applyReplaceAssetVariant(scene: Draft<SceneData>, op: ReplaceAss
   }
   asset.variant = op.variant;
   return { summary: `Asset ${op.assetId} replaced with variant ${op.variant}`, touched: [touchedAsset(op.assetId)] };
+}
+
+/** The anchor pair a replacement must share: where the origin belongs, and whether it stands on another object. */
+function anchorPair(object: CatalogueArchetype): string {
+  return `${object.anchor ?? 'floor'}${object.onSurface === true ? ' on a surface' : ''}`;
+}
+
+/**
+ * Gives a placement another asset, keeping the placement itself.
+ *
+ * The target is read the way `place_object` reads one — its `library`, else
+ * the document's `assetLibrary`, else the registries' default — and must share
+ * the current asset's anchor pair and allow the mirror the placement carries.
+ * The position is copied as it is, never reseated: a vase on a table keeps
+ * its height. Interior presets forget the variant and finish edits they
+ * recorded for the placement, which named the old body.
+ */
+export function applyReplaceAsset(scene: Draft<SceneData>, op: ReplaceAssetOp, registries: SceneRegistries): OpOutcome {
+  const asset = findAsset(scene, op.assetId);
+  const target = requireArchetype(scene, registries, { asset: op.asset, library: op.library });
+  if (op.variant !== undefined && !target.variants.some((variant) => variant.id === op.variant)) {
+    throw new OpError(`Variant ${op.variant} is not offered for asset ${op.asset}`);
+  }
+  const current = registries.resolvePlacement(asset)?.object;
+  if (current === undefined) throw new OpError(`Asset ${op.assetId} names no asset the catalogue knows`);
+  if (anchorPair(current) !== anchorPair(target)) {
+    throw new OpError(`replace_asset: ${op.asset} is anchored ${anchorPair(target)}, asset ${op.assetId} ${anchorPair(current)}`);
+  }
+  const mirror = asset.mirror ?? {};
+  const refused = disallowedMirrorAxes(mirror, target.mirror);
+  if (mirroredAxes(mirror).length > 0 && refused.length > 0) {
+    throw new OpError(`replace_asset: ${op.asset} may not be mirrored on ${refused.join(', ')}`, 'replace_asset', {
+      reason: 'mirror_not_allowed',
+      assetId: op.assetId,
+      axes: refused,
+    });
+  }
+
+  asset.type = target.id;
+  asset.asset = op.asset;
+  if (op.library === undefined) delete asset.library;
+  else asset.library = op.library;
+  if (op.variant === undefined) delete asset.variant;
+  else asset.variant = op.variant;
+  delete asset.finishes;
+  delete asset.material;
+  delete asset.scale;
+  delete asset.collision;
+  forgetInPresets(
+    scene,
+    (candidate) =>
+      (candidate.op === 'replace_asset_variant' && candidate.assetId === op.assetId) ||
+      (candidate.op === 'set_object' &&
+        candidate.assetId === op.assetId &&
+        (candidate.finishes !== undefined || candidate.material !== undefined || candidate.scale !== undefined)),
+  );
+  const shown = op.variant === undefined ? target.id : `${target.id}@${op.variant}`;
+  return { summary: `Object ${op.assetId}: replaced with ${shown}`, touched: [touchedAsset(op.assetId)] };
 }
 
 /**

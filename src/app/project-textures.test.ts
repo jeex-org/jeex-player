@@ -101,6 +101,7 @@ function loaded(key = 'project-under-test'): LoadedDocument {
     project: {
       key,
       info: { manifest: {}, baseUrl: BASE } as never,
+      offers: null,
       facts: shippedAssetFacts,
       registries: LIBRARY_REGISTRIES,
       variants: undefined as never,

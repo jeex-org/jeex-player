@@ -113,6 +113,8 @@ export class ViewerEditor {
   private activePresetId: string | null = null;
   /** Where the interior panel last opened, so a commit does not move it. */
   private interiorAnchor = { x: 0, y: 0 };
+  /** Rendered previews of the popup's offers, per archetype: rendering one is the expensive part of opening it. */
+  private readonly offerPreviews = new Map<string, string | null>();
 
   /**
    * The touched-entity dispatch table `applyRevision` folds over — shared in
@@ -219,8 +221,7 @@ export class ViewerEditor {
 
   /** Orbit click on a floor, a wall or an opening. */
   handleSurfacePick(pick: SurfacePick | null, clientX: number, clientY: number): void {
-    // Compared before `clearSelection()` forgets it: a second tap on the
-    // selected opening deselects it.
+    // Compared before `clearSelection()` forgets it: a second tap deselects.
     const again = pick?.surface === 'opening' && !!pick.openingId && pick.openingId === this.selectedOpeningId;
     this.clearSelection();
     if (pick?.surface === 'opening') {
@@ -288,6 +289,10 @@ export class ViewerEditor {
           this.closePanel();
           this.requestFurnitureVariant(assetId, variantId);
         },
+        replace:
+          this.deps.edits.mode === 'off'
+            ? undefined
+            : { previews: this.offerPreviews, open: (popup) => this.deps.ui.openReplacePopup(popup), commit: (op) => this.dispatch(op) },
       }),
     );
     this.deps.ui.wakeControls();
@@ -322,10 +327,8 @@ export class ViewerEditor {
    * whatever was selected: a preset is about the whole flat.
    */
   openInteriorPanel(anchor?: { x: number; y: number }): void {
-    // `'off'`: a click opens no panel (only `select`). The
-    // control-bar interiors button reaches this panel through `ui-commands`,
-    // OUTSIDE the `director-wiring` pick gate, so the panel refuses on its own,
-    // the same way the pick paths do.
+    // `'off'` opens no panel. The interiors button reaches this through `ui-commands`,
+    // outside the `director-wiring` pick gate, so the panel refuses on its own.
     if (this.deps.edits.mode === 'off') return;
     const presets = this.deps.model.scene.interiors ?? [];
     if (presets.length === 0) return;

@@ -259,6 +259,11 @@ export type ResolveOptions = {
    * (`registriesFromLibrary`), whether or not the document says `assetLibrary`.
    */
   catalogueLibrary?: string | undefined;
+  /**
+   * More library ids the injected `catalogue` answers for, accepted the same
+   * way: a layered bank's project and offers libraries (`library-stack.ts`).
+   */
+  catalogueLibraries?: readonly string[] | undefined;
   /** Which finish UUIDs survive; the shipped bank's own resolver when absent. */
   resolveFinish?: FinishIdResolver | undefined;
 };
@@ -279,7 +284,9 @@ export function resolveAsset(placement: DemoAsset, options: ResolveOptions = {})
   const lookup = options.catalogue ?? findCatalogueEntry;
   // With an injected bank the library a reference may name is the document's
   // own or the bank's; without one it is the shipped library, as it always was.
-  const accepted = options.catalogue ? [defaultLibrary, options.catalogueLibrary] : [DEFAULT_LIBRARY];
+  const accepted = options.catalogue
+    ? [defaultLibrary, options.catalogueLibrary, ...(options.catalogueLibraries ?? [])]
+    : [DEFAULT_LIBRARY];
   if (!accepted.includes(ref.library)) {
     return { failure: { placementId: placement.id, reason: 'unknown-library', detail: ref.library } };
   }

@@ -59,7 +59,7 @@ const FOCUSABLE_SELECTOR = "button:not([disabled]), input:not([disabled]), [href
  * `is-hidden` ancestor — the scope checkbox and the footer button are both
  * toggled that way, and a hidden control is not a place Tab may land.
  */
-function focusablesOf(panel: HTMLElement): HTMLElement[] {
+export function focusablesOf(panel: HTMLElement): HTMLElement[] {
   return [...panel.querySelectorAll<HTMLElement>(FOCUSABLE_SELECTOR)].filter((element) => !element.closest('.is-hidden'));
 }
 
@@ -92,6 +92,11 @@ export type PanelRequest = {
   scope?: { label: string; checked: boolean; onChange?: ((checked: boolean) => void) | undefined } | undefined;
   /** Optional wide action button under the swatches; absent hides it. */
   footer?: { label: string; hint?: string; onClick: (context: PanelFooterContext) => void };
+  /**
+   * Optional second action, in a row of its own under `footer`, so showing it
+   * moves no control that was already there; absent hides it.
+   */
+  secondary?: { label: string; onClick: () => void } | undefined;
   /** Client coordinates the panel is anchored to, clamped into the shell. */
   anchor: { x: number; y: number };
   /**
@@ -210,6 +215,7 @@ export class SelectionPanel {
   private readonly scopeLabel: HTMLElement;
   private readonly scopeInput: HTMLInputElement;
   private readonly footer: HTMLButtonElement;
+  private readonly secondary: HTMLButtonElement;
 
   private request: PanelRequest | null = null;
   private activeItemId: string | null = null;
@@ -234,6 +240,7 @@ export class SelectionPanel {
     this.scopeLabel = byName('finish-scope-label');
     this.scopeInput = byName<HTMLInputElement>('finish-scope-wall');
     this.footer = byName<HTMLButtonElement>('finish-all');
+    this.secondary = byName<HTMLButtonElement>('finish-other');
   }
 
   /**
@@ -334,6 +341,9 @@ export class SelectionPanel {
     } else {
       this.footer.onclick = null;
     }
+    this.secondary.classList.toggle('is-hidden', !request.secondary);
+    if (request.secondary) this.secondary.textContent = request.secondary.label;
+    this.secondary.onclick = request.secondary ? () => request.secondary?.onClick() : null;
     this.anchor(request.anchor.x, request.anchor.y);
     this.panel.classList.remove('is-hidden');
     // Dialog focus-in: the FIRST control of the panel, in DOM
@@ -415,5 +425,9 @@ export class SelectionPanel {
     const top = Math.min(Math.max(PANEL_MIN_TOP, clientY - rect.top + PANEL_OFFSET_Y), maxTop);
     this.panel.style.left = `${left}px`;
     this.panel.style.top = `${top}px`;
+    // The panel never runs past the viewer's bottom: its swatch region scrolls
+    // instead (`viewer.css`), so every item stays reachable. Nothing is
+    // measured: the bound follows from where the panel was just put.
+    this.panel.style.maxBlockSize = `${Math.max(0, viewport.clientHeight - top - PANEL_MIN_LEFT)}px`;
   }
 }
