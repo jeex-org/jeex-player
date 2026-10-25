@@ -539,7 +539,8 @@ describe('room lighting on the demo apartment', { timeout: MOUNT_TIMEOUT_MS }, (
     await until(() => refresh.mock.calls.length > 0, 'the refresh after the debounce', 60_000);
     expect(calledAt - editedAt).toBeGreaterThanOrEqual(T.refreshDebounceMs - 50);
     expect(refresh).toHaveBeenCalledTimes(1);
-    expect(refresh.mock.calls[0]![0]).toEqual({ all: false, grids: [], probes: [ROOM.living] });
+    // Every asset edit asks for the lamp check; this one moved no lamp, so only the probe is re-captured.
+    expect(refresh.mock.calls[0]![0]).toEqual({ all: false, grids: [], probes: [ROOM.living], lamps: true });
   });
 
   test('a floor lamp moved next to the living probe moves the probe; the refresh draws once and the view rests', async () => {
@@ -571,6 +572,8 @@ describe('room lighting on the demo apartment', { timeout: MOUNT_TIMEOUT_MS }, (
     });
     expect(debug().applyOps([{ op: 'move_object', assetId: asset.id, position: to }]).error).toBeUndefined();
     await until(() => refreshes > 0, 'the refresh after the debounce', 60_000);
+    // A lamp moved: the whole walk lighting re-bakes (grids, then probes) before it is live again.
+    await until(() => debug().walkLighting().state === 'live', 'live again after the re-bake', 240_000);
     spy.mockRestore();
     refreshed.mockRestore();
     // The moved lamp as the scene now holds it (a move may rebuild the item).
