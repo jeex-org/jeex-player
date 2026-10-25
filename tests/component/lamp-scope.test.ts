@@ -484,6 +484,48 @@ describe('lamp light stays in its room', { timeout: TIMEOUT_MS }, () => {
   });
 });
 
+describe('rooms follow three’s light order', { timeout: TIMEOUT_MS }, () => {
+  test('a shadow-casting lamp (listed first by three) and a plain one each light only their own room', () => {
+    let a: THREE.PointLight[] = [];
+    let b: THREE.PointLight[] = [];
+    const w = world(
+      [
+        { id: 'a', box: A },
+        { id: 'b', box: B },
+      ],
+      (scene, furniture) => {
+        shell(scene, A, GREY());
+        shell(scene, B, GREY());
+        // A card on each side of the shared wall, facing the wall; each room's lamp hangs between its card and the wall.
+        scene.add(card([3.3, 1.2, 2], [1, 0, 0]));
+        scene.add(card([4.7, 1.2, 2], [-1, 0, 0]));
+        a = lamp(furniture, 'mesh', [3.65, 1.8, 1.2], 20, 3);
+        b = lamp(furniture, 'mesh', [4.35, 1.8, 1.2], 20, 3);
+        // B's lamp casts a shadow: three sorts it before A's although it comes later in the scene.
+        for (const light of b) light.castShadow = true;
+      },
+    );
+    try {
+      w.bake();
+      const inA = {
+        own: onOff(a, () => w.read([3.92, 1.2, 2], [3.3, 1.2, 2])),
+        other: onOff(b, () => w.read([3.92, 1.2, 2], [3.3, 1.2, 2])),
+      };
+      const inB = {
+        own: onOff(b, () => w.read([4.08, 1.2, 2], [4.7, 1.2, 2])),
+        other: onOff(a, () => w.read([4.08, 1.2, 2], [4.7, 1.2, 2])),
+      };
+      record('light-order', { inA, inB });
+      expect(change(inA.own.off, inA.own.on)).toBeGreaterThan(LIT);
+      expect(change(inA.other.off, inA.other.on)).toBeLessThan(SAME);
+      expect(change(inB.own.off, inB.own.on)).toBeGreaterThan(LIT);
+      expect(change(inB.other.off, inB.other.on)).toBeLessThan(SAME);
+    } finally {
+      w.dispose();
+    }
+  });
+});
+
 describe('receiver room of the parts in a wall', { timeout: TIMEOUT_MS }, () => {
   /** Two rooms with a doorway; A holds the lamp, B none. */
   function rooms(build: (scene: THREE.Scene) => void, lampAt: Vec) {
