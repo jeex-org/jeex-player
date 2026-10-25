@@ -902,10 +902,17 @@ describe('lamp edits in walk through the real commands (demo apartment)', { time
 
   test('a lamp moved to another room re-bakes everything, takes the new room, and compiles no program', async () => {
     // The warm-up ends with the first return to the direct look (a re-bake), which may compile the variants
-    // three picks without grids; measured 78 -> 92 on the demo, then constant.
+    // three picks without grids (measured 78 -> 92 on the demo), and the first furniture edit in walk, which
+    // compiles one more whatever the item (measured with a sofa, 92 -> 93); then the count is constant.
     const lighting = caught.lighting!;
     lighting.rebake();
     await rebaked('warm-up re-bake');
+    const sofa = demoScene().assets.find((a) => a.type === 'sofa')!;
+    expect(
+      debug().applyOps([{ op: 'move_object', assetId: sofa.id, position: { ...sofa.position, x: sofa.position.x + 0.05 } }]).error,
+    ).toBeUndefined();
+    for (let i = 0; i < 90; i += 1) await nextFrame();
+    await until(() => debug().walkLighting().state === 'live', 'live after the sofa move', 240_000);
     const programs = renderer!.info.programs!.length;
     const placement = lampPlacements()[0]!;
     const before = lightOf(placement).userData['jeexLampRoom'] as number;
