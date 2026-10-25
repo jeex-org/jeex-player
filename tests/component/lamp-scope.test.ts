@@ -969,10 +969,10 @@ describe('the temperature across modes (demo apartment)', { timeout: TIMEOUT_MS 
 
 describe('lamp decomposition in the demo living room (diagnostic)', { timeout: TIMEOUT_MS }, () => {
   test('three linear readings on a zero-specular card: lamp-off bake, lamps-on bake with direct suppressed, the same grid with direct on', async () => {
-    let lighting: WalkLighting | null = null;
+    const caught: { lighting: WalkLighting | null } = { lighting: null };
     const load = Object.getOwnPropertyDescriptor(WalkLighting.prototype, 'load')!.value as WalkLighting['load'];
     const spy = vi.spyOn(WalkLighting.prototype, 'load').mockImplementation(function (this: WalkLighting, doc) {
-      lighting = this as unknown as WalkLighting;
+      caught.lighting = this;
       load.call(this, doc);
     });
     const handle = mountViewer(openContainer(320, 240), {
@@ -985,6 +985,7 @@ describe('lamp decomposition in the demo living room (diagnostic)', { timeout: T
       await handle.ready;
       handle.setMode('walk');
       await until(() => debug().walkLighting().state === 'live', 'walk live', 240_000);
+      const lighting = caught.lighting!;
       const internals = lighting as unknown as { scene: THREE.Scene; renderer: THREE.WebGLRenderer };
       const { scene, renderer } = internals;
       // A zero-specular grey card 0.66 m from the living floor lamp, facing it.
@@ -1018,7 +1019,7 @@ describe('lamp decomposition in the demo living room (diagnostic)', { timeout: T
         return luminance(pixels);
       };
       const rebake = async (): Promise<void> => {
-        lighting!.rebake();
+        lighting.rebake();
         await until(() => debug().walkLighting().state === 'live', 'live after the re-bake', 240_000);
       };
       for (const light of lamps) light.intensity = 0;
