@@ -154,7 +154,7 @@ In `walk` and `tour` the emissive term of every material SHALL be capped so its 
 
 #### Scenario: Shades not blown out
 - **WHEN** the demo floor lamp wears each glowing shade finish (ivory, opal, warm lamp, ink) and is metered in walk before tone mapping
-- **THEN** the shade's mean brightest channel is at most 1.52 (the highest lamps-on reading measured when the lamps joined the room grids, 1.38, plus 10 %: the light a lamp bounces off the ceiling and walls lands on its own shade) and at least 1.25 times the same shade with its emissive off
+- **THEN** the shade's mean brightest channel is at most 1.52 (the highest lamps-on reading measured when the lamps joined the room grids, 1.38, plus 10 %: the light a lamp bounces off the ceiling and walls lands on its own shade) and at least 1.20 times the same shade with its emissive off (1.25 before the lamps fed the room grids: the same bounce raises the unlit shade)
 
 #### Scenario: Editing glow unchanged
 - **WHEN** the same shade is metered in orbit, `plan3d` and the editing look before and after a walk session

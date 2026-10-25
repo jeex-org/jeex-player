@@ -19,7 +19,9 @@
  * walls lands on its own shade too, which is physical and lifts the unlit
  * shade alone to about 0.76. The bound is the highest lamps-on reading
  * measured then (1.380, `lamp_warm`, on an NVIDIA GPU) plus 10 %, so the
- * emissive cap still has to hold the glow on top of that light. In the
+ * emissive cap still has to hold the glow on top of that light. The same
+ * bounce raises the unlit shade, so the lit/unlit bound is 1.20, not 1.25
+ * (`WALK_LIT_RATIO`). In the
  * editing look the glow must still add light; the displayed
  * 8-bit luminance is recorded too.
  *
@@ -55,8 +57,13 @@ const CEILING = 1.52;
 const EDITING_HEADROOM = 4;
 /** How much light the glow must still add in the editing look, before tone mapping. */
 const EDITING_LIT_RATIO = 1.02;
-/** How much brighter than the unlit surface the shade must read in walk, in mean luminance. */
-const WALK_LIT_RATIO = 1.25;
+/**
+ * How much brighter than the unlit surface the shade must read in walk, in mean luminance. It was 1.25 while the
+ * lamps stayed out of the room grids; the light a lamp bounces off the ceiling and walls also raises the unlit
+ * shade, which compresses this ratio for the same physical reason as `CEILING` (measured lowest: 1.231,
+ * `lamp_warm`), so the bound is 1.20.
+ */
+const WALK_LIT_RATIO = 1.2;
 
 const SHADES = ['shade_ivory', 'shade_ink', 'shade_opal', 'lamp_warm'] as const;
 type Shade = (typeof SHADES)[number];
