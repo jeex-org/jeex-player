@@ -45,9 +45,10 @@ import * as THREE from 'three';
 import { addShaderTransform, chunkMarker, expandOwnedChunks, replaceAnchor, WALK_TRANSFORM_ID } from '../shader-compose.js';
 import type { RoomBox, RoomProbe } from './room-volumes.js';
 import { WALK_LIGHTING_TUNING as T } from './walk-lighting-tuning.js';
+import { installLightDrawHook, LIGHT_UNIFORMS } from '../light-uniforms.js';
 
 /** The patch's transform: one program variant, whatever the state; the version changes with the shader text. */
-export const WALK_TRANSFORM = Object.freeze({ id: WALK_TRANSFORM_ID, version: 5 });
+export const WALK_TRANSFORM = Object.freeze({ id: WALK_TRANSFORM_ID, version: 6 });
 /** Edge of an atlas tile: the PMREM layout of a 128 px cube (and of the studio environment). */
 export const TILE = Object.freeze({ width: 384, height: 512 });
 /** The largest mip of a probe's cube-UV layout: `log2(TILE.height) - 2`, as three derives `CUBEUV_MAX_MIP`. */
@@ -61,6 +62,7 @@ export const ENGINE_CHUNK_ANCHORS = Object.freeze({
     'irradiance += getLightProbeGridIrradiance( probeWorldPos, probeWorldNormal );',
     'DirectionalLight directionalLight;',
     'getDirectionalLightInfo( directionalLight, directLight );',
+    'getPointLightInfo( pointLight, geometryPosition, directLight );',
   ],
   lights_fragment_maps: [
     'iblIrradiance += getIBLIrradiance( geometryNormal );',
@@ -94,6 +96,10 @@ export type WalkUniforms = {
   jeexAtlasTexel: { value: THREE.Vector2 };
   jeexBlend: { value: number };
   jeexPush: { value: number };
+  /** 1 while walk or tour shows the room lighting or bakes it (the lamp gate on), 0 in the editing modes. */
+  jeexLampScope: { value: number };
+  /** The room of each box: its index in the probe order, shared by every box of the room. */
+  jeexBoxRoom: { value: number[] };
 };
 
 /** The rig's three uniform states: editing look, bake capture, walk look. */
@@ -126,6 +132,8 @@ export function createWalkUniforms(): WalkUniforms {
     jeexAtlasTexel: { value: new THREE.Vector2(1, 1) },
     jeexBlend: { value: T.blendM / 2 },
     jeexPush: { value: T.normalPushM },
+    jeexLampScope: { value: 0 },
+    jeexBoxRoom: { value: Array.from({ length: T.maxBoxes }, () => -1) },
   };
 }
 
@@ -182,6 +190,7 @@ export function setRoomBoxes(uniforms: WalkUniforms, boxes: readonly RoomBox[], 
     put(uniforms.jeexBoxMax.value[i]!, box.projection.max);
     put(uniforms.jeexProbe.value[i]!, probes[probe]!.position);
     uniforms.jeexTile.value[i]!.set(layout.tiles[probe]!.x, layout.tiles[probe]!.y);
+    uniforms.jeexBoxRoom.value[i] = probe;
   });
   uniforms.jeexBoxCount.value = boxes.length;
   uniforms.jeexAtlasTexel.value.set(1 / layout.width, 1 / layout.height);
@@ -208,9 +217,18 @@ uniform sampler2D jeexAtlas;
 uniform vec2 jeexAtlasTexel;
 uniform float jeexBlend;
 uniform float jeexPush;
+uniform float jeexLampScope;
+uniform float jeexBoxRoom[ JEEX_MAX_BOXES ];
+#if NUM_POINT_LIGHTS > 0
+uniform float jeexPointRoom[ NUM_POINT_LIGHTS ];
+#endif
 vec3 jeexWorldPos = vec3( 0.0 );
 vec3 jeexLookup = vec3( 0.0 );
+vec3 jeexPushDir = vec3( 0.0 );
 float jeexInRoom = 0.0;
+// The receiver's room (-1 outside every box) and how far inside it the point pushed once more lies.
+float jeexRoom = -1.0;
+float jeexAhead = 0.0;
 
 float jeexInside( const in vec3 p, const in int i ) {
 	vec3 d = min( p - jeexSelMin[ i ], jeexSelMax[ i ] - p );
@@ -219,12 +237,32 @@ float jeexInside( const in vec3 p, const in int i ) {
 
 void jeexLocate( const in vec3 viewPosition, const in vec3 viewNormal ) {
 	jeexWorldPos = ( ( vec4( viewPosition, 1.0 ) - viewMatrix[ 3 ] ) * viewMatrix ).xyz;
-	jeexLookup = jeexWorldPos + transformNormalByInverseViewMatrix( viewNormal, viewMatrix ) * jeexPush;
+	jeexPushDir = transformNormalByInverseViewMatrix( viewNormal, viewMatrix );
+	jeexLookup = jeexWorldPos + jeexPushDir * jeexPush;
 	jeexInRoom = 0.0;
+	jeexRoom = -1.0;
+	jeexAhead = 0.0;
 	for ( int i = 0; i < JEEX_MAX_BOXES; i ++ ) {
 		if ( i >= jeexBoxCount ) break;
 		if ( jeexInside( jeexLookup, i ) > 0.0 ) jeexInRoom = 1.0;
+		// The receiver's room: boundaries included; where boxes of several rooms hold the point, the room the
+		// face points into (deeper inside once pushed again) owns it, and the lower room index on a tie.
+		float d = jeexInside( jeexLookup, i );
+		if ( d >= 0.0 ) {
+			float ahead = jeexInside( jeexLookup + jeexPushDir * jeexPush, i );
+			if ( jeexRoom < 0.0 || ahead > jeexAhead || ( ahead == jeexAhead && jeexBoxRoom[ i ] < jeexRoom ) ) {
+				jeexRoom = jeexBoxRoom[ i ];
+				jeexAhead = ahead;
+			}
+		}
 	}
+}
+
+// A point light's direct term on this fragment: whole for a light that is not a lamp or outside walk and tour,
+// otherwise only when the lamp's source room is the fragment's room (-2, a lamp in no room, lights nothing).
+float jeexLampGate( const in float room ) {
+	if ( jeexLampScope < 0.5 || ( room < -0.5 && room > -1.5 ) ) return 1.0;
+	return ( room > -0.5 && abs( room - jeexRoom ) < 0.5 ) ? 1.0 : 0.0;
 }
 
 vec3 jeexBilinear( vec3 direction, float mipInt, vec2 tile ) {
@@ -336,13 +374,20 @@ const viaProbes = (line: string, probes: string): string => `#if defined( ENVMAP
 		${line}
 		#endif`;
 
-/** The begin chunk, expanded by the composer: the room located ahead of it, the grid kept apart, the sun scaled. */
+/** The lamp gate, right after three computes a point light's term and before it is applied. */
+const LAMP_GATE = /* glsl */ `
+		#if defined( USE_ENVMAP ) && defined( ENVMAP_TYPE_CUBE_UV )
+		directLight.color *= jeexLampGate( jeexPointRoom[ i ] );
+		#endif`;
+
+/** The begin chunk, expanded by the composer: the room located ahead of it, the grid kept apart, the sun scaled, lamps gated by room. */
 function rewriteBegin(text: string): string {
-  const [grid, declare, directional] = ENGINE_CHUNK_ANCHORS.lights_fragment_begin;
+  const [grid, declare, directional, point] = ENGINE_CHUNK_ANCHORS.lights_fragment_begin;
   const begin = chunkMarker('lights_fragment_begin', 'begin');
   let out = replaceAnchor(text, begin, LOCATE + begin, WALK_TRANSFORM_ID);
   out = replaceAnchor(out, grid, GRID, WALK_TRANSFORM_ID);
   out = replaceAnchor(out, declare, SUN_SCALE, WALK_TRANSFORM_ID);
+  out = replaceAnchor(out, point, point + LAMP_GATE, WALK_TRANSFORM_ID);
   return replaceAnchor(out, directional, `${directional}\n\t\tdirectLight.color *= jeexSunScale;`, WALK_TRANSFORM_ID);
 }
 
@@ -447,9 +492,10 @@ export function installWalkPatch(root: THREE.Object3D, uniforms: WalkUniforms): 
       if (!target.isMeshStandardMaterial || target[PATCHED]) continue;
       target[PATCHED] = true;
       addShaderTransform(target, WALK_TRANSFORM.id, WALK_TRANSFORM.version, (shader) => {
-        Object.assign(shader.uniforms, uniforms);
+        Object.assign(shader.uniforms, uniforms, { jeexPointRoom: LIGHT_UNIFORMS.jeexPointRoom });
         shader.fragmentShader = patchFragmentShader(shader.fragmentShader);
       });
+      installLightDrawHook(target);
       count += 1;
     }
   });

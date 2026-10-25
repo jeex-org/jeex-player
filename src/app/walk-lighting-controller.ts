@@ -16,10 +16,12 @@
  * A document the lighting refuses (more room boxes than it takes) keeps the
  * direct look and reports one error until the next document.
  *
- * Relight: a new colour of the artificial light (`relit`) re-captures every
- * room's probe once the value has rested `relightSettleMs`, one room per
- * frame, each frame a draw; the grids are not re-baked, because their bake
- * hides the furniture (the lamps with it) and zeroes the ambient floor.
+ * Relight: a new colour of the artificial light (`relit`) is handed to the
+ * lighting (`relight`), which re-bakes the grids and probes with the tinted
+ * lamps when they changed. In walk or tour it waits until the value has
+ * rested `relightSettleMs`; a change made outside them waits, doing nothing,
+ * and is handed over on the first walk or tour frame at once, before that
+ * frame is drawn, so the entry never shows the old tint as live.
  *
  * Lifetime, as the walk chain's (`walk-post-controller.ts`): disposed on
  * context loss and viewer disposal, a build finished for a lost context or a
@@ -56,7 +58,7 @@ export type WalkLightingHandle<Doc = WalkDocument> = {
   frame(eligible: boolean): void;
   /** Refreshes what `scope` names; `doc` is the document on screen now, whose furniture the probe points follow. */
   refresh(scope: LightingScope, doc: Doc | null): void;
-  /** Queues every room's probe for a re-capture, one per live frame. */
+  /** The artificial light changed colour: re-bakes grids and probes when the lamps differ from those baked. */
   relight(): void;
   /** Whether a relight still has probes to write. */
   readonly recapturing: boolean;
@@ -144,6 +146,8 @@ export class WalkLightingController<Doc = WalkDocument> {
   private relitAt: number | null = null;
   /** Whether the last frame showed the room lighting (rather than the direct look). */
   private shown = false;
+  /** Whether the last frame was eligible (walk or tour with the chain ready). */
+  private wasEligible = false;
   /** The host sky's current entry, its files and what the lighting holds of them. */
   private hdriEntry: HdriEntry | null = null;
   private hdriTarget: HdriTarget | null = null;
@@ -184,9 +188,16 @@ export class WalkLightingController<Doc = WalkDocument> {
         lighting.refresh(scope, this.deps.document());
         refreshed = true;
       }
-      if (eligible && this.relitAt !== null && !this.failed && this.deps.now() - this.relitAt >= WALK_LIGHTING_TUNING.relightSettleMs) {
+      const entering = eligible && !this.wasEligible;
+      if (
+        eligible &&
+        this.relitAt !== null &&
+        !this.failed &&
+        (entering || this.deps.now() - this.relitAt >= WALK_LIGHTING_TUNING.relightSettleMs)
+      ) {
         this.relitAt = null;
         lighting.relight();
+        refreshed = true;
       }
       // A probe written this frame changes what the room reflects.
       if (eligible && !this.failed && lighting.recapturing) refreshed = true;
@@ -198,6 +209,7 @@ export class WalkLightingController<Doc = WalkDocument> {
       this.deps.report(error);
       lighting.frame(false);
     }
+    this.wasEligible = eligible;
     const shown = eligible && !this.failed && lighting.phase === 'live';
     const sky = lighting.hdriState ?? 'off';
     const changed = refreshed || shown !== this.shown || sky !== this.hdriShown;
@@ -327,7 +339,7 @@ export class WalkLightingController<Doc = WalkDocument> {
     this.hdriFailed.clear();
   }
 
-  /** The artificial light changed colour: the probes are re-captured once it rests. */
+  /** The artificial light changed colour: the lighting is relit once it rests, or on the next entry into walk or tour. */
   relit(): void {
     this.relitAt = this.deps.now();
   }
@@ -406,6 +418,7 @@ export class WalkLightingController<Doc = WalkDocument> {
     this.lighting = null;
     this.stale = true;
     this.shown = false;
+    this.wasEligible = false;
   }
 }
 

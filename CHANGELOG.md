@@ -9,6 +9,19 @@ as described under [Versioning](#versioning).
 
 ### Changed
 
+- **Lamps light their room in walk and tour, and stop at its walls.** Every
+  lamp, a lamp fact's light or a built-in lamp's bulb, now feeds its room's
+  light-probe grid, so a lamp-lit room gets the light its lamps bounce off the
+  walls and ceiling, and that light passes through doorways. Each lamp belongs
+  to the room whose floor plan holds its bulb, and its direct light reaches only
+  that room's surfaces: a lamp no longer lights the room behind a wall. In an
+  L-shaped room a lamp can still reach a surface of the same room behind the
+  inner corner. Moving, removing, adding or swapping a lamp, or a new light
+  temperature, bakes the walk lighting again; a temperature set in another mode
+  is applied on the next entry into walk or tour. The editing modes are
+  unchanged. The walk camera white balance is recalibrated for the warmer
+  default view.
+
 - **Cream limestone is a honed marble scan.** The bundled Cream limestone
   finish keeps its id and now draws Poly Haven marble_01 tinted warm cream,
   at the scan's real size of 1.5 m, instead of a tiled scan whose chalk

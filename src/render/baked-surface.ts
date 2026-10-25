@@ -33,7 +33,8 @@
 import type * as THREE from 'three';
 import { LIGHTING_STANDARD } from '../lighting/lighting-standard.js';
 import { bakeFragmentShader } from './baked-surface-glsl.js';
-import { lightMasks, LAMP_BAKED_KEY } from './light-order.js';
+import { LAMP_BAKED_KEY } from './light-order.js';
+import { installLightDrawHook, LIGHT_UNIFORMS } from './light-uniforms.js';
 import { addShaderTransform, BAKED_TRANSFORM_ID, hasShaderTransform } from './shader-compose.js';
 
 export { addShaderTransform, type ShaderTransform } from './shader-compose.js';
@@ -45,9 +46,9 @@ const BAKED_VERSION = 2;
 
 /** The uniforms every baked material shares: the light masks, resized to three's light counts per render, and the gains. */
 const SHARED = {
-  jeexPointDiffuse: { value: [] as number[] },
-  jeexSpotDiffuse: { value: [] as number[] },
-  jeexDirDirect: { value: [] as number[] },
+  jeexPointDiffuse: LIGHT_UNIFORMS.jeexPointDiffuse,
+  jeexSpotDiffuse: LIGHT_UNIFORMS.jeexSpotDiffuse,
+  jeexDirDirect: LIGHT_UNIFORMS.jeexDirDirect,
   jeexBakedGain: { value: LIGHTING_STANDARD.baked.exposure.editing },
   /** Outside every room box, in every mode: such a surface keeps the editing look, like a facade. */
   jeexBakedEditingGain: { value: LIGHTING_STANDARD.baked.exposure.editing },
@@ -70,18 +71,9 @@ export function bakedLightGain(scene: object): number {
   return LIGHTING_STANDARD.baked.exposure[SCENE_MODES.get(scene) ?? 'editing'];
 }
 
-/** The (render, scene, camera) the masks were last computed for, by id: no reference keeps a released scene alive. */
-const computed = { frame: -1, scene: -1, camera: -1 };
-
-function updateMasks(renderer: THREE.WebGLRenderer, scene: THREE.Object3D, camera: THREE.Camera): void {
+/** The gain of the scene being drawn; the masks come from the shared light hook (`render/light-uniforms.ts`). */
+function updateGain(scene: THREE.Object3D): void {
   SHARED.jeexBakedGain.value = bakedLightGain(scene);
-  const frame = renderer.info.render.frame;
-  if (computed.frame === frame && computed.scene === scene.id && computed.camera === camera.id) return;
-  Object.assign(computed, { frame, scene: scene.id, camera: camera.id });
-  const masks = lightMasks(scene, camera);
-  SHARED.jeexPointDiffuse.value = masks.point;
-  SHARED.jeexSpotDiffuse.value = masks.spot;
-  SHARED.jeexDirDirect.value = masks.directional;
 }
 
 /** Materials whose draw hook this module installed: the runtime state idempotence checks, not the copyable flag. */
@@ -101,10 +93,11 @@ function installDrawHook(material: THREE.Material): void {
   // The hook as the function-valued property it is (three declares it as a method).
   const hooks = material as unknown as { onBeforeRender: DrawHook };
   const previous = hooks.onBeforeRender;
-  hooks.onBeforeRender = function bakedSurfaceMasks(renderer, scene, camera, geometry, object, group) {
-    updateMasks(renderer, scene, camera);
+  hooks.onBeforeRender = function bakedSurfaceGain(renderer, scene, camera, geometry, object, group) {
+    updateGain(scene);
     previous.call(this, renderer, scene, camera, geometry, object, group);
   };
+  installLightDrawHook(material);
   DRAW_HOOKED.add(material);
 }
 

@@ -12,10 +12,16 @@
  * grids baked earlier in pass 1 are seen with their pass-1 light (the order
  * is fixed, accepted).
  *
- * Invariants: each frame's slice runs in the rig's capture state with the
- * furniture, the mirrors and the transmissive meshes hidden, and puts back
- * the editing state, every visibility and every grid's `visible = false` in
- * `finally`, also when a call throws.
+ * Invariants: each frame's slice runs in the rig's capture state with every
+ * furniture renderable on no layer and the mirrors and transmissive meshes
+ * outside the furniture hidden, and puts back the editing state, every layer
+ * mask, every visibility and every grid's `visible = false` in `finally`,
+ * also when a call throws.
+ *
+ * Why layers for the furniture: three stops traversing at an invisible
+ * object, so hiding a body would hide the lamp lights under it; a mesh that
+ * fails the camera's layer test is not drawn, but its children (the lamp
+ * lights) are still collected and light the shell the grid records.
  */
 
 import type * as THREE from 'three';
@@ -42,8 +48,10 @@ export type GridBakeDeps = {
   /** The exterior grid, in the scene and hidden. */
   exterior: { visible: boolean };
   rig: { setState(state: UniformState): void };
-  /** What a probe must not see: the furniture, the mirrors, the transmissive meshes. */
+  /** What a probe must not see, hidden by visibility: the mirrors and the transmissive meshes outside the furniture. */
   exclusions: () => readonly { visible: boolean }[];
+  /** What a probe must not see, taken off every layer: the furniture renderables, so the lamps under them stay in the scene. */
+  layerExclusions?: () => readonly { layers: { mask: number } }[];
   probesPerFrame: number;
   cubemapSize: number;
 };
@@ -71,15 +79,18 @@ export class GridBake {
     if (this.done) return true;
     const { grids, exterior, rig, exclusions } = this.deps;
     const hidden = exclusions().filter((object) => object.visible);
+    const layered = (this.deps.layerExclusions?.() ?? []).map((object) => ({ object, mask: object.layers.mask }));
     const started = performance.now();
     rig.setState('capture');
     for (const object of hidden) object.visible = false;
+    for (const { object } of layered) object.layers.mask = 0;
     try {
       let budget = this.deps.probesPerFrame;
       while (budget > 0 && !this.done) budget -= this.bakeRange(budget);
     } finally {
       for (const grid of grids) grid.visible = false;
       exterior.visible = false;
+      for (const { object, mask } of layered) object.layers.mask = mask;
       for (const object of hidden) object.visible = true;
       rig.setState('editing');
       this.stats.frames += 1;
