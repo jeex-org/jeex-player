@@ -11,7 +11,15 @@ const scope = (touched: TouchedEntity[]) => refreshScope(touched, lookups);
 
 describe('refreshScope', () => {
   test("a furniture edit re-captures its room's probe only", () => {
-    expect(scope([{ kind: 'asset', id: 'sofa' }])).toEqual({ all: false, grids: [], probes: ['living'] });
+    expect(scope([{ kind: 'asset', id: 'sofa' }])).toEqual({ all: false, grids: [], probes: ['living'], lamps: true });
+  });
+
+  test('an asset edit the updated model cannot place in a room (removed, or moved out of every room) still asks for the lamp check', () => {
+    expect(scope([{ kind: 'asset', id: 'gone' }])).toEqual({ all: false, grids: [], probes: [], lamps: true });
+  });
+
+  test('edits that touch no asset ask for no lamp check', () => {
+    expect(scope([{ kind: 'floor', room: 'bath' }])?.lamps).toBeUndefined();
   });
 
   test("a finish edit re-bakes its room's grid (and with it the probe)", () => {
@@ -38,5 +46,7 @@ describe('mergeScopes', () => {
     expect(mergeScopes(a, b)).toEqual({ all: false, grids: ['a', 'c'], probes: ['b'] });
     expect(mergeScopes(null, b)).toEqual(b);
     expect(mergeScopes(a, { all: true, grids: [], probes: [] }).all).toBe(true);
+    expect(mergeScopes(a, { all: false, grids: [], probes: [], lamps: true }).lamps).toBe(true);
+    expect(mergeScopes({ all: false, grids: [], probes: [], lamps: true }, b).lamps).toBe(true);
   });
 });

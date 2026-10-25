@@ -14,6 +14,7 @@ import {
 import type { RoomBox } from './room-volumes.js';
 import { chunkMarker, expandOwnedChunks } from '../shader-compose.js';
 import { WALK_LIGHTING_TUNING } from './walk-lighting-tuning.js';
+import { bakeFragmentShader } from '../baked-surface-glsl.js';
 
 describe('the r186 chunks the patch rewrites', () => {
   test('still read exactly as the patch expects', () => {
@@ -164,6 +165,69 @@ describe('uniform states', () => {
     expect(uniforms.jeexSelMin.value[0]!.toArray()).toEqual([-0.05, -0.2, -0.05]);
     expect(uniforms.jeexProbe.value[1]!.toArray()).toEqual([2.5, 1.5, 0.5]);
     expect(uniforms.jeexTile.value[1]!.toArray()).toEqual([0, 512]);
+    // Each box carries its room's index, the probe order.
+    expect(uniforms.jeexBoxRoom.value.slice(0, 2)).toEqual([0, 1]);
+  });
+
+  test('every box of one room carries that room', () => {
+    const uniforms = createWalkUniforms();
+    const box = (roomId: string, x: number): RoomBox => ({
+      roomId,
+      projection: { min: { x, y: 0, z: 0 }, max: { x: x + 1, y: 2.5, z: 1 } },
+      sampling: { min: { x, y: 0, z: 0 }, max: { x: x + 1, y: 2.5, z: 1 } },
+      selection: { min: { x, y: 0, z: 0 }, max: { x: x + 1, y: 2.5, z: 1 } },
+      resolution: { x: 2, y: 2, z: 2 },
+    });
+    setRoomBoxes(
+      uniforms,
+      [box('b', 0), box('a', 1), box('b', 2)],
+      [
+        { roomId: 'a', position: { x: 1.5, y: 1.5, z: 0.5 } },
+        { roomId: 'b', position: { x: 0.5, y: 1.5, z: 0.5 } },
+      ],
+      atlasLayout(2),
+    );
+    expect(uniforms.jeexBoxRoom.value.slice(0, 3)).toEqual([1, 0, 1]);
+  });
+});
+
+describe('the lamp gate', () => {
+  const physical = patchFragmentShader(THREE.ShaderLib.physical.fragmentShader);
+
+  test('declares the scope, the box rooms and the per-point-light rooms, the last only with point lights', () => {
+    expect(physical).toContain('uniform float jeexLampScope;');
+    expect(physical).toContain('uniform float jeexBoxRoom[ JEEX_MAX_BOXES ];');
+    const declared = physical.indexOf('uniform float jeexPointRoom[ NUM_POINT_LIGHTS ];');
+    expect(declared).toBeGreaterThan(0);
+    expect(physical.lastIndexOf('#if NUM_POINT_LIGHTS > 0', declared)).toBeGreaterThan(physical.lastIndexOf('#endif', declared));
+  });
+
+  test('locates the receiver room with boundaries included, the faced room on a shared boundary, the lower index on a tie; jeexInRoom stays strict', () => {
+    expect(physical).toContain('float jeexRoom = -1.0;');
+    expect(physical).toContain('if ( jeexInside( jeexLookup, i ) > 0.0 ) jeexInRoom = 1.0;');
+    expect(physical).toContain('if ( d >= 0.0 ) {');
+    expect(physical).toContain('float ahead = jeexInside( jeexLookup + jeexPushDir * jeexPush, i );');
+    expect(physical).toContain('if ( jeexRoom < 0.0 || ahead > jeexAhead || ( ahead == jeexAhead && jeexBoxRoom[ i ] < jeexRoom ) ) {');
+  });
+
+  test('gates each point light right after its info and before its direct term', () => {
+    const info = physical.indexOf('getPointLightInfo( pointLight, geometryPosition, directLight );');
+    const gate = physical.indexOf('directLight.color *= jeexLampGate( jeexPointRoom[ i ] );');
+    const direct = physical.indexOf('RE_Direct(', info);
+    expect(info).toBeGreaterThan(0);
+    expect(gate).toBeGreaterThan(info);
+    expect(gate).toBeLessThan(direct);
+    expect(physical).toContain('float jeexLampGate( const in float room ) {');
+  });
+
+  test('the baked policy still finds its point-light anchor after the gate', () => {
+    expect(() => bakeFragmentShader(physical)).not.toThrow();
+    expect(bakeFragmentShader(physical)).toContain('jeexPointDiffuse[ i ]');
+  });
+
+  test('the scope uniform defaults off and the transform version is 6', () => {
+    expect(createWalkUniforms().jeexLampScope.value).toBe(0);
+    expect(WALK_TRANSFORM.version).toBe(6);
   });
 });
 
