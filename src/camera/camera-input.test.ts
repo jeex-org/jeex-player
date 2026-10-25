@@ -223,6 +223,14 @@ describe('pointer gestures', () => {
     expect(tap.at).toBeLessThanOrEqual(performance.now());
   });
 
+  test('the second click of a double click is a repeat tap; a single or synthetic click is not', () => {
+    const built = rig();
+    built.canvas.fire('click', { clientX: 10, clientY: 10, detail: 1 });
+    built.canvas.fire('click', { clientX: 10, clientY: 10, detail: 2 });
+    built.canvas.fire('click', { clientX: 10, clientY: 10 });
+    expect(built.of('tap').map((tap) => tap.repeat)).toEqual([false, true, false]);
+  });
+
   test('a double click is its own gesture, at its own point', () => {
     const built = rig();
     built.canvas.fire('dblclick', { clientX: 55, clientY: 66 });
