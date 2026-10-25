@@ -319,14 +319,15 @@ describe('lamp light stays in its room', { timeout: TIMEOUT_MS }, () => {
       (scene, furniture) => {
         shell(scene, A, material);
         shell(scene, B, material);
-        scene.add(card([4.4, 1.2, 2], [1, 0, 0]));
+        // Facing the wall and the lamp behind it, read from between it and the wall.
+        scene.add(card([4.7, 1.2, 2], [-1, 0, 0]));
         scene.add(card([3.0, 1.2, 1.0], [0, 0, 1]));
         lights = lamp(furniture, 'mesh', [3.5, 1.2, 2], 20, 3);
       },
     );
     try {
       w.bake();
-      const far = onOff(lights, () => w.read([6, 1.2, 2], [4.4, 1.2, 2]));
+      const far = onOff(lights, () => w.read([4.08, 1.2, 2], [4.7, 1.2, 2]));
       const near = onOff(lights, () => w.read([3.0, 1.2, 2.5], [3.0, 1.2, 1.0]));
       // B's floor, the same material as A's floor, right behind the wall.
       const floor = onOff(lights, () => w.read([5.5, 1.5, 2], [4.3, 0, 2]));
@@ -351,7 +352,7 @@ describe('lamp light stays in its room', { timeout: TIMEOUT_MS }, () => {
         shell(scene, B, GREY(), DOOR_B);
         // A card deep in B, beyond the lamp's cutoff, lit by B's grid only.
         scene.add(card([7.7, 1.2, 2], [-1, 0, 0]));
-        lights = lamp(furniture, 'mesh', [3.6, 1.2, 2], 30, 2.5);
+        lights = lamp(furniture, 'mesh', [3.6, 1.2, 2], 30, 4.5);
       },
     );
     try {
@@ -382,7 +383,7 @@ describe('lamp light stays in its room', { timeout: TIMEOUT_MS }, () => {
       (scene, furniture) => {
         shell(scene, A, GREY(), DOOR);
         shell(scene, B, GREY(), DOOR_B);
-        scene.add(card([1.0, 1.2, 2], [1, 0, 0], 0.4));
+        scene.add(card([1.0, 1.2, 2], [1, 0, 0], 1.2));
         lamp(furniture, 'mesh', [1.8, 1.6, 2.6], 10, 3);
       },
     );
@@ -402,12 +403,13 @@ describe('lamp light stays in its room', { timeout: TIMEOUT_MS }, () => {
     let lights: THREE.PointLight[] = [];
     const w = world([{ id: 'a', box: A }], (scene, furniture) => {
       shell(scene, A, GREY());
-      scene.add(card([0.5, 1.2, 2], [1, 0, 0]));
+      // Facing the lamp in the wall, read from between it and the wall.
+      scene.add(card([0.6, 1.2, 2], [-1, 0, 0]));
       lights = lamp(furniture, 'mesh', [-0.02, 1.2, 2], 20, 3);
     });
     try {
       w.bake();
-      const reading = onOff(lights, () => w.read([2.5, 1.2, 2], [0.5, 1.2, 2]));
+      const reading = onOff(lights, () => w.read([0.1, 1.2, 2], [0.6, 1.2, 2]));
       record('no-room', reading);
       expect(change(reading.off, reading.on)).toBeLessThan(SAME);
     } finally {
@@ -425,7 +427,8 @@ describe('lamp light stays in its room', { timeout: TIMEOUT_MS }, () => {
       (scene, furniture) => {
         shell(scene, A, GREY());
         shell(scene, B, GREY());
-        scene.add(card([4.4, 1.2, 2], [1, 0, 0]));
+        // Facing the wall and the lamp behind it, read from between it and the wall.
+        scene.add(card([4.7, 1.2, 2], [-1, 0, 0]));
         lights = lamp(furniture, 'mesh', [3.5, 1.2, 2], 20, 3);
       },
     );
@@ -444,7 +447,7 @@ describe('lamp light stays in its room', { timeout: TIMEOUT_MS }, () => {
       });
       w.lighting.frame(true);
       expect(w.lighting.phase).not.toBe('live');
-      const far = onOff(lights, () => w.read([6, 1.2, 2], [4.4, 1.2, 2]));
+      const far = onOff(lights, () => w.read([4.08, 1.2, 2], [4.7, 1.2, 2]));
       record('warm-up', far);
       expect(change(far.off, far.on)).toBeLessThan(SAME);
     } finally {
@@ -462,15 +465,16 @@ describe('lamp light stays in its room', { timeout: TIMEOUT_MS }, () => {
       (scene, furniture) => {
         shell(scene, A, GREY());
         shell(scene, B, GREY());
-        scene.add(card([4.4, 1.2, 2], [1, 0, 0]));
+        // Facing the wall and the lamp behind it, read from between it and the wall.
+        scene.add(card([4.7, 1.2, 2], [-1, 0, 0]));
         lights = lamp(furniture, 'mesh', [3.5, 1.2, 2], 20, 3);
       },
     );
     try {
-      const before = onOff(lights, () => w.read([6, 1.2, 2], [4.4, 1.2, 2]));
+      const before = onOff(lights, () => w.read([4.08, 1.2, 2], [4.7, 1.2, 2]));
       w.bake();
       w.lighting.frame(false);
-      const after = onOff(lights, () => w.read([6, 1.2, 2], [4.4, 1.2, 2]));
+      const after = onOff(lights, () => w.read([4.08, 1.2, 2], [4.7, 1.2, 2]));
       record('editing-restore', { before, after });
       expect(after).toEqual(before);
       expect(change(before.off, before.on)).toBeGreaterThan(LIT);
