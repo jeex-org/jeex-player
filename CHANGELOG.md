@@ -23,6 +23,23 @@ as described under [Versioning](#versioning).
   unreadable library is an `offers-invalid` warning, never a failed mount.
 - `jeex-viewer/ops` exports `parseProjectLibrary` and `libraryOf`, so a host
   validates a document that names an offers library as the viewer does.
+- **Removing the wall between rooms merges them.** A batch that removes the
+  only wall between two or more rooms now commits one merged room instead of
+  failing with `MULTI_ANCHOR`. The largest room survives with its id, name,
+  kind, purpose, accent, floor, finishes and camera; the others' objects and
+  painted faces move to it, and their cameras and preset instructions go.
+  `ApplyOk.roomMerges` says which room went into which. A room the batch
+  added or moved is still refused.
+- **`merge_wall` joins two collinear walls back into one.** The inverse of
+  `split_wall`: the caller names the two walls and the new wall's id, the
+  joint node goes, and openings and paint come along. Every refusal carries a
+  stable `detail.kind`. `jeex-viewer/ops` exports `MergeWallOp` and
+  `RoomMerge`.
+- **Removing a wall or a room no longer trips its own presets.** `remove_wall`
+  forgets the preset instructions that name the wall, and `remove_room` every
+  instruction that names the room (a camera, a room edit, a purpose, either
+  form of `set_material`), so a preset that dressed them no longer refuses the
+  batch.
 
 ### Changed
 

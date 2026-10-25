@@ -17,6 +17,7 @@ import { apartmentScene } from '../../demo/scene-data.js';
 import { opDraft, openingOf, rejectsOp } from '../../fixtures/op-drafts.js';
 import { countIssues, describeIssues, lintLayout } from '../../layout/layout-lint.js';
 import { solvePlan } from '../../plan/plan-solver.js';
+import { resolveDoorSwing } from '../../plan/door-swing.js';
 import { OPENING_EDGE_MARGIN } from '../../plan/plan-openings.js';
 import { isApplyOk, SceneModel } from '../scene-model.js';
 import { validateScene } from '../scene-validator.js';
@@ -51,6 +52,14 @@ const NEW = {
   node: '01a12ff3-0a66-7d3d-b658-c03073154263',
 } as const;
 
+/** Ids the `merge_wall` and preset tests create, minted offline like `NEW`. */
+const MERGE = {
+  merged: '01a172f5-2a54-714b-aadf-c8fb114e5c33',
+  door: '01a172f5-2a54-714c-80cb-590ddb22f8d1',
+  preset: '01a172f5-2a54-714d-bc93-46a36ae27d6c',
+  presetGone: '01a172f5-2a54-714e-9975-28f5e1c45ead',
+} as const;
+
 /** A well-formed UUID of version 4: the right shape, the wrong version. */
 const UUID_V4 = '3b241101-e2bb-4255-8caf-4136c566a962';
 
@@ -58,7 +67,7 @@ const { a: ROOM_A } = L_SHAPE.room;
 const W = L_SHAPE.wall;
 const N = L_SHAPE.node;
 
-import type { SceneData, SceneOp } from '../types.js';
+import type { SceneData, SceneOp, Wall } from '../types.js';
 import { MIN_SPLIT_HALF, WALL_THICKNESS } from './limits.js';
 import {
   MAX_CEILING_HEIGHT,
@@ -355,6 +364,33 @@ describe('remove_wall', () => {
   test('rejects an unknown wall', () => {
     expect(rejectsOp(opDraft(), { op: 'remove_wall', wallId: NEW.ghost })).toContain('Unknown wall');
   });
+
+  test('forgets every preset instruction naming the removed wall, and a preset left with nothing to do', () => {
+    const scene = opDraft();
+    const keep: SceneOp = { op: 'set_material', target: ROOM_A, material: FINISH.walnut };
+    scene.interiors = [
+      {
+        id: MERGE.preset,
+        name: 'Warm walnut',
+        swatch: [FINISH.walnut, FINISH.terra],
+        ops: [
+          { op: 'set_material', target: faceKey(ROOM_A, W.wPart, 'L'), material: FINISH.terra },
+          keep,
+          { op: 'set_material', surface: 'wall', face: faceKey(L_SHAPE.room.b, W.wPart, 'R'), material: FINISH.terra },
+        ],
+      },
+      {
+        id: MERGE.presetGone,
+        name: 'Thin partition',
+        swatch: [FINISH.walnut, FINISH.terra],
+        ops: [{ op: 'set_wall', wallId: W.wPart, thickness: 0.08 }],
+      },
+    ];
+
+    applyOp(scene, { op: 'remove_wall', wallId: W.wPart }, CATALOGUE_REGISTRIES);
+
+    expect(scene.interiors).toEqual([{ id: MERGE.preset, name: 'Warm walnut', swatch: [FINISH.walnut, FINISH.terra], ops: [keep] }]);
+  });
 });
 
 describe('split_wall', () => {
@@ -638,3 +674,349 @@ describe('split_wall', () => {
     expect(detail['after']).toBeCloseTo(1.2, 9);
   });
 });
+
+/* ------------------------------------------------------------- merging --- */
+
+/** The structured payload a merge refusal carries (`OpError.detail`). */
+function mergeDetail(error: OpError): Record<string, unknown> {
+  expect(error.detail?.['op']).toBe('merge_wall');
+  return error.detail as Record<string, unknown>;
+}
+
+function wallById(scene: Draft<SceneData>, id: string): Draft<Wall> {
+  const found = scene.walls.find((wall) => wall.id === id);
+  if (!found) throw new Error(`draft has no wall ${id}`);
+  return found;
+}
+
+/** The L-shape with `wallId` cut at `at` metres into `NEW.wL` (from node `a`) and `NEW.wR`, at node `NEW.nMid`. */
+function splitDraft(wallId: string = W.wSA, at = 3): Draft<SceneData> {
+  const scene = opDraft();
+  applyOp(scene, { op: 'split_wall', wallId, at, nodeId: NEW.nMid, ids: [NEW.wL, NEW.wR] }, CATALOGUE_REGISTRIES);
+  return scene;
+}
+
+/**
+ * Turns a wall round on its own line: `a` and `b` swap, and every opening
+ * stays where it stands — its centre is measured from the other end and an
+ * explicit hinge names the same jamb by its other node. A swing is left as
+ * written; the tests that care set it themselves.
+ */
+function reverseWall(scene: Draft<SceneData>, wallId: string): void {
+  const wall = wallById(scene, wallId);
+  const length = wallCentrelineLength(scene, wall);
+  [wall.a, wall.b] = [wall.b, wall.a];
+  for (const opening of wall.openings ?? []) {
+    opening.center = length - opening.center;
+    if (opening.hinge !== undefined) opening.hinge = opening.hinge === 'a' ? 'b' : 'a';
+  }
+}
+
+function merge(wallIds: readonly [string, string], id: string = MERGE.merged): SceneOp {
+  return { op: 'merge_wall', wallIds: [wallIds[0], wallIds[1]], id };
+}
+
+/** Where a door's leaf hangs and which way it opens, in plan coordinates: what a merge must not move. */
+function leafOf(scene: Draft<SceneData>, openingId: string): { pivot: { x: number; z: number }; open: { x: number; z: number } } {
+  const wall = scene.walls.find((candidate) => (candidate.openings ?? []).some((opening) => opening.id === openingId))!;
+  const swing = resolveDoorSwing(scene, solvePlan(scene), wall, openingOf(scene, openingId), () => 0.05);
+  return { pivot: swing.pivot, open: swing.open };
+}
+
+function expectSameLeaf(after: ReturnType<typeof leafOf>, before: ReturnType<typeof leafOf>): void {
+  expect(after.pivot.x).toBeCloseTo(before.pivot.x, 9);
+  expect(after.pivot.z).toBeCloseTo(before.pivot.z, 9);
+  expect(after.open.x).toBeCloseTo(before.open.x, 9);
+  expect(after.open.z).toBeCloseTo(before.open.z, 9);
+}
+
+describe('merge_wall', () => {
+  test('undoes a split under the original id: the document is the one the split started from, with the remap', () => {
+    const before = opDraft();
+    before.finishes = {
+      faces: [
+        { room: ROOM_A, wallId: W.wSA, side: 'L', finish: FINISH.graphite },
+        { wallId: W.wSA, side: 'R', finish: FINISH.sage },
+      ],
+    };
+    const scene = draftOf(before);
+    applyOp(scene, { op: 'split_wall', wallId: W.wSA, at: 3, nodeId: NEW.nMid, ids: [NEW.wL, NEW.wR] }, CATALOGUE_REGISTRIES);
+
+    const outcome = applyOp(scene, merge([NEW.wL, NEW.wR], W.wSA), CATALOGUE_REGISTRIES);
+
+    expect(scene).toEqual(before);
+    // 3 m and 3 m: a tie, so the primary ancestor is `wallIds[0]`.
+    expect(outcome.remap).toEqual({
+      faces: [
+        { from: faceKey(ROOM_A, NEW.wL, 'L'), to: [faceKey(ROOM_A, W.wSA, 'L')], primary: faceKey(ROOM_A, NEW.wL, 'L'), status: 'merged' },
+        { from: faceKey(ROOM_A, NEW.wR, 'L'), to: [faceKey(ROOM_A, W.wSA, 'L')], primary: faceKey(ROOM_A, NEW.wL, 'L'), status: 'merged' },
+        { from: faceKey(null, NEW.wL, 'R'), to: [faceKey(null, W.wSA, 'R')], primary: faceKey(null, NEW.wL, 'R'), status: 'merged' },
+        { from: faceKey(null, NEW.wR, 'R'), to: [faceKey(null, W.wSA, 'R')], primary: faceKey(null, NEW.wL, 'R'), status: 'merged' },
+      ],
+      created: [],
+    });
+    expect(outcome.summary).toBe(`Wall ${W.wSA}: merged from ${NEW.wL} and ${NEW.wR} (6 m)`);
+    expect(outcome.touched).toEqual([
+      TOUCHED_SHELL,
+      touchedFace(faceKey(ROOM_A, NEW.wL, 'L')),
+      touchedFace(faceKey(ROOM_A, NEW.wR, 'L')),
+      touchedFace(faceKey(null, NEW.wL, 'R')),
+      touchedFace(faceKey(null, NEW.wR, 'R')),
+      touchedFace(faceKey(ROOM_A, W.wSA, 'L')),
+      touchedFace(faceKey(null, W.wSA, 'R')),
+    ]);
+  });
+
+  test('runs from the first wall’s outer node to the second’s, whichever way each ran, and drops the joint node', () => {
+    for (const [first, second] of [
+      [false, false],
+      [true, false],
+      [false, true],
+      [true, true],
+    ] as const) {
+      const scene = splitDraft();
+      if (first) reverseWall(scene, NEW.wL);
+      if (second) reverseWall(scene, NEW.wR);
+
+      applyOp(scene, merge([NEW.wL, NEW.wR]), CATALOGUE_REGISTRIES);
+
+      const wall = wallById(scene, MERGE.merged);
+      expect({ a: wall.a, b: wall.b, thickness: wall.thickness, role: wall.role }).toEqual({
+        a: N.n1,
+        b: N.n2,
+        thickness: 0.3,
+        role: 'facade',
+      });
+      expect(scene.nodes.some((node) => node.id === NEW.nMid)).toBe(false);
+      expect(scene.walls.some((candidate) => candidate.id === NEW.wL || candidate.id === NEW.wR)).toBe(false);
+      // The entrance door and the window stand where they stood, measured from n1.
+      const [door, window] = wall.openings!;
+      expect(door!.id).toBe(L_SHAPE.opening.doorEntry);
+      expect(door!.center).toBeCloseTo(1.25, 9);
+      expect(window!.id).toBe(L_SHAPE.opening.windowASouth);
+      expect(window!.center).toBeCloseTo(4.15, 9);
+      expect(window!.width).toBe(2.0);
+    }
+  });
+
+  test('the pair taken the other way round runs the other way, openings re-measured from its start', () => {
+    const scene = splitDraft();
+    applyOp(scene, merge([NEW.wR, NEW.wL]), CATALOGUE_REGISTRIES);
+
+    const wall = wallById(scene, MERGE.merged);
+    expect({ a: wall.a, b: wall.b }).toEqual({ a: N.n2, b: N.n1 });
+    // Listed by their new centres: the window (6 - 4.15) now comes first.
+    expect(wall.openings!.map((opening) => opening.id)).toEqual([L_SHAPE.opening.windowASouth, L_SHAPE.opening.doorEntry]);
+    expect(wall.openings![0]!.center).toBeCloseTo(1.85, 9);
+    expect(wall.openings![1]!.center).toBeCloseTo(4.75, 9);
+  });
+
+  test('takes the earlier index of the two in the wall list', () => {
+    const scene = splitDraft();
+    const index = scene.walls.findIndex((wall) => wall.id === NEW.wL);
+    applyOp(scene, merge([NEW.wR, NEW.wL]), CATALOGUE_REGISTRIES);
+    expect(scene.walls.findIndex((wall) => wall.id === MERGE.merged)).toBe(index);
+    expect(scene.walls).toHaveLength(lShapePlan.walls.length);
+  });
+
+  test('a reversed exterior wall keeps its explicit hinge on the same jamb and its swing as written', () => {
+    const scene = splitDraft(W.wSB, 2);
+    reverseWall(scene, NEW.wR);
+    // The door stands 0.9 m from n3 on the reversed second half, hinged on the n3 jamb.
+    wallById(scene, NEW.wR).openings = [
+      { id: MERGE.door, type: 'door', center: 0.9, width: 0.8, sill: 0, head: 2.1, hinge: 'a', swing: 'in' },
+    ];
+    const before = leafOf(scene, MERGE.door);
+
+    applyOp(scene, merge([NEW.wL, NEW.wR]), CATALOGUE_REGISTRIES);
+
+    const door = openingOf(scene, MERGE.door);
+    expect(door.center).toBeCloseTo(3.1, 9);
+    expect(door.hinge).toBe('b');
+    // One side of the wall is the facade, so `in` is the room side whichever way the wall runs.
+    expect(door.swing).toBe('in');
+    expectSameLeaf(leafOf(scene, MERGE.door), before);
+  });
+
+  test('a reversed wall between two rooms flips its explicit swing, so the leaf opens to the same side', () => {
+    const scene = splitDraft(W.wPart, 1.5);
+    reverseWall(scene, NEW.wR);
+    const door = openingOf(scene, L_SHAPE.opening.doorAb);
+    door.hinge = 'a';
+    door.swing = 'in';
+    const before = leafOf(scene, L_SHAPE.opening.doorAb);
+
+    applyOp(scene, merge([NEW.wL, NEW.wR]), CATALOGUE_REGISTRIES);
+
+    const merged = openingOf(scene, L_SHAPE.opening.doorAb);
+    expect(merged.center).toBeCloseTo(2.5, 9);
+    expect(merged.hinge).toBe('b');
+    // With rooms on both sides `in` is the left of a -> b, and the merged wall runs the other way.
+    expect(merged.swing).toBe('out');
+    expectSameLeaf(leafOf(scene, L_SHAPE.opening.doorAb), before);
+  });
+
+  test('an explicit swing on a reversed wall is refused while the plan cannot be solved; without one the merge applies', () => {
+    const unresolved = splitDraft(W.wSB, 2);
+    reverseWall(unresolved, NEW.wR);
+    wallById(unresolved, NEW.wR).openings = [{ id: MERGE.door, type: 'door', center: 0.9, width: 0.8, sill: 0, head: 2.1, swing: 'in' }];
+    // Mid-batch the plan may be open: here n4 and n5 lose a wall each.
+    unresolved.walls.splice(
+      unresolved.walls.findIndex((wall) => wall.id === W.wNB),
+      1,
+    );
+    const snapshot = JSON.stringify(unresolved);
+
+    expect(mergeDetail(refusalOf(unresolved, merge([NEW.wL, NEW.wR])))['kind']).toBe('merge_wall_swing_unresolved');
+    expect(JSON.stringify(unresolved)).toBe(snapshot);
+
+    delete openingOf(unresolved, MERGE.door).swing;
+    applyOp(unresolved, merge([NEW.wL, NEW.wR]), CATALOGUE_REGISTRIES);
+    expect(openingOf(unresolved, MERGE.door).center).toBeCloseTo(3.1, 9);
+  });
+
+  test('carries paint per side: left and right through a reversal, the longer ancestor’s finish wins', () => {
+    // 5.3 m and 0.7 m: the reversed first half is the primary.
+    const scene = splitDraft(W.wSA, 5.3);
+    reverseWall(scene, NEW.wL);
+    scene.finishes = {
+      faces: [
+        { room: ROOM_A, wallId: NEW.wL, side: 'R', finish: FINISH.graphite },
+        { room: ROOM_A, wallId: NEW.wR, side: 'L', finish: FINISH.sage },
+        { wallId: NEW.wL, side: 'L', finish: FINISH.terra },
+        { wallId: NEW.wR, side: 'R', finish: FINISH.walnut },
+      ],
+    };
+
+    applyOp(scene, merge([NEW.wL, NEW.wR]), CATALOGUE_REGISTRIES);
+
+    expect(scene.finishes.faces).toEqual([
+      { room: ROOM_A, wallId: MERGE.merged, side: 'L', finish: FINISH.graphite },
+      { wallId: MERGE.merged, side: 'R', finish: FINISH.terra },
+    ]);
+  });
+
+  test('an unpainted primary leaves the merged face without an override', () => {
+    const scene = splitDraft(W.wSA, 5.3);
+    scene.finishes = { faces: [{ room: ROOM_A, wallId: NEW.wR, side: 'L', finish: FINISH.sage }] };
+
+    const outcome = applyOp(scene, merge([NEW.wL, NEW.wR]), CATALOGUE_REGISTRIES);
+
+    expect(scene.finishes.faces).toEqual([]);
+    expect(outcome.remap?.faces).toEqual([
+      {
+        from: faceKey(ROOM_A, NEW.wR, 'L'),
+        to: [faceKey(ROOM_A, MERGE.merged, 'L')],
+        primary: faceKey(ROOM_A, NEW.wL, 'L'),
+        status: 'merged',
+      },
+    ]);
+  });
+
+  test('forgets every preset instruction naming either wall, and a preset left with nothing to do', () => {
+    const scene = splitDraft();
+    const keep: SceneOp = { op: 'set_material', target: ROOM_A, material: FINISH.walnut };
+    scene.interiors = [
+      {
+        id: MERGE.preset,
+        name: 'Warm walnut',
+        swatch: [FINISH.walnut, FINISH.terra],
+        ops: [
+          { op: 'set_material', target: faceKey(ROOM_A, NEW.wL, 'L'), material: FINISH.terra },
+          keep,
+          { op: 'set_material', surface: 'facade', face: faceKey(null, NEW.wR, 'R'), material: FINISH.terra },
+          { op: 'set_opening', openingId: L_SHAPE.opening.doorAb, wallId: NEW.wR, center: 1 },
+        ],
+      },
+      {
+        id: MERGE.presetGone,
+        name: 'Thick',
+        swatch: [FINISH.walnut, FINISH.terra],
+        ops: [{ op: 'set_wall', wallId: NEW.wL, thickness: 0.35 }],
+      },
+    ];
+
+    applyOp(scene, merge([NEW.wL, NEW.wR]), CATALOGUE_REGISTRIES);
+
+    expect(scene.interiors).toEqual([{ id: MERGE.preset, name: 'Warm walnut', swatch: [FINISH.walnut, FINISH.terra], ops: [keep] }]);
+  });
+
+  test('every refusal names its kind and leaves the plan exactly as it was', () => {
+    const cases: { name: string; scene: () => Draft<SceneData>; op: SceneOp; kind: string; field?: string }[] = [
+      { name: 'same wall', scene: opDraft, op: merge([W.wSA, W.wSA]), kind: 'merge_wall_same_wall' },
+      { name: 'unknown wall', scene: opDraft, op: merge([W.wSA, NEW.ghost]), kind: 'merge_wall_unknown_wall' },
+      { name: 'not adjacent', scene: opDraft, op: merge([W.wSA, W.wE]), kind: 'merge_wall_not_adjacent' },
+      // n2 also carries the partition: a T-junction.
+      { name: 'junction', scene: opDraft, op: merge([W.wSA, W.wSB]), kind: 'merge_wall_junction' },
+      // n1 is a corner of the plan.
+      { name: 'corner', scene: opDraft, op: merge([W.wW, W.wSA]), kind: 'merge_wall_not_collinear' },
+      {
+        name: 'folded back',
+        scene: () => {
+          const scene = withoutPartition();
+          // n3 pulled back onto wSA's line: the joint n2 is on the line but outside n1..n3.
+          scene.nodes.find((node) => node.id === N.n3)!.p = { x: 2, z: 0 };
+          return scene;
+        },
+        op: merge([W.wSA, W.wSB]),
+        kind: 'merge_wall_not_between',
+      },
+      { name: 'arc', scene: () => draftOf(bayPlan), op: merge([BAY.wall.bay, BAY.wall.bayE]), kind: 'merge_wall_arc_unsupported' },
+      {
+        name: 'thickness',
+        scene: () => {
+          const scene = withoutPartition();
+          wallById(scene, W.wSB).thickness = 0.2;
+          return scene;
+        },
+        op: merge([W.wSA, W.wSB]),
+        kind: 'merge_wall_mismatch',
+        field: 'thickness',
+      },
+      {
+        name: 'role',
+        scene: () => {
+          const scene = withoutPartition();
+          wallById(scene, W.wSB).role = 'bearing';
+          return scene;
+        },
+        op: merge([W.wSA, W.wSB]),
+        kind: 'merge_wall_mismatch',
+        field: 'role',
+      },
+    ];
+    for (const entry of cases) {
+      const scene = entry.scene();
+      const snapshot = JSON.stringify(scene);
+      const detail = mergeDetail(refusalOf(scene, entry.op));
+      expect({ name: entry.name, kind: detail['kind'], field: detail['field'] }).toEqual({
+        name: entry.name,
+        kind: entry.kind,
+        field: entry.field,
+      });
+      expect(JSON.stringify(scene)).toBe(snapshot);
+    }
+  });
+
+  test('the new id is checked like every caller-minted id; one of the two source walls is duplicate_id', () => {
+    const refuse = (id: string): unknown => {
+      const scene = splitDraft();
+      const snapshot = JSON.stringify(scene);
+      const error = refusalOf(scene, merge([NEW.wL, NEW.wR], id));
+      expect(JSON.stringify(scene)).toBe(snapshot);
+      return error.detail;
+    };
+    expect(refuse(UUID_V4)).toEqual({ reason: 'invalid_id', field: 'id', id: UUID_V4, op: 'merge_wall' });
+    expect(refuse(W.wE)).toEqual({ reason: 'duplicate_id', field: 'id', id: W.wE, op: 'merge_wall' });
+    expect(refuse(NEW.wL)).toEqual({ reason: 'duplicate_id', field: 'id', id: NEW.wL, op: 'merge_wall' });
+    expect(refuse(NEW.wR)).toEqual({ reason: 'duplicate_id', field: 'id', id: NEW.wR, op: 'merge_wall' });
+    expect(refuse(NEW.nMid)).toEqual({ reason: 'duplicate_id', field: 'id', id: NEW.nMid, op: 'merge_wall' });
+  });
+});
+
+/** The L-shape with its partition gone, so n2 and n5 carry two walls each. */
+function withoutPartition(): Draft<SceneData> {
+  const scene = opDraft();
+  applyOp(scene, { op: 'remove_wall', wallId: W.wPart }, CATALOGUE_REGISTRIES);
+  return scene;
+}

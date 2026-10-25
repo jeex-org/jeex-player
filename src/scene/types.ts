@@ -652,6 +652,20 @@ export type SplitWallOp = {
   /** Ids of the halves: `[a -> new node, new node -> b]`. */
   readonly ids: readonly [string, string];
 };
+/**
+ * Joins two straight, collinear walls of the same thickness and role that meet
+ * at a node no other wall uses — the inverse of `split_wall`. The merged wall
+ * runs from `wallIds[0]`'s outer node to `wallIds[1]`'s, keeps the openings
+ * and the paint, and the joint node goes. The CALLER mints `id`, as for every
+ * creating operation; an id a split freed may be named again.
+ */
+export type MergeWallOp = {
+  readonly op: 'merge_wall';
+  /** The two walls, in the order the merged wall runs through them. */
+  readonly wallIds: readonly [string, string];
+  /** The merged wall's UUID, minted by the caller. */
+  readonly id: string;
+};
 
 /**
  * Sets or clears the plan's orientation and sun preset (schema 2.3 only; the
@@ -695,6 +709,7 @@ export type SceneOp =
   | SetWallOp
   | RemoveWallOp
   | SplitWallOp
+  | MergeWallOp
   | SetSiteOp;
 
 /**

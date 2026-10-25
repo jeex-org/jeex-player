@@ -902,3 +902,22 @@ describe('a 2.4 document with room purposes', () => {
     }
   });
 });
+
+describe('room merges on commit', () => {
+  test('an ordinary batch carries no roomMerges key at all', () => {
+    const subject = model();
+    const result = ok(subject.apply({ baseRev: 0, ops: [RAISE_CEILING] }));
+    expect('roomMerges' in result).toBe(false);
+  });
+
+  test('removing the partition commits one room in one revision and says which room went into which', () => {
+    const subject = model();
+    const result = ok(subject.apply({ baseRev: 0, ops: [{ op: 'remove_wall', wallId: L_SHAPE.wall.wPart }] }));
+    expect(result.rev).toBe(1);
+    expect(subject.scene.rooms.map((room) => room.id)).toEqual([ROOM_A]);
+    expect(result.roomMerges).toEqual([{ from: ROOM_B, to: ROOM_A, summary: 'Room B merged into Room A' }]);
+    // The model's own invariant: what it commits validates and is solved.
+    expect(validateScene(subject.toJSON(), CATALOGUE_REGISTRIES)).toBeDefined();
+    expect(subject.plan.rooms).toHaveLength(1);
+  });
+});

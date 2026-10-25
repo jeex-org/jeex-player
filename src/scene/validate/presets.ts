@@ -29,6 +29,7 @@ const CREATING_OPS: ReadonlySet<string> = new Set<SceneOp['op']>([
   'add_node',
   'add_wall',
   'split_wall',
+  'merge_wall',
   'add_room',
   'add_opening',
   'place_object',
