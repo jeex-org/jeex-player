@@ -149,6 +149,14 @@ function expectRefused(model: SceneModel, ops: readonly SceneOp[], message: RegE
 const REMOVE_PARTITION: SceneOp = { op: 'remove_wall', wallId: W.wPart };
 
 describe('removing the wall between two rooms merges them', () => {
+  test("a survivor renamed in the same batch, after the removal, is still reported by both rooms' names before the batch", () => {
+    const model = new SceneModel(kitchenAndLiving(), CATALOGUE_REGISTRIES);
+    const result = commit(model, [REMOVE_PARTITION, { op: 'set_room', roomId: ROOM_A, name: 'Kitchen-living' }]);
+
+    expect(result.roomMerges).toEqual([{ from: ROOM_B, to: ROOM_A, summary: 'Kitchen merged into Living room' }]);
+    expect(model.scene.rooms.map((room) => room.name)).toEqual(['Kitchen-living']);
+  });
+
   test('two rooms become one in one revision, the larger keeping its id and the plan solving to one room', () => {
     const model = new SceneModel(kitchenAndLiving(), CATALOGUE_REGISTRIES);
     const result = commit(model, [REMOVE_PARTITION]);
@@ -322,13 +330,15 @@ describe('what the absorbed room hands over and what it leaves behind', () => {
     expect(model.scene.interiors).toEqual([{ id: NEW.preset, name: 'Warm walnut', swatch: [FINISH.walnut, FINISH.terra], ops: [keep] }]);
   });
 
-  test('the merge is reported: roomMerges by the names before the merge, touched with everything that moved', () => {
+  test('the merge is reported: roomMerges by the names before the batch, touched with everything that moved', () => {
     const model = new SceneModel(kitchenAndLiving(), CATALOGUE_REGISTRIES);
     commit(model, [{ op: 'set_material', target: faceKey(ROOM_B, W.wE, 'L'), material: FINISH.graphite }]);
 
+    // The merge happens at commit, after every op: a rename in the same batch
+    // is not what the rooms were called when the person asked for the edit.
     const result = commit(model, [{ op: 'set_room', roomId: ROOM_B, name: 'Galley' }, REMOVE_PARTITION]);
 
-    expect(result.roomMerges).toEqual([{ from: ROOM_B, to: ROOM_A, summary: 'Galley merged into Living room' }]);
+    expect(result.roomMerges).toEqual([{ from: ROOM_B, to: ROOM_A, summary: 'Kitchen merged into Living room' }]);
     expect(result.touched).toEqual([
       TOUCHED_SHELL,
       touchedOpening(L_SHAPE.opening.doorAb),
