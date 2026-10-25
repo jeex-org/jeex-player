@@ -70,8 +70,12 @@ export type CameraGesture =
    * in on that scene point, not on the screen centre.
    */
   | { type: 'zoom'; dy: number; x: number; y: number }
-  /** A click that did not move: `at` is `performance.now()` of the click. */
-  | { type: 'tap'; x: number; y: number; at: number }
+  /**
+   * A click that did not move: `at` is `performance.now()` of the click.
+   * `repeat` marks the second click of a double click (`detail > 1`); a
+   * synthetic or assistive click with no `detail` is not a repeat.
+   */
+  | { type: 'tap'; x: number; y: number; at: number; repeat: boolean }
   | { type: 'double-tap'; x: number; y: number }
   /** The pointer moved over the canvas with nothing pressed. */
   | { type: 'hover'; x: number; y: number }
@@ -369,7 +373,9 @@ export class CameraInput {
    * drag-vs-click window with the click event it guards.
    */
   private onClick = (event: MouseEvent): void => {
-    if (!this.moved) this.emit({ type: 'tap', x: event.clientX, y: event.clientY, at: performance.now() });
+    if (!this.moved) {
+      this.emit({ type: 'tap', x: event.clientX, y: event.clientY, at: performance.now(), repeat: event.detail > 1 });
+    }
     this.moved = false;
   };
 

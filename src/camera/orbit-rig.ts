@@ -128,10 +128,12 @@ export class OrbitRig {
   }
 
   /**
-   * A tap: hands the picker's answer to the application. A surface and an
-   * object are two different selections, so exactly one of them is reported
-   * and the other is cleared — a tap on a sofa must not leave the wall behind
-   * it selected as well.
+   * A tap: hands the picker's answer to the application, through exactly ONE
+   * callback. Selecting an object already drops the previous selection, so no
+   * leading `null` call is needed to clear the other kind — and such a call
+   * would clear the selection before the editor could tell a second tap on
+   * the selected object (which deselects it) from a first. A miss reports
+   * `null` to both.
    */
   tap(clientX: number, clientY: number): void {
     const { callbacks } = this.deps;
@@ -142,11 +144,9 @@ export class OrbitRig {
       return;
     }
     if (pick.surface === 'furniture') {
-      callbacks.onSurfacePicked?.(null, clientX, clientY);
       callbacks.onFurniturePicked?.(pick.assetId ?? null);
       return;
     }
-    if (pick.surface === 'opening') callbacks.onFurniturePicked?.(null);
     callbacks.onSurfacePicked?.(pick, clientX, clientY);
   }
 

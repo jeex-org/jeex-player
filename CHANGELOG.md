@@ -9,6 +9,11 @@ as described under [Versioning](#versioning).
 
 ### Changed
 
+- **A second tap deselects in 360.** A tap on the furniture item or opening
+  that is already selected clears its selection aura and closes its panel; a
+  third tap selects it again. A double tap still selects once and flies in,
+  and walk taps, drags and wall and floor panels are unchanged. The `tap`
+  camera gesture carries `repeat` for the second click of a double click.
 - **Lamps light their room in walk and tour, and stop at its walls.** Every
   lamp, a lamp fact's light or a built-in lamp's bulb, now feeds its room's
   light-probe grid, so a lamp-lit room gets the light its lamps bounce off the

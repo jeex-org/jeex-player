@@ -419,3 +419,96 @@ describe('the selection aura asks walk and tour to redraw while it exists', () =
     expect(subject.editor.updateGlows(performance.now() + 60_016)).toBe(false);
   });
 });
+
+/**
+ * In 360 a tap on the furniture or opening that carries the aura drops the
+ * selection. A press on the canvas has already closed the panel by the time
+ * the tap lands (the shell's dismiss runs on `pointerdown`), so every test
+ * closes it between taps, exactly as the app does.
+ */
+describe('a second tap on the selected object deselects it', () => {
+  const WINDOW = '01a1714b-3c2e-7d41-9a5f-2b7c8e1d4f60';
+
+  function tapHarness() {
+    const closed: number[] = [];
+    let closes = 0;
+    const built = stubRoot(ID.sofa);
+    const lamp = stubRoot(ID.lamp).item;
+    built.furniture.add(lamp);
+    const windowGroup = new THREE.Group();
+    windowGroup.add(new THREE.Mesh(new THREE.BoxGeometry(1, 1.2, 0.1), new THREE.MeshBasicMaterial()));
+    let editor!: ViewerEditor;
+    const deps = {
+      model: {
+        scene: { assets: [SOFA, { id: ID.lamp, type: 'lamp', position: { x: 2, y: 0, z: 0 } }], walls: [] },
+        rev: 0,
+        apply: () => ({ rev: 1, applied: [], touched: [] }),
+      },
+      ui: {
+        closePanel: () => {
+          closes += 1;
+          editor.forgetPanelTarget();
+        },
+        openPanel: () => {},
+        setHint: () => {},
+        wakeControls: () => {},
+      },
+      messages: createMessages('en'),
+      picker: { registerFurniture: () => {}, unregister: () => {} },
+      builder: {
+        buildFurnitureVariant: () => null,
+        getOpeningGroup: (id: string) => (id === WINDOW ? windowGroup : undefined),
+        openingsList: () => [],
+      },
+      animator: { attach: () => {} },
+      dollhouse: {},
+      renderPreview: () => null,
+      rebuild: (): BuildResult | null => null,
+      reseed: () => {},
+    } as unknown as EditorDeps;
+    editor = new ViewerEditor(deps);
+    editor.attachRoot(built.root);
+    /** The press before every tap closes whatever panel is open, as the shell does. */
+    const press = (): void => {
+      editor.closePanel();
+      closed.push(closes);
+    };
+    return { editor, press, closes: () => closes, opening: { surface: 'opening', openingId: WINDOW, wallId: ID.room } };
+  }
+
+  test('a second tap on the selected sofa clears the aura; a third selects it again', () => {
+    const subject = tapHarness();
+    subject.editor.handleFurniturePick(ID.sofa);
+    expect(subject.editor.selectedFurniture()).toBe(ID.sofa);
+
+    subject.press();
+    const before = subject.closes();
+    subject.editor.handleFurniturePick(ID.sofa);
+    expect(subject.editor.selectedFurniture()).toBeNull();
+    expect(subject.closes()).toBe(before + 1);
+
+    subject.press();
+    subject.editor.handleFurniturePick(ID.sofa);
+    expect(subject.editor.selectedFurniture()).toBe(ID.sofa);
+  });
+
+  test('a tap on another object switches the selection instead', () => {
+    const subject = tapHarness();
+    subject.editor.handleFurniturePick(ID.sofa);
+    subject.press();
+    subject.editor.handleFurniturePick(ID.lamp);
+    expect(subject.editor.selectedFurniture()).toBe(ID.lamp);
+  });
+
+  test('a second tap on the selected window clears its aura', () => {
+    const subject = tapHarness();
+    subject.editor.handleSurfacePick(subject.opening as never, 10, 10);
+    expect(subject.editor.selectedOpening()).toBe(WINDOW);
+    subject.press();
+    subject.editor.handleSurfacePick(subject.opening as never, 10, 10);
+    expect(subject.editor.selectedOpening()).toBeNull();
+    subject.press();
+    subject.editor.handleSurfacePick(subject.opening as never, 10, 10);
+    expect(subject.editor.selectedOpening()).toBe(WINDOW);
+  });
+});

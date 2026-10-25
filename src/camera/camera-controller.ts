@@ -514,7 +514,10 @@ export class CameraController {
         return false;
       case 'tap':
         // A tap means "what is this?" in 360 and "take me there" on foot.
-        if (this.mode === 'orbit') this.orbit.tap(gesture.x, gesture.y);
+        // The second click of a double click is not a second "what is this?"
+        // (it would deselect what the first one selected before the fly-in);
+        // on foot it is, and speeds the walker up.
+        if (this.mode === 'orbit' && !gesture.repeat) this.orbit.tap(gesture.x, gesture.y);
         if (this.mode === 'walk') this.walk.tap(gesture.x, gesture.y, gesture.at);
         return false;
       case 'double-tap': {
