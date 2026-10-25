@@ -57,7 +57,7 @@ import type { SceneData } from './types.js';
 /** One face's rooms folded into one: the survivor and the rooms it absorbs, the latter sorted by id. */
 export type RoomMergeGroup = { readonly survivor: string; readonly absorbed: readonly string[] };
 
-/** One absorbed room, as `ApplyOk.roomMerges` reports it: `summary` names both rooms as they were called before the merge. */
+/** One absorbed room, as `ApplyOk.roomMerges` reports it: `summary` names both rooms as they were called before the batch. */
 export type RoomMerge = { readonly from: string; readonly to: string; readonly summary: string };
 
 /**
@@ -105,8 +105,13 @@ export function planRoomMerges(base: SceneData, basePlan: SolvedPlan, draft: Sce
 export function applyRoomMerges(
   draft: Draft<SceneData>,
   groups: readonly RoomMergeGroup[],
+  base: SceneData,
 ): { merges: RoomMerge[]; touched: TouchedEntity[] } {
-  const names = new Map(draft.rooms.map((room) => [room.id, room.name]));
+  // The names the rooms had BEFORE the batch: the merge runs at commit, after
+  // every op, so a `set_room` anywhere in the same batch (before or after the
+  // removal) must not rename what the report says was merged. Every merged
+  // room was in `base` by construction (`planRoomMerges`).
+  const names = new Map(base.rooms.map((room) => [room.id, room.name]));
   const merges: RoomMerge[] = [];
   const touched: TouchedEntity[] = [TOUCHED_SHELL];
   const touch = (entity: TouchedEntity): void => {

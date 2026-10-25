@@ -576,6 +576,9 @@ as described under [Versioning](#versioning).
 
 ### Fixed
 
+- **A merge is reported by the rooms' names before the batch.** A
+  `set_room` in the same batch as the `remove_wall`, before or after it, no
+  longer renames what `ApplyOk.roomMerges[].summary` says was merged.
 - **A windowless room no longer turns black on software rendering.** A
   room's reflection probe that saw a bump-mapped surface on the edge of a
   capture cube face (where a software rasteriser's screen derivatives vanish)
