@@ -54,9 +54,9 @@
       "finish": "01a12fdf-1594-715c-a2ec-7257f0ac0434",
       "slug": "limestone",
       "name": "Cream limestone",
-      "variant": "01a16edd-c6f5-717f-ab06-1a7fa3f0a9a0",
-      "version": "01a16edd-c6f5-717f-ab06-1a807ea38b3d",
-      "colour": "#d4cab8"
+      "variant": "01a17052-6c88-7224-9c80-240bbaa56a47",
+      "version": "01a17052-6c88-7224-9c80-240c126fe952",
+      "colour": "#dcc8a4"
     },
     {
       "finish": "01a12fdf-1595-71e8-be84-9227216ac42d",
@@ -829,14 +829,14 @@
       }
     },
     {
-      "version": "01a16edd-c6f5-717f-ab06-1a807ea38b3d",
-      "variant": "01a16edd-c6f5-717f-ab06-1a7fa3f0a9a0",
-      "name": "Tiles 143, limestone",
+      "version": "01a17052-6c88-7224-9c80-240c126fe952",
+      "variant": "01a17052-6c88-7224-9c80-240bbaa56a47",
+      "name": "Marble 01, limestone",
       "kind": "scan",
       "facts": {
         "tileM": [
-          3.72,
-          3.72
+          1.5,
+          1.5
         ],
         "grain": "unknown",
         "suitability": "continuous",
@@ -847,13 +847,13 @@
           "suggestedColours": [
             {
               "name": "natural",
-              "hex": "#dab58e"
+              "hex": "#b29d7a"
             }
           ]
         },
         "averageColour": "#808080",
         "pbr": {
-          "roughness": 0.8952479638105189
+          "roughness": 0.5931042604748559
         }
       },
       "maps": {
@@ -861,19 +861,19 @@
           "colourSpace": "srgb",
           "files": {
             "256": {
-              "path": "tex/01a16edd-c6f5-717f-ab06-1a807ea38b3d/albedoTint.256.webp",
-              "bytes": 18292,
-              "sha256": "4e0e0b1ab2957c73702d7cb0aa47fbb5beb470f95c9338932ba21af5c513bcf1"
+              "path": "tex/01a17052-6c88-7224-9c80-240c126fe952/albedoTint.256.webp",
+              "bytes": 11208,
+              "sha256": "0d8b60a0d88e9eb4750abd710ca16307e3a088b49db0b187c9ff3db9c9606037"
             },
             "512": {
-              "path": "tex/01a16edd-c6f5-717f-ab06-1a807ea38b3d/albedoTint.512.webp",
-              "bytes": 69518,
-              "sha256": "4ec6e97e26b0fac738643991a68541f752c4c4fc30e28faf3b1573366dee491d"
+              "path": "tex/01a17052-6c88-7224-9c80-240c126fe952/albedoTint.512.webp",
+              "bytes": 47270,
+              "sha256": "bf5bef6cfb3a2256fc3cb842f1672de90139d2f1e2c9bf71136f66e0cd59b086"
             },
             "768": {
-              "path": "tex/01a16edd-c6f5-717f-ab06-1a807ea38b3d/albedoTint.768.webp",
-              "bytes": 155632,
-              "sha256": "072a68acb42243da6de2a57cf1f4236c9293bcab14befce731540ae5093d3f18"
+              "path": "tex/01a17052-6c88-7224-9c80-240c126fe952/albedoTint.768.webp",
+              "bytes": 114502,
+              "sha256": "6859fca0b28d0cc675c0c96fdf125e7f32303ebff7c20f75d11498fcf4dc2778"
             }
           }
         },
@@ -882,19 +882,19 @@
           "convention": "opengl",
           "files": {
             "256": {
-              "path": "tex/01a16edd-c6f5-717f-ab06-1a807ea38b3d/normal.256.webp",
-              "bytes": 17888,
-              "sha256": "49d286b4415ac58262ac75cb1e854c86b1243ef206434c0b542531f8547b2c94"
+              "path": "tex/01a17052-6c88-7224-9c80-240c126fe952/normal.256.webp",
+              "bytes": 14298,
+              "sha256": "5942698ce2dce00a9070fef5bad1f09343f7aeeedf1a9eedfa948d1decb34ab0"
             },
             "512": {
-              "path": "tex/01a16edd-c6f5-717f-ab06-1a807ea38b3d/normal.512.webp",
-              "bytes": 78780,
-              "sha256": "77af2e26a6d993d3c655a5a8040c4f748bdae9d30e94119e5d333593f23bc359"
+              "path": "tex/01a17052-6c88-7224-9c80-240c126fe952/normal.512.webp",
+              "bytes": 80424,
+              "sha256": "bcab302325628daf6b246cb1886f3f006f7527f5c7a99f00eecc1ef3a011661f"
             },
             "768": {
-              "path": "tex/01a16edd-c6f5-717f-ab06-1a807ea38b3d/normal.768.webp",
-              "bytes": 188328,
-              "sha256": "9916f9317e4f500893b74398dde92300b2f015bf4714a8ff4d3eaefae6251e83"
+              "path": "tex/01a17052-6c88-7224-9c80-240c126fe952/normal.768.webp",
+              "bytes": 187722,
+              "sha256": "a701fcc76fd94fe9852f1e590095b11cb34d1609466a5cff8b926430a27872ce"
             }
           }
         },
@@ -902,27 +902,27 @@
           "colourSpace": "linear",
           "files": {
             "256": {
-              "path": "tex/01a16edd-c6f5-717f-ab06-1a807ea38b3d/arm.256.webp",
-              "bytes": 26046,
-              "sha256": "2b1447b8c3c93d5e4157630b520c2901ce143826839427aac3656ad2df1c6da0"
+              "path": "tex/01a17052-6c88-7224-9c80-240c126fe952/arm.256.webp",
+              "bytes": 32734,
+              "sha256": "f8a30b6bf316ce2d4384b883f7caf4a27e28a141a262ae45edd887a4c7d8b4f3"
             },
             "512": {
-              "path": "tex/01a16edd-c6f5-717f-ab06-1a807ea38b3d/arm.512.webp",
-              "bytes": 102680,
-              "sha256": "382e424e2d65341dd7f4a2699e80e070c8032dd07a54fd2893b70e0a1577ab17"
+              "path": "tex/01a17052-6c88-7224-9c80-240c126fe952/arm.512.webp",
+              "bytes": 118894,
+              "sha256": "b6b82d089f41d30c086b3c3feacb18635a2703742ba30eb87f8c99b2aac76f93"
             },
             "768": {
-              "path": "tex/01a16edd-c6f5-717f-ab06-1a807ea38b3d/arm.768.webp",
-              "bytes": 238218,
-              "sha256": "a1d19c345794febf0f88b19c13144ebeded6b6a31ac3b8751e072951f432d7be"
+              "path": "tex/01a17052-6c88-7224-9c80-240c126fe952/arm.768.webp",
+              "bytes": 267954,
+              "sha256": "5c7b34aa7715bdc983115c53ee2bd5c32cff9e9701dba116a7a2a12d3e9a154e"
             }
           }
         }
       },
       "source": {
-        "provider": "ambientcg",
-        "sourceName": "Tiles143",
-        "sourcePage": "https://ambientcg.com/a/Tiles143",
+        "provider": "polyhaven",
+        "sourceName": "marble_01",
+        "sourcePage": "https://polyhaven.com/a/marble_01",
         "licence": "CC0-1.0"
       }
     },

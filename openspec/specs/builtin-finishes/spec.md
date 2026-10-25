@@ -18,8 +18,12 @@ Every bundled floor and wall finish and the default ceiling finish that the ship
 - **THEN** that finish draws its generated look, exactly as before
 
 #### Scenario: Tiled finish
-- **WHEN** a floor is painted with Cream limestone, Warm stone porcelain or Graphite porcelain
-- **THEN** it is drawn as its library material, whose tile size makes one tile 0.62 m, 0.6 m and 0.6 m wide
+- **WHEN** a floor is painted with Warm stone porcelain or Graphite porcelain
+- **THEN** it is drawn as its library material, whose tile size makes one tile 0.6 m wide
+
+#### Scenario: Continuous stone finish
+- **WHEN** a floor is painted with Cream limestone
+- **THEN** it is drawn as a honed stone scan tinted warm cream, repeating every 1.5 m (the scan's real size), with no grid of its own
 
 #### Scenario: No kept finish
 - **WHEN** the shipped index is read
