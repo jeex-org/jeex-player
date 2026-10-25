@@ -47,9 +47,11 @@ import type { RoomBox, RoomProbe } from './room-volumes.js';
 import { WALK_LIGHTING_TUNING as T } from './walk-lighting-tuning.js';
 
 /** The patch's transform: one program variant, whatever the state; the version changes with the shader text. */
-export const WALK_TRANSFORM = Object.freeze({ id: WALK_TRANSFORM_ID, version: 4 });
+export const WALK_TRANSFORM = Object.freeze({ id: WALK_TRANSFORM_ID, version: 5 });
 /** Edge of an atlas tile: the PMREM layout of a 128 px cube (and of the studio environment). */
 export const TILE = Object.freeze({ width: 384, height: 512 });
+/** The largest mip of a probe's cube-UV layout: `log2(TILE.height) - 2`, as three derives `CUBEUV_MAX_MIP`. */
+const PROBE_MAX_MIP = Math.log2(TILE.height) - 2;
 /** Tiles per atlas column. */
 const ROWS_MAX = 8;
 
@@ -188,6 +190,8 @@ export function setRoomBoxes(uniforms: WalkUniforms, boxes: readonly RoomBox[], 
 const PARS = /* glsl */ `
 #if defined( USE_ENVMAP ) && defined( ENVMAP_TYPE_CUBE_UV )
 #define JEEX_MAX_BOXES ${T.maxBoxes}
+// The atlas's own largest mip, whatever size the scene's environment is (an HDRI is larger than the studio's).
+#define JEEX_PROBE_MAX_MIP ${PROBE_MAX_MIP}.0
 uniform float jeexDiffuse;
 uniform float jeexOutside;
 uniform float jeexSun;
@@ -235,7 +239,7 @@ vec3 jeexBilinear( vec3 direction, float mipInt, vec2 tile ) {
 	}
 	uv.x += face * faceSize;
 	uv.x += filterInt * 3.0 * cubeUV_minTileSize;
-	uv.y += 4.0 * ( exp2( CUBEUV_MAX_MIP ) - faceSize );
+	uv.y += 4.0 * ( exp2( JEEX_PROBE_MAX_MIP ) - faceSize );
 	uv = ( uv + tile ) * jeexAtlasTexel;
 	#ifdef texture2DGradEXT
 		return texture2DGradEXT( jeexAtlas, uv, vec2( 0.0 ), vec2( 0.0 ) ).rgb;
@@ -245,7 +249,7 @@ vec3 jeexBilinear( vec3 direction, float mipInt, vec2 tile ) {
 }
 
 vec3 jeexProbeSample( vec3 direction, float roughness, vec2 tile ) {
-	float mip = clamp( roughnessToMip( roughness ), cubeUV_m0, CUBEUV_MAX_MIP );
+	float mip = clamp( roughnessToMip( roughness ), cubeUV_m0, JEEX_PROBE_MAX_MIP );
 	float mipF = fract( mip );
 	float mipInt = floor( mip );
 	vec3 lower = jeexBilinear( direction, mipInt, tile );

@@ -23,6 +23,8 @@ import { FINISH } from '../../src/materials/finish-ids.js';
 import { isBakedSurface } from '../../src/render/baked-surface.js';
 import { isApplyOk } from '../../src/scene/scene-model.js';
 import type { LogEntry } from '../../src/shared/logger.js';
+import type { HdriEntry } from '../../src/lighting/hdri-entry.js';
+import type { SceneData } from '../../src/scene/types.js';
 import CALIBRATION from '../fixtures/lightmap-calibration/sidecar.json' with { type: 'json' };
 import { closeContainers, demoScene, nextFrame, openContainer, until } from './support.js';
 import { FIXTURE } from './lightmap-support.js';
@@ -45,6 +47,8 @@ let bake: LightBake;
 let served: LightBake;
 /** How many times the sidecar was asked for: one per attempt. */
 let attempts = 0;
+/** Every URL fetched through the page's `fetch`. */
+const fetched: string[] = [];
 
 beforeAll(async () => {
   const scene = demoScene();
@@ -57,6 +61,7 @@ beforeAll(async () => {
   bake = await standInSidecar(unwrapped, CALIBRATION as unknown as LightBake, scene.id, await shellInputsHash(scene));
   vi.spyOn(globalThis, 'fetch').mockImplementation(async (input, init) => {
     const url = typeof input === 'string' ? input : input instanceof URL ? input.href : input.url;
+    fetched.push(url);
     if (!url.startsWith(BASE)) return realFetch(input, init);
     const name = url.slice(BASE.length);
     if (name === 'sidecar.json') {
@@ -207,6 +212,51 @@ describe('the debug light bake', () => {
       expect(withUv1()).toHaveLength(0);
     },
     MOUNT_TIMEOUT_MS,
+  );
+
+  test(
+    'a host sky over a bake: held while the bake loads, the sky alone once applied, full lighting once dropped',
+    async () => {
+      const log: LogEntry[] = [];
+      const scene: SceneData = { ...demoScene(), site: { northDeg: 30, sun: 'noon' } };
+      served = await standInSidecar(unwrapped, CALIBRATION as unknown as LightBake, scene.id, await shellInputsHash(scene));
+      page.__JEEX_DEBUG_LIGHT_BAKE__ = { sidecar: `${BASE}sidecar.json`, shell: `${BASE}shell.glb` };
+      page.__JEEX_DEBUG_CAMERA__ = VIEW;
+      const hdriFile = (name: string): string => new URL(`/tests/fixtures/hdri/${name}`, location.href).href;
+      const sidecar = (await (await realFetch(hdriFile('sky.json'))).json()) as { sun: HdriEntry['sun'] };
+      const entry: HdriEntry = { environmentUrl: hdriFile('sky-1k.jpg'), skyUrl: hdriFile('sky-256.avif'), sun: sidecar.sun };
+      fetched.length = 0;
+      const handle = mountViewer(openContainer(480, 320), {
+        scene: { repository: new InlineSceneRepository(scene) },
+        tour: { mode: 'off' },
+        debug: true,
+        lighting: { hdri: { noon: entry } },
+        onLog: (item) => log.push(item),
+      });
+      handles.push(handle);
+      await new Promise<void>((resolve) => {
+        handle.on('ready', () => resolve());
+      });
+      await untilState('applied');
+      await until(() => debug().hdri().state === 'sky-only', `the sky alone (now ${JSON.stringify(debug().hdri())})`, BAKE_TIMEOUT_MS);
+      expect(fetched).toContain(entry.skyUrl);
+      expect(fetched).not.toContain(entry.environmentUrl);
+      // The bake's daylight stays: the preset sun, not the sky's.
+      expect(debug().sunShadow()!.elevation).toBe(55);
+      expect(log.filter((item) => item.code === 'hdri-bake-daylight')).toHaveLength(1);
+      const room = scene.rooms[0]!.id;
+      expect(isApplyOk(debug().applyOps!([{ op: 'set_material', surface: 'floor', room, material: FINISH.walnut }]))).toBe(true);
+      expect(debug().lightBake().state).toBe('dropped');
+      await until(
+        () => debug().hdri().state === 'live',
+        `full lighting after the drop (now ${JSON.stringify(debug().hdri())})`,
+        BAKE_TIMEOUT_MS * 2,
+      );
+      expect(fetched).toContain(entry.environmentUrl);
+      expect(debug().sunShadow()!.elevation).toBeCloseTo(entry.sun.elevationDeg, 6);
+      expect(log.filter((item) => item.code === 'hdri-bake-daylight')).toHaveLength(1);
+    },
+    MOUNT_TIMEOUT_MS * 2,
   );
 
   test(

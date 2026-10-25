@@ -116,7 +116,7 @@ describe('resolveViewerOptions', () => {
       scene: { url: undefined },
       analytics: { mode: 'on', endpoint: undefined },
       settings: { show: false, side: 'end' },
-      lighting: { temperature: null },
+      lighting: { temperature: null, hdri: {} },
       onLog: logged.sink,
     });
     // The tour only engages at start in `view.mode: 'tour'`; `tour.mode` says
@@ -180,7 +180,7 @@ describe('resolveViewerOptions', () => {
       scene: { url: undefined },
       analytics: { mode: 'on', endpoint: undefined },
       settings: { show: false, side: 'end' },
-      lighting: { temperature: null },
+      lighting: { temperature: null, hdri: {} },
       onLog: logged.sink,
     });
     expect(Object.keys(resolved)).toEqual([
@@ -1061,7 +1061,7 @@ describe('settings.show and lighting.temperature', () => {
   test('the settings button is off and the temperature «Original» by default', () => {
     const options = resolve();
     expect(options.settings).toEqual({ show: false, side: 'end' });
-    expect(options.lighting).toEqual({ temperature: null });
+    expect(options.lighting).toEqual({ temperature: null, hdri: {} });
   });
 
   test('a host turns the button on and sets a temperature, or «Original» with null', () => {
@@ -1096,6 +1096,39 @@ describe('settings.show and lighting.temperature', () => {
     });
     expect(OPTION_SCHEMA['settings.show'].attr).toBe('settings');
     expect(OPTION_SCHEMA['lighting.temperature'].attr).toBe('light-temperature');
+  });
+});
+
+describe('lighting.hdri', () => {
+  const entry = {
+    environmentUrl: 'https://cdn.example.test/noon.jpg',
+    skyUrl: 'https://cdn.example.test/noon.avif',
+    sun: { azimuthDeg: 54, elevationDeg: 43, colourLinear: [1, 0.94, 0.87] as const, horizontalIrradianceShare: 0.78 },
+  };
+
+  test('is empty by default', () => {
+    expect(resolve().lighting.hdri).toEqual({});
+    expect(warnings()).toEqual([]);
+  });
+
+  test('keeps a valid entry as given, beside the temperature', () => {
+    const options = resolve({ lighting: { temperature: 3000, hdri: { noon: entry } } });
+    expect(options.lighting).toEqual({ temperature: 3000, hdri: { noon: entry } });
+    expect(warnings()).toEqual([]);
+  });
+
+  test('drops a refused entry with one option-invalid warning naming it, and keeps its sibling', () => {
+    const options = resolve({ lighting: { hdri: { morning: { ...entry, skyUrl: 'sky.avif' }, noon: entry } } });
+    expect(Object.keys(options.lighting.hdri)).toEqual(['noon']);
+    expect(warnings()).toHaveLength(1);
+    expect(warnings()[0]).toContain('lighting.hdri.morning');
+    expect(logged.codes()).toEqual(['option-invalid']);
+  });
+
+  test('no query parameter or attribute reaches it', () => {
+    expect(optionsFromQuery('?hdri=x&lightingHdri=x&lighting.hdri=x')).toEqual({});
+    expect(optionsFromDataset({ hdri: 'x', lightingHdri: 'x' })).toEqual({});
+    expect(Object.keys(OPTION_SCHEMA).filter((path) => path.includes('hdri'))).toEqual([]);
   });
 });
 

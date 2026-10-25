@@ -84,6 +84,7 @@ const READ_ONLY_KEYS = [
   'wallJoints',
   'walkPost',
   'walkLighting',
+  'hdri',
   'renderDemand',
   'lightBake',
 ];
@@ -123,6 +124,7 @@ function host(overrides: Partial<ViewerDebugHost> = {}): ViewerDebugHost {
     sun: () => undefined,
     walkPost: () => undefined,
     walkLighting: () => undefined,
+    hdri: () => undefined,
     renderDemand: () => undefined,
     lightBake: () => ({ state: 'applied', bakeId: 'bake', bound: 3 }),
     director: () => stubDirector(),
@@ -314,6 +316,14 @@ describe('the getters project the model', () => {
   test('walkLighting is off without a stage and the controller state with one', () => {
     expect(installViewerDebug(host()).walkLighting()).toEqual({ state: 'off', stats: null });
     expect(installViewerDebug(host({ walkLighting: () => ({ state: 'baking', stats: null }) })).walkLighting().state).toBe('baking');
+  });
+
+  test('hdri is off without a stage and the controller state with one, for every state', () => {
+    expect(installViewerDebug(host()).hdri()).toEqual({ state: 'off', preset: null, cubeSize: null, sunIntensity: null });
+    for (const state of ['off', 'loading', 'ready', 'live', 'sky-only', 'failed'] as const) {
+      const debug = { state, preset: 'noon', cubeSize: 256, sunIntensity: 2 };
+      expect(installViewerDebug(host({ hdri: () => debug })).hdri()).toEqual(debug);
+    }
   });
 
   test("lightBake answers the mount's light bake state", () => {

@@ -44,7 +44,7 @@ import { ViewerSelectionController, type ViewerSelection } from './selection.js'
 import type { Picker } from '../geometry/picker.js';
 import type { AssetMoveControl } from '../edit/asset-move-session.js';
 import { loadWalkPost, WalkPostController } from './walk-post-controller.js';
-import { loadWalkLighting, WalkLightingController } from './walk-lighting-controller.js';
+import { hdriLoads, loadWalkLighting, WalkLightingController, type HdriDeps } from './walk-lighting-controller.js';
 import { wireWalkLighting } from './walk-lighting-wiring.js';
 import type { WalkDocument } from '../render/walk-lighting/walk-lighting.js';
 import type { PostProcessor } from '../render/post-processor.js';
@@ -92,6 +92,8 @@ export type ViewerStageDeps = {
   usage?: UsageSink | undefined;
   /** Puts the current colour temperature on artificial lights added later (the walk's ambient floor). */
   artificialLights?: ((root: THREE.Object3D) => void) | undefined;
+  /** The host sky (`lighting.hdri`, `hdri-wiring.ts`); its files load in the walk chunk on this stage's renderer. */
+  hdri?: Omit<HdriDeps, 'loads'> | undefined;
   /**
    * `options.select` and the sink for the `select` event (`app/selection.ts`).
    * `listen: false` attaches no pointer listener at all; the controller is
@@ -269,6 +271,7 @@ export class ViewerStage {
       chainReady: () => this.walkPost.state() === 'on',
       document: () => this.lightingDocument?.document() ?? null,
       now: () => performance.now(),
+      hdri: deps.hdri === undefined ? undefined : { ...deps.hdri, loads: hdriLoads(this.runtime.renderer) },
     });
     this.planModes = new PlanModes({
       container: deps.roots.viewport,

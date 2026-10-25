@@ -6,6 +6,7 @@ import { WALK_LIGHTING_TUNING as T } from './walk-lighting-tuning.js';
 import { isArtificialLight } from '../../assets/artificial-light.js';
 import { bakedLightGain } from '../baked-surface.js';
 import { LIGHTING_STANDARD } from '../../lighting/lighting-standard.js';
+import { HdriSky } from '../hdri/hdri-sky.js';
 
 function setup() {
   const scene = new THREE.Scene();
@@ -104,5 +105,84 @@ describe('WalkRig', () => {
     rig.dispose();
     expect(sky.intensity).toBe(0.9);
     expect(scene.children.some((child) => (child as THREE.AmbientLight).isAmbientLight)).toBe(false);
+  });
+
+  describe('with an HDRI sky', () => {
+    function withSky(full = true) {
+      const world = setup();
+      const gradient = new THREE.Texture();
+      world.scene.background = gradient;
+      world.scene.backgroundIntensity = 0.8;
+      const hdri = new HdriSky({ scene: world.scene, renderer: world.renderer, exterior: () => null, sun: () => null });
+      const display = new THREE.Texture();
+      const environment = new THREE.Texture();
+      hdri.install({
+        ...(full ? { environment: { texture: environment, gain: 1.2, sunIntensity: 5 } } : {}),
+        sky: { texture: display },
+        view: { rotationY: 0.4, elevationDeg: 40, colourLinear: [1, 1, 1] },
+      });
+      world.rig.setHdri(hdri);
+      return { ...world, gradient, display, environment, hdri };
+    }
+
+    test('walk: the sky owns the background; the rig neither divides nor saves it', () => {
+      const { scene, rig, renderer, display, gradient, hdri } = withSky();
+      rig.setState('walk');
+      expect(scene.background).toBe(display);
+      expect(scene.backgroundIntensity).toBeCloseTo(LIGHTING_STANDARD.hdri.skyBrightness / T.walkExposure, 12);
+      expect(renderer.toneMappingExposure).toBe(T.walkExposure);
+      expect(hdri.state).toBe('display');
+      rig.setState('capture');
+      expect(hdri.state).toBe('capture');
+      rig.setState('walk');
+      expect(scene.backgroundIntensity).toBeCloseTo(LIGHTING_STANDARD.hdri.skyBrightness / T.walkExposure, 12);
+      rig.setState('editing');
+      expect(scene.background).toBe(gradient);
+      expect(scene.backgroundIntensity).toBe(0.8);
+      expect(hdri.state).toBe('off');
+    });
+
+    test('without a sky the gradient path is as before', () => {
+      const { scene, rig } = withSky();
+      rig.setHdri(null);
+      rig.setState('walk');
+      expect(scene.backgroundIntensity).toBeCloseTo(0.8 / T.walkExposure, 12);
+      rig.setState('editing');
+      expect(scene.backgroundIntensity).toBe(0.8);
+    });
+
+    test('a sky removed while in walk gives the gradient its walk compensation back', () => {
+      const { scene, rig } = withSky();
+      rig.setState('walk');
+      rig.setHdri(null);
+      expect(scene.backgroundIntensity).toBeCloseTo(0.8 / T.walkExposure, 12);
+      rig.setState('editing');
+      expect(scene.backgroundIntensity).toBe(0.8);
+    });
+
+    test('the open-air display in editing (no closed room): hemisphere and fill at zero, the exposure untouched, restored after', () => {
+      const { sky: hemisphere, fill, renderer, rig, hdri, scene, display } = withSky();
+      rig.setHdriDaylight(true);
+      expect(hdri.state).toBe('display');
+      expect(scene.background).toBe(display);
+      expect([hemisphere.intensity, fill.intensity]).toEqual([0, 0]);
+      expect(renderer.toneMappingExposure).toBe(1);
+      expect(rig.ambient.intensity).toBe(0);
+      rig.setHdriDaylight(false);
+      expect(hdri.state).toBe('off');
+      expect([hemisphere.intensity, fill.intensity]).toEqual([0.9, 0.4]);
+    });
+
+    test('a sky without an environment (a baked apartment) is sky-only in walk and off in capture; the lights stay the rig’s', () => {
+      const { rig, hdri, fill } = withSky(false);
+      rig.setState('walk');
+      expect(hdri.state).toBe('sky-only');
+      rig.setState('capture');
+      expect(hdri.state).toBe('off');
+      rig.setHdriDaylight(true);
+      rig.setState('editing');
+      expect(hdri.state).toBe('sky-only');
+      expect(fill.intensity).toBe(0.4);
+    });
   });
 });

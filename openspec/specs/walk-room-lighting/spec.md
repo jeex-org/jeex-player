@@ -7,7 +7,7 @@ How walk and tour light each room: a light-probe grid per room for indirect ligh
 
 ### Requirement: Room grids in walk and tour
 
-In `walk` and `tour` everything in a room (shell, furniture, fixtures, door leaves, window parts) SHALL be lit indirectly by that room's light-probe grid, with one bounce through doorways; everything outside the rooms by a fixed hemisphere-equivalent grid. Grids SHALL be baked before they light the view. A baked surface SHALL take no light from any grid: its lightmap is its indirect light.
+In `walk` and `tour` everything in a room (shell, furniture, fixtures, door leaves, window parts) SHALL be lit indirectly by that room's light-probe grid, with one bounce through doorways; everything outside the rooms by a fixed hemisphere-equivalent grid (requirement «Exterior light under the HDRI» for the HDRI). Grids SHALL be baked before they light the view. A baked surface SHALL take no light from any grid: its lightmap is its indirect light.
 
 #### Scenario: Windowless room darker
 - **WHEN** a closed room without a window and a room with a window are compared in walk on a 0.18 grey patch
@@ -22,12 +22,20 @@ In `walk` and `tour` everything in a room (shell, furniture, fixtures, door leav
 - **THEN** it is lit by the bathroom's grid
 
 #### Scenario: Facade
-- **WHEN** the exterior is seen from a window in walk
+- **WHEN** the exterior is seen from a window in walk without an HDRI
 - **THEN** facades look as in the editing modes within 5 %
 
 #### Scenario: Baked shell ignores the grid
 - **WHEN** the room grid's irradiance is doubled in walk
 - **THEN** a grey zero-specular baked floor in that room does not change, while an unbaked card beside it does
+
+### Requirement: Exterior light under the HDRI
+
+In the HDRI full-lighting states (capability `hdri-sky`) everything outside the rooms SHALL be lit by the HDRI environment, with the fixed exterior grid adding nothing.
+
+#### Scenario: Exterior grid silent under the HDRI
+- **WHEN** the HDRI is live in walk and the exterior grid's coefficients are doubled
+- **THEN** a grey card outside every room box does not change
 
 ### Requirement: Light that ignores walls is off in walk and tour
 
@@ -43,7 +51,7 @@ In `walk` and `tour` the hemisphere and fill lights SHALL contribute nothing and
 
 ### Requirement: Room reflection probes
 
-In `walk` and `tour` glossy surfaces SHALL reflect their own room from a probe captured at the room's probe point (requirement «Reflection probe placement»), box-projected onto the room's box, blended with the neighbouring room within 0.4 m of a shared boundary. Probes SHALL be captured without feedback from earlier probes and without mirrors; a fragment outside every room box SHALL reflect the studio environment.
+In `walk` and `tour` glossy surfaces SHALL reflect their own room from a probe captured at the room's probe point (requirement «Reflection probe placement»), box-projected onto the room's box, blended with the neighbouring room within 0.4 m of a shared boundary. Probes SHALL be captured without feedback from earlier probes and without mirrors; a fragment outside every room box SHALL reflect the scene's environment: the studio environment, or the HDRI in its full-lighting states.
 
 #### Scenario: Reflections line up with walls
 - **WHEN** a mirror-like floor reflects a stripe on the far wall
@@ -56,6 +64,10 @@ In `walk` and `tour` glossy surfaces SHALL reflect their own room from a probe c
 #### Scenario: Bathroom reflects the bathroom
 - **WHEN** a glossy surface in a windowless room is viewed
 - **THEN** its reflection contains no window of another room
+
+#### Scenario: Outside reflects the HDRI
+- **WHEN** a mirror-like card outside every room box faces the HDRI's sun spot with the HDRI live
+- **THEN** it reflects the spot
 
 ### Requirement: Bake and refresh
 
@@ -196,3 +208,11 @@ In `walk` and `tour` the emissive term of every material SHALL be capped so its 
 #### Scenario: Editing glow unchanged
 - **WHEN** the same shade is metered in orbit, `plan3d` and the editing look before and after a walk session
 - **THEN** its readings are unchanged
+
+### Requirement: Probe atlas independent of the environment's size
+
+The room probes' atlas SHALL be captured and sampled at its own fixed cube size, whatever the size of the scene's environment; a capture SHALL be checked against the atlas's own layout, not against the environment's.
+
+#### Scenario: 1K environment
+- **WHEN** an HDRI whose prefiltered cube is 256 is installed and the room probes are captured
+- **THEN** no layout error is raised, and a glossy floor's reflected stripe matches the reflection under the recipe environment within 2 px

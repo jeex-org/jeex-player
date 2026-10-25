@@ -16,6 +16,7 @@
  */
 
 import type { ViewerMode } from '../scene/types.js';
+import type { HdriOption } from '../lighting/hdri-entry.js';
 // TYPE only, and it must be: `ui/host-slots.ts` touches the DOM. The runtime
 // copy of `SLOT_NAMES` this table validates against lives in `option-sets.ts`.
 import type { SlotName } from '../ui/host-slots.js';
@@ -23,7 +24,7 @@ import { SLOT_VALUES, closedSet } from './option-sets.js';
 import type { Locale } from '../ui/messages.js';
 import type { SceneSource } from '../scene/scene-repository.js';
 import { createLogger, type Logger, type LogSink } from '../shared/logger.js';
-import { resolveBySpec, warnInvalid, withOptionSink, type OptionSpec } from './option-resolvers.js';
+import { resolveBySpec, resolveHdri, warnInvalid, withOptionSink, type OptionSpec } from './option-resolvers.js';
 import { blankRecord, containerFor, descend, split, toDatasetKey, type SectionShorthands } from './option-paths.js';
 import { asFlag, convertRaw } from './option-raw.js';
 
@@ -253,6 +254,8 @@ export type ViewerOptions = {
      * @multipleOf 100
      */
     temperature: number | null;
+    /** A sky per sun preset for walk and tour (`HdriEntry`, README «Sky in walk and tour»); an object at mount only. */
+    hdri: HdriOption;
   };
 };
 
@@ -315,7 +318,7 @@ export const DEFAULT_VIEWER_OPTIONS: ViewerOptions = {
   scene: {},
   analytics: { mode: 'on' },
   settings: { show: false, side: 'end' },
-  lighting: { temperature: null },
+  lighting: { temperature: null, hdri: {} },
 };
 
 /**
@@ -632,6 +635,7 @@ function foldOptions(given: (path: string) => unknown): ViewerOptions {
     if (section === null) result[field] = resolved;
     else containerFor(result, section, blankRecord)[field] = resolved;
   }
+  containerFor(result, 'lighting', blankRecord)['hdri'] = resolveHdri(given('lighting.hdri'));
   // The host objects, copied through: there is nothing here to validate, and
   // dropping them would take the scene with them.
   for (const path of OPAQUE_PATHS) {

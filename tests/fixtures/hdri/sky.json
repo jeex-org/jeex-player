@@ -1,0 +1,50 @@
+{
+  "width": 1024,
+  "height": 512,
+  "sun": {
+    "azimuthDeg": 54,
+    "elevationDeg": 40,
+    "colourLinear": [1, 0.93, 0.8],
+    "horizontalIrradianceShare": 0.6351
+  },
+  "reference": {
+    "skyMeanLuminance": 0.1715,
+    "skyHorizontalIrradiance": 0.86717,
+    "coneResidual": 0.03339,
+    "sunConeDeg": 6,
+    "note": "luminance-weighted, Rec. 709; sky mean excludes the sun cone and 15° around the marker; irradiances over the upper hemisphere"
+  },
+  "encoder": {
+    "ultrahdr": [
+      "-m",
+      "0",
+      "-p",
+      "-a",
+      "4",
+      "-t",
+      "0",
+      "-C",
+      "0",
+      "-c",
+      "0",
+      "-M",
+      "0",
+      "-w",
+      "1024",
+      "-h",
+      "512",
+      "-q",
+      "85",
+      "-Q",
+      "85",
+      "-s",
+      "2",
+      "-z"
+    ],
+    "magick": ["-strip", "-quality", "60"],
+    "versions": {
+      "magick": "Version: ImageMagick 7.1.2-18 Q16 x86_64 23822 https://imagemagick.org",
+      "ultrahdr": "libultrahdr ultrahdr_app (see the encoder arguments)"
+    }
+  }
+}

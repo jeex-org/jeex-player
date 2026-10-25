@@ -28,6 +28,8 @@ import type { Messages } from '../ui/messages.js';
 import { toViewerError } from './viewer-events.js';
 import { directorWiring } from './director-wiring.js';
 import { checkpointsWiring } from './checkpoints-wiring.js';
+import { hdriTarget } from './hdri-wiring.js';
+import { instanceLogger } from './viewer-failure.js';
 
 type StageWiringDeps = {
   /** Hears accepted map and camera use (`shared/usage.ts`). */
@@ -75,6 +77,11 @@ export function stageWiring(deps: StageWiringDeps): ViewerStageDeps {
     },
     usage: deps.usage,
     artificialLights: (root) => deps.handle().lightTemperature.apply(root),
+    hdri: {
+      target: () => hdriTarget(deps.options.lighting.hdri, deps.mount.model?.scene.site, deps.mount.lightBake.state().state),
+      warn: (code, message) => instanceLogger(() => deps.options).warn(code, message),
+      sun: () => deps.mount.sunShadow,
+    },
     onContextLost: deps.onContextLost,
     onContextRestored: deps.onContextRestored,
     signal: deps.signal,

@@ -44,4 +44,30 @@ describe('WalkLighting', () => {
     expect(scene.getObjectByName('walk-lighting-grids')!.children).toHaveLength(0);
     lighting.dispose();
   });
+
+  test('an HDRI over a plan without a closed room shows on eligible frames only, and goes on removal', () => {
+    const scene = new THREE.Scene();
+    const gradient = new THREE.Texture();
+    scene.background = gradient;
+    const lighting = new WalkLighting(renderer(), scene);
+    lighting.load({ volumes: { rooms: [], ceilingHeight: 2.6, doors: [], furniture: [] }, furniture: null });
+    const display = new THREE.Texture();
+    lighting.setHdri({
+      environment: { texture: new THREE.Texture(), gain: 1, sunIntensity: 2 },
+      sky: { texture: display },
+      view: { rotationY: 0, elevationDeg: 40, colourLinear: [1, 1, 1] },
+    });
+    expect(lighting.hdriState).toBe('off');
+    lighting.frame(true);
+    expect(lighting.hdriState).toBe('display');
+    expect(scene.background).toBe(display);
+    lighting.frame(false);
+    expect(lighting.hdriState).toBe('off');
+    expect(scene.background).toBe(gradient);
+    lighting.frame(true);
+    lighting.setHdri(null);
+    expect(lighting.hdriState).toBe('off');
+    expect(scene.background).toBe(gradient);
+    lighting.dispose();
+  });
 });

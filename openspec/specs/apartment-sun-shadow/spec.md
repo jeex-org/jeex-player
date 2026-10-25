@@ -21,6 +21,14 @@ On every scene load, rebuild and GPU context restore, the player SHALL aim the a
 - **WHEN** a still of the default state is captured from an overview
 - **THEN** its sun direction equals the live view's, its ceilings block the sun as in the live view, and its frustum contains its own scene's casters
 
+### Requirement: Sun under the HDRI
+
+In the HDRI full-lighting states (capability `hdri-sky`) the sun SHALL keep the preset's world azimuth but take the HDRI's elevation, colour and intensity through the same fit policy as requirement «Sun from the scene's orientation», and SHALL return to the preset's sun outside them.
+
+#### Scenario: HDRI sun in walk
+- **WHEN** a scene with `site: { northDeg: 0, sun: "evening" }` and an evening entry with elevation 10.5 is walked with the HDRI live
+- **THEN** the sun shines from world azimuth 270° at 10.5°, and its shadow frustum contains the apartment's casters
+
 ### Requirement: Fitted shadow
 
 The sun's shadow SHALL cover exactly the apartment and its shadow on the ground: walls with their thickness, ceiling casters, furniture, floors and the swept space of doors, padded by the standard; the site ground disk, the sky and helpers SHALL NOT widen it. The fit SHALL be recomputed after a structural change; while an object is dragged or animated the frustum SHALL only grow to contain it, and SHALL be refitted when the move is committed, cancelled or reverted.
