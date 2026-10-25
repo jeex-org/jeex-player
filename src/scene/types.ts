@@ -418,6 +418,22 @@ export type SetMaterialSurfaceOp = {
 };
 
 export type ReplaceAssetVariantOp = { readonly op: 'replace_asset_variant'; readonly assetId: string; readonly variant: string };
+
+/**
+ * Gives a placement another asset and keeps the placement: its id, room,
+ * position (verbatim), yaw and mirror stay; `type` and `asset` become the
+ * target, `library` and `variant` are set when given and removed when absent,
+ * and `finishes`, `material`, `scale` and `collision` — facts of the old body —
+ * are removed. Refused when the target's anchor or on-surface flag differs from
+ * the current asset's, or its mirror facts forbid the placement's mirror.
+ */
+export type ReplaceAssetOp = {
+  readonly op: 'replace_asset';
+  readonly assetId: string;
+  readonly asset: string;
+  readonly library?: string;
+  readonly variant?: string;
+};
 export type ReplaceOpeningVariantOp = { readonly op: 'replace_opening_variant'; readonly openingId: string; readonly variant: string };
 export type SetCeilingOp = { readonly op: 'set_ceiling'; readonly height: number };
 
@@ -652,6 +668,7 @@ export type SetSiteOp = {
 export type SceneOp =
   | SetMaterialOp
   | ReplaceAssetVariantOp
+  | ReplaceAssetOp
   | ReplaceOpeningVariantOp
   | SetCeilingOp
   | SetOpeningOp

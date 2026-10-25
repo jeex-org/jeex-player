@@ -1,0 +1,26 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>JEEX embed — offers and Replace with another</title>
+    <style>
+      html,
+      body {
+        margin: 0;
+        block-size: 100%;
+        background: #101615;
+      }
+      jeex-viewer {
+        display: block;
+        inline-size: 100%;
+        block-size: 100vh;
+      }
+    </style>
+  </head>
+  <body>
+    <!-- `readonly="0"`: the element is read-only unless told otherwise, and this page edits. -->
+    <jeex-viewer id="viewer" tour="off" view="orbit" analytics="off" readonly="0" debug></jeex-viewer>
+    <script type="module" src="./offers.ts"></script>
+  </body>
+</html>

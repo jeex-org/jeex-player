@@ -161,6 +161,7 @@ function rig(
         key,
         // A manifest with no `mark`: the mount hands it to the UI.
         info: { manifest: {}, baseUrl: '' } as never,
+        offers: null,
         facts: shippedAssetFacts,
         registries: CATALOGUE_REGISTRIES,
         variants: undefined as never,

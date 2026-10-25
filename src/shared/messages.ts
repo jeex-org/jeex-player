@@ -127,6 +127,10 @@ export const EN = {
   'panel.applyAllRoomWalls': 'Apply to all room walls',
   'panel.applyAllWalls': 'Apply to all walls',
   'panel.standardVariant': 'Standard variant',
+  'panel.replaceWithAnother': 'Replace with another…',
+  'replacePopup.title': 'Replace {name} with',
+  'replacePopup.close': 'Close the list',
+  'replacePopup.empty': 'Nothing else fits where this object stands.',
   'panel.ownerFacade': 'Facade',
   'panel.ownerExterior': 'Exterior',
 

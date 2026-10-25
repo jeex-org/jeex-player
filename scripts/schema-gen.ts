@@ -359,6 +359,7 @@ export const UUID_FIELDS: Readonly<
   SetMaterialSurfaceOp: { value: ['room'] },
   SetCameraTarget: { value: ['room'] },
   ReplaceAssetVariantOp: { value: ['assetId'] },
+  ReplaceAssetOp: { value: ['assetId', 'asset', 'library'] },
   ReplaceOpeningVariantOp: { value: ['openingId'] },
   SetOpeningOp: { value: ['openingId', 'wallId'] },
   AddOpeningOp: { value: ['id', 'wallId'] },

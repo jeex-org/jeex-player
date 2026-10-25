@@ -51,11 +51,11 @@ export function sameData(a: unknown, b: unknown): boolean {
 
 /**
  * The fields that decide what a placement's BODY is: the archetype, the
- * variant and the finishes. Everything else — position, yaw, scale, mirror,
+ * library it is read in, the variant and the finishes. Everything else — position, yaw, scale, mirror,
  * room, collision — is where and how that body stands, and is applied to the
  * body already on screen (`ViewerEditor`), never by building it again.
  */
-const BODY_FIELDS = ['type', 'asset', 'variant', 'finishes', 'material'] as const satisfies ReadonlyArray<keyof DemoAsset>;
+const BODY_FIELDS = ['type', 'asset', 'library', 'variant', 'finishes', 'material'] as const satisfies ReadonlyArray<keyof DemoAsset>;
 
 /** True when `a` and `b` draw the same body, wherever each of them stands. */
 export function sameBody(a: DemoAsset, b: DemoAsset): boolean {

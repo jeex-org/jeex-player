@@ -26,6 +26,7 @@ import type { Messages } from './messages.js';
 import type { ViewerRoots } from './viewer-shell.js';
 import type { FullscreenController } from './fullscreen-controller.js';
 import { SelectionPanel, type PanelRequest } from './selection-panel.js';
+import { ReplacePopup, type ReplacePopupRequest } from './replace-popup.js';
 import { TourBar } from './tour-bar.js';
 import { ViewerChrome, type ChromeCommands, type ChromeFlags, type FullscreenButtonFlags } from './viewer-chrome.js';
 import { SettingsPanel, type SettingsSide } from './settings-panel.js';
@@ -84,6 +85,8 @@ export class ViewerUI implements DirectorChrome {
   private readonly usage: UsageSink | undefined;
   private readonly chrome: ViewerChrome;
   private readonly panel: SelectionPanel;
+  /** The "Replace with another…" popup, opened from the furniture panel. */
+  private readonly popup: ReplacePopup;
   private readonly tourBar: TourBar;
   /** The settings button and its panel; nothing of it exists until the host enables it. */
   private readonly settings: SettingsPanel;
@@ -114,6 +117,7 @@ export class ViewerUI implements DirectorChrome {
       onClose: options.onPanelClose,
       signal: options.signal,
     });
+    this.popup = new ReplacePopup({ roots: options.roots, signal: options.signal });
     this.settings = new SettingsPanel({
       roots: options.roots,
       messages: options.messages,
@@ -154,6 +158,7 @@ export class ViewerUI implements DirectorChrome {
   bind(): void {
     this.chrome.bind();
     this.panel.bind();
+    this.popup.bind();
     this.tourBar.bind();
   }
 
@@ -282,11 +287,33 @@ export class ViewerUI implements DirectorChrome {
 
   openPanel(request: PanelRequest): void {
     this.settings.close(false);
+    this.popup.close();
     this.panel.open(request);
     this.usage?.('panel');
   }
   closePanel(): void {
+    this.popup.close();
     this.panel.close();
+  }
+  /**
+   * Opens the "Replace with another…" popup over the panel; focus returns to
+   * the control that had it. A pick closes the panel too: it lists the
+   * variants of the asset being replaced.
+   */
+  openReplacePopup(request: ReplacePopupRequest): void {
+    this.popup.open({
+      ...request,
+      onPick: (id) => {
+        this.panel.close();
+        request.onPick(id);
+      },
+    });
+  }
+  closeReplacePopup(): void {
+    this.popup.close();
+  }
+  isReplacePopupOpen(): boolean {
+    return this.popup.isOpen();
   }
   isPanelOpen(): boolean {
     return this.panel.isOpen();
@@ -322,6 +349,12 @@ export class ViewerUI implements DirectorChrome {
   private dismiss(event: Event): void {
     // The settings panel listens for presses outside it on the whole page itself (`settings-panel.ts`).
     if (event.type === 'keydown' && this.settings.dismissKey(event as KeyboardEvent)) return;
+    // The popup is on top of the panel: Escape closes the popup alone, and a
+    // press anywhere while it is open is the popup's own (its backdrop closes it).
+    if (this.popup.isOpen()) {
+      if (event.type === 'keydown' && (event as KeyboardEvent).key === 'Escape') this.popup.close();
+      return;
+    }
     if (!this.panel.isOpen()) return;
     if (event.type === 'keydown') {
       if ((event as KeyboardEvent).key === 'Escape') this.closePanel();

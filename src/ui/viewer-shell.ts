@@ -36,6 +36,7 @@ import { SCROLL_HINT_NAME } from './scroll-hint.js';
 import { CAMERA_PREVIEW_NAME } from './camera-preview.js';
 import { DOOR_HUD_NAME } from '../doors/door-hud.js';
 import { TOUR_CHROME_NODES } from './tour-bar-markup.js';
+import { REPLACE_POPUP_NODES } from './replace-popup-markup.js';
 
 /** Class of the shell root; the whole component stylesheet is scoped to it. */
 export const VIEWER_ROOT_CLASS = 'jeex-viewer';
@@ -139,6 +140,12 @@ export const SHELL_NAMES = [
   'finish-scope-label',
   'finish-scope-wall',
   'finish-all',
+  'finish-other',
+  'replace-popup',
+  'replace-popup-title',
+  'replace-popup-close',
+  'replace-popup-list',
+  'replace-popup-empty',
   'hint-card',
   'hint-text',
   'degraded-notice',
@@ -454,8 +461,17 @@ export const VIEWER_SHELL_TREE: ShellNode = {
               attrs: { class: 'finish-all is-hidden', type: 'button', 'data-i18n': 'panel.applyAllFloors' },
               text: 'Apply to all floors',
             },
+            // A second footer action in a row of its own, under the first:
+            // nothing that was in the panel moves when it is shown.
+            {
+              name: 'finish-other',
+              tag: 'button',
+              attrs: { class: 'finish-other is-hidden', type: 'button', 'data-i18n': 'panel.replaceWithAnother' },
+              text: 'Replace with another…',
+            },
           ],
         },
+        ...REPLACE_POPUP_NODES,
         {
           name: 'hint-card',
           tag: 'div',

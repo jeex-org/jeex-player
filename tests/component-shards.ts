@@ -90,6 +90,7 @@ export const COMPONENT_FILE_COST_S: Readonly<Record<string, number>> = {
   'provenance.test.ts': 1,
   'render-on-demand.test.ts': 292,
   'render-runtime-lighting.test.ts': 2,
+  'replace-popup.test.ts': 40,
   'selection-highlight.test.ts': 1,
   'selection-panel.test.ts': 1,
   'selection.test.ts': 59,

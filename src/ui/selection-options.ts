@@ -222,8 +222,8 @@ export function openingLabel(type: OpeningType, entrance: boolean, messages: Mes
   return messages.t(entrance ? 'opening.entranceDoor' : 'opening.door');
 }
 
-/** Fallback chip of a furniture variant: its palette as a hard-stop gradient. */
-function variantChipBackground(variant: AssetVariant): string {
+/** Fallback chip of a furniture variant (or of an offer in the replace popup): its palette as a hard-stop gradient. */
+export function variantChipBackground(variant: Pick<AssetVariant, 'swatch'> | { readonly swatch: readonly string[] }): string {
   const colours = variantPalette(variant);
   const stops = colours
     .slice(0, 3)
@@ -233,7 +233,7 @@ function variantChipBackground(variant: AssetVariant): string {
 }
 
 /** The colours a furniture variant's fallback picture is made of. */
-function variantPalette(variant: AssetVariant): string[] {
+function variantPalette(variant: { readonly swatch: readonly string[] }): string[] {
   return variant.swatch.length > 0 ? [...variant.swatch] : [...FALLBACK_VARIANT_PALETTE];
 }
 

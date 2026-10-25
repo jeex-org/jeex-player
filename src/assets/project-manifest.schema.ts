@@ -55,7 +55,7 @@ import { MAX_PROJECT_TEXTURE_FILES } from '../shared/limits.js';
 import type { LibraryMapRole } from '../materials/finish-types.js';
 import { ASSET_ANCHORS, KNEE_SIDES, VARIANT_ACCESS, isHttpUrl } from './asset-types.js';
 import { PROJECT_FORMAT } from './project-manifest.js';
-import type { BakedProjectManifest } from './project-manifest.js';
+import type { BakedProjectManifest, ProjectLibraryManifest } from './project-manifest.js';
 
 /**
  * A path a bake may name: relative to the manifest folder and inside it.
@@ -645,4 +645,29 @@ export function parseProjectManifest(value: unknown): BakedProjectManifest {
   const issues = projectManifestIssues(value);
   if (issues.length > 0) throw schemaRefusal('project-invalid', 'parseProjectManifest', issues);
   return value as BakedProjectManifest;
+}
+
+/**
+ * A bare library — an `offers` library a host serves beside a scene — judged
+ * by the same schema a baked project's `library` is, and returned as it came.
+ * The project-only rule tying a library id to a project id does not apply: a
+ * bare library has no project.
+ *
+ * @throws ViewerLibError `project-invalid` with the field paths, as
+ * `parseProjectManifest` does.
+ */
+export function parseProjectLibrary(value: unknown): ProjectLibraryManifest {
+  const result = z.safeParse(librarySchema, value);
+  const issues = result.success ? checkedLibraryIssues(result.data) : result.error.issues.flatMap((issue) => readableIssues(issue, []));
+  if (issues.length > 0) throw schemaRefusal('project-invalid', 'parseProjectLibrary', issues);
+  return value as ProjectLibraryManifest;
+}
+
+/** The manifest-wide texture rules, applied to a bare library. */
+function checkedLibraryIssues(library: z.infer<typeof librarySchema>): SchemaIssue[] {
+  const issues: SchemaIssue[] = [];
+  checkTextureFiles(library.materials, (message, path) =>
+    issues.push({ path: path.slice(1).map((step) => pathStep(step)), message, code: 'custom' }),
+  );
+  return issues;
 }

@@ -117,6 +117,10 @@ describe('sameBody', () => {
     expect(sameBody(sofa, bare)).toBe(false);
     expect(sameBody(sofa, { ...sofa, finishes: { body: 'x' } })).toBe(false);
   });
+  test('so is the library: the same asset id in another library is another body', () => {
+    const library = '01a1f5aa-1000-7308-9743-2d1026706d7e';
+    expect(sameBody(sofa, { ...sofa, library })).toBe(false);
+  });
   test('an absent field equals an undefined one', () => {
     expect(sameData({ a: 1 }, { a: 1, b: undefined })).toBe(true);
   });

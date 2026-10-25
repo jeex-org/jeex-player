@@ -367,17 +367,24 @@ export class SceneMount {
   /** `mount` for a loaded document: the project's builder options, variant bank, library key and texture source. */
   mountDocument(loaded: LoadedDocument): BuildResult {
     const project = loaded.project;
-    this.deps.ui.setProjectMark(project?.info.manifest.mark);
+    this.deps.ui.setProjectMark(project?.info?.manifest.mark);
     const textures = project === null ? null : this.texturesFor(project);
     const options = project === null ? undefined : textures === null ? project.builderOptions : { ...project.builderOptions, textures };
     return this.mount(loaded.model, options, project?.variants, project?.key ?? '', project?.facts);
   }
 
-  /** The project's texture source: the mounted one when the library is the same, else a new one; `null` without a context. */
+  /**
+   * The libraries' texture source: the mounted one when the libraries are the
+   * same, else a new one; `null` without a context. One source serves the
+   * project and the offers: an offers texture path is already absolute
+   * inside its own folder (`assets/library-stack.ts`).
+   */
   private texturesFor(project: LoadedProjectContext): LibraryTextures | null {
     if (this.textures !== null && this.textures.key === project.key) return this.textures.textures;
     const env = this.deps.textureEnv?.() ?? null;
-    return env === null ? null : { ...createProjectTextures(project.info.baseUrl, env), attached: () => this.invalidate() };
+    const baseUrl = project.info?.baseUrl ?? project.offers?.baseUrl;
+    if (env === null || baseUrl === undefined) return null;
+    return { ...createProjectTextures(baseUrl, env), attached: () => this.invalidate() };
   }
 
   /**

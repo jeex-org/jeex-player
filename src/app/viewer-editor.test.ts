@@ -88,6 +88,7 @@ function harness(): Harness {
     },
     dollhouse: {},
     renderPreview: () => null,
+    edits: { mode: 'local' },
     rebuild: (): BuildResult | null => ({ root: next.root, degradedAssets: 0 }),
     reseed: (): void => {
       state.reseeds += 1;
@@ -454,6 +455,7 @@ describe('a second tap on the selected object deselects it', () => {
         wakeControls: () => {},
       },
       messages: createMessages('en'),
+      edits: { mode: 'local' },
       picker: { registerFurniture: () => {}, unregister: () => {} },
       builder: {
         buildFurnitureVariant: () => null,

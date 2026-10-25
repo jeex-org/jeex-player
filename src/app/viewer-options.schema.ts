@@ -195,10 +195,11 @@ const MOTION_VALUES = ['auto', 'full', 'reduced'] as const;
 const INTERACTION_VALUES = ['full', 'none', 'passive'] as const;
 
 /**
- * `ViewerOptions` minus the two fields no schema can usefully describe:
- * `onLog` is a function and `scene` is a `SceneSource` whose `repository` is
- * a live loader and whose `document` is the host's own object
- * (`viewer-options.ts`'s `DeepPartial` says exactly this). Both stay opaque
+ * `ViewerOptions` minus the fields no schema can usefully describe:
+ * `onLog` is a function, `scene` is a `SceneSource` whose `repository` is
+ * a live loader and whose `document` is the host's own object, and `offers`
+ * may hold the host's own library object
+ * (`viewer-options.ts`'s `DeepPartial` says exactly this). All three stay opaque
  * here and are proved only to be present-or-absent by `viewer-options.ts`
  * itself, which is where they are actually used.
  */

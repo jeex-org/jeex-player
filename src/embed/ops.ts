@@ -51,7 +51,11 @@
  * them as hand-written types — `BakedProjectManifest`,
  * `ProjectLibraryManifest`, `ProjectMaterial`, `ProjectObject`,
  * `ProjectVariant` — so the producer of a bake types it without importing
- * from `assets/` directly.
+ * from `assets/` directly. A host's `offers` library (an extra library with no
+ * project around it) has the pair too: `parseProjectLibrary` judges a bare
+ * library and `libraryOf` projects it, so a document that names offers is
+ * validated with `registriesFromLibrary(libraryOf(parseProjectLibrary(offers)),
+ * CATALOGUE_REGISTRIES)`, exactly as the viewer validates it.
  *
  * The entry carries one more set — what external FORMAT CONVERTERS ask for:
  * plan geometry (`dist`, `sub`, `dot`, `pointInPolygon`, `distanceToPolygon`,
@@ -189,6 +193,7 @@ export type {
   RemoveObjectOp,
   MirrorObjectOp,
   ReplaceAssetVariantOp,
+  ReplaceAssetOp,
   SetCameraOp,
   SetCameraTarget,
   SetNavigationOp,
@@ -239,8 +244,8 @@ export { SCHEMA_VERSIONS, schemaVersionBefore } from '../scene/types.js';
 
 export { CATALOGUE_REGISTRIES } from '../assets/catalogue-registries.js';
 
-export { parseProjectManifest } from '../assets/project-manifest.schema.js';
-export { projectLibraryOf } from '../assets/project-manifest.js';
+export { parseProjectManifest, parseProjectLibrary } from '../assets/project-manifest.schema.js';
+export { projectLibraryOf, libraryOf } from '../assets/project-manifest.js';
 export type {
   BakedProjectManifest,
   ProjectLibraryManifest,
