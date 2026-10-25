@@ -46,11 +46,11 @@ Every behaviour change lands as a failing test first, then the code, as two comm
 
 ## 7. Calibration
 
-- [ ] 7.1 Before (main) and after (this branch), daylight-only and lamps-on, each after a fresh bake, on a hardware renderer, with the renderer string, lamp intensities and temperature recorded: fill design.md's calibration table, every cell marked acceptance or diagnostic as there; verify the table is complete in the report.
-- [ ] 7.2 The lamp decomposition: readings `A` (fresh lamp-off bake), `B` (lamps-on bake, direct suppressed) and `C` (same grid, direct on) on a zero-specular card, with mask and domain; bounce, direct and combined from their differences; verify recorded.
-- [ ] 7.3 Re-record the ceiling's raw R/B as the measured default-state baseline (red first: the ceiling test against the new recorded value), with its evidence; re-record the white balance source by the existing procedure only if the corrected ceiling leaves 1.3–1.6 or breaks R ≥ G ≥ B; verify `walk-glossy.test.ts` on the GPU.
-- [ ] 7.4 Any other acceptance target missed: a parameter changes only on evidence that fits it (shade readings for the emissive cap, daylight readings for exposure, ambient floor and sun factor; lamp units never); gloss thresholds, poses, masks and roughness never move; a conflict goes into the report with its numbers for an acceptance decision; verify by the report.
-- [ ] 7.5 Costs before and after, lamps on: wall-clock time to `live` for a cold and a warm entry, temperature-settle-to-live, the worst slice ms, `bakeMs`/`bakeFrames`/`probeMs`/`probeFrames`, warmed display frame ms over forced frames, draw calls and program count; no cost conclusion beyond the numbers; verify recorded with the renderer.
+- [x] 7.1 Before (main) and after (this branch), daylight-only and lamps-on, each after a fresh bake, on a hardware renderer, with the renderer string, lamp intensities and temperature recorded: fill design.md's calibration table, every cell marked acceptance or diagnostic as there; verify the table is complete in the report.
+- [x] 7.2 The lamp decomposition: readings `A` (fresh lamp-off bake), `B` (lamps-on bake, direct suppressed) and `C` (same grid, direct on) on a zero-specular card, with mask and domain; bounce, direct and combined from their differences; verify recorded.
+- [x] 7.3 Re-record the ceiling's raw R/B as the measured default-state baseline (red first: the ceiling test against the new recorded value), with its evidence; re-record the white balance source by the existing procedure only if the corrected ceiling leaves 1.3–1.6 or breaks R ≥ G ≥ B; verify `walk-glossy.test.ts` on the GPU.
+- [x] 7.4 Any other acceptance target missed: a parameter changes only on evidence that fits it (shade readings for the emissive cap, daylight readings for exposure, ambient floor and sun factor; lamp units never); gloss thresholds, poses, masks and roughness never move; a conflict goes into the report with its numbers for an acceptance decision; verify by the report.
+- [x] 7.5 Costs before and after, lamps on: wall-clock time to `live` for a cold and a warm entry, temperature-settle-to-live, the worst slice ms, `bakeMs`/`bakeFrames`/`probeMs`/`probeFrames`, warmed display frame ms over forced frames, draw calls and program count; no cost conclusion beyond the numbers; verify recorded with the renderer.
 
 ## 8. README
 
@@ -58,9 +58,9 @@ Every behaviour change lands as a failing test first, then the code, as two comm
 
 ## 9. Integration
 
-- [ ] 9.1 Re-measure the walk-post lazy chunk if it grew and keep it under the repo's budget rule (measured + 1 KB, never raised by guess); verify the budget check passes.
-- [ ] 9.2 `scripts/check.sh fast` and the full `bun test` green; verify by their last lines in the report.
-- [ ] 9.3 Shots of the demo living room by daylight and in the evening with lamps on, and of a doorway with a lamp-lit neighbouring room, each taken after `walkLighting().state === 'live'`; verify the files exist.
+- [x] 9.1 Re-measure the walk-post lazy chunk if it grew and keep it under the repo's budget rule (measured + 1 KB, never raised by guess); verify the budget check passes.
+- [x] 9.2 `scripts/check.sh fast` and the full `bun test` green; verify by their last lines in the report.
+- [x] 9.3 Shots of the demo living room by daylight and in the evening with lamps on, and of a doorway with a lamp-lit neighbouring room, each taken after `walkLighting().state === 'live'`; verify the files exist.
 
 ## Workflow follow-up
 
