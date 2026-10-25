@@ -14,14 +14,22 @@
  * Masks: points and spots 0 when marked baked (`userData.jeexBaked === true`),
  * 1 otherwise; directional lights 0 for the apartment rig's fill, 1 otherwise
  * (the sun is never told apart by `castShadow`).
+ *
+ * Rooms: per drawn point light, in the same order, the source room the walk
+ * lighting gave it (`userData.jeexLampRoom`: a room index, or -2 for a lamp
+ * in no room), -1 for a light that carries none (not a lamp).
  */
 
 import type * as THREE from 'three';
 import { APARTMENT_FILL_LIGHT_NAME } from '../lighting/lighting-context.js';
 /** The light `userData` key a lamp is marked baked by (`render/baked-surface.ts`). */
 export const LAMP_BAKED_KEY = 'jeexBaked';
+/** The light `userData` key the walk lighting writes a lamp's source room under (`render/walk-lighting/walk-lighting.ts`). */
+export const LAMP_ROOM_KEY = 'jeexLampRoom';
+/** The room value of a point light that is not a lamp: never gated. */
+export const NOT_A_LAMP = -1;
 
-export type LightMasks = { point: number[]; spot: number[]; directional: number[] };
+export type LightMasks = { point: number[]; spot: number[]; directional: number[]; pointRoom: number[] };
 
 type AnyLight = THREE.Light & {
   isPointLight?: boolean;
@@ -44,14 +52,18 @@ export function lightMasks(scene: THREE.Object3D, camera: THREE.Camera): LightMa
   const lights: AnyLight[] = [];
   collect(scene, camera, lights);
   lights.sort((a, b) => weight(b) - weight(a));
-  const masks: LightMasks = { point: [], spot: [], directional: [] };
+  const masks: LightMasks = { point: [], spot: [], directional: [], pointRoom: [] };
   for (const light of lights) {
     const live = light.userData[LAMP_BAKED_KEY] === true ? 0 : 1;
     // The same branch order as WebGLLights: a sun light is not a directional light there.
     if (light.isSunLight) continue;
     if (light.isDirectionalLight) masks.directional.push(light.name === APARTMENT_FILL_LIGHT_NAME ? 0 : 1);
     else if (light.isSpotLight) masks.spot.push(live);
-    else if (light.isPointLight) masks.point.push(live);
+    else if (light.isPointLight) {
+      masks.point.push(live);
+      const room: unknown = light.userData[LAMP_ROOM_KEY];
+      masks.pointRoom.push(typeof room === 'number' ? room : NOT_A_LAMP);
+    }
   }
   return masks;
 }
