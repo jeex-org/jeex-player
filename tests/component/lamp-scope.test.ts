@@ -114,7 +114,8 @@ function lamp(furniture: THREE.Object3D, kind: LampKind, at: Vec, intensity: num
     // The bulb at the placement's point, wherever the builder put it.
     body.position.y = -(body.children.find((c) => (c as THREE.PointLight).isPointLight)?.position.y ?? 0);
     placement.add(body);
-  } else {
+  }
+  if (kind !== 'bank') {
     const material =
       kind === 'transmissive'
         ? new THREE.MeshPhysicalMaterial({ color: 0xffffff, transmission: 1, roughness: 0.2 })
@@ -501,12 +502,15 @@ describe('receiver room of the parts in a wall', { timeout: TIMEOUT_MS }, () => 
   const zeroSpecular = () => new THREE.MeshPhysicalMaterial({ color: 0x808080, roughness: 1, metalness: 0, specularIntensity: 0 });
 
   test('a jamb across the shared boundary: its part on A’s side takes A’s lamp, its part on B’s side does not, on screen and in a capture', () => {
-    const { w, lights } = rooms((scene) => {
-      // A jamb face in the doorway's side plane z = 1.5, facing +z, across the wall from x 3.6 to 4.4.
-      const jamb = new THREE.Mesh(new THREE.PlaneGeometry(0.8, 1.2), zeroSpecular());
-      jamb.position.set(4.0, 1.0, 1.5);
-      scene.add(jamb);
-    }, [3.2, 1.0, 2.2]);
+    const { w, lights } = rooms(
+      (scene) => {
+        // A jamb face in the doorway's side plane z = 1.5, facing +z, across the wall from x 3.6 to 4.4.
+        const jamb = new THREE.Mesh(new THREE.PlaneGeometry(0.8, 1.2), zeroSpecular());
+        jamb.position.set(4.0, 1.0, 1.5);
+        scene.add(jamb);
+      },
+      [3.2, 1.0, 2.2],
+    );
     try {
       // Seen square on from z = 2.6: 0.8 m spans about 34 px at 30°; 12 px either side of the centre is well inside each half.
       const aSide = onOff(lights(), () => w.read([4.0, 1.0, 2.6], [4.0, 1.0, 1.5], -12));
@@ -521,15 +525,18 @@ describe('receiver room of the parts in a wall', { timeout: TIMEOUT_MS }, () => 
   });
 
   test('a closed door leaf: the face towards A takes A’s lamp, the face towards B takes none, on screen and in a capture', () => {
-    const { w, lights } = rooms((scene) => {
-      const towardsA = new THREE.Mesh(new THREE.PlaneGeometry(1, 2), zeroSpecular());
-      towardsA.position.set(3.98, 1.0, 2);
-      towardsA.rotation.y = -Math.PI / 2;
-      const towardsB = new THREE.Mesh(new THREE.PlaneGeometry(1, 2), zeroSpecular());
-      towardsB.position.set(4.02, 1.0, 2);
-      towardsB.rotation.y = Math.PI / 2;
-      scene.add(towardsA, towardsB);
-    }, [3.4, 1.4, 2]);
+    const { w, lights } = rooms(
+      (scene) => {
+        const towardsA = new THREE.Mesh(new THREE.PlaneGeometry(1, 2), zeroSpecular());
+        towardsA.position.set(3.98, 1.0, 2);
+        towardsA.rotation.y = -Math.PI / 2;
+        const towardsB = new THREE.Mesh(new THREE.PlaneGeometry(1, 2), zeroSpecular());
+        towardsB.position.set(4.02, 1.0, 2);
+        towardsB.rotation.y = Math.PI / 2;
+        scene.add(towardsA, towardsB);
+      },
+      [3.4, 1.4, 2],
+    );
     try {
       const a = onOff(lights(), () => w.read([2.5, 1.0, 2], [3.98, 1.0, 2]));
       const b = onOff(lights(), () => w.read([5.5, 1.0, 2], [4.02, 1.0, 2]));
@@ -546,12 +553,15 @@ describe('receiver room of the parts in a wall', { timeout: TIMEOUT_MS }, () => 
   });
 
   test('a window reveal: the part inside the room’s box takes the lamp, the part beyond every box none', () => {
-    const { w, lights } = rooms((scene) => {
-      // A reveal through A's west wall at z = 2, facing +z, from x = -0.4 (outside) to 0.4 (inside).
-      const reveal = new THREE.Mesh(new THREE.PlaneGeometry(0.8, 1.0), zeroSpecular());
-      reveal.position.set(0, 1.2, 2);
-      scene.add(reveal);
-    }, [0.6, 1.2, 2.8]);
+    const { w, lights } = rooms(
+      (scene) => {
+        // A reveal through A's west wall at z = 2, facing +z, from x = -0.4 (outside) to 0.4 (inside).
+        const reveal = new THREE.Mesh(new THREE.PlaneGeometry(0.8, 1.0), zeroSpecular());
+        reveal.position.set(0, 1.2, 2);
+        scene.add(reveal);
+      },
+      [0.6, 1.2, 2.8],
+    );
     try {
       const inside = onOff(lights(), () => w.read([0, 1.2, 3.1], [0, 1.2, 2], 12));
       const beyond = onOff(lights(), () => w.read([0, 1.2, 3.1], [0, 1.2, 2], -12));
@@ -565,11 +575,14 @@ describe('receiver room of the parts in a wall', { timeout: TIMEOUT_MS }, () => 
   });
 
   test('a cabinet against the shared wall in B takes none of A’s lamp, on screen and in a capture', () => {
-    const { w, lights } = rooms((scene) => {
-      const cabinet = new THREE.Mesh(new THREE.BoxGeometry(0.4, 0.9, 0.8), zeroSpecular());
-      cabinet.position.set(4.27, 0.45, 0.8);
-      scene.add(cabinet);
-    }, [3.6, 1.6, 0.8]);
+    const { w, lights } = rooms(
+      (scene) => {
+        const cabinet = new THREE.Mesh(new THREE.BoxGeometry(0.4, 0.9, 0.8), zeroSpecular());
+        cabinet.position.set(4.27, 0.45, 0.8);
+        scene.add(cabinet);
+      },
+      [3.6, 1.6, 0.8],
+    );
     try {
       const top = onOff(lights(), () => w.read([4.8, 1.6, 0.8], [4.27, 0.9, 0.8]));
       const capture = onOff(lights(), () => w.readCube([4.27, 1.5, 0.8], 3));
@@ -594,7 +607,10 @@ describe('one room in several boxes, and programs', { timeout: TIMEOUT_MS }, () 
       { x: 0, z: 4 },
     ];
     const container = world([{ id: 'l', box: { x0: 0, x1: 5, z0: 0, z1: 4 } }], (scene, furniture) => {
-      const floorMesh = new THREE.Mesh(new THREE.PlaneGeometry(5, 4), new THREE.MeshPhysicalMaterial({ color: 0x808080, roughness: 1, specularIntensity: 0 }));
+      const floorMesh = new THREE.Mesh(
+        new THREE.PlaneGeometry(5, 4),
+        new THREE.MeshPhysicalMaterial({ color: 0x808080, roughness: 1, specularIntensity: 0 }),
+      );
       floorMesh.rotation.x = -Math.PI / 2;
       floorMesh.position.set(2.5, 0, 2);
       scene.add(floorMesh);
@@ -762,6 +778,27 @@ const EYE_FAR: Vec = [2.2, 1.2, 3.0];
 
 /* ------------------------------------------------- the demo apartment, real commands */
 
+const LIVING_ROOM = '01a15f1b-dbbd-7634-b8b8-af9c8008284d';
+
+/** sRGB-encoded 8-bit channel as linear light. */
+const linearByte = (byte: number): number => {
+  const v = byte / 255;
+  return v <= 0.04045 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4;
+};
+
+/** Mean linear luminance of the central 8 x 8 pixels of a PNG (the displayed picture). */
+async function centreLuminance(blob: Blob, size = 8): Promise<number> {
+  const bitmap = await createImageBitmap(blob);
+  const canvas = new OffscreenCanvas(bitmap.width, bitmap.height);
+  const context = canvas.getContext('2d')!;
+  context.drawImage(bitmap, 0, 0);
+  const { data } = context.getImageData(Math.floor((bitmap.width - size) / 2), Math.floor((bitmap.height - size) / 2), size, size);
+  let sum = 0;
+  for (let i = 0; i < data.length; i += 4)
+    sum += 0.2126 * linearByte(data[i]!) + 0.7152 * linearByte(data[i + 1]!) + 0.0722 * linearByte(data[i + 2]!);
+  return sum / (data.length / 4);
+}
+
 type Debug = {
   walkLighting: () => { state: string };
   applyOps: (ops: SceneOp[]) => { rev?: number; error?: unknown };
@@ -773,7 +810,7 @@ describe('lamp edits in walk through the real commands (demo apartment)', { time
   let scene: THREE.Scene | null = null;
   let renderer: THREE.WebGLRenderer | null = null;
   const states: string[] = [];
-  let watching = true;
+  const watching = { on: true };
 
   /** The placement groups of the scene that hold a lamp light. */
   const lampPlacements = (): THREE.Object3D[] => {
@@ -781,7 +818,9 @@ describe('lamp edits in walk through the real commands (demo apartment)', { time
     scene!.traverse((object) => {
       if (typeof object.userData['assetId'] !== 'string') return;
       let lit = false;
-      object.traverse((child) => (lit ||= (child as THREE.PointLight).isPointLight === true));
+      object.traverse((child) => {
+        if ((child as THREE.PointLight).isPointLight) lit = true;
+      });
       if (lit) out.push(object);
     });
     return out;
@@ -818,7 +857,7 @@ describe('lamp edits in walk through the real commands (demo apartment)', { time
     handle.setMode('walk');
     await until(() => debug().walkLighting().state === 'live', 'walk live', 240_000);
     const watch = async (): Promise<void> => {
-      while (watching) {
+      while (watching.on) {
         states.push(debug().walkLighting().state);
         await nextFrame();
       }
@@ -827,10 +866,30 @@ describe('lamp edits in walk through the real commands (demo apartment)', { time
   }, TIMEOUT_MS);
 
   afterAll(() => {
-    watching = false;
+    watching.on = false;
     handle.dispose();
     vi.restoreAllMocks();
     closeContainers();
+  });
+
+  test('concave living room audit: the pendant’s direct light on the floor behind the inner corner, recorded', async () => {
+    // The living room is an L: its inner corner at (4.35, 5.25) in plan. The pendant hangs at (5.5, 7.06); the floor
+    // at (4.1, 4.0) lies in the room but the segment to the pendant leaves it through the notch's walls.
+    const pendantAsset = demoScene().assets.find((a) => a.type === 'pendant' && a.room === LIVING_ROOM)!;
+    const pendant = lightOf(lampPlacements().find((p) => p.userData['assetId'] === pendantAsset.id)!);
+    const camera = { position: { x: 3.2, y: 1.4, z: 4.9 }, target: { x: 4.1, y: 0, z: 4.0 } };
+    const shot = async (): Promise<number> => {
+      const { blob } = await handle.capture.still({ width: 160, height: 120, camera, caption: false });
+      return centreLuminance(blob);
+    };
+    const on = await shot();
+    const kept = pendant.intensity;
+    pendant.intensity = 0;
+    const off = await shot();
+    pendant.intensity = kept;
+    const bulb = new THREE.Vector3();
+    pendant.getWorldPosition(bulb);
+    record('concave-living', { on, off, change: change(off, on), pendant: bulb.toArray(), cutoff: pendant.distance });
   });
 
   test('a lamp moved to another room re-bakes everything, takes the new room, and compiles no program', async () => {
