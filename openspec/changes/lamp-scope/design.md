@@ -74,7 +74,7 @@ Alignment with three's order: `light-order.ts` grows one output, `pointRoom: num
 
 Programs: a room index is a uniform value, so room changes need no variant. A change in the light count or the shadow layout may select new programs, as it does today; the constant-program claims hold only for an unchanged light configuration.
 
-Scope switch: `WalkRig` sets `jeexLampScope` to 1 when the walk lighting is installed for walk or tour and to 0 on `dispose`/leaving, independently of `setUniformState`, so the editing-state slices of the warm-up are gated too, and the editing modes stay pixel-identical.
+Scope switch: `WalkLighting.frame` sets `jeexLampScope` to 1 on every eligible frame with rooms to light (walk or tour, the bake included) and to 0 on an ineligible frame, a plan without rooms and `dispose`, independently of `setUniformState`, so the editing-state slices of the warm-up are gated too, and the editing modes stay pixel-identical.
 
 Why at the receiver: a probe in room B sees room A's surfaces through the doorway, and those fragments are located in A, so they keep A's lamp; B's fragments reject it. Bounce crosses openings, direct light stops at the room boundary, and the result does not depend on where the camera or the capture point is.
 
