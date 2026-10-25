@@ -2,13 +2,24 @@ import { describe, expect, test } from 'bun:test';
 import { GridBake, type BakeGrid } from './grid-bake.js';
 import type { UniformState } from './box-probe-patch.js';
 
-type Call = { grid: string; start: number; count: number; pass: number; visible: string[]; hidden: boolean; state: UniformState };
+type Call = {
+  grid: string;
+  start: number;
+  count: number;
+  pass: number;
+  visible: string[];
+  hidden: boolean;
+  masks: number[];
+  state: UniformState;
+};
 
 function setup(options: { probesPerFrame: number; throwOn?: number; only?: string } = { probesPerFrame: 5 }) {
   const calls: Call[] = [];
   let state: UniformState = 'editing';
   const furniture = { visible: true };
   const mirror = { visible: true };
+  // Furniture renderables: a body, a transmissive body, a shade with a non-default mask.
+  const renderables = [{ layers: { mask: 1 } }, { layers: { mask: 1 } }, { layers: { mask: 5 } }];
   const all: BakeGrid[] = [];
   const grid = (name: string, probes: number): BakeGrid & { name: string } => {
     const g = {
@@ -25,6 +36,7 @@ function setup(options: { probesPerFrame: number; throwOn?: number; only?: strin
           // three makes the baking grid visible itself; the rest is ours.
           visible: all.filter((other) => other.visible || other === g).map((other) => (other as unknown as { name: string }).name),
           hidden: !furniture.visible && !mirror.visible,
+          masks: renderables.map((r) => r.layers.mask),
           state,
         });
       },
@@ -45,10 +57,11 @@ function setup(options: { probesPerFrame: number; throwOn?: number; only?: strin
     exterior,
     rig: { setState: (next) => (state = next) },
     exclusions: () => [furniture, mirror],
+    layerExclusions: () => renderables,
     probesPerFrame: options.probesPerFrame,
     cubemapSize: 8,
   });
-  return { bake, calls, a, b, exterior, furniture, mirror, state: () => state };
+  return { bake, calls, a, b, exterior, furniture, mirror, renderables, state: () => state };
 }
 
 describe('GridBake', () => {
@@ -88,6 +101,20 @@ describe('GridBake', () => {
       false,
       false,
     ]);
+  });
+
+  test('every call sees the furniture renderables on no layer; between frames each has its own mask back', () => {
+    const { bake, calls, renderables } = setup();
+    bake.step();
+    expect(calls.length).toBeGreaterThan(0);
+    for (const call of calls) expect(call.masks).toEqual([0, 0, 0]);
+    expect(renderables.map((r) => r.layers.mask)).toEqual([1, 1, 5]);
+  });
+
+  test('puts every layer mask back when a call throws', () => {
+    const { bake, renderables } = setup({ probesPerFrame: 20, throwOn: 1 });
+    expect(() => bake.step()).toThrow('lost');
+    expect(renderables.map((r) => r.layers.mask)).toEqual([1, 1, 5]);
   });
 
   test('restores everything when a call throws, and rethrows', () => {
