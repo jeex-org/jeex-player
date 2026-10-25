@@ -51,6 +51,8 @@ import { isLocale } from '../ui/messages.js';
 import { isTelemetryEndpoint } from '../telemetry/telemetry.schema.js';
 import { isLightTemperature } from '../lighting/colour-temperature.js';
 import { TEMPERATURE_RANGE } from '../lighting/temperature-range.js';
+import { SITE_SUNS } from '../scene/schema-sets.js';
+import { hdriEntrySchema } from './hdri-option.schema.js';
 
 /**
  * How one option is declared, resolved and reached from the two adapters.
@@ -239,5 +241,5 @@ export const viewerOptionsSchema = z.object({
   debug: z.boolean(),
   analytics: z.object({ mode: z.enum(['on', 'off']), endpoint: z.optional(z.string()) }),
   settings: z.object({ show: z.boolean(), side: z.enum(SETTINGS_SIDE_VALUES) }),
-  lighting: z.object({ temperature: lightTemperatureSchema }),
+  lighting: z.object({ temperature: lightTemperatureSchema, hdri: z.partialRecord(z.enum(SITE_SUNS), hdriEntrySchema) }),
 });

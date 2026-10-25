@@ -39,6 +39,7 @@ import { ProbeAtlas, RoomProbes } from './room-probes.js';
 import { atlasLayout, installWalkPatch, walkUniformsFor, setRoomBoxes, type WalkUniforms } from './box-probe-patch.js';
 import { WalkRig } from './walk-rig.js';
 import { WALK_LIGHTING_TUNING as T } from './walk-lighting-tuning.js';
+import { HdriSky, type HdriContent, type HdriSkyState, type HdriView } from '../hdri/hdri-sky.js';
 import type { LightProbeGridWebGL } from 'three/addons/lighting/LightProbeGridWebGL.js';
 
 /**
@@ -127,6 +128,10 @@ export class WalkLighting {
   private probes: RoomProbes | null = null;
   private current: WalkLightingPhase = 'baking';
   private last: WalkLightingStats | null = null;
+  /** The host sky (`hdri/hdri-sky.ts`), shown in the states the rig picks. */
+  private readonly sky: HdriSky;
+  /** The live sun's direction authority, for the sky's elevation (`render/sun-shadow.ts`). */
+  private sun: () => { override(elevationDeg: number | null): void } | null | undefined = () => null;
 
   constructor(renderer: THREE.WebGLRenderer, scene: THREE.Scene) {
     this.renderer = renderer;
@@ -134,12 +139,41 @@ export class WalkLighting {
     this.uniforms = walkUniformsFor(scene);
     this.placeholder = this.uniforms.jeexAtlas.value;
     this.rig = new WalkRig({ scene, renderer, uniforms: this.uniforms });
+    this.sky = new HdriSky({ scene, renderer, exterior: () => this.exterior, sun: () => this.sun() });
     this.parent.name = 'walk-lighting-grids';
     scene.add(this.parent);
   }
 
   get phase(): WalkLightingPhase {
     return this.current;
+  }
+
+  /** What the host sky shows now. */
+  get hdriState(): HdriSkyState {
+    return this.sky.state;
+  }
+
+  /** Where the sky reads the live sun from. */
+  setSun(sun: () => { override(elevationDeg: number | null): void } | null | undefined): void {
+    this.sun = sun;
+  }
+
+  /**
+   * Installs a host sky, or removes it (`null`). A change of HDRI lighting
+   * (an environment installed or removed) re-bakes the rooms, so the swap
+   * frame shows sky, sun and room lighting that agree; a sky alone (a baked
+   * apartment) re-bakes nothing.
+   */
+  setHdri(content: HdriContent | null): void {
+    const relit = this.sky.lighting || content?.environment !== undefined;
+    this.sky.install(content);
+    this.rig.setHdri(content ? this.sky : null);
+    if (relit && this.volumes) this.restart();
+  }
+
+  /** The site's north changed: the sky and the sun turn with it. */
+  setHdriView(view: HdriView): void {
+    this.sky.setView(view);
   }
 
   /**
@@ -150,6 +184,7 @@ export class WalkLighting {
     const result = roomVolumes(doc.volumes);
     if (!result.ok) throw new ViewerLibError('internal', result.error);
     this.release();
+    this.rig.setHdriDaylight(false);
     const volumes = result.volumes;
     if (volumes.boxes.length === 0) {
       this.current = 'empty';
@@ -177,6 +212,11 @@ export class WalkLighting {
 
   /** One frame: `eligible` is whether the frame is drawn in walk or tour with the chain ready. */
   frame(eligible: boolean): void {
+    if (this.current === 'empty') {
+      // No room to light: a host sky shows on its own, in the open-air look.
+      this.rig.setHdriDaylight(eligible);
+      return;
+    }
     if (!eligible || !this.bake || !this.probes) {
       this.show(false);
       return;
@@ -263,6 +303,7 @@ export class WalkLighting {
     this.release();
     this.parent.removeFromParent();
     this.rig.dispose();
+    this.sky.dispose();
   }
 
   private restart(): void {
@@ -277,7 +318,6 @@ export class WalkLighting {
       mirrors: () => mirrorsOf(scene),
       grids: this.grids,
       exterior: this.exterior!,
-      expectedHeight: (scene.environment?.image as { height?: number } | undefined)?.height ?? 0,
       capture: this.atlas!.capture,
       copy: this.atlas!.copy,
     });

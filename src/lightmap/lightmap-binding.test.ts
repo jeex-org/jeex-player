@@ -161,7 +161,7 @@ describe('bindLightBake', () => {
     const patched = materialOf(patchedRoot, CALIBRATION_NODES.floor);
     const plain = materialOf(plainRoot, CALIBRATION_NODES.floor);
     expect(plain.customProgramCacheKey()).toBe(patched.customProgramCacheKey());
-    expect(plain.customProgramCacheKey()).toBe('jeex||jeex-walk-lighting@4|jeex-baked-surface@2|jeex-lightmap-rgbm-r8@1');
+    expect(plain.customProgramCacheKey()).toBe('jeex||jeex-walk-lighting@5|jeex-baked-surface@2|jeex-lightmap-rgbm-r8@1');
   });
 
   test('a source that already carries the walk lighting gives its clone the patch, the policy and the decode, without touching the source', async () => {
@@ -179,8 +179,8 @@ describe('bindLightBake', () => {
     expect(shader.fragmentShader).toContain('jeexLocate( - vViewPosition, normal );');
     expect(shader.fragmentShader).toContain('#define JEEX_BAKED_SURFACE');
     expect(shader.fragmentShader).toContain('#define lightMapIntensity ( lightMapIntensity * lightMapTexel.a * JEEX_RGBM_RANGE )');
-    expect(clone.customProgramCacheKey()).toMatch(/\|jeex-walk-lighting@4\|jeex-baked-surface@2\|jeex-lightmap-rgbm-r8@1$/);
-    expect(source.customProgramCacheKey()).toMatch(/\|jeex-walk-lighting@4$/);
+    expect(clone.customProgramCacheKey()).toMatch(/\|jeex-walk-lighting@5\|jeex-baked-surface@2\|jeex-lightmap-rgbm-r8@1$/);
+    expect(source.customProgramCacheKey()).toMatch(/\|jeex-walk-lighting@5$/);
   });
 
   test('refuses a missing, ambiguous, multi-material or UV-less mesh, and UV1 outside its rect, changing nothing', async () => {

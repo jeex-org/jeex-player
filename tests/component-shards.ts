@@ -61,6 +61,9 @@ export const COMPONENT_FILE_COST_S: Readonly<Record<string, number>> = {
   'fullscreen-controller.test.ts': 1,
   'gltf-body.test.ts': 1,
   'gltf-furniture.test.ts': 1,
+  // Measured on this machine's SwiftShader with one worker (2026-10-25), not on the hosted runner.
+  'hdri-assets.test.ts': 1,
+  'hdri-walk.test.ts': 102,
   'host-slots.test.ts': 27,
   'ktx2.test.ts': 1,
   'lamp-lights.test.ts': 3,

@@ -29,6 +29,8 @@
 import { createLogger, type Logger, type LogSink } from '../shared/logger.js';
 import { resolveLocaleTag, type Locale } from '../ui/messages.js';
 import { judgeOption, type OptionSpec } from './viewer-options.schema.js';
+import { judgeHdriOption } from './hdri-option.schema.js';
+import type { HdriOption } from '../lighting/hdri-entry.js';
 
 /**
  * `OptionSpec` is declared in `viewer-options.schema.ts` now (`judgeOption`
@@ -64,6 +66,26 @@ export function warnInvalid(log: Logger, path: string, value: unknown, fallback:
       fallback,
     },
   );
+}
+
+/**
+ * The `option-invalid` warning of an option that has no fallback value: the
+ * part named by `path` is dropped. The value is not echoed (it may carry
+ * signed URLs); `reason` says what was wrong.
+ */
+function warnDropped(path: string, reason: string): void {
+  sink.warn('option-invalid', `viewer options: ${path} is not valid (${reason}); dropped`, { path, reason });
+}
+
+/**
+ * `lighting.hdri`: a typed object with no string spelling, judged entry by
+ * entry (`hdri-option.schema.ts`); a refused entry is dropped with one
+ * warning and its siblings are kept.
+ */
+export function resolveHdri(value: unknown): HdriOption {
+  const verdict = judgeHdriOption(value);
+  for (const refusal of verdict.refused) warnDropped(refusal.path, refusal.message);
+  return verdict.value;
 }
 
 function warn(path: string, value: unknown, fallback: unknown): void {

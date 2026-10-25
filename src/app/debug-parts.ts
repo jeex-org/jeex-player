@@ -56,6 +56,7 @@ export function debugHostFor(model: SceneModel, deps: DebugPartsDeps): ViewerDeb
       const lighting = stage()?.walkLighting;
       return lighting ? { state: lighting.state(), stats: lighting.stats() } : undefined;
     },
+    hdri: () => stage()?.walkLighting.hdri(),
     renderDemand: () => stage()?.runtime.demand.counters(),
     lightBake: () => deps.mount.lightBake.state(),
     furnitureVisible: () => deps.furnitureVisible(),

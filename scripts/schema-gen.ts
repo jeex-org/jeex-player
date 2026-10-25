@@ -155,7 +155,10 @@ export function generateSchema(target: SchemaTarget, version: string = packageVe
   // `createSchema` emits draft-07's `$schema` unconditionally; `Config` has no
   // draft-selection field, so the repository's own draft is set here instead.
   schema['$schema'] = SCHEMA_DRAFT;
-  if (target.type === 'ViewerOptions') dropHostOnlyOptions(schema);
+  if (target.type === 'ViewerOptions') {
+    dropHostOnlyOptions(schema);
+    annotateHdriColour(schema);
+  }
   if (target.name === SCENE_SCHEMA_TARGET.name && target.type === SCENE_SCHEMA_TARGET.type) {
     allowPublishedSchemaKey(schema, target.type);
     annotateUuidFields(schema);
@@ -181,6 +184,22 @@ function dropHostOnlyOptions(schema: Record<string, unknown>): void {
   const properties = definition?.['properties'] as Record<string, unknown> | undefined;
   if (properties === undefined) throw new Error('schema-gen: expected definitions.ViewerOptions.properties');
   for (const name of HOST_ONLY_OPTIONS) delete properties[name];
+}
+
+/**
+ * The one rule of a `lighting.hdri` entry its TypeScript type and JSDoc cannot
+ * spell, written as the Zod twin (`src/app/hdri-option.schema.ts`) judges it:
+ * the sun's linear colour has three channels in [0, 1] and its largest is
+ * exactly 1 (`contains: { const: 1 }`).
+ */
+function annotateHdriColour(schema: Record<string, unknown>): void {
+  const sun = (
+    (schema['definitions'] as Record<string, SchemaNode>)['HdriEntry']?.['properties'] as Record<string, SchemaNode> | undefined
+  )?.['sun'];
+  const colour = (sun?.['properties'] as Record<string, SchemaNode> | undefined)?.['colourLinear'];
+  if (colour === undefined) throw new Error('schema-gen: expected definitions.HdriEntry.properties.sun.properties.colourLinear');
+  colour['items'] = { type: 'number', minimum: 0, maximum: 1 };
+  colour['contains'] = { const: 1 };
 }
 
 /**

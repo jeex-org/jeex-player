@@ -9,14 +9,15 @@
  * (the room is lit as it will be on screen, and every program the walk draws
  * with is compiled here, before the swap), the mirrors hidden.
  *
- * Layout invariant: a 128 px probe's PMREM output has exactly the studio
- * environment's cube-UV layout, so the patch reuses three's sampling with a
- * tile offset; `step` fails loudly when the capture's layout differs.
+ * Layout invariant: a 128 px probe's PMREM output is exactly one atlas tile
+ * (`TILE`), and the patch samples it with the atlas's own largest mip
+ * (`JEEX_PROBE_MAX_MIP`), whatever the size of the scene's environment;
+ * `step` fails loudly when a capture's layout differs from the tile.
  */
 
 import { ViewerLibError } from '../../shared/errors.js';
 import * as THREE from 'three';
-import type { AtlasLayout, UniformState } from './box-probe-patch.js';
+import { TILE, type AtlasLayout, type UniformState } from './box-probe-patch.js';
 import type { RoomProbe, Vec3 } from './room-volumes.js';
 import { WALK_LIGHTING_TUNING as T } from './walk-lighting-tuning.js';
 
@@ -34,8 +35,6 @@ export type RoomProbesDeps = {
   mirrors: () => readonly { visible: boolean }[];
   grids: readonly { visible: boolean }[];
   exterior: { visible: boolean };
-  /** The studio environment's cube-UV height, which every capture must match. */
-  expectedHeight: number;
   capture: ProbeCapture;
   copy: ProbeCopy;
 };
@@ -76,10 +75,10 @@ export class RoomProbes {
     try {
       const probe = this.deps.capture(this.deps.probes[index]!.position);
       try {
-        if (probe.height !== this.deps.expectedHeight) {
+        if (probe.width !== TILE.width || probe.height !== TILE.height) {
           throw new ViewerLibError(
             'internal',
-            `a room probe's cube-UV layout is ${probe.width} x ${probe.height}; the studio environment's is ${this.deps.expectedHeight} high`,
+            `a room probe's cube-UV layout is ${probe.width} x ${probe.height}; the atlas tile is ${TILE.width} x ${TILE.height}`,
           );
         }
         this.deps.copy(probe.texture, layout.tiles[index]!);

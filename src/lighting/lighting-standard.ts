@@ -216,6 +216,38 @@ export const LIGHTING_STANDARD = deepFreeze({
    * surface looks and raises `LIGHTING_STANDARD_VERSION`.
    */
   baked: { exposure: { editing: 80, walk: 6.4 } },
+  /**
+   * A host's sky (`lighting.hdri`) lighting the apartment rig in walk and
+   * tour. `environmentGain` times `loaderCompensation` is the
+   * `scene.environmentIntensity` of the HDRI; `loaderCompensation` undoes the
+   * darkening of three's `UltraHDRLoader` against the reference decode (it
+   * multiplies in sRGB-encoded space with a display-boost weight): re-measure
+   * it on every three upgrade that touches the loader. `sunConeDeg` is the half
+   * angle of the cone around the stored sun whose residual light the analytic
+   * sun does not repeat. `skyBrightness` is the displayed brightness of the
+   * window sky at exposure 1, before the walk chain's output pass.
+   * Measured 2026-10-24 on three clear-sky panoramas (sun at 8°, 43° and
+   * 10.5°, 1K gain-map environments, 2K skies):
+   * - `loaderCompensation`: three r186's decode against the panoramas' own
+   *   float data reads 0.949 to 0.956 of the sky (0.958 on the synthetic
+   *   test fixture, `tests/component/hdri-assets.test.ts`); 1 / 0.952.
+   * - `environmentGain`: an open-air horizontal card under the 43° panorama
+   *   (sky plus derived sun, `hdri-calibration.ts`; 5.226 decoded units ×
+   *   the compensation) receives what the standard's apartment rig gives it
+   *   at `noon` (environment 4.279, hemisphere 0.878, fill 0.097, sun 2.253:
+   *   7.507), so a facade reads as in the editing modes at midday; the low
+   *   suns' panoramas then give 0.61 and 0.44 of the recipe, as their skies do.
+   * - `skyBrightness`: the knee of the window sky's median display value
+   *   through PBR Neutral (0.72, 0.79 and 0.69 at 3; under +0.03 per further
+   *   unit). PBR Neutral does not clip, so no clipped fraction decides it.
+   * Additions only, no existing value changed: the version stays 1.
+   */
+  hdri: {
+    environmentGain: 1.37,
+    loaderCompensation: 1 / 0.952,
+    skyBrightness: 3,
+    sunConeDeg: 6,
+  },
 });
 
 export type LightingStandard = typeof LIGHTING_STANDARD;

@@ -273,6 +273,7 @@ Every option has one name in each of the three spellings. Unknown keys are ignor
 | `settings.show` | `settings` | `settings` | `false` | The viewer's settings button, attached to the control bar's end next to Interior styles, and the panel it opens (its one setting so far is the light temperature). Off by default, so visitors see none; a host that lets the viewer's user choose turns it on. It hides with the control bar. See [Settings and light temperature](#settings-and-light-temperature). |
 | `settings.side` | `settingsSide` | `settings-side` | `'end'` | The control bar edge the settings button attaches to: `'end'` (next to Interior styles) or `'start'`, the bar's inline edges by its writing direction (start is the left in a left-to-right page). Read once at mount; on its own it shows no button (`settings.show` does). Any other value keeps `'end'` with a warning. |
 | `lighting.temperature` | `lightTemperature` | `light-temperature` | `null` («Original») | Colour temperature of the interior's artificial light (the lamps and the walk's ambient floor), kelvin from `2700` to `6500` in steps of `100`, or `null` (query and attribute: `original`) for every light's own colour. The attribute is live: setting it changes the light, removing it means «Original», and a value that is not a temperature warns once and keeps the current one. |
+| `lighting.hdri` | none | none | none | A real sky per sun preset for walk and tour, as an object passed to `mountViewer` only. See [Sky in walk and tour](#sky-in-walk-and-tour). |
 
 **Compound attributes.** `chrome`, `overlay` and `unbranded` are query/attribute-only sugar, applied in this order — `overlay` (or, when it is absent, `unbranded`), then `chrome`, then every individual attribute — so a preset never has the last word: `<jeex-viewer overlay="kiosk" chrome-status="true">` shows the status pill even though `kiosk` turns it off, and `<jeex-viewer chrome="false" chrome-status="true">` hides everything but the status pill. `<jeex-viewer unbranded overlay="kiosk">` (or the query-string equivalent, in either order) resolves to plain `kiosk`: an explicit `overlay=` is read first and, when present, decides everything on its own, so `unbranded` never even gets a look. None of the three names works in the plain options object passed to `mountViewer` — `chrome` already names the nested `{ brand, controls, … }` object there, and `overlay`/`unbranded` have nothing to expand into without going through `optionsFromDataset`/`optionsFromQuery` first.
 
@@ -1195,6 +1196,33 @@ In `walk` and `tour` each room is lit by its own light: a windowless bathroom is
 - **Editing modes** (`plan2d`, `plan3d`, `orbit`) are unchanged, and leaving walk restores them exactly.
 - **Captures:** stills, video frames and panoramas of the live view in walk or tour show the room lighting once it is baked (before that, the direct look). Captures of other states (another camera's preview, an exported file) show the editing look.
 - **Cost:** the code travels in the walk chunk (about 12 KB gzip more). GPU memory is about 1.6 MB per room for the reflection probe plus a few kilobytes per grid.
+
+### Sky in walk and tour
+
+A host can hand the viewer a real sky for each sun preset with `lighting.hdri`. In `walk` and `tour` the windows then show that sky, and the apartment is lit from it: the exterior, the room light probes and reflections, and a sun that agrees with the sky. The editing modes never load it and look exactly as before.
+
+```js
+mountViewer(element, {
+  scene: { url: '/flat.json' }, // the scene's site names the sun preset
+  lighting: {
+    hdri: {
+      noon: {
+        environmentUrl: 'https://cdn.example.com/sky/noon-1k.jpg', // gain-map (Ultra HDR) JPEG, 1024 x 512
+        skyUrl: 'https://cdn.example.com/sky/noon-2k.avif', // what the windows show, sRGB
+        sun: { azimuthDeg: 54, elevationDeg: 43, colourLinear: [1, 0.94, 0.87], horizontalIrradianceShare: 0.78 },
+      },
+    },
+  },
+});
+```
+
+- **Which entry:** the scene's `site.sun` (`noon` when the site names none). A scene without a `site`, or a preset without an entry, keeps the standard look. An entry never serves another preset.
+- **The sun facts** are measured once when the panorama is prepared: `azimuthDeg` is the panorama's own sun azimuth, degrees clockwise from +Z towards +X (a three.js `atan2(z, x)` azimuth `a` is `90 - a`); `elevationDeg` its elevation, above 0; `colourLinear` its linear colour with the largest channel 1; `horizontalIrradianceShare` the part of the sky's horizontal irradiance that came from the 6° around the sun before the sun was clamped, from 0 up to but not including 1. The viewer turns the panorama so its sun stands at the preset's azimuth from the scene's north, keeps the sun's elevation and colour, and derives the sun's strength from the sky.
+- **Files:** the environment JPEG must carry the gain map's `hdrgm` XMP packet; the ISO 21496-1 block alone is not read (libultrahdr writes it alone by default: build it with `-DUHDR_WRITE_XMP=ON` and encode with `-M 0`). Both files are fetched with `fetch`, so a URL on another origin needs CORS headers (`Access-Control-Allow-Origin`).
+- **Validation:** both URLs absolute `http:`, `https:` or `blob:`. An invalid entry is dropped with one `option-invalid` warning; the others are kept. There is no query parameter and no attribute for it.
+- **When:** the pair of the active preset is fetched on the first entry into walk or tour, both files at once; until both are ready the view looks as before, and the sky, the sun and the room lighting then change in one frame. A failed file logs one `hdri-unavailable` warning and keeps the standard look; it is not fetched again until another scene is loaded.
+- **Baked apartments** (an applied light bake) show the sky through the windows but keep the daylight the bake recorded, and log one `hdri-bake-daylight` warning.
+- **Cost:** the decoder travels in the walk chunk; the images are the host's (about 0.4 MB per preset for a 1K environment and a 2K sky).
 
 ## Settings and light temperature
 
