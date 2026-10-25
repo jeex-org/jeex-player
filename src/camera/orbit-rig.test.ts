@@ -808,3 +808,66 @@ describe('orbit input direction', () => {
     expect(prevented).toBe(6);
   });
 });
+
+/**
+ * One tap, one pick callback. A leading `null` call to the other callback
+ * used to clear the editor's selection before the real pick arrived, so the
+ * editor could never tell a second tap on the selected object from a first.
+ */
+describe('a 360 tap reports exactly one pick', () => {
+  const SOFA = '01a1714b-3c2f-7a10-8e21-5d6c7b8a9f01';
+  const WINDOW = '01a1714b-3c30-7b22-9f33-6e7d8c9b0a12';
+
+  function tapped(pick: unknown): { surfaces: unknown[]; furniture: unknown[] } {
+    const surfaces: unknown[] = [];
+    const furniture: unknown[] = [];
+    const camera = new THREE.PerspectiveCamera(55, 4 / 3, 0.1, 200);
+    const orbit = new OrbitRig({
+      camera,
+      picker: stubPicker({ pickSurface: () => pick } as never),
+      callbacks: {
+        onSurfacePicked: (picked) => surfaces.push(picked),
+        onFurniturePicked: (assetId) => furniture.push(assetId),
+      },
+    });
+    orbit.tap(10, 10);
+    return { surfaces, furniture };
+  }
+
+  test('furniture: only the furniture callback', () => {
+    expect(tapped({ surface: 'furniture', assetId: SOFA })).toEqual({ surfaces: [], furniture: [SOFA] });
+  });
+
+  test('an opening: only the surface callback', () => {
+    const pick = { surface: 'opening', openingId: WINDOW };
+    expect(tapped(pick)).toEqual({ surfaces: [pick], furniture: [] });
+  });
+
+  test('a miss still clears both', () => {
+    expect(tapped(null)).toEqual({ surfaces: [null], furniture: [null] });
+  });
+});
+
+describe('a repeat tap in 360 and in walk', () => {
+  test('orbit ignores the second click of a double click; walk takes both', () => {
+    const { controller, canvas } = cameraHarness();
+    const internals = controller as unknown as {
+      orbit: { tap: (x: number, y: number) => void };
+      walk: { tap: (x: number, y: number, at: number) => void };
+    };
+    const orbitTaps: number[] = [];
+    const walkTaps: number[] = [];
+    internals.orbit.tap = (x) => orbitTaps.push(x);
+    internals.walk.tap = (x) => walkTaps.push(x);
+
+    controller.setMode('orbit');
+    canvas.fire('click', { clientX: 1, clientY: 1, detail: 1 });
+    canvas.fire('click', { clientX: 2, clientY: 1, detail: 2 });
+    expect(orbitTaps).toEqual([1]);
+
+    controller.setMode('walk');
+    canvas.fire('click', { clientX: 3, clientY: 1, detail: 1 });
+    canvas.fire('click', { clientX: 4, clientY: 1, detail: 2 });
+    expect(walkTaps).toEqual([3, 4]);
+  });
+});

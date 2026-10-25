@@ -219,9 +219,12 @@ export class ViewerEditor {
 
   /** Orbit click on a floor, a wall or an opening. */
   handleSurfacePick(pick: SurfacePick | null, clientX: number, clientY: number): void {
+    // Compared before `clearSelection()` forgets it: a second tap on the
+    // selected opening deselects it.
+    const again = pick?.surface === 'opening' && !!pick.openingId && pick.openingId === this.selectedOpeningId;
     this.clearSelection();
     if (pick?.surface === 'opening') {
-      if (!pick.openingId) {
+      if (!pick.openingId || again) {
         this.closePanel();
         return;
       }
@@ -236,9 +239,9 @@ export class ViewerEditor {
     this.closePanel();
   }
 
-  /** Orbit click on furniture; `null` means the click missed every object. */
+  /** Orbit click on furniture; `null` (a miss) or the selected item again (a second tap) deselects. */
   handleFurniturePick(assetId: string | null): void {
-    if (!assetId) {
+    if (!assetId || assetId === this.selectedAssetId) {
       this.clearSelection();
       this.closePanel();
       return;
