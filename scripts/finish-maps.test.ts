@@ -163,9 +163,18 @@ describe('the contemporary set', () => {
     expect(BUILTIN_DEFAULT_CEILING?.material.facts.colourMode).toBe('tintable');
   });
 
-  test('the porcelain and limestone repeats hold whole tiles', () => {
+  test('the porcelain repeats hold whole tiles', () => {
     expect(BUILTIN_FINISHES.get(FINISH.ceramic_light)?.material.facts.tileM).toEqual([3.6, 1.8]);
     expect(BUILTIN_FINISHES.get(FINISH.porcelain_grey)?.material.facts.tileM).toEqual([3.6, 1.8]);
-    expect(BUILTIN_FINISHES.get(FINISH.stone)?.material.facts.tileM).toEqual([3.72, 3.72]);
+  });
+
+  test('Cream limestone is the honed marble scan at its real size, tinted warm cream', () => {
+    const limestone = BUILTIN_FINISHES.get(FINISH.stone)!;
+    expect({
+      version: limestone.material.versionId,
+      colour: limestone.colour,
+      tileM: limestone.material.facts.tileM,
+      roughness: limestone.material.facts.pbr.roughness?.toFixed(3),
+    }).toEqual({ version: '01a17052-6c88-7224-9c80-240c126fe952', colour: '#dcc8a4', tileM: [1.5, 1.5], roughness: '0.593' });
   });
 });

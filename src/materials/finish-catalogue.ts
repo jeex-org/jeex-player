@@ -88,7 +88,7 @@ export const FLOOR_FINISHES: BankFinish[] = [
     slug: 'stone',
     name: 'Cream limestone',
     kind: 'tiles',
-    base: '#d5cbb9',
+    base: '#ddc9a5',
     accent: '#8f877b',
     roughness: 0.7,
     tile: 2.48,

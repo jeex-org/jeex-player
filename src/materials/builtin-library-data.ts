@@ -146,10 +146,10 @@ export const BUILTIN_RECORDS: BuiltinRecords = {
       sizes: ['256', '512', '768'],
     },
     {
-      versionId: '01a16edd-c6f5-717f-ab06-1a807ea38b3d',
+      versionId: '01a17052-6c88-7224-9c80-240c126fe952',
       kind: 'scan',
       facts: {
-        tileM: [3.72, 3.72],
+        tileM: [1.5, 1.5],
         grain: 'unknown',
         suitability: 'continuous',
         normalStrength: 1,
@@ -159,13 +159,13 @@ export const BUILTIN_RECORDS: BuiltinRecords = {
           suggestedColours: [
             {
               name: 'natural',
-              hex: '#dab58e',
+              hex: '#b29d7a',
             },
           ],
         },
         averageColour: '#808080',
         pbr: {
-          roughness: 0.8952479638105189,
+          roughness: 0.5931042604748559,
         },
       },
       roles: ['albedoTint', 'normal', 'arm'],
@@ -573,7 +573,7 @@ export const BUILTIN_RECORDS: BuiltinRecords = {
     {
       finish: '01a12fdf-1594-715c-a2ec-7257f0ac0434',
       version: 7,
-      colour: '#d4cab8',
+      colour: '#dcc8a4',
       rotation: 0,
     },
     {

@@ -9,6 +9,12 @@ as described under [Versioning](#versioning).
 
 ### Changed
 
+- **Cream limestone is a honed marble scan.** The bundled Cream limestone
+  finish keeps its id and now draws Poly Haven marble_01 tinted warm cream,
+  at the scan's real size of 1.5 m, instead of a tiled scan whose chalk
+  markings and dark pits read as dirt. Light bakes of scenes that wear it
+  should be made again.
+
 - **Orbit and the top view draw on demand.** Like walk and tour, orbit and
   the 3D top view now draw a frame only when something on screen changes: the
   camera, the scene, a selection, an overlay or the lighting. A view at rest

@@ -11,7 +11,7 @@ The maps under `tex/` are scanned textures released under CC0 1.0 (public domain
 | Wood Floor 053, herringbone | ambientcg | https://ambientcg.com/a/WoodFloor053 | CC0-1.0 | `01a16edd-bed9-76f3-abc4-1417005b2b52` |
 | Wood Floor 014, herringbone dark | ambientcg | https://ambientcg.com/a/WoodFloor014 | CC0-1.0 | `01a16edd-bfe8-7549-a32c-adb6bea37c9a` |
 | Terrazzo 005, terrazzo | ambientcg | https://ambientcg.com/a/Terrazzo005 | CC0-1.0 | `01a16edd-c42d-74d3-ae0b-ef01cb3841da` |
-| Tiles 143, limestone | ambientcg | https://ambientcg.com/a/Tiles143 | CC0-1.0 | `01a16edd-c6f5-717f-ab06-1a807ea38b3d` |
+| Marble 01, limestone | polyhaven | https://polyhaven.com/a/marble_01 | CC0-1.0 | `01a17052-6c88-7224-9c80-240c126fe952` |
 | Tiles 038, ceramic light | ambientcg | https://ambientcg.com/a/Tiles038 | CC0-1.0 | `01a16edd-c8c1-72e8-b680-50a5a458b45d` |
 | Tiles 038, ceramic graphite | ambientcg | https://ambientcg.com/a/Tiles038 | CC0-1.0 | `01a16edd-ca51-77c3-b6e4-216df60b2371` |
 | Plaster 002, white | ambientcg | https://ambientcg.com/a/Plaster002 | CC0-1.0 | `01a16edd-cfd9-7142-9875-89a7cb31b32f` |
