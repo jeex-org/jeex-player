@@ -6,7 +6,7 @@
 
 import { describe, expect, test } from 'bun:test';
 import * as THREE from 'three';
-import { WalkLighting } from './walk-lighting.js';
+import { bakeExclusions, furnitureRenderables, WalkLighting } from './walk-lighting.js';
 import { installWalkPatch } from './box-probe-patch.js';
 
 const renderer = () => ({ toneMappingExposure: 1 }) as unknown as THREE.WebGLRenderer;
@@ -69,5 +69,44 @@ describe('WalkLighting', () => {
     expect(lighting.hdriState).toBe('off');
     expect(scene.background).toBe(gradient);
     lighting.dispose();
+  });
+});
+
+describe('grid bake exclusions', () => {
+  /** A scene with a furniture group holding an opaque body, a transmissive body and a mirror-like reflector, each over a lamp, plus a glass pane and a reflector outside it. */
+  function scene() {
+    const root = new THREE.Scene();
+    const furniture = new THREE.Group();
+    root.add(furniture);
+    const body = new THREE.Mesh(new THREE.BoxGeometry(), new THREE.MeshStandardMaterial());
+    body.add(new THREE.PointLight());
+    const glass = new THREE.Mesh(new THREE.BoxGeometry(), new THREE.MeshPhysicalMaterial({ transmission: 1 }));
+    glass.add(new THREE.PointLight());
+    const reflector = Object.assign(new THREE.Mesh(new THREE.PlaneGeometry(), new THREE.MeshBasicMaterial()), { isReflector: true });
+    const group = new THREE.Group();
+    group.add(body, glass, reflector);
+    furniture.add(group);
+    const pane = new THREE.Mesh(new THREE.PlaneGeometry(), new THREE.MeshPhysicalMaterial({ transmission: 1 }));
+    const wallMirror = Object.assign(new THREE.Mesh(new THREE.PlaneGeometry(), new THREE.MeshBasicMaterial()), { isReflector: true });
+    root.add(pane, wallMirror);
+    return { root, furniture, body, glass, reflector, pane, wallMirror };
+  }
+
+  test('nothing under the furniture group is hidden by visibility; mirrors and glass outside it are', () => {
+    const { root, furniture, pane, wallMirror } = scene();
+    const hidden = bakeExclusions(root, furniture);
+    expect(hidden).toContain(pane);
+    expect(hidden).toContain(wallMirror);
+    for (const object of hidden) {
+      let inFurniture = false;
+      object.traverseAncestors((ancestor) => (inFurniture ||= ancestor === furniture));
+      expect(object === furniture || inFurniture).toBe(false);
+    }
+  });
+
+  test('every renderable under the furniture group leaves the capture by its layers, transmissive and mirror included', () => {
+    const { furniture, body, glass, reflector } = scene();
+    expect(new Set(furnitureRenderables(furniture))).toEqual(new Set([body, glass, reflector]));
+    expect(furnitureRenderables(null)).toEqual([]);
   });
 });

@@ -26,7 +26,10 @@ class FakeLighting implements WalkLightingHandle<Doc> {
     this.loads.push(doc);
     this.phase = 'baking';
   }
+  /** Relights and frames in the order they came. */
+  calls: string[] = [];
   frame(eligible: boolean): void {
+    this.calls.push(eligible ? 'frame' : 'frame-off');
     this.frames.push(eligible);
     if (eligible && this.phase === 'live' && this.pendingProbes > 0) this.pendingProbes -= 1;
     if (eligible && this.phase !== 'live' && --this.left <= 0) this.phase = 'live';
@@ -35,6 +38,7 @@ class FakeLighting implements WalkLightingHandle<Doc> {
     return this.phase === 'live' && this.pendingProbes > 0;
   }
   relight(): void {
+    this.calls.push('relight');
     this.relights += 1;
     this.pendingProbes = 3;
   }
@@ -303,5 +307,25 @@ describe('WalkLightingController.relit (a new colour of the artificial light)', 
     expect(built[0]!.relights).toBe(0);
     controller.update('walk');
     expect(built[0]!.relights).toBe(1);
+  });
+
+  test('a change made outside walk is handed over on the very first walk frame, before it is drawn, without the settle wait', async () => {
+    const { controller, built, tick } = await live();
+    controller.update('orbit');
+    controller.relit();
+    tick(10);
+    controller.update('orbit');
+    expect(built[0]!.relights).toBe(0);
+    built[0]!.calls = [];
+    controller.update('walk');
+    expect(built[0]!.calls.slice(0, 2)).toEqual(['relight', 'frame']);
+  });
+
+  test('a change in walk still waits for the value to rest', async () => {
+    const { controller, built, tick } = await live();
+    controller.relit();
+    tick(10);
+    controller.update('walk');
+    expect(built[0]!.relights).toBe(0);
   });
 });

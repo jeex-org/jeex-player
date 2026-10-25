@@ -63,4 +63,29 @@ describe('lightMasks (three r186.1 WebGLLights order)', () => {
     scene.add(sun, fill, new THREE.AmbientLight(), new THREE.HemisphereLight());
     expect(lightMasks(scene, new THREE.PerspectiveCamera()).directional).toEqual([0, 1]);
   });
+
+  test('rooms: every drawn point light answers its room in the same order and length as its mask, -1 when it has none', () => {
+    const scene = new THREE.Scene();
+    const room = <T extends THREE.Light>(light: T, index: number): T => {
+      light.userData['jeexLampRoom'] = index;
+      return light;
+    };
+    const first = room(new THREE.PointLight(), 0);
+    const caster = room(new THREE.PointLight(), 2);
+    caster.castShadow = true;
+    const hidden = new THREE.Group();
+    hidden.visible = false;
+    hidden.add(room(new THREE.PointLight(), 5));
+    const offLayer = room(new THREE.PointLight(), 6);
+    offLayer.layers.set(3);
+    // A lamp under a body that is off every layer (the grid capture): still drawn.
+    const body = new THREE.Mesh();
+    body.layers.mask = 0;
+    body.add(room(new THREE.PointLight(), 1));
+    scene.add(first, hidden, offLayer, body, new THREE.PointLight(), caster, room(new THREE.PointLight(), -2));
+    const masks = lightMasks(scene, new THREE.PerspectiveCamera());
+    // The caster sorts first; the rest keep traversal order.
+    expect(masks.pointRoom).toEqual([2, 0, 1, -1, -2]);
+    expect(masks.pointRoom).toHaveLength(masks.point.length);
+  });
 });
