@@ -424,6 +424,21 @@ export function buildGraph(nodes: readonly PlanNode[], walls: readonly Wall[]): 
 }
 
 /**
+ * The ATTACHED rooms whose anchor lies inside each positive face, index for
+ * index with `graph.faces`, in the order `rooms` lists them. Detached rooms
+ * (`Room.polygon`) are left out here, so no caller can count them by mistake.
+ *
+ * The one grouping `assignRooms` judges and the commit-time room merge
+ * (`scene/room-merge.ts`) acts on: a face with several anchors is a
+ * `MULTI_ANCHOR` refusal here and a merge candidate there, and the two cannot
+ * drift apart.
+ */
+export function anchorsPerFace<R extends Room>(graph: PlanGraph, rooms: readonly R[]): R[][] {
+  const attached = rooms.filter((room) => room.polygon === undefined);
+  return graph.faces.map((face) => attached.filter((r) => pointInPolygon(r.anchor, face.polygon)));
+}
+
+/**
  * Match every positive face with the single room whose `anchor` lies inside it.
  * Exactly one anchor per face and one face per room, or a `PlanError`.
  *
@@ -436,7 +451,7 @@ export function buildGraph(nodes: readonly PlanNode[], walls: readonly Wall[]): 
  */
 export function assignRooms(graph: PlanGraph, rooms: readonly Room[]): Map<GraphFace, Room> {
   const attached = rooms.filter((room) => room.polygon === undefined);
-  const matches = graph.faces.map((face) => attached.filter((r) => pointInPolygon(r.anchor, face.polygon)));
+  const matches = anchorsPerFace(graph, attached);
 
   for (let i = 0; i < graph.faces.length; i += 1) {
     if (matches[i]!.length > 1) {

@@ -381,6 +381,7 @@ export const UUID_FIELDS: Readonly<
   SetWallOp: { value: ['wallId'] },
   RemoveWallOp: { value: ['wallId'] },
   SplitWallOp: { value: ['wallId', 'nodeId'], items: ['ids'] },
+  MergeWallOp: { value: ['id'], items: ['wallIds'] },
 };
 
 /** A JSON Schema node, loosely: the generator's output is plain JSON. */
