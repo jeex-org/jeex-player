@@ -231,17 +231,30 @@ export function isProjectDocument(value: unknown): value is { format: 'jeex-proj
  * deliberately instead of surviving by accident.
  */
 export function projectLibraryOf(manifest: BakedProjectManifest): ProjectLibrary {
+  return libraryOf(manifest.library);
+}
+
+/**
+ * `projectLibraryOf` for a bare library: what an `offers` library, which has
+ * no project around it, turns into for the registries. A host validates a
+ * document that names offers with
+ * `registriesFromLibrary(libraryOf(parseProjectLibrary(offers)), …)`, exactly
+ * as the viewer does.
+ */
+export function libraryOf(library: ProjectLibraryManifest): ProjectLibrary {
   return {
-    id: manifest.library.id,
-    objects: manifest.library.objects.map((object) => ({
+    id: library.id,
+    objects: library.objects.map((object) => ({
       id: object.id,
       variants: object.variants.map((variant) => ({ id: variant.id })),
       defaultVariant: object.defaultVariant,
       anchor: object.anchor,
-      // The one other archetype fact an EDIT judges: which axes `mirror_object` may set.
+      // The archetype facts an EDIT judges: which axes `mirror_object` may set,
+      // and whether it stands on a surface (`replace_asset` keeps the pair).
       ...(object.mirror === undefined ? {} : { mirror: object.mirror }),
+      ...(object.onSurface === true ? { onSurface: true as const } : {}),
     })),
-    materials: manifest.library.materials.map((material) => ({
+    materials: library.materials.map((material) => ({
       id: material.id,
       apply: material.apply,
       // Which member draws it: only a `library` material takes a finish object.

@@ -66,6 +66,24 @@ export type VariantBank = {
   readonly previewUrl?: ((asset: { readonly preview?: string | undefined }) => string | undefined) | undefined;
   /** The project's own materials, in manifest order: its library materials are offered first on a room surface. */
   readonly materials?: readonly ProjectMaterial[] | undefined;
+  /**
+   * The host's `offers` library, when one was given: what the "Replace with
+   * another…" popup lists instead of the bundled bank (`replace-offers.ts`).
+   * Its previews are already absolute (`library-stack.ts`).
+   */
+  readonly offers?:
+    | {
+        readonly id: string;
+        readonly objects: readonly ResolvableObject[];
+        /**
+         * The project library and the archetype ids it declares too. Such an
+         * offer is the PROJECT's copy on screen (the project answers first),
+         * so it is offered under the project library: what is validated is
+         * what is drawn.
+         */
+        readonly project?: { readonly id: string; readonly ids: ReadonlySet<string> } | undefined;
+      }
+    | undefined;
 };
 
 function project(object: ResolvableObject, variant: ResolvableVariant, bank?: VariantBank): AssetVariant {

@@ -1,0 +1,239 @@
+{
+  "schemaVersion": "2.2",
+  "units": "m",
+  "id": "01a1f5aa-100b-7c15-b0c8-e9df469611a1",
+  "name": "Offers fixture",
+  "ceilingHeight": 2.7,
+  "nodes": [
+    {
+      "id": "01a12fec-9d30-7a6a-a4d0-2fbafdac7f03",
+      "p": {
+        "x": 0,
+        "z": 0
+      }
+    },
+    {
+      "id": "01a12fec-9d31-7663-b822-d518a25e8453",
+      "p": {
+        "x": 4,
+        "z": 0
+      }
+    },
+    {
+      "id": "01a12fec-9d32-7196-9884-83bb8f3e8fdf",
+      "p": {
+        "x": 8,
+        "z": 0
+      }
+    },
+    {
+      "id": "01a12fec-9d33-7364-9333-b1df92a13118",
+      "p": {
+        "x": 8,
+        "z": 6
+      }
+    },
+    {
+      "id": "01a12fec-9d34-758a-acfa-d0f66594ca54",
+      "p": {
+        "x": 4,
+        "z": 6
+      }
+    },
+    {
+      "id": "01a12fec-9d35-76aa-b291-0094d081428f",
+      "p": {
+        "x": 0,
+        "z": 6
+      }
+    }
+  ],
+  "walls": [
+    {
+      "id": "01a12fec-9d36-748e-aa0d-a631b3e6e145",
+      "a": "01a12fec-9d30-7a6a-a4d0-2fbafdac7f03",
+      "b": "01a12fec-9d31-7663-b822-d518a25e8453",
+      "thickness": 0.3,
+      "role": "facade"
+    },
+    {
+      "id": "01a12fec-9d37-7a6c-97e1-5b8e298a7acb",
+      "a": "01a12fec-9d31-7663-b822-d518a25e8453",
+      "b": "01a12fec-9d32-7196-9884-83bb8f3e8fdf",
+      "thickness": 0.3,
+      "role": "facade"
+    },
+    {
+      "id": "01a12fec-9d38-7e15-b79b-11b19ef19139",
+      "a": "01a12fec-9d32-7196-9884-83bb8f3e8fdf",
+      "b": "01a12fec-9d33-7364-9333-b1df92a13118",
+      "thickness": 0.3,
+      "role": "facade"
+    },
+    {
+      "id": "01a12fec-9d39-7f57-85de-524e75edac98",
+      "a": "01a12fec-9d33-7364-9333-b1df92a13118",
+      "b": "01a12fec-9d34-758a-acfa-d0f66594ca54",
+      "thickness": 0.3,
+      "role": "facade"
+    },
+    {
+      "id": "01a12fec-9d3a-7677-b6d1-79764d2bb268",
+      "a": "01a12fec-9d34-758a-acfa-d0f66594ca54",
+      "b": "01a12fec-9d35-76aa-b291-0094d081428f",
+      "thickness": 0.3,
+      "role": "facade"
+    },
+    {
+      "id": "01a12fec-9d3b-7671-88a7-ece42bed2c54",
+      "a": "01a12fec-9d35-76aa-b291-0094d081428f",
+      "b": "01a12fec-9d30-7a6a-a4d0-2fbafdac7f03",
+      "thickness": 0.3,
+      "role": "facade"
+    },
+    {
+      "id": "01a12fec-9d3c-7fc8-8e73-a5aa3f2c6c06",
+      "a": "01a12fec-9d31-7663-b822-d518a25e8453",
+      "b": "01a12fec-9d34-758a-acfa-d0f66594ca54",
+      "thickness": 0.15,
+      "role": "partition",
+      "openings": [
+        {
+          "id": "01a12fec-9d3d-706a-8371-da5610d96c72",
+          "type": "passage",
+          "center": 3,
+          "width": 1.1
+        }
+      ]
+    }
+  ],
+  "rooms": [
+    {
+      "id": "01a12fec-9d3e-7347-8cc4-be2db319e364",
+      "name": "Living",
+      "anchor": {
+        "x": 2,
+        "z": 3
+      },
+      "floorMaterial": "01a12fdf-158e-7748-adfe-d397dde469ba"
+    },
+    {
+      "id": "01a12fec-9d3f-77fe-9782-eaaca12a4518",
+      "name": "Bedroom",
+      "anchor": {
+        "x": 6,
+        "z": 3
+      },
+      "floorMaterial": "01a12fdf-158e-7748-adfe-d397dde469ba"
+    }
+  ],
+  "assets": [
+    {
+      "id": "01a1f5aa-100c-71f5-8252-27c3712da86a",
+      "type": "01a1f5aa-1003-7682-975e-c87a171ac826",
+      "asset": "01a1f5aa-1003-7682-975e-c87a171ac826",
+      "library": "01a1f5aa-1000-7308-9743-2d1026706d7e",
+      "room": "01a12fec-9d3e-7347-8cc4-be2db319e364",
+      "position": {
+        "x": 2,
+        "y": 0,
+        "z": 4.2
+      },
+      "rotationY": 0
+    },
+    {
+      "id": "01a1f5aa-100d-778c-99ea-20e32684b27b",
+      "type": "01a1f5aa-1005-745d-8cce-8038a39d5e08",
+      "asset": "01a1f5aa-1005-745d-8cce-8038a39d5e08",
+      "library": "01a1f5aa-1000-7308-9743-2d1026706d7e",
+      "room": "01a12fec-9d3e-7347-8cc4-be2db319e364",
+      "position": {
+        "x": 1.2,
+        "y": 0.75,
+        "z": 3.2
+      },
+      "rotationY": 0
+    }
+  ],
+  "finishes": {
+    "facade": "01a12fdf-1598-7b82-807b-83d8a5effde3",
+    "rooms": {
+      "01a12fec-9d3e-7347-8cc4-be2db319e364": {
+        "floor": "01a12fdf-158e-7748-adfe-d397dde469ba",
+        "walls": "01a12fdf-1598-7b82-807b-83d8a5effde3"
+      },
+      "01a12fec-9d3f-77fe-9782-eaaca12a4518": {
+        "floor": "01a12fdf-158e-7748-adfe-d397dde469ba",
+        "walls": "01a12fdf-1598-7b82-807b-83d8a5effde3"
+      }
+    }
+  },
+  "presentationCamera": {
+    "position": {
+      "x": 4,
+      "y": 9,
+      "z": 15
+    },
+    "target": {
+      "x": 4,
+      "y": 1,
+      "z": 3
+    }
+  },
+  "roomCameras": {
+    "01a12fec-9d3e-7347-8cc4-be2db319e364": {
+      "position": {
+        "x": 2,
+        "y": 1.6,
+        "z": 1.2
+      },
+      "target": {
+        "x": 2,
+        "y": 1.2,
+        "z": 4.2
+      }
+    },
+    "01a12fec-9d3f-77fe-9782-eaaca12a4518": {
+      "position": {
+        "x": 6,
+        "y": 1.6,
+        "z": 1.2
+      },
+      "target": {
+        "x": 6,
+        "y": 1.2,
+        "z": 4.5
+      }
+    }
+  },
+  "navigation": {
+    "points": [
+      {
+        "x": 2,
+        "y": 0,
+        "z": 3
+      },
+      {
+        "x": 6,
+        "y": 0,
+        "z": 3
+      }
+    ]
+  },
+  "autotour": {
+    "speed": 1.2,
+    "path": [
+      {
+        "x": 2,
+        "y": 1.6,
+        "z": 3
+      },
+      {
+        "x": 6,
+        "y": 1.6,
+        "z": 3
+      }
+    ],
+    "gaze": []
+  }
+}

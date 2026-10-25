@@ -65,6 +65,12 @@ export type CatalogueArchetype = {
    * rules) belongs to `assets/` and `layout/` and stays there.
    */
   readonly anchor?: 'floor' | 'wall' | 'ceiling';
+  /**
+   * True for an object that stands on another object's top (a vase, a table
+   * lamp). `replace_asset` reads it with `anchor`: the pair is what a
+   * replacement must share with the asset it replaces.
+   */
+  readonly onSurface?: true | undefined;
   /** Which axes `mirror_object` may set; absent allows none. */
   readonly mirror?: MirrorFacts | undefined;
 };

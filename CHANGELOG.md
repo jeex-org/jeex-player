@@ -7,6 +7,23 @@ as described under [Versioning](#versioning).
 
 ## [Unreleased]
 
+### Added
+
+- **Replace an object with another asset.** Under the Replace panel's
+  variants, "Replace with another…" opens a popup of the assets the selected
+  object can become, grouped by category: the same anchor and on-surface flag,
+  a mirror the asset allows, its own design excluded. A pick commits the new
+  scene operation `replace_asset`, which keeps the placement's id, room,
+  position, yaw and mirror and drops what belonged to the old body. It works
+  with a keyboard and as a bottom sheet on a phone.
+- **`offers`: an extra library to replace from.** The option and the
+  `offers` attribute take a library in the project-library format, by URL or
+  inline with its folder. It is loaded before the document is validated, a
+  document may name it, and without it the bundled bank is offered. An
+  unreadable library is an `offers-invalid` warning, never a failed mount.
+- `jeex-viewer/ops` exports `parseProjectLibrary` and `libraryOf`, so a host
+  validates a document that names an offers library as the viewer does.
+
 ### Changed
 
 - **A second tap deselects in 360.** A tap on the furniture item or opening
@@ -14,6 +31,9 @@ as described under [Versioning](#versioning).
   third tap selects it again. A double tap still selects once and flies in,
   and walk taps, drags and wall and floor panels are unchanged. The `tap`
   camera gesture carries `repeat` for the second click of a double click.
+- **Every variant is reachable.** The Replace panel's list scrolls inside the
+  viewer, with the title and footer buttons kept in view, instead of running
+  off a short viewer.
 - **Lamps light their room in walk and tour, and stop at its walls.** Every
   lamp, a lamp fact's light or a built-in lamp's bulb, now feeds its room's
   light-probe grid, so a lamp-lit room gets the light its lamps bounce off the

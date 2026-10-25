@@ -23,11 +23,15 @@ import { BUILTIN_FINISHES } from '../materials/builtin-library.js';
 import type { PanelItem, PanelRequest } from './viewer-ui.js';
 import { defaultOpeningVariant } from '../assets/opening-variants.js';
 import type { OpeningListEntry } from '../geometry/opening-builder.js';
-import type { DemoAsset, SceneData } from '../scene/types.js';
+import type { DemoAsset, ReplaceAssetOp, SceneData } from '../scene/types.js';
 import type { VariantBank } from '../assets/asset-variants.js';
 import type { InteriorPreset } from '../scene/scene-ops.js';
 import type { Messages } from './messages.js';
+import { replaceOffers, replaceOp, type CandidatePreview } from '../assets/replace-offers.js';
+import type { ReplacePopupRequest } from './replace-popup.js';
 import {
+  assetLabel,
+  variantChipBackground,
   finishCore,
   finishCurrentOf,
   finishFooterKey,
@@ -119,16 +123,43 @@ type FurniturePanelArgs = {
   variants?: VariantBank | undefined;
   onPick: (variantId: string) => void;
   onStandard: (variantId: string | undefined) => void;
+  /**
+   * "Replace with another…": where the popup opens and where its pick goes,
+   * with the previews kept across openings. Absent hides the button (an
+   * editor that allows no edit).
+   */
+  replace?: ReplaceWiring | undefined;
 };
 
-/** Replace panel for a picked furniture item: the four variants of its archetype. */
+/** What the furniture panel's "Replace with another…" button needs from the editor. */
+type ReplaceWiring = {
+  /** Rendered previews per archetype, kept across openings: rendering is the expensive part. */
+  readonly previews: Map<string, string | null>;
+  readonly open: (popup: ReplacePopupRequest) => void;
+  /** Commits `replace_asset` (the UI has closed the popup and the panel by then). */
+  readonly commit: (op: ReplaceAssetOp) => void;
+};
+
+/** Replace panel for a picked furniture item: the variants of its archetype, and the way to another asset. */
 export function furniturePanelRequest(args: FurniturePanelArgs): PanelRequest {
   const core = furnitureCore(args.placement, args.messages, args.renderPreview, args.variants);
+  const replace = args.replace;
+  const popup = (): ReplacePopupRequest =>
+    replacePopupRequest({
+      messages: args.messages,
+      placement: args.placement,
+      variants: args.variants,
+      renderPreview: args.renderPreview,
+      previews: replace!.previews,
+      onPick: (op) => replace!.commit(op),
+    });
   return {
     kind: 'furniture',
     title: core.title,
     items: core.options.map((option) => panelItem(option, core.current, 'variant')),
     footer: { label: args.messages.t('panel.standardVariant'), onClick: () => args.onStandard(core.options[0]?.id) },
+    secondary:
+      replace === undefined ? undefined : { label: args.messages.t('panel.replaceWithAnother'), onClick: () => replace.open(popup()) },
     // The furniture panel is anchored to the shell, not to the click: the pick
     // point is inside the object being replaced.
     anchor: { x: 0, y: 0 },
@@ -219,5 +250,48 @@ export function openingPanelRequest(args: OpeningPanelArgs): PanelRequest {
     anchor: args.anchor,
     panelData: { opening: entry.id, openingType: entry.type, entrance: String(entry.entrance) },
     onPick: ({ id }) => args.onPick(id),
+  };
+}
+
+type ReplacePopupArgs = {
+  messages: Messages;
+  /** The placement being replaced: its label names the popup. */
+  placement: DemoAsset;
+  variants?: VariantBank | undefined;
+  /** Honest preview of one variant of a candidate placement, or `null` for the palette chip. */
+  renderPreview: CandidatePreview;
+  /** Rendered previews per archetype, kept across openings: rendering is the expensive part. */
+  previews: Map<string, string | null>;
+  /** Commits the pick: `replace_asset` naming the offered default variant. */
+  onPick: (op: ReplaceAssetOp) => void;
+};
+
+/**
+ * The "Replace with another…" popup for a placement: one titled list of the
+ * offers `replaceOffers` finds, each a swatch like the panel's — the
+ * content's own picture first, the viewer's render second, the palette chip
+ * last.
+ */
+export function replacePopupRequest(args: ReplacePopupArgs): ReplacePopupRequest {
+  const groups = replaceOffers(args.placement, args.variants, args.renderPreview, args.previews);
+  const offers = new Map(groups.flatMap((group) => group.offers.map((offer) => [offer.archetypeId, offer] as const)));
+  return {
+    title: args.messages.t('replacePopup.title', { name: assetLabel(args.placement, args.variants) }),
+    empty: args.messages.t('replacePopup.empty'),
+    groups: groups.map((group) => ({
+      label: group.label,
+      items: group.offers.map((offer) => ({
+        id: offer.archetypeId,
+        label: offer.name,
+        thumbnail: offer.image ?? offer.thumbnail,
+        background: variantChipBackground(offer),
+        active: false,
+        dataset: { offer: offer.archetypeId },
+      })),
+    })),
+    onPick: (id) => {
+      const offer = offers.get(id);
+      if (offer) args.onPick(replaceOp(args.placement.id, offer));
+    },
   };
 }

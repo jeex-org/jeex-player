@@ -396,6 +396,13 @@ export const sceneOpSchema = z.discriminatedUnion('op', [
     }),
   ]),
   z.object({ op: z.literal('replace_asset_variant'), assetId: uuidSchema, variant: z.string() }),
+  z.object({
+    op: z.literal('replace_asset'),
+    assetId: uuidSchema,
+    asset: uuidSchema,
+    library: z.optional(uuidSchema),
+    variant: z.optional(nonEmptySchema),
+  }),
   z.object({ op: z.literal('replace_opening_variant'), openingId: uuidSchema, variant: z.string() }),
   z.object({ op: z.literal('set_ceiling'), height: z.number() }),
   z.object({

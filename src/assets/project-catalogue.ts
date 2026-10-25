@@ -123,7 +123,7 @@ export function projectCatalogue(library: ProjectLibraryManifest, base?: Catalog
  * id neither knows is dropped, exactly as before, so a slot falls back to the
  * archetype default rather than to an untextured mesh.
  */
-export function projectFinishResolver(library: ProjectLibraryManifest): FinishIdResolver {
+export function projectFinishResolver(library: Pick<ProjectLibraryManifest, 'materials'>): FinishIdResolver {
   const own = new Set(library.materials.map((material) => material.id));
   return (id) => (id !== undefined && own.has(id) ? id : resolveFinishId(id));
 }

@@ -17,6 +17,7 @@ This document is the integration reference.
   - [3. iframe with postMessage](#3-iframe-with-postmessage)
 - [Options](#options)
 - [Scene sources](#scene-sources)
+- [Offers](#offers)
 - [Viewer handle API](#viewer-handle-api)
   - [Moving assets in an editor](#moving-assets-in-an-editor)
   - [Host slots (`handle.slots`)](#host-slots-handleslots)
@@ -268,6 +269,7 @@ Every option has one name in each of the three spellings. Unknown keys are ignor
 | `motion` | `motion` | `motion` | `auto` | `auto`, `full`, `reduced`. `auto` follows `prefers-reduced-motion`; `reduced` opens an engaged tour paused (unless `tour.mode` was set) and makes scripted travel instant; `full` forces full motion. See [Accessibility](#accessibility). |
 | `debug` | `debug` | `debug` | dev build: `true`, otherwise `false` | Installs the authoring calls (`applyOps`, `exportScene`, `loadScene`) on `window.__viewerDebug`. |
 | `scene.url` | `scene` | `src` | none | Scene document URL. See [scene sources](#scene-sources). |
+| `offers.url` | `offers` | `offers` | none | URL of an extra library, in the project-library format, that "Replace with another…" offers. In JS also `offers: { library, baseUrl }`. See [Offers](#offers). |
 | `analytics.mode` | `analytics` | `analytics` | `on` | `on`, `off`. Anonymous [telemetry](#telemetry); `off` sends nothing at all. Fails closed: any value other than `on` (`OFF`, `none`, `false`, an empty attribute) is off. In JS, `analytics: 'off'` is shorthand for `{ mode: 'off' }`. |
 | `analytics.endpoint` | `analyticsEndpoint` | `analytics-endpoint` | `https://telemetry.jeex.org/v1/player` | Where telemetry goes: an `https:` URL, or `http:` on `localhost`/`127.0.0.1`. Any other value turns telemetry off (and is reported as `option-invalid`). |
 | `settings.show` | `settings` | `settings` | `false` | The viewer's settings button, attached to the control bar's end next to Interior styles, and the panel it opens (its one setting so far is the light temperature). Off by default, so visitors see none; a host that lets the viewer's user choose turns it on. It hides with the control bar. See [Settings and light temperature](#settings-and-light-temperature). |
@@ -297,6 +299,16 @@ Precedence: `repository` over `document` over `url`. Every source goes through t
 Overlapping `loadScene` calls race by START order, not completion order: a slow call that started first is discarded the moment a later call starts, even if the slow one's document is perfectly valid and finishes loading after the newer call has already won. A discarded call never fires `scene` or `ready` and never fires `error` either — losing a race is not a failure of that call's source or document — and its promise simply resolves once its (unused) document has finished loading. `dispose()` while a call is in flight discards it the same way.
 
 A `loadScene` whose document is the one on screen, edited — the same scene `id`, drawn with the same library (`library.baseUrl` and manifest) — is applied as one revision of it rather than built from scratch: a moved, turned or mirrored placement keeps its meshes and its loaded model and is stood anew, a placement with another variant or finish is built alone, an added or removed one comes or goes alone, and every other placement is left untouched. A change to walls, rooms, openings or finishes rebuilds the shell as a plan-level operation does. `scene` and `ready` fire as for any `loadScene`, and the `rev` they carry keeps counting. This is the road for a host that keeps the document itself and answers every edit it committed with the whole next document.
+
+## Offers
+
+`offers` names an extra library the viewer offers when an object is replaced with a different asset: `{ url }` (the `offers` attribute, `?offers=`), or `{ library, baseUrl }` when the host already holds the library object and the absolute folder URL its relative paths resolve against. The file is a bare library in the project format (the `library` member of a [project manifest](#project-format), with its own UUID `id`), judged by the same schema: `manifestVersion`, `id`, `publisher`, `license`, `objects` and `materials`. A `url` is fetched like a manifest (no credentials, no redirect, a timeout and the manifest size cap), and its folder is the base of every relative model, preview and texture path in it.
+
+Offers are loaded before the document is validated, so a mount with offers by URL waits for them, and a document may name the offers library in a placement's `library`. An offers library that cannot be fetched or is not valid, or whose `id` is the project library's, is reported as `offers-invalid` through [`onLog`](#logging); the scene still opens and the bundled bank is offered instead. Assets resolve in the project library first, then in offers, then in the bundled bank, for drawing, validation and the panels alike.
+
+The Replace panel lists every variant of the selected object; its list scrolls inside the viewer. Under it, "Replace with another…" (shown unless `edits` is `off` or the viewer is read-only) opens a popup of the assets of `offers`, or of the bundled bank without them, that the selected object can become: the same anchor and on-surface flag, a mirror the asset allows, its own design excluded. They are grouped by `category`, each group labelled by the last segment of the category path. A pick commits [`replace_asset`](#scene-operations-entry-jeex-viewerops) naming the asset's default variant, locally or as a `jeex-edit` under `edits: 'emit'`.
+
+A host that validates such a document itself uses the same pair the viewer does: `registriesFromLibrary(libraryOf(parseProjectLibrary(offers)), CATALOGUE_REGISTRIES)` from `jeex-viewer/ops`.
 
 ## Viewer handle API
 
@@ -1094,6 +1106,7 @@ None of these is a failure; all of them arrive through `onLog` (see [Logging](#l
 | `texture-colour-space` | A KTX2 map's container states another transfer function than its role; it is drawn as its role says |
 | `texture-too-large`, `texture-budget`, `texture-deadline` | A library map hit one of the [texture limits](#library-materials); the surfaces still waiting keep their flat colours |
 | `unknown-generator:<kind>` | A material named a parametric texture this build does not have; it is drawn flat in the entry's own `tone` |
+| `offers-invalid` | The [offers](#offers) library could not be fetched or is not valid, or its `id` is the project library's; the scene opens without it and the bundled bank is offered |
 
 ## Scene operations entry (`jeex-viewer/ops`)
 
@@ -1137,6 +1150,7 @@ The full export list:
 | `remove_object` | Removes a placement. |
 | `mirror_object` | Sets a placement's whole mirror state (`mirror: { x?: true, y?: true, z?: true }`, absolute; `{}` clears it), applied about the body bounds centre. Refused with `detail.reason: 'mirror_not_allowed'` when the asset's catalogue facts do not allow a set axis, or are unknown. |
 | `replace_asset_variant` | Swaps a placement's variant for one the registries offer for it. |
+| `replace_asset` | Gives a placement another asset: `{ assetId, asset, library?, variant? }`. The placement keeps its `id`, `room`, `position` (as it is, never reseated), `rotationY` and `mirror`; `type` and `asset` become the target, `library` and `variant` are set when given and removed when absent, and `finishes`, `material`, `scale` and `collision` are removed. Refused when the asset, library or variant does not resolve, when the target's `anchor` or `onSurface` differs from the current asset's, or when its mirror facts forbid the placement's mirror (`detail.reason: 'mirror_not_allowed'`). Interior presets forget their `replace_asset_variant` and finish-setting `set_object` ops for the placement. No id is minted. |
 | `set_camera` | Sets the presentation camera, the walk spawn or one room's camera; `remove: true` clears the spawn or a room's (never the presentation one). |
 | `set_navigation` | Replaces the walk-mode waypoints wholesale. |
 | `set_autotour` | Updates the tour's `path`, `gaze`, `zones` and `speed` (clamped into `TOUR_SPEED`); every `at` has to index the effective path. |
@@ -1161,6 +1175,7 @@ Every operation is atomic inside its batch: `applyOp` mutates a draft and answer
 - **Typed parsing** — `parseSceneOps(input)` and `parseSceneDocument(input)` judge an unknown value against the `zod/mini` schemas and return **the value they were handed**, typed with the hand-written types. A consumer compiling with `exactOptionalPropertyTypes: true` gets `x?: T` optionals and needs no cast; a refusal is a `ViewerLibError('scene-invalid')` whose `path` names the first bad field and whose `detail.issues` carries the list.
 - **The revision model** — `SceneModel`, `isApplyOk` (types: `ApplyBatch`, `ApplyOk`, `ApplyFailure`, `ApplyResult`, `AppliedOp`, `LintMode`, `RevisionListener`, `SceneModelOptions`). A batch may ask for the furniture layout to be reviewed before it commits: `lint: 'report'` returns `issues` on the result, `lint: 'strict'` refuses a candidate carrying a hard issue with `error: 'layout_failed'` and leaves the revision alone. The linter is injected — `new SceneModel(document, registries, { lint: lintLayout })` — so a viewer that never lints does not carry it.
 - **Validation** — `validateScene`.
+- **Libraries** — `parseProjectManifest` and `projectLibraryOf` for a baked project, and `parseProjectLibrary` and `libraryOf` for a bare library such as [offers](#offers): each judges the value against the schema and projects it into the `ProjectLibrary` that `registriesFromLibrary` takes.
 - **The registries interface and the shipped catalogues** — types `SceneRegistries`, `CatalogueArchetype`, `CataloguePlacement`, `CatalogueVariantRef`, `LibraryCatalogue`, `LibraryFinish`, `ProjectLibrary`, `AssetRef`, `AssetRefFields`, `OpeningVariantFamily`, `OpeningVariantOption`; the function `assetRefOf(fields, defaultLibrary)`, the one rule a reference is read by (`{ library: fields.library ?? defaultLibrary, assetId: fields.asset ?? fields.type }`, nothing parsed out of a string); the value `CATALOGUE_REGISTRIES`, ready to hand a `SceneModel` without wiring the catalogues by hand, and `registriesFromLibrary(library, base?)`, which builds registries from an object-bank manifest (its objects, their variants, and its materials as finishes). Registries declare every library they can resolve, so a document whose `assetLibrary` names a project's own bank validates against it: `registriesFromLibrary(projectLibrary, CATALOGUE_REGISTRIES)` accepts both. They also answer the two questions an editor asks before it edits: `registries.openingVariantsOf(type, { entrance? })` lists what a variant `<select>` may offer (id and label, no canvas), and `registries.defaultFloorFinish` says what `add_room` writes when the user names no floor — the oak floor's UUID for the shipped bank, a project library's own first floor material otherwise.
 - **Scene document types** — `SceneData`, `Vec2`, `Vec3`, `DemoAsset`, `Wall`, `Room`, `Opening`, `PlanNode`, `WallArc`, `WallRole`, `RoomKind`, `RoomPurpose`, `OpeningType`, `OpeningShape`, `OpeningHinge`, `OpeningSwing`, `MaterialDefinition`, `CameraPose`, `TourGazeKey`, `TourSpeedZone`, `SchemaVersion`, `LengthUnit`.
 - **The plan solver** — `solvePlan` (type `SolvedPlan`).

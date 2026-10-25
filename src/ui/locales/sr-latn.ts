@@ -104,6 +104,10 @@ export const SR_LATN: Record<MessageKey, string> = {
   'panel.applyAllRoomWalls': 'Primeni na sve zidove prostorije',
   'panel.applyAllWalls': 'Primeni na sve zidove',
   'panel.standardVariant': 'Standardna varijanta',
+  'panel.replaceWithAnother': 'Zameni drugim…',
+  'replacePopup.title': 'Zameni {name} sa',
+  'replacePopup.close': 'Zatvori listu',
+  'replacePopup.empty': 'Ništa drugo ne odgovara mestu ovog predmeta.',
   'panel.ownerFacade': 'Fasada',
   'panel.ownerExterior': 'Spolja',
 

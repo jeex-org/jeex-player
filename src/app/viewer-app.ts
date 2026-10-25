@@ -167,7 +167,7 @@ export class ViewerApp {
     // it was not told which. Resolved before any DOM is built, so a throw
     // never leaves the host with an exception, a dangling viewer root and no
     // handle to dispose it with.
-    this.documents = new DocumentSource(options.scene, this.log);
+    this.documents = new DocumentSource(options.scene, this.log, options.offers);
     // The context is built next: everything below is scoped to its root and
     // speaks its catalogue, and nothing reaches for the host document again.
     this.context = createViewerContext(container, options.locale, options.slots);

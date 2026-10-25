@@ -57,6 +57,11 @@ export type BakeBank =
       readonly catalogue: CatalogueLookup;
       /** The library the catalogue answers for (`projectBank(...).defaultLibrary`), as the live view is given it. */
       readonly catalogueLibrary: string;
+    }
+  | {
+      readonly catalogue: CatalogueLookup;
+      /** The libraries a layered bank answers for, project then offers: a `LibraryStack` (`assets/library-stack.ts`) is one. */
+      readonly libraries: readonly string[];
     };
 
 /** Collects the lamp lights of a built scene; `collectLampLights` unless a test stands in for it. */
@@ -71,13 +76,28 @@ function linear(hex: string, scale = 1): Rgb {
 }
 
 /** The scene builder's bank options for `bank`; refuses a missing or malformed bank. */
-function bankOptions(bank: BakeBank | undefined): { catalogue?: CatalogueLookup; catalogueLibrary?: string } {
+function bankOptions(bank: BakeBank | undefined): {
+  catalogue?: CatalogueLookup;
+  catalogueLibrary?: string;
+  catalogueLibraries?: readonly string[];
+} {
   if (bank === SHIPPED_BANK) return {};
   if (
     bank !== null &&
     typeof bank === 'object' &&
     'catalogue' in bank &&
     typeof bank.catalogue === 'function' &&
+    'libraries' in bank &&
+    Array.isArray(bank.libraries)
+  ) {
+    return { catalogue: bank.catalogue, catalogueLibraries: bank.libraries };
+  }
+  if (
+    bank !== null &&
+    typeof bank === 'object' &&
+    'catalogue' in bank &&
+    typeof bank.catalogue === 'function' &&
+    'catalogueLibrary' in bank &&
     typeof bank.catalogueLibrary === 'string'
   ) {
     return { catalogue: bank.catalogue, catalogueLibrary: bank.catalogueLibrary };
