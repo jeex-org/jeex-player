@@ -22,7 +22,8 @@
  * the floor. A file that failed counts what it cost, timeouts included, since
  * that is what its shard waited for. `export-library.test.ts` was added after
  * that run and keeps its earlier value (a simulated runner, 2026-10-21) until
- * the next measurement. The runner is two to fourteen times slower per file
+ * the next measurement; `lamp-scope.test.ts` was added later still and
+ * keeps a local software-rasteriser measurement the same way. The runner is two to fourteen times slower per file
  * than that simulation was. A file
  * missing from the table (a new one) costs `UNKNOWN_FILE_COST_S`, which is
  * deliberately above the median, so a new heavy file cannot pile onto an
@@ -67,6 +68,8 @@ export const COMPONENT_FILE_COST_S: Readonly<Record<string, number>> = {
   'host-slots.test.ts': 27,
   'ktx2.test.ts': 1,
   'lamp-lights.test.ts': 3,
+  // Measured on this machine's SwiftShader, 2026-10-25 (291 s), until the next runner measurement.
+  'lamp-scope.test.ts': 291,
   'lamp-shade-emissive.test.ts': 200,
   'library-material.test.ts': 1,
   'library-panel.test.ts': 12,
