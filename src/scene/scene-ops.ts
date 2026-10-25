@@ -69,6 +69,7 @@ import { applyAddRoom, applyRemoveRoom, applySetRoom, applySetRoomPurpose } from
 import {
   applyAddNode,
   applyAddWall,
+  applyMergeWall,
   applyMoveNode,
   applyRemoveNode,
   applyRemoveWall,
@@ -308,6 +309,8 @@ function dispatchOp(scene: Draft<SceneData>, op: SceneOp, registries: SceneRegis
       return applyRemoveWall(scene, op);
     case 'split_wall':
       return applySplitWall(scene, op);
+    case 'merge_wall':
+      return applyMergeWall(scene, op);
     case 'set_site':
       return applySetSite(scene, op);
     default: {

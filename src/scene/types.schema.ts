@@ -568,6 +568,14 @@ export const sceneOpSchema = z.discriminatedUnion('op', [
     at: z.number(),
     nodeId: uuidSchema,
     ids: z.tuple([uuidSchema, uuidSchema]),
+  }),
+  // The inverse of the split, with the same rule: the merged wall's id is
+  // CALLER-minted. Whether the two walls can be joined is `scene/ops/shell.ts`'s
+  // question; this schema only proves the shape.
+  z.object({
+    op: z.literal('merge_wall'),
+    wallIds: z.tuple([uuidSchema, uuidSchema]),
+    id: uuidSchema,
   }), // Strict like `site` itself, and every refusal names its field; the
   // applier (`scene/ops/site.ts`) repeats the checks for a caller that
   // skipped this schema.

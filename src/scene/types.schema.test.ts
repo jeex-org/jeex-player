@@ -1229,6 +1229,7 @@ describe('the shell operations pass the op schema', () => {
     { op: 'set_wall', wallId: WALL.wPart, arc: null },
     { op: 'remove_wall', wallId: WALL.wPart },
     { op: 'split_wall', wallId: WALL.wPart, at: 1.9, nodeId: EXTRA.newNode, ids: [EXTRA.newWallLeft, EXTRA.newWallRight] },
+    { op: 'merge_wall', wallIds: [WALL.wSA, WALL.wSB], id: EXTRA.newWallLeft },
     { op: 'set_opening', openingId: OPENING.doorAb, wallId: WALL.wW, center: 1.2 },
   ];
 
@@ -1263,6 +1264,22 @@ describe('the shell operations pass the op schema', () => {
     expect(z.safeParse(sceneOpSchema, { op: 'add_node', id: 'n9', p: { x: 1, z: 2 } }).success).toBe(false);
     expect(z.safeParse(sceneOpSchema, { op: 'add_wall', a: NODE.n1, b: NODE.n2, thickness: 0.2 }).success).toBe(false);
     expect(z.safeParse(sceneOpSchema, { op: 'remove_wall', wallId: 'w-part' }).success).toBe(false);
+  });
+
+  test('merge_wall names exactly two walls by UUID and carries the id of the wall it makes', () => {
+    const parses = (op: unknown): boolean => z.safeParse(sceneOpSchema, op).success;
+    const id = EXTRA.newWallLeft;
+    expect(parses({ op: 'merge_wall', wallIds: [WALL.wSA, WALL.wSB], id })).toBe(true);
+    expect(parses({ op: 'merge_wall', wallIds: [WALL.wSA], id })).toBe(false);
+    expect(parses({ op: 'merge_wall', wallIds: [WALL.wSA, WALL.wSB, WALL.wE], id })).toBe(false);
+    expect(parses({ op: 'merge_wall', wallIds: [WALL.wSA, 'w-sb'], id })).toBe(false);
+    expect(parses({ op: 'merge_wall', wallIds: [WALL.wSA, WALL.wSB], id: 'w-merged' })).toBe(false);
+    expect(parses({ op: 'merge_wall', wallIds: [WALL.wSA, WALL.wSB] })).toBe(false);
+  });
+
+  test('a preset carrying merge_wall is refused: it creates a wall', () => {
+    const preset = { ...soundPreset(), ops: [{ op: 'merge_wall', wallIds: [WALL.wSA, WALL.wSB], id: EXTRA.newWallLeft }] };
+    expect(ruleRaisedBy(brokenScene((scene) => put(scene, 'interiors', [preset])))).toBe('interior-preset-op-creates');
   });
 });
 

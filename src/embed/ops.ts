@@ -116,6 +116,7 @@ export type {
   RevisionListener,
   SceneModelOptions,
 } from '../scene/scene-model.js';
+export type { RoomMerge } from '../scene/room-merge.js';
 
 export { validateScene } from '../scene/scene-validator.js';
 
@@ -178,6 +179,7 @@ export type {
   SetWallOp,
   RemoveWallOp,
   SplitWallOp,
+  MergeWallOp,
   AddOpeningOp,
   SetOpeningOp,
   RemoveOpeningOp,

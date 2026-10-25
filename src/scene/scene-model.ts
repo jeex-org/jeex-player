@@ -4,8 +4,9 @@
  * atomic batch of operations.
  *
  * Atomicity: `apply` validates the base revision, clones the committed scene,
- * runs every operation on the clone, then re-runs `validateScene` and
- * `solvePlan` on the candidate. Only when all of that succeeds does the clone
+ * runs every operation on the clone, merges the rooms a removed wall joined
+ * (`room-merge.ts`), then re-runs `validateScene` and `solvePlan` on the
+ * candidate. Only when all of that succeeds does the clone
  * become the committed scene and `rev` advance; a failure anywhere leaves the
  * previous scene, plan and revision untouched — the caller's draft is dropped.
  *
@@ -31,6 +32,7 @@
 import { solvePlan, type SolvedPlan } from '../plan/plan-solver.js';
 import { validateScene } from './scene-validator.js';
 import { applyOp, OpError, sameTouched, type SceneOp, type TouchedEntity } from './scene-ops.js';
+import { applyRoomMerges, planRoomMerges, type RoomMerge } from './room-merge.js';
 import { diffScenes, sameData } from './scene-diff.js';
 import { Fanout } from '../shared/fanout.js';
 import { draftOf, type Committed, type Draft } from '../shared/committed.js';
@@ -75,6 +77,12 @@ export type ApplyOk = {
   touched: TouchedEntity[];
   /** What the layout linter found, when the batch asked for it and it found anything. */
   issues?: LayoutIssue[];
+  /**
+   * The rooms the batch merged because it removed the walls between them,
+   * one entry per absorbed room sorted by `from` (`room-merge.ts`). Present
+   * only when a merge happened.
+   */
+  roomMerges?: RoomMerge[];
   /**
    * Listeners that threw while being notified. The batch is committed either
    * way — this only says who failed to react to it.
@@ -266,6 +274,18 @@ export class SceneModel {
       return { error: 'validation_failed', message };
     }
 
+    // Removing the wall between rooms leaves their anchors in one face; they
+    // merge here, on the FINAL plan, before validation would refuse it as
+    // MULTI_ANCHOR. A batch that removes no wall is never touched.
+    let roomMerges: RoomMerge[] = [];
+    if (batch.ops.some((op) => op.op === 'remove_wall')) {
+      const merged = applyRoomMerges(draft, planRoomMerges(this.committed, this.solved, draft));
+      roomMerges = merged.merges;
+      if (roomMerges.length > 0) {
+        for (const entity of merged.touched) if (!touched.some((seen) => sameTouched(seen, entity))) touched.push(entity);
+      }
+    }
+
     let candidate: SceneData;
     let candidatePlan: SolvedPlan;
     try {
@@ -285,8 +305,9 @@ export class SceneModel {
     // The batch is committed the moment the revision advances. Notification is
     // a separate, best-effort phase: one broken listener must not swallow the
     // others, and it must never turn a successful commit into a thrown call.
-    const result: ApplyOk =
-      linted.length > 0 ? { rev: this.revision, applied, touched, issues: linted } : { rev: this.revision, applied, touched };
+    const result: ApplyOk = { rev: this.revision, applied, touched };
+    if (linted.length > 0) result.issues = linted;
+    if (roomMerges.length > 0) result.roomMerges = roomMerges;
     this.pendingErrors = [];
     this.applying = true;
     try {

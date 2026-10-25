@@ -245,6 +245,49 @@ describe('remove_room', () => {
   test('rejects an unknown room', () => {
     expect(rejectsOp(opDraft(), { op: 'remove_room', roomId: NEW.ghost })).toContain(`Unknown room ${NEW.ghost}`);
   });
+
+  test('forgets explicit-form preset instructions naming the room, by room or by face', () => {
+    const scene = opDraft();
+    const keep: SceneOp = { op: 'set_material', surface: 'wall', room: ROOM_B, material: FINISH.sage };
+    scene.interiors = [
+      {
+        id: PRESET.mixed,
+        name: 'Mixed',
+        swatch: [FINISH.walnut, FINISH.sage],
+        ops: [
+          { op: 'set_material', surface: 'floor', room: ROOM_A, material: FINISH.walnut },
+          keep,
+          { op: 'set_material', surface: 'wall', face: faceKey(ROOM_A, L_SHAPE.wall.wPart, 'L'), material: FINISH.graphite },
+        ],
+      },
+    ];
+
+    apply(scene, { op: 'remove_room', roomId: ROOM_A });
+
+    expect(scene.interiors?.[0]?.ops).toEqual([keep]);
+  });
+
+  test('forgets every other preset instruction naming the room: a camera, a room edit, a purpose', () => {
+    const scene = opDraft();
+    const keep: SceneOp = { op: 'set_room', roomId: ROOM_B, name: 'Study' };
+    scene.interiors = [
+      {
+        id: PRESET.mixed,
+        name: 'Mixed',
+        swatch: [FINISH.walnut, FINISH.sage],
+        ops: [
+          { op: 'set_camera', target: { room: ROOM_A }, remove: true },
+          { op: 'set_room', roomId: ROOM_A, name: 'Den' },
+          keep,
+          { op: 'set_room_purpose', roomId: ROOM_A, purpose: 'study' },
+        ],
+      },
+    ];
+
+    apply(scene, { op: 'remove_room', roomId: ROOM_A });
+
+    expect(scene.interiors?.[0]?.ops).toEqual([keep]);
+  });
 });
 
 describe('set_room_purpose', () => {

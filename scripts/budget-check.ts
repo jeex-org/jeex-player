@@ -62,11 +62,15 @@ export const HOST_BUDGET_FAIL_BYTES = 4 * 1024;
  * scene schemas — a good deal of the scene model, but still no `three` and no
  * DOM.
  *
- * The gate is set from a measured size of `jeex-viewer-ops.js` (82,556 gzip
- * bytes, 80.6 KB, from `measureBundle('dist-lib')` right after
+ * The gate is set from a measured size of `jeex-viewer-ops.js` (85,580 gzip
+ * bytes, 83.6 KB, from `measureBundle('dist-lib')` right after
  * `bun run build:lib`) plus 1 KB. Most of the entry is the scene model and its
  * `zod/mini` schemas; the bundled bank's fixed UUID v7 literals (random hex
- * that gzip cannot fold) are a large share. The last raise, from 81,994
+ * that gzip cannot fold) are a large share. The last raise, from 82,556
+ * bytes, is the room merge on wall removal (the commit-time planner and
+ * applier in `SceneModel.apply`, about 1.5 KB) and the `merge_wall`
+ * operation (its schema, applier and refusals, about 1.5 KB), which a host
+ * applies server-side. The raise before it, from 81,994
  * bytes measured on the main branch, is the contemporary room-finish set
  * (eleven new finish ids and rows, the three retired aliases) and the two
  * host tables `FINISH_ALIASES` and `FINISH_NAMES`, 562 bytes in all. The raise before it, from 79,666
@@ -80,7 +84,7 @@ export const HOST_BUDGET_FAIL_BYTES = 4 * 1024;
  * `npm pack` time; the fix is to re-measure and update this comment, never to
  * raise the number from memory.
  */
-export const OPS_BUDGET_FAIL_BYTES = 82_556 + 1024;
+export const OPS_BUDGET_FAIL_BYTES = 85_580 + 1024;
 
 /**
  * Hard limit for the `jeex-viewer/lighting` entry, gzip bytes. It carries the

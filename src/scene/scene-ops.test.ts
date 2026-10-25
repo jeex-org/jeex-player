@@ -483,6 +483,14 @@ const VOCABULARY_SNAPSHOT: readonly VocabularyCase[] = [
     summary: `Wall ${DEMO.wall.wallBedroomHall}: split at 2.5 m into ${NEW.splitWest} (2.5 m) and ${NEW.splitEast} (1.5 m)`,
     touched: [TOUCHED_SHELL],
   },
+  {
+    name: 'merge_wall',
+    // The split above, undone under the wall's own id: the halves are unpainted, so only the shell moves.
+    before: [{ op: 'split_wall', wallId: DEMO.wall.wallBedroomHall, at: 2.5, nodeId: NEW.splitNode, ids: [NEW.splitWest, NEW.splitEast] }],
+    op: { op: 'merge_wall', wallIds: [NEW.splitWest, NEW.splitEast], id: DEMO.wall.wallBedroomHall },
+    summary: `Wall ${DEMO.wall.wallBedroomHall}: merged from ${NEW.splitWest} and ${NEW.splitEast} (4 m)`,
+    touched: [TOUCHED_SHELL],
+  },
 ];
 
 /* ------------------------------------------- set_material, explicit form --- */
@@ -718,6 +726,7 @@ describe('op vocabulary snapshot on the demo apartment', () => {
       'add_opening',
       'add_room',
       'add_wall',
+      'merge_wall',
       'move_node',
       'move_object',
       'place_object',
@@ -755,7 +764,8 @@ describe('op vocabulary snapshot on the demo apartment', () => {
   }
 
   test('a replay of the same creating batch on the same document is byte-identical: nothing is minted', () => {
-    const creating = new Set(['add_room', 'add_node', 'add_wall', 'add_opening', 'place_object', 'split_wall']);
+    // `merge_wall` rejoins the halves `split_wall` cut, so the batch keeps the snapshot's order.
+    const creating = new Set(['add_room', 'add_node', 'add_wall', 'add_opening', 'place_object', 'split_wall', 'merge_wall']);
     const batch = VOCABULARY_SNAPSHOT.filter((entry) => creating.has(entry.op.op)).map((entry) => entry.op);
     expect(batch).toHaveLength(creating.size);
     const replay = (): string => {
