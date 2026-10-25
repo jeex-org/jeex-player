@@ -22,6 +22,11 @@ export type LibraryThreeMaterial = THREE.MeshStandardMaterial | THREE.MeshPhysic
 /** The glTF mask cutoff. */
 const MASK_CUTOFF = 0.5;
 
+/** How far a sheen without a stated colour is lifted from its tint toward white: the grazing sheen of dyed fibre is lighter than its body. */
+export const SHEEN_LIFT = 0.2;
+
+const WHITE = new THREE.Color('#ffffff');
+
 /** The fields only the physical model draws. */
 const PHYSICAL_FIELDS: readonly (keyof LibraryPbr)[] = [
   'sheen',
@@ -102,14 +107,15 @@ export function createLibraryMaterial(draw: LibraryDraw): LibraryThreeMaterial {
  * The physical fields under their three.js names. three's sheen colour is
  * black until set, which hides a stated sheen, so a sheen stated without a
  * colour takes the draw's tint (the plain colour: the sheen lobe samples no
- * map, so the tint recipe's gain does not apply), or white without a tint.
- * An absent sheen roughness keeps three's default of 1.
+ * map, so the tint recipe's gain does not apply) lifted toward white by
+ * `SHEEN_LIFT` in linear light, or white without a tint. An absent sheen
+ * roughness keeps three's default of 1.
  */
 function applyPhysical(material: THREE.MeshPhysicalMaterial, draw: LibraryDraw): void {
   const { pbr } = draw.material.facts;
   if (pbr.sheen !== undefined) material.sheen = pbr.sheen;
   if (pbr.sheenColour !== undefined) material.sheenColor.set(pbr.sheenColour);
-  else if (pbr.sheen !== undefined) material.sheenColor.set(tintOf(draw) ?? '#ffffff');
+  else if (pbr.sheen !== undefined) material.sheenColor.set(tintOf(draw) ?? WHITE).lerp(WHITE, SHEEN_LIFT);
   if (pbr.sheenRoughness !== undefined) material.sheenRoughness = pbr.sheenRoughness;
   if (pbr.clearcoat !== undefined) material.clearcoat = pbr.clearcoat;
   if (pbr.clearcoatRoughness !== undefined) material.clearcoatRoughness = pbr.clearcoatRoughness;
