@@ -815,6 +815,7 @@ describe('lamp edits in walk through the real commands (demo apartment)', { time
   let handle: ViewerHandle;
   let scene: THREE.Scene | null = null;
   let renderer: THREE.WebGLRenderer | null = null;
+  const caught: { lighting: WalkLighting | null } = { lighting: null };
   const states: string[] = [];
   const watching = { on: true };
 
@@ -851,6 +852,7 @@ describe('lamp edits in walk through the real commands (demo apartment)', { time
       const internals = this as unknown as { scene: THREE.Scene; renderer: THREE.WebGLRenderer };
       scene = internals.scene;
       renderer = internals.renderer;
+      caught.lighting = this;
       load.call(this, doc);
     });
     handle = mountViewer(openContainer(320, 240), {
@@ -899,6 +901,11 @@ describe('lamp edits in walk through the real commands (demo apartment)', { time
   });
 
   test('a lamp moved to another room re-bakes everything, takes the new room, and compiles no program', async () => {
+    // The warm-up ends with the first return to the direct look (a re-bake), which may compile the variants
+    // three picks without grids; measured 78 -> 92 on the demo, then constant.
+    const lighting = caught.lighting!;
+    lighting.rebake();
+    await rebaked('warm-up re-bake');
     const programs = renderer!.info.programs!.length;
     const placement = lampPlacements()[0]!;
     const before = lightOf(placement).userData['jeexLampRoom'] as number;

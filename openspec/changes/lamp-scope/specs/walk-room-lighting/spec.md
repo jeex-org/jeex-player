@@ -119,8 +119,8 @@ The room gate SHALL use no room-specific shader variant: with the number and kin
 - **THEN** the number of compiled programs stays constant
 
 #### Scenario: Lamp moved to another room
-- **WHEN** a lamp is moved in walk into another room and the walk lighting has re-baked
-- **THEN** no program is compiled beyond those of the first warm-up
+- **WHEN** after the warm-up (the first bake and the first return to the direct look) a lamp is moved in walk into another room and the walk lighting has re-baked
+- **THEN** no program is compiled
 
 #### Scenario: Light count from none to several and back
 - **WHEN** lamps are added in walk from none to one to several and removed back to none, the lighting re-baking after each
