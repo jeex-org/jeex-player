@@ -55,7 +55,7 @@ Objects bound to an absorbed room SHALL be rebound to the survivor without movin
 
 ### Requirement: The merge is reported
 
-A successful batch that merged rooms SHALL report `roomMerges`, one `{ from, to, summary }` per absorbed room sorted by `from`, the summary naming both rooms by their names before the merge. `touched` SHALL include the shell, rebound objects, dropped cameras, the absorbed rooms' floor, walls, ceiling and trim, and old and new keys of re-keyed faces.
+A successful batch that merged rooms SHALL report `roomMerges`, one `{ from, to, summary }` per absorbed room sorted by `from`, the summary naming both rooms by their names before the batch. `touched` SHALL include the shell, rebound objects, dropped cameras, the absorbed rooms' floor, walls, ceiling and trim, and old and new keys of re-keyed faces.
 
 #### Scenario: Journal line
 - **WHEN** the kitchen merges into the living room
