@@ -966,3 +966,86 @@ describe('the temperature across modes (demo apartment)', { timeout: TIMEOUT_MS 
     }
   });
 });
+
+describe('lamp decomposition in the demo living room (diagnostic)', { timeout: TIMEOUT_MS }, () => {
+  test('three linear readings on a zero-specular card: lamp-off bake, lamps-on bake with direct suppressed, the same grid with direct on', async () => {
+    let lighting: WalkLighting | null = null;
+    const load = Object.getOwnPropertyDescriptor(WalkLighting.prototype, 'load')!.value as WalkLighting['load'];
+    const spy = vi.spyOn(WalkLighting.prototype, 'load').mockImplementation(function (this: WalkLighting, doc) {
+      lighting = this as unknown as WalkLighting;
+      load.call(this, doc);
+    });
+    const handle = mountViewer(openContainer(320, 240), {
+      scene: { repository: new InlineSceneRepository(demoScene()) },
+      tour: { mode: 'off' },
+      doors: { autoOpen: false },
+      debug: true,
+    });
+    try {
+      await handle.ready;
+      handle.setMode('walk');
+      await until(() => debug().walkLighting().state === 'live', 'walk live', 240_000);
+      const internals = lighting as unknown as { scene: THREE.Scene; renderer: THREE.WebGLRenderer };
+      const { scene, renderer } = internals;
+      // A zero-specular grey card 0.66 m from the living floor lamp, facing it.
+      const probeCard = card([2.2, 1.0, 7.45], [1, 0, 0], 0.3);
+      scene.add(probeCard);
+      const lamps: THREE.PointLight[] = [];
+      scene.traverse((object) => {
+        if ((object as THREE.PointLight).isPointLight && object.userData['artificialLight'] !== undefined)
+          lamps.push(object as THREE.PointLight);
+      });
+      const intensities = lamps.map((light) => light.intensity);
+      const read = (): number => {
+        const camera = new THREE.PerspectiveCamera(30, 1, 0.05, 50);
+        camera.position.set(1.4, 1.0, 7.45);
+        camera.lookAt(2.2, 1.0, 7.45);
+        camera.updateMatrixWorld();
+        const target = new THREE.WebGLRenderTarget(SIZE.w, SIZE.h, { type: THREE.FloatType });
+        renderer.setRenderTarget(target);
+        renderer.render(scene, camera);
+        const pixels = new Float32Array(CARD_MASK_PX * CARD_MASK_PX * 4);
+        renderer.readRenderTargetPixels(
+          target,
+          (SIZE.w - CARD_MASK_PX) / 2,
+          (SIZE.h - CARD_MASK_PX) / 2,
+          CARD_MASK_PX,
+          CARD_MASK_PX,
+          pixels,
+        );
+        renderer.setRenderTarget(null);
+        target.dispose();
+        return luminance(pixels);
+      };
+      const rebake = async (): Promise<void> => {
+        lighting!.rebake();
+        await until(() => debug().walkLighting().state === 'live', 'live after the re-bake', 240_000);
+      };
+      for (const light of lamps) light.intensity = 0;
+      await rebake();
+      const a = read();
+      lamps.forEach((light, i) => (light.intensity = intensities[i]!));
+      await rebake();
+      const rooms = lamps.map((light) => light.userData['jeexLampRoom'] as number);
+      for (const light of lamps) light.userData['jeexLampRoom'] = -2;
+      const b = read();
+      lamps.forEach((light, i) => (light.userData['jeexLampRoom'] = rooms[i]!));
+      const c = read();
+      record('decomposition', {
+        renderer: String(renderer.getContext().getParameter(renderer.getContext().RENDERER)),
+        lamps: lamps.map((light) => ({ intensity: light.intensity, colour: light.color.toArray(), distance: light.distance })),
+        a,
+        b,
+        c,
+        bounce: b - a,
+        direct: c - b,
+        combined: c - a,
+      });
+      expect(c).toBeGreaterThan(b);
+    } finally {
+      spy.mockRestore();
+      handle.dispose();
+      closeContainers();
+    }
+  });
+});
