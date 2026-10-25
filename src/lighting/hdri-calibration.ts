@@ -18,6 +18,7 @@
  * Pure module: no `three`, no DOM.
  */
 
+import { LightingError } from './lighting-error.js';
 import type { Triple } from './lighting-standard.js';
 
 const DEG = Math.PI / 180;
@@ -118,7 +119,7 @@ export function measureSkyIrradiance(texels: PanoramaTexels): SkyIrradiance {
 
 /** The analytic sun's normal irradiance; throws for a share of 1 or more. */
 export function hdriSunNormalIrradiance(sky: SkyIrradiance, share: number, elevationDeg: number): number {
-  if (!(share >= 0 && share < 1)) throw new RangeError(`HDRI sun refused: share must be in [0, 1), got ${String(share)}`);
+  if (!(share >= 0 && share < 1)) throw new LightingError('bad-options', `HDRI sun refused: share must be in [0, 1), got ${String(share)}`);
   const onHorizontal = (sky.horizontal * share) / (1 - share) - sky.residual;
   return Math.max(0, onHorizontal) / Math.sin(elevationDeg * DEG);
 }

@@ -23,6 +23,7 @@
  */
 
 import * as THREE from 'three';
+import { ViewerLibError } from '../../shared/errors.js';
 import { UltraHDRLoader } from 'three/addons/loaders/UltraHDRLoader.js';
 import type { HdriEntry } from '../../lighting/hdri-entry.js';
 import { LIGHTING_STANDARD } from '../../lighting/lighting-standard.js';
@@ -67,7 +68,8 @@ const asError = (error: unknown): Error => (error instanceof Error ? error : new
 
 async function fetchOk(fetcher: Fetch, url: string, signal: AbortSignal): Promise<Response> {
   const response = await fetcher(url, { signal });
-  if (!response.ok) throw new Error(`HDRI file answered HTTP ${String(response.status)}`);
+  if (!response.ok)
+    throw new ViewerLibError('scene-load', `HDRI file answered HTTP ${String(response.status)}`, { detail: { status: response.status } });
   return response;
 }
 
