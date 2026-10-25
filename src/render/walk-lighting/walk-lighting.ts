@@ -81,11 +81,22 @@ export type WalkLightingStats = {
 
 type Mirror = THREE.Object3D & { isReflector?: boolean };
 
-/** The furniture group, every mirror and every transmissive mesh under `scene`: what a grid probe must not see. */
-function bakeExclusions(scene: THREE.Object3D, furniture: THREE.Object3D | null): THREE.Object3D[] {
-  const out: THREE.Object3D[] = furniture ? [furniture] : [];
+/** Whether `object` is `furniture` or lies under it. */
+function under(object: THREE.Object3D, furniture: THREE.Object3D | null): boolean {
+  for (let at: THREE.Object3D | null = object; at !== null; at = at.parent) if (at === furniture) return true;
+  return false;
+}
+
+/**
+ * Every mirror and every transmissive mesh under `scene` outside the furniture
+ * group: what a grid probe must not see, hidden by visibility. Nothing under
+ * the furniture group is hidden, so no lamp light loses its ancestor
+ * (`furnitureRenderables` takes the furniture out by layers).
+ */
+export function bakeExclusions(scene: THREE.Object3D, furniture: THREE.Object3D | null): THREE.Object3D[] {
+  const out: THREE.Object3D[] = [];
   scene.traverse((object) => {
-    if (object === furniture) return;
+    if (under(object, furniture)) return;
     if ((object as Mirror).isReflector === true) {
       out.push(object);
       return;
@@ -94,6 +105,16 @@ function bakeExclusions(scene: THREE.Object3D, furniture: THREE.Object3D | null)
     if (!mesh.isMesh) return;
     const materials = Array.isArray(mesh.material) ? mesh.material : [mesh.material];
     if (materials.some((material) => ((material as THREE.MeshPhysicalMaterial).transmission ?? 0) > 0)) out.push(object);
+  });
+  return out;
+}
+
+/** Every renderable under the furniture group (bodies, shades, transmissive bodies, mirrors): what the grid capture takes off every layer. */
+export function furnitureRenderables(furniture: THREE.Object3D | null): THREE.Object3D[] {
+  const out: THREE.Object3D[] = [];
+  furniture?.traverse((object) => {
+    const drawn = object as THREE.Object3D & { isMesh?: boolean; isLine?: boolean; isPoints?: boolean; isSprite?: boolean };
+    if (drawn.isMesh || drawn.isLine || drawn.isPoints || drawn.isSprite) out.push(object);
   });
   return out;
 }
@@ -333,6 +354,7 @@ export class WalkLighting {
       exterior: this.exterior!,
       rig: this.rig,
       exclusions: () => bakeExclusions(scene, this.furniture),
+      layerExclusions: () => furnitureRenderables(this.furniture),
       probesPerFrame,
       cubemapSize: T.gridCubemapSize,
     });
