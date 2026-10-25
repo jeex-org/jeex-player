@@ -42,7 +42,7 @@ Every behaviour change lands as a failing test first, then the code, as two comm
 ## 6. Concave rooms
 
 - [x] 6.1 Audit every room with more than one box in the demo apartment and the plan fixtures: the lamps inside, and whether a surface behind the room's inner corner lies within a lamp's cutoff; meter each such surface in walk (decomposition `C − B` of group 7, direct only); verify by the recorded list and readings.
-- [ ] 6.2 A visible leak in a supported scene: stop and report the case with a containment method shown correct for it and its estimated cost, before building it. No leak: record "no supported case" with the list, and the README states the limit (group 8).
+- [x] 6.2 A visible leak in a supported scene: stop and report the case with a containment method shown correct for it and its estimated cost, before building it. No leak: record "no supported case" with the list, and the README states the limit (group 8). Result: the demo living room shows 3.9 % displayed luminance behind its inner corner, not a visible crossing; the limit is documented, no containment is built.
 
 ## 7. Calibration
 

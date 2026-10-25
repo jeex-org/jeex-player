@@ -110,6 +110,10 @@ A concave room whose lamp's direct light is shown, in a supported scene (the dem
 - **WHEN** every room with more than one box in the supported scenes is checked for a lamp whose cutoff reaches a surface behind the room's inner corner
 - **THEN** either no such surface is visibly lit by that lamp and the README names the limit, or one is and, after the fix, that surface takes no direct light from the lamp while a surface in clear sight of it across a box split does
 
+#### Scenario: Demo living room, measured
+- **WHEN** the demo living room (an L around the hall) is metered in walk on a hardware renderer at the floor behind its inner corner, (4.1, 0, 4.0), with the pendant at (5.5, 1.66, 7.06) at its intensity and at zero, the grid kept
+- **THEN** the displayed luminance differs by 3.9 % (0.0918 against 0.0883, measured when the lamp scope was delivered): no visible crossing, so the limit stands and the README names it
+
 ### Requirement: Lamp scope compiles nothing
 
 The room gate SHALL use no room-specific shader variant: with the number and kinds of lights and their shadow layout unchanged, entering, leaving and crossing rooms, moving the camera, re-assigning a lamp's room and switching the gate on or off SHALL compile no program once the walk warm-up is done. A change in the light count MAY compile programs and SHALL render correctly.
@@ -127,6 +131,35 @@ The room gate SHALL use no room-specific shader variant: with the number and kin
 - **THEN** every state renders its expected lamp pixels, including after a nested render returns, and WebGL reports no error
 
 ## MODIFIED Requirements
+
+### Requirement: Glossy finishes read as glossy
+
+In walk by daylight (every lamp off, the lighting freshly baked), on the demo living-room fixture (recorded pose, resolution and floor mask), the floor's specular contrast (99th percentile over median of linear specular luminance, floor black, non-metal, map-free) at roughness 0.07 SHALL be at least 2.2 times that at 0.6, and that ratio SHALL be at least 1.15 times the one read with the probe at the footprint rule's point; where geometry puts the window's mirror image on that floor, it SHALL show the window.
+
+#### Scenario: Contrast by roughness
+- **WHEN** the demo living-room floor (black, non-metal, map-free) is metered in walk at the recorded pose and resolution, at roughness 0.07 and at 0.6, with the room lighting live by daylight (every lamp off, freshly baked) on a hardware renderer
+- **THEN** the 0.07 floor's contrast of linear specular luminance in the recorded floor mask is at least 2.2 times the 0.6 floor's, and that ratio is at least 1.15 times the ratio with the living probe at (2.70, 1.50, 7.13), where the footprint rule placed it
+
+#### Scenario: Window in a polished floor
+- **WHEN** a recorded pose sees the floor band where the living room window's mirror image falls, the floor black, non-metal, map-free at roughness 0.07, with the room lighting live by daylight (every lamp off, freshly baked) on a hardware renderer
+- **THEN** that band is brighter than the floor beside it, in the window's screen column
+
+#### Scenario: Lamps on, recorded
+- **WHEN** the same two measurements are taken with the default lamps on
+- **THEN** they are recorded beside the daylight ones as diagnostics: the lamps' light in the probes lifts the floor's specular median and is not what these checks judge
+
+### Requirement: Emissive surfaces in walk and tour
+
+In `walk` and `tour` the emissive term of every material SHALL be capped so its brightest channel does not exceed one walk value, keeping its chroma (`E × min(1, cap / max(E))`); an emissive term below the cap SHALL pass unchanged. The editing modes SHALL keep their emissive glow exactly.
+
+#### Scenario: Shades not blown out
+- **WHEN** the demo floor lamp wears each glowing shade finish (ivory, opal, warm lamp, ink) and is metered in walk before tone mapping
+- **THEN** the shade's mean brightest channel is at most 1.52 (the highest lamps-on reading measured when the lamps joined the room grids, 1.38, plus 10 %: the light a lamp bounces off the ceiling and walls lands on its own shade) and at least 1.25 times the same shade with its emissive off
+
+#### Scenario: Editing glow unchanged
+- **WHEN** the same shade is metered in orbit, `plan3d` and the editing look before and after a walk session
+- **THEN** its readings are unchanged
+
 
 ### Requirement: Bake and refresh
 

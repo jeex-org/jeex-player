@@ -76,6 +76,7 @@ type Internals = {
   uniforms: WalkUniforms;
   volumes: { boxes: RoomBox[]; probes: RoomProbe[] };
   refresh: WalkLighting['refresh'];
+  rebake: WalkLighting['rebake'];
 };
 
 /** Window glass: the opening builder's glazing material (it names no pane). */
@@ -290,6 +291,36 @@ describe.skipIf(!HARDWARE)(`walk gloss and white balance in the demo living room
     }
   }
 
+  const debugState = (): string =>
+    (window as unknown as { __viewerDebug: { walkLighting: () => { state: string } } }).__viewerDebug.walkLighting().state;
+
+  /** Re-bakes the walk lighting and waits until it is live again. */
+  async function rebaked(): Promise<void> {
+    lighting.rebake.call(lighting as unknown as WalkLighting);
+    for (let i = 0; i < 3; i += 1) await nextFrame();
+    await until(() => debugState() === 'live', 'room lighting live after the re-bake', MOUNT_TIMEOUT_MS - 60_000);
+  }
+
+  /**
+   * The daylight control: every lamp at zero and a fresh bake, so the probes reflect the room by daylight alone (a
+   * lamp's light in the grids and probes is not what these checks are about); answers the restore, which bakes the
+   * default lamps again.
+   */
+  async function lampsOff(): Promise<() => Promise<void>> {
+    const lamps: Array<[THREE.PointLight, number]> = [];
+    lighting.scene.traverse((object) => {
+      const light = object as THREE.PointLight;
+      if (light.isPointLight && light.userData['artificialLight'] !== undefined) lamps.push([light, light.intensity]);
+    });
+    expect(lamps.length).toBeGreaterThan(0);
+    for (const [light] of lamps) light.intensity = 0;
+    await rebaked();
+    return async () => {
+      for (const [light, intensity] of lamps) light.intensity = intensity;
+      await rebaked();
+    };
+  }
+
   beforeAll(async () => {
     const load = Object.getOwnPropertyDescriptor(WalkLighting.prototype, 'load')!.value as WalkLighting['load'];
     vi.spyOn(WalkLighting.prototype, 'load').mockImplementation(function (this: WalkLighting, doc) {
@@ -348,42 +379,62 @@ describe.skipIf(!HARDWARE)(`walk gloss and white balance in the demo living room
     expect(nearest).toBeGreaterThanOrEqual(0.5);
   });
 
-  test('gloss by contrast: r 0.07 at least 2.2 times r 0.6 on the black living floor, and 1.15 times the ratio at the old probe point', () => {
+  test('gloss by contrast, by daylight (lamps off): r 0.07 at least 2.2 times r 0.6 on the black living floor, and 1.15 times the ratio at the old probe point', async () => {
     const view = poseCamera(POSE_GLOSS.position, POSE_GLOSS.target);
-    const restore = probeAt(PROBE_BEFORE);
-    const before = { r007: contrast(view, 0.07), r06: contrast(view, 0.6) };
-    restore();
-    const after = { r007: contrast(view, 0.07), r06: contrast(view, 0.6) };
+    const measure = () => {
+      const restore = probeAt(PROBE_BEFORE);
+      const before = { r007: contrast(view, 0.07), r06: contrast(view, 0.6) };
+      restore();
+      const after = { r007: contrast(view, 0.07), r06: contrast(view, 0.6) };
+      return {
+        before,
+        after,
+        ratioBefore: before.r007.contrast / before.r06.contrast,
+        ratioAfter: after.r007.contrast / after.r06.contrast,
+      };
+    };
+    // Diagnostic: the default lamps on, their bounce in the probes (it lifts the floor's specular median).
+    const lampsOn = measure();
+    const restoreLamps = await lampsOff();
+    const daylight = measure();
+    await restoreLamps();
     record('glossContrast', {
       pose: { position: POSE_GLOSS.position.toArray(), target: POSE_GLOSS.target.toArray(), fov: 60, size: SIZE },
-      before,
-      after,
+      before: daylight.before,
+      after: daylight.after,
+      lampsOn,
     });
-    const ratioAfter = after.r007.contrast / after.r06.contrast;
-    const ratioBefore = before.r007.contrast / before.r06.contrast;
-    expect(ratioAfter).toBeGreaterThanOrEqual(2.2);
-    expect(ratioAfter).toBeGreaterThanOrEqual(1.15 * ratioBefore);
+    expect(daylight.ratioAfter).toBeGreaterThanOrEqual(2.2);
+    expect(daylight.ratioAfter).toBeGreaterThanOrEqual(1.15 * daylight.ratioBefore);
   });
 
-  test('the window shows in the polished black floor in its own columns', () => {
+  test('the window shows in the polished black floor in its own columns, by daylight (lamps off)', async () => {
     // Pose P2: across the living room towards the bay, where geometry puts the windows' mirror image on the floor.
     const view = poseCamera(POSE_WINDOW.position, POSE_WINDOW.target);
     let panes = 0;
     lighting.scene.traverse((object) => {
       if ((object as THREE.Mesh).isMesh && isGlass(object as THREE.Mesh)) panes += 1;
     });
-    const restore = probeAt(PROBE_BEFORE);
-    const before = windowBand(view);
-    restore();
-    const after = windowBand(view);
+    const measure = () => {
+      const restore = probeAt(PROBE_BEFORE);
+      const before = windowBand(view);
+      restore();
+      return { before, after: windowBand(view) };
+    };
+    // Diagnostic: the default lamps on.
+    const lampsOn = measure();
+    const restoreLamps = await lampsOff();
+    const daylight = measure();
+    await restoreLamps();
     record('windowBand', {
       pose: { position: POSE_WINDOW.position.toArray(), target: POSE_WINDOW.target.toArray(), fov: 60, size: SIZE },
       panes,
-      before,
-      after,
+      before: daylight.before,
+      after: daylight.after,
+      lampsOn,
     });
-    expect(after.counts[0]).toBeGreaterThan(200);
-    expect(after.band).toBeGreaterThan(after.rest);
+    expect(daylight.after.counts[0]).toBeGreaterThan(200);
+    expect(daylight.after.band).toBeGreaterThan(daylight.after.rest);
   });
 
   test('white balance at the walk start: the ceiling reads warm white, a saturated finish and the sky keep their hue', () => {
