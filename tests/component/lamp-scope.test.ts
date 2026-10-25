@@ -484,6 +484,45 @@ describe('lamp light stays in its room', { timeout: TIMEOUT_MS }, () => {
   });
 });
 
+describe('a lamp built or moved in walk takes its room before the next frame draws', { timeout: TIMEOUT_MS }, () => {
+  test('a new lamp and a lamp moved across the wall are gated on the next frame, before the debounced re-bake', () => {
+    let moved: THREE.PointLight[] = [];
+    let furnitureRoot: THREE.Group | null = null;
+    const w = world(
+      [
+        { id: 'a', box: A },
+        { id: 'b', box: B },
+      ],
+      (scene, furniture) => {
+        shell(scene, A, GREY());
+        shell(scene, B, GREY());
+        // Facing the wall and room A behind it, read from between it and the wall.
+        scene.add(card([4.7, 1.2, 2], [-1, 0, 0]));
+        // Starts in B, far from the card's side of the wall.
+        moved = lamp(furniture, 'mesh', [7.0, 1.2, 3.5], 20, 3);
+        furnitureRoot = furniture;
+      },
+    );
+    try {
+      w.bake();
+      const read = () => w.read([4.08, 1.2, 2], [4.7, 1.2, 2]);
+      // Moved into A, next to the shared wall: within its cutoff of B's card through the wall.
+      moved[0]!.parent!.parent!.position.set(3.5, 1.2, 2);
+      w.lighting.frame(true);
+      const afterMove = onOff(moved, read);
+      // A new lamp placed in A next to the wall.
+      const added = lamp(furnitureRoot!, 'mesh', [3.5, 1.2, 2.3], 20, 3);
+      w.lighting.frame(true);
+      const afterAdd = onOff(added, read);
+      record('room-on-next-frame', { afterMove, afterAdd });
+      expect(change(afterMove.off, afterMove.on)).toBeLessThan(SAME);
+      expect(change(afterAdd.off, afterAdd.on)).toBeLessThan(SAME);
+    } finally {
+      w.dispose();
+    }
+  });
+});
+
 describe('rooms follow three’s light order', { timeout: TIMEOUT_MS }, () => {
   test('a shadow-casting lamp (listed first by three) and a plain one each light only their own room', () => {
     let a: THREE.PointLight[] = [];
