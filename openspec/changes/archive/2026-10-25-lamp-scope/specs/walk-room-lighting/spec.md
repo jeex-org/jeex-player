@@ -134,7 +134,7 @@ The room gate SHALL use no room-specific shader variant: with the number and kin
 
 ### Requirement: Glossy finishes read as glossy
 
-In walk by daylight (every lamp off, the lighting freshly baked), on the demo living-room fixture (recorded pose, resolution and floor mask), the floor's specular contrast (99th percentile over median of linear specular luminance, floor black, non-metal, map-free) at roughness 0.07 SHALL be at least 2.2 times that at 0.6, and that ratio SHALL be at least 1.15 times the one read with the probe at the footprint rule's point; where geometry puts the window's mirror image on that floor, it SHALL show the window.
+In walk by daylight (lamps off, freshly baked), on the demo living-room fixture (recorded pose, resolution, floor mask), the floor's specular contrast (99th percentile over median of linear specular luminance, floor black, non-metal, map-free) at roughness 0.07 SHALL be at least 2.2 times that at 0.6, and that ratio SHALL be at least 1.15 times the one read with the probe at the footprint rule's point; where geometry puts the window's mirror image on that floor, it SHALL show the window.
 
 #### Scenario: Contrast by roughness
 - **WHEN** the demo living-room floor (black, non-metal, map-free) is metered in walk at the recorded pose and resolution, at roughness 0.07 and at 0.6, with the room lighting live by daylight (every lamp off, freshly baked) on a hardware renderer
@@ -163,7 +163,7 @@ In `walk` and `tour` the emissive term of every material SHALL be capped so its 
 
 ### Requirement: Bake and refresh
 
-On entry to `walk` or `tour` the grids and probes SHALL be built after the walk chain is ready, a fixed number of probes per frame, while the direct look is shown, then switched on in one frame without a recompile. Edits in walk SHALL refresh only what they affect after a short debounce; a scene load, a full rebuild, a sun change, a context restore, and a change that alters a lamp (moved, removed, added, variant swapped, retinted) SHALL re-bake everything, in walk or tour only. More than 16 room boxes SHALL keep the direct look and report an error.
+On entry to `walk` or `tour` the grids and probes SHALL be built once the walk chain is ready, a fixed number of probes per frame, under the direct look, then switched on in one frame, no recompile. Edits in walk SHALL refresh only what they affect after a debounce; a scene load, a rebuild, a sun change, a context restore and a lamp change (move, removal, addition, swap, tint) SHALL re-bake everything, in walk or tour only. Over 16 room boxes SHALL keep the direct look and report an error.
 
 #### Scenario: No shader thrash
 - **WHEN** the lighting has switched on in walk
