@@ -269,13 +269,17 @@ export class WalkLighting {
   frame(eligible: boolean): void {
     if (this.current === 'empty') {
       // No room to light: a host sky shows on its own, in the open-air look.
+      this.uniforms.jeexLampScope.value = 0;
       this.rig.setHdriDaylight(eligible);
       return;
     }
     if (!eligible || !this.bake || !this.probes) {
+      this.uniforms.jeexLampScope.value = 0;
       this.show(false);
       return;
     }
+    // The lamp gate holds from the first walk frame on, through the bake's direct look and its captures.
+    this.uniforms.jeexLampScope.value = 1;
     // Materials made since the last frame (a paint, a model upgrade, a rebuild) get the patch too.
     installWalkPatch(this.scene, this.uniforms);
     if (this.current === 'baking') {
@@ -355,6 +359,7 @@ export class WalkLighting {
   }
 
   dispose(): void {
+    this.uniforms.jeexLampScope.value = 0;
     this.release();
     this.parent.removeFromParent();
     this.rig.dispose();
