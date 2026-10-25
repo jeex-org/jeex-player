@@ -32,8 +32,12 @@ const MOUNT_TIMEOUT_MS = 300_000;
 const LIVING = '01a15f1b-dbbd-7634-b8b8-af9c8008284d';
 /** Mesh names of the living room's floor (the shell names its floor meshes after the room). */
 const LIVING_FLOOR = /^floor-01a15f1b-dbbd-7634/;
-/** The ceiling of the living room at the walk start, metered without the white balance (scene linear, R/B). */
-const CEILING_RB_MEASURED = 2.086;
+/**
+ * The ceiling of the living room at the walk start, metered without the white balance (scene linear, R/B), in
+ * the default state: the default sun and lamps, the lamps feeding the room grids. Re-recorded 2026-10-25 when
+ * the lamps joined the grids (it was 2.086 while the grid bake hid them), on an NVIDIA GPU.
+ */
+const CEILING_RB_MEASURED = 2.453;
 /**
  * Where the 2D footprint placement put the living probe before the
  * clearance: beside the floor lamp's shade. The «before» reading and the ratio check against it use it.
