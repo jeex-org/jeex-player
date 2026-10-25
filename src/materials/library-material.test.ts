@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, test } from 'bun:test';
 import * as THREE from 'three';
-import { SHEEN_LIFT, attachLibraryMaps, createLibraryMaterial, libraryMapFormat } from './library-material.js';
+import { attachLibraryMaps, createLibraryMaterial, libraryMapFormat } from './library-material.js';
 import type { LibraryDraw } from './room-finish.js';
 import type { LibraryMaterial, LibraryPbr, ProjectMaterial } from './finish-types.js';
 import { NATURAL_SCAN, PAINT, TINTABLE_SCAN } from '../fixtures/library-materials.js';
@@ -198,8 +198,8 @@ describe('createLibraryMaterial: the sheen lobe of a cloth', () => {
     expect(cloth({ sheenRoughness: 0.6 }).sheenRoughness).toBe(0.6);
   });
 
-  /** `hex` lifted toward white by the sheen lift, in linear light. */
-  const lifted = (hex: string): THREE.Color => new THREE.Color(hex).lerp(new THREE.Color('#ffffff'), SHEEN_LIFT);
+  /** `hex` lifted toward white by the stated sheen lift of 0.2, in linear light. */
+  const lifted = (hex: string): THREE.Color => new THREE.Color(hex).lerp(new THREE.Color('#ffffff'), 0.2);
 
   test('a sheen without a colour takes the plain tint lifted toward white, never the tint times the recipe gain', () => {
     expect(closeTo(cloth(CLOTH, '#5a6b8c').sheenColor, lifted('#5a6b8c'))).toBe(true);

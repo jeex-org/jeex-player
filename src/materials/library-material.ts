@@ -23,7 +23,7 @@ export type LibraryThreeMaterial = THREE.MeshStandardMaterial | THREE.MeshPhysic
 const MASK_CUTOFF = 0.5;
 
 /** How far a sheen without a stated colour is lifted from its tint toward white: the grazing sheen of dyed fibre is lighter than its body. */
-export const SHEEN_LIFT = 0.2;
+const SHEEN_LIFT = 0.2;
 
 const WHITE = new THREE.Color('#ffffff');
 
