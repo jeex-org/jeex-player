@@ -198,12 +198,15 @@ describe('createLibraryMaterial: the sheen lobe of a cloth', () => {
     expect(cloth({ sheenRoughness: 0.6 }).sheenRoughness).toBe(0.6);
   });
 
-  test('a sheen without a colour takes the plain tint, never the tint times the recipe gain', () => {
-    expect(closeTo(cloth(CLOTH, '#5a6b8c').sheenColor, new THREE.Color('#5a6b8c'))).toBe(true);
+  /** `hex` lifted toward white by the stated sheen lift of 0.2, in linear light. */
+  const lifted = (hex: string): THREE.Color => new THREE.Color(hex).lerp(new THREE.Color('#ffffff'), 0.2);
+
+  test('a sheen without a colour takes the plain tint lifted toward white, never the tint times the recipe gain', () => {
+    expect(closeTo(cloth(CLOTH, '#5a6b8c').sheenColor, lifted('#5a6b8c'))).toBe(true);
   });
 
-  test('a sheen without a colour or a finish colour takes the first suggested colour', () => {
-    expect(closeTo(cloth(CLOTH).sheenColor, new THREE.Color('#c9d6df'))).toBe(true);
+  test('a sheen without a colour or a finish colour takes the first suggested colour lifted toward white', () => {
+    expect(closeTo(cloth(CLOTH).sheenColor, lifted('#c9d6df'))).toBe(true);
   });
 
   test('a sheen without a colour on an untinted material is white', () => {
