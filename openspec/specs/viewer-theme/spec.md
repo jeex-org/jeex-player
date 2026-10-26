@@ -7,7 +7,7 @@ How a host themes the viewer through CSS custom properties on its root: the WebG
 
 ### Requirement: The 3D backdrop follows the host's CSS
 
-At mount, before the first frame, the viewer SHALL resolve `--jeex-backdrop` (horizon) and `--jeex-backdrop-top` (default: the horizon mixed with 8% white) on its root to opaque colours, and SHALL draw the fallback sky gradient and fog from them. A value that is not a colour SHALL fall back to the neutral default.
+At mount, before the first frame, the viewer SHALL resolve `--jeex-backdrop` (horizon) and `--jeex-backdrop-top` (default: the horizon mixed with 8% white) on its root to opaque colours, and SHALL draw the fallback sky gradient and fog from them. A value that is not a colour SHALL fall back to the neutral default. In 360 and the 3D plan the site ground SHALL show only the model's shadow over that sky.
 
 #### Scenario: Host sets a graphite backdrop
 - **WHEN** the host sets `--jeex-backdrop: #20242a` on the root

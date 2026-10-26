@@ -49,6 +49,7 @@ import { hdriLoads, loadWalkLighting, WalkLightingController, type HdriDeps } fr
 import { wireWalkLighting } from './walk-lighting-wiring.js';
 import type { WalkDocument } from '../render/walk-lighting/walk-lighting.js';
 import type { PostProcessor } from '../render/post-processor.js';
+import { findSiteGround, setSiteGroundLit } from '../geometry/site-ground.js';
 
 /**
  * What the stage needs from the application, minus the camera it builds itself.
@@ -157,6 +158,12 @@ export function orderFrameHooks(cameraHook: FrameHook, appHooks: readonly FrameH
   return [cameraHook, ...appHooks];
 }
 
+/** Whether `object` still hangs under `root` (a rebuild takes the old root off the scene). */
+function isUnder(object: THREE.Object3D, root: THREE.Object3D): boolean {
+  for (let node: THREE.Object3D | null = object; node; node = node.parent) if (node === root) return true;
+  return false;
+}
+
 /**
  * The camera a host anchor projects through: the one the mode DRAWS with.
  *
@@ -213,6 +220,8 @@ export class ViewerStage {
   private disposed = false;
   /** Camera-view captures in flight (`underDaylightSky`): the live sky stays the daylight one until the last is done. */
   private daylightCaptures = 0;
+  /** The live scene's site ground, kept between frames; `null` before the first build or when a rebuild dropped it. */
+  private siteGround: THREE.Mesh | null = null;
   /** The asset move tool's switch, once `handle.setAssetMoveTool` was first called (`asset-move-wiring.ts`). */
   assetMove: AssetMoveControl | null = null;
 
@@ -499,8 +508,8 @@ export class ViewerStage {
       this.overlay.frame();
       // Walk and tour render through the chain, once it has loaded.
       this.walkPost.update(mode);
-      // Walk and tour see and are lit by the daylight sky, never the host's backdrop: before the bake below.
-      this.runtime.setDaylightSky(this.daylightSky());
+      // Walk and tour see and are lit by the daylight sky and the lit ground, never the host's backdrop: before the bake below.
+      this.syncDaylight();
       // The room lighting bakes after the chain is attached and shows once baked;
       // a change of its look is a new picture in walk and tour.
       if (this.walkLighting.update(mode)) this.runtime.demand.invalidate();
@@ -531,19 +540,36 @@ export class ViewerStage {
    */
   async underDaylightSky<T>(take: () => Promise<T>): Promise<T> {
     this.daylightCaptures += 1;
-    this.runtime.setDaylightSky(true);
+    this.syncDaylight();
     try {
       return await take();
     } finally {
       this.daylightCaptures -= 1;
-      this.runtime.setDaylightSky(this.daylightSky());
+      this.syncDaylight();
     }
+  }
+
+  /** Gives a root built offscreen for a capture the ground look the live scene has now (`capture-commands.ts`). */
+  groundLike(root: THREE.Object3D): void {
+    setSiteGroundLit(findSiteGround(root), this.daylightSky());
   }
 
   /** Whether the sky is the daylight one now: in walk and tour, and while a camera-view capture runs. */
   private daylightSky(): boolean {
     const mode = this.mode;
     return mode === 'walk' || mode === 'tour' || this.daylightCaptures > 0;
+  }
+
+  /**
+   * The daylight sky and the lit ground together, or the host's backdrop with
+   * the ground as a shadow catcher over it (`geometry/site-ground.ts`). The
+   * ground is looked up again only when a rebuild replaced it.
+   */
+  private syncDaylight(): void {
+    const daylight = this.daylightSky();
+    this.runtime.setDaylightSky(daylight);
+    if (this.siteGround === null || !isUnder(this.siteGround, this.runtime.scene)) this.siteGround = findSiteGround(this.runtime.scene);
+    setSiteGroundLit(this.siteGround, daylight);
   }
 
   /** Re-measures the container; normally the `ResizeObserver` has already. */
