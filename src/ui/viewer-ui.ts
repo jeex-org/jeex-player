@@ -64,6 +64,12 @@ type ViewerUIOptions = {
   /** Fired when the panel closes for any reason, so the caller can drop its target. */
   onPanelClose?: () => void;
   /**
+   * Escape that no overlay took (the settings panel and the replace popup
+   * close on theirs first): the caller clears its selection, as a tap on
+   * nothing does. The selection panel, if open, is closed before.
+   */
+  onEscape?: () => void;
+  /**
    * The Retry button of the error card. It re-runs THIS instance's boot, never
    * `location.reload()`, which would reload the host page — the one thing an
    * embedded component must never do to a page it does not own.
@@ -83,6 +89,7 @@ type ViewerUIOptions = {
 export class ViewerUI implements DirectorChrome {
   private readonly commands: ViewerCommands;
   private readonly usage: UsageSink | undefined;
+  private readonly onEscape: (() => void) | undefined;
   private readonly chrome: ViewerChrome;
   private readonly panel: SelectionPanel;
   /** The "Replace with another…" popup, opened from the furniture panel. */
@@ -98,6 +105,7 @@ export class ViewerUI implements DirectorChrome {
   constructor(options: ViewerUIOptions) {
     this.commands = options.commands;
     this.usage = options.usage;
+    this.onEscape = options.onEscape;
     this.mark = new ProjectMark({ container: options.roots.viewport, messages: options.messages });
     this.chrome = new ViewerChrome({
       roots: options.roots,
@@ -345,9 +353,10 @@ export class ViewerUI implements DirectorChrome {
   }
 
   /**
-   * Escape, and a press outside the panel, close whatever is open. Both arrive
-   * on the shell root, so they belong to the viewer that has focus and to no
-   * other one on the page.
+   * Escape, and a press outside the panel, close whatever is open; an Escape
+   * left over clears the selection (`onEscape`). Both arrive on the shell
+   * root, so they belong to the viewer that has focus and to no other one on
+   * the page.
    */
   private dismiss(event: Event): void {
     // The settings panel listens for presses outside it on the whole page itself (`settings-panel.ts`).
@@ -358,11 +367,12 @@ export class ViewerUI implements DirectorChrome {
       if (event.type === 'keydown' && (event as KeyboardEvent).key === 'Escape') this.popup.close();
       return;
     }
-    if (!this.panel.isOpen()) return;
     if (event.type === 'keydown') {
-      if ((event as KeyboardEvent).key === 'Escape') this.closePanel();
+      if ((event as KeyboardEvent).key !== 'Escape') return;
+      if (this.panel.isOpen()) this.closePanel();
+      this.onEscape?.();
       return;
     }
-    if (!this.panel.contains(event.target as Node)) this.closePanel();
+    if (this.panel.isOpen() && !this.panel.contains(event.target as Node)) this.closePanel();
   }
 }

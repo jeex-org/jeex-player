@@ -9,7 +9,9 @@
  * reports.
  */
 
-import { afterEach, describe, expect, test } from 'vitest';
+import { afterEach, describe, expect, test, vi } from 'vitest';
+import { ViewerEditor } from '../../src/app/viewer-editor.js';
+import { DEMO } from '../../src/demo/demo-ids.js';
 import { InlineSceneRepository, mountViewer } from '../../src/app/viewer-api.js';
 import type { ViewerHandle } from '../../src/app/viewer-handle.js';
 import type { ViewerEditRequest, ViewerSceneInfo } from '../../src/app/viewer-events.js';
@@ -231,5 +233,33 @@ describe("edits: 'off'", () => {
     await until(() => selections.length > 0, 'a select event');
     expect(panelOpen(container)).toBe(false);
     expect(edits).toEqual([]);
+  });
+});
+
+describe('Escape', () => {
+  test('clears the built-in editor’s selection and closes its panel', async () => {
+    let editorOf: (() => ViewerEditor) | null = null;
+    const updateGlows = Object.getOwnPropertyDescriptor(ViewerEditor.prototype, 'updateGlows')!.value as ViewerEditor['updateGlows'];
+    const caught = vi.spyOn(ViewerEditor.prototype, 'updateGlows').mockImplementation(function (this: ViewerEditor, now) {
+      editorOf = () => this;
+      return updateGlows.call(this, now);
+    });
+    try {
+      const { container, handle } = mount({});
+      await handle.ready;
+      await until(() => editorOf !== null, 'the editor');
+      const editor = editorOf!();
+      editor.handleFurniturePick(DEMO.asset.livingSofa);
+      expect(editor.selectedFurniture()).toBe(DEMO.asset.livingSofa);
+
+      container
+        .querySelector<HTMLElement>('.jeex-viewer')!
+        .dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true, cancelable: true }));
+
+      expect(editor.selectedFurniture()).toBeNull();
+      expect(panelOpen(container)).toBe(false);
+    } finally {
+      caught.mockRestore();
+    }
   });
 });

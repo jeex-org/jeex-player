@@ -1,7 +1,7 @@
 # orbit-selection Specification
 
 ## Purpose
-How taps in 360 select and deselect furniture and openings in the viewer's built-in editor, and which gestures (drags, double taps, walk taps, the host's move tool) never count as a second tap.
+How taps in 360 select and deselect furniture and openings in the viewer's built-in editor, how Escape deselects, and which gestures (drags, double taps, walk taps, the host's move tool) never count as a second tap.
 
 ## Requirements
 
@@ -24,6 +24,18 @@ In `orbit` with the built-in editor on, a tap on the furniture item or opening t
 #### Scenario: Third tap
 - **WHEN** a sofa was deselected by a second tap and is tapped again
 - **THEN** it is selected again
+
+### Requirement: Escape deselects
+
+With the built-in editor on, Escape on the viewer SHALL clear the selection and close its panel, as a tap on nothing does. An open settings panel or replace popup SHALL take the Escape first and close alone; a running asset move SHALL take it and put the object back. Escape SHALL add no control and change no host selection.
+
+#### Scenario: Escape after a pick
+- **WHEN** a sofa is selected with its Replace panel open and the user presses Escape
+- **THEN** the aura fades out, the panel closes and nothing is selected
+
+#### Scenario: Popup over the panel
+- **WHEN** the replace popup is open over the panel and the user presses Escape twice
+- **THEN** the first Escape closes the popup only, and the second clears the selection
 
 ### Requirement: Gestures that are not a second tap
 
