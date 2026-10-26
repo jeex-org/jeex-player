@@ -9,6 +9,11 @@ as described under [Versioning](#versioning).
 
 ### Added
 
+- **`replace_asset`'s anchor refusal names its reason.** It carries
+  `detail: { reason: 'anchor_mismatch', assetId, mount, currentMount }`, each
+  mounting one of `floor`, `wall`, `ceiling` or `surface`, so a host can say
+  why a floor armchair cannot become a wall sconce.
+
 - **Replace an object with another asset.** Under the Replace panel's
   variants, "Replace with another…" opens a popup of the assets the selected
   object can become, grouped by category: the same anchor and on-surface flag,
@@ -576,6 +581,9 @@ as described under [Versioning](#versioning).
 
 ### Fixed
 
+- **`replace_asset`'s anchor refusal names each side with its own
+  mounting.** The message described the placement with the target's anchor
+  and the target with the placement's.
 - **A merge is reported by the rooms' names before the batch.** A
   `set_room` in the same batch as the `remove_wall`, before or after it, no
   longer renames what `ApplyOk.roomMerges[].summary` says was merged.
