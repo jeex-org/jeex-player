@@ -14,6 +14,9 @@ function noop(): void {
   // Command stubs: this file is about focus and the Escape key, not effects.
 }
 
+/** Every Escape the viewer passed on to clear its selection. */
+let deselects = 0;
+
 function build(): { shell: Shell; ui: ViewerUI } {
   const shell = openShell();
   shell.roots.byName('loading-state').classList.add('is-hidden');
@@ -36,6 +39,9 @@ function build(): { shell: Shell; ui: ViewerUI } {
     messages: shell.messages,
     roots: shell.roots,
     commands,
+    onEscape: () => {
+      deselects += 1;
+    },
   });
   ui.bind();
   return { shell, ui };
@@ -44,6 +50,7 @@ function build(): { shell: Shell; ui: ViewerUI } {
 let harness: { shell: Shell; ui: ViewerUI };
 
 beforeEach(() => {
+  deselects = 0;
   harness = build();
 });
 
@@ -119,5 +126,38 @@ describe('the tour chrome follows the mode', () => {
     harness.ui.setPlanMode('tour');
     expect(bar.dataset['visible']).toBe('true');
     expect(pill.classList.contains('is-hidden')).toBe(false);
+  });
+});
+
+describe('Escape clears the selection', () => {
+  const escape = (): void => {
+    harness.shell.roots.root.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true, cancelable: true }));
+  };
+
+  test('with nothing open, Escape on the shell root is passed on to clear the selection', () => {
+    escape();
+    expect(deselects).toBe(1);
+  });
+
+  test('with the selection panel open, one Escape closes it and clears the selection', () => {
+    harness.ui.openPanel({ kind: 'finish', title: 'Floor finish', items: [], anchor: { x: 100, y: 100 }, onPick: vi.fn() });
+    escape();
+    expect(harness.ui.isPanelOpen()).toBe(false);
+    expect(deselects).toBe(1);
+  });
+
+  test('an open popup takes the first Escape alone; the next one clears the selection', () => {
+    harness.ui.openPanel({ kind: 'finish', title: 'Floor finish', items: [], anchor: { x: 100, y: 100 }, onPick: vi.fn() });
+    harness.ui.openReplacePopup({ title: 'Replace Long sofa with', empty: 'Nothing else fits here', groups: [], onPick: vi.fn() });
+    escape();
+    expect(harness.ui.isPanelOpen()).toBe(true);
+    expect(deselects).toBe(0);
+    escape();
+    expect(deselects).toBe(1);
+  });
+
+  test('a key other than Escape clears nothing', () => {
+    harness.shell.roots.root.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true, cancelable: true }));
+    expect(deselects).toBe(0);
   });
 });

@@ -9,6 +9,10 @@ as described under [Versioning](#versioning).
 
 ### Added
 
+- **Escape clears the selection.** In the built-in editor, Escape on the
+  viewer deselects as a tap on nothing does: the aura fades and the panel
+  closes. An open settings panel or replace popup closes on the first Escape
+  alone, and a running move still goes back first. No control is added.
 - **A library material states its sheen lift.** `facts.pbr.sheenLift`, in
   [0, 1], is how far a sheen without `sheenColour` moves from the tint toward
   white in linear light; absent, it is 0.2 as before. Dark dyed pile such as
