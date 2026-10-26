@@ -52,6 +52,11 @@ function zonesOf(doors: readonly DoorZone[]): { clear: ClearZone[]; sweeps: Swee
   return zones;
 }
 
+/** Rule 3's clear zones of `doors`, one per side that owns a room: what `doorClearZones` hands a host. */
+export function clearZonesOf(doors: readonly DoorZone[]): readonly ClearZone[] {
+  return zonesOf(doors).clear;
+}
+
 function clearIssue(zone: ClearZone, item: LintItem): LayoutIssue | null {
   if (!item.quad || apart(item.quad, zone.quad)) return null;
   const depth = overlapDepth(item.quad, zone.quad);

@@ -9,6 +9,12 @@ as described under [Versioning](#versioning).
 
 ### Added
 
+- **`doorClearZones` in `jeex-viewer/ops`.** `doorClearZones(scene, plan)`
+  returns the rectangles the layout linter's `door-clear-zone` rule keeps
+  clear, one `{ openingId, roomId, quad }` per door side that owns a room:
+  0.9 m deep where the leaf swings in and on both sides of a passage, 0.6 m
+  where it swings away. A host's own placement filter reads them instead of
+  sizing a door's zone itself, so it never disagrees with the lint.
 - **`dining` is a room purpose.** `ROOM_PURPOSES` gains `dining` after
   `kitchen-living`, fourteen values in all, for a room set aside for meals.
   It is additive: every document that was valid stays valid, and
