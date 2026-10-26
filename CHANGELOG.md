@@ -607,6 +607,11 @@ as described under [Versioning](#versioning).
 
 ### Fixed
 
+- **The host's backdrop shows around the model in 360 and the 3D plan.** The
+  warm site ground under the flat filled the whole frame from those cameras,
+  so the themed sky behind it never showed and the view stayed beige. There
+  the ground now shows only the model's shadow over the backdrop; walk and
+  tour keep it lit, as the room lighting sees it through the windows.
 - **`replace_asset`'s anchor refusal names each side with its own
   mounting.** The message described the placement with the target's anchor
   and the target with the placement's.
