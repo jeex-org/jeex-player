@@ -66,6 +66,9 @@ as described under [Versioning](#versioning).
 
 ### Changed
 
+- **The plinth under the flat is a neutral grey.** The slab the model stands
+  on in every mode was the last warm colour around it in 360; it is now a
+  concrete grey (`#b4b4b0`), still lit and still taking the contact shadow.
 - **Neutral theme defaults.** The package's defaults move from warm beige and
   gold to a neutral graphite: the accent, the surfaces, the text, the backdrop
   and the state cards. The accent's strong and muted shades and the focus ring
