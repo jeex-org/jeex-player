@@ -40,6 +40,7 @@ import { EPS, add, dist, leftN, norm, sub } from '../plan/plan-geometry.js';
 import { clamp } from '../shared/math.js';
 import { DEFAULT_WALL_FINISH } from '../scene/scene-ops.js';
 import { ShellPaint } from './shell-paint.js';
+import { createSiteGround } from './site-ground.js';
 import { resolveFinish } from '../materials/material-catalogue.js';
 import { FINISH } from '../materials/finish-ids.js';
 import { effectiveRoom, isDoorLike, type Vec2 } from '../scene/types.js';
@@ -201,11 +202,10 @@ export class ShellBuilder {
     slab.name = 'site-slab';
     slab.receiveShadow = true;
     root.add(slab);
-    const ground = new THREE.Mesh(new THREE.CircleGeometry(36, 48), new THREE.MeshStandardMaterial({ color: '#b7a893', roughness: 1 }));
+    // Lit as built; 360 and plan put its shadow catcher on (`site-ground.ts`).
+    const ground = createSiteGround(36, this.ownedMaterials);
     ground.rotation.x = -Math.PI / 2;
     ground.position.set((bounds.minX + bounds.maxX) / 2, -0.462, (bounds.minZ + bounds.maxZ) / 2);
-    ground.name = 'site-ground';
-    ground.receiveShadow = true;
     root.add(ground);
   }
 

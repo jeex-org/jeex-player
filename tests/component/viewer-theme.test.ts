@@ -10,15 +10,17 @@
 
 import * as THREE from 'three';
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest';
+import { page } from 'vitest/browser';
 import { InlineSceneRepository, mountViewer } from '../../src/app/viewer-api.js';
 import { createRenderRuntime, type RenderRuntime } from '../../src/render/render-runtime.js';
 import { GridBake } from '../../src/render/walk-lighting/grid-bake.js';
+import { findSiteGround } from '../../src/geometry/site-ground.js';
 import { resolveBackdrop, resolveThemeColour } from '../../src/ui/theme-colour.js';
 import { createViewerShell, THEME_PROPERTIES } from '../../src/ui/viewer-shell.js';
 import { createMessages } from '../../src/ui/messages.js';
 import { lShapePlan } from '../../src/fixtures/plan-l-shape.js';
 import { L_SHAPE } from '../../src/fixtures/plan-l-shape-ids.js';
-import { closeContainers, demoScene, openContainer, until } from './support.js';
+import { closeContainers, demoScene, nextFrame, openContainer, until } from './support.js';
 
 /** The former warm palette: none of it may survive the neutral defaults. */
 const FORMER_GOLD = [
@@ -221,12 +223,17 @@ describe('a mounted viewer under a dark host backdrop', () => {
         scene ??= this as THREE.Scene;
       return add.apply(this, objects);
     });
-    // Every grid bake step captures the scene, background included: what it sees is the probes' input.
+    // Every grid bake step captures the scene, background and ground included: what it sees is the probes' input.
     const bakedFrom: boolean[] = [];
     const step = Object.getOwnPropertyDescriptor(GridBake.prototype, 'step')!.value as GridBake['step'];
     const baked = vi.spyOn(GridBake.prototype, 'step').mockImplementation(function (this: GridBake) {
       const background = scene?.background as THREE.Texture | null | undefined;
-      bakedFrom.push(background?.isTexture === true && near(skyPixel(background, 'bottom'), DAYLIGHT_HORIZON));
+      const ground = scene ? findSiteGround(scene) : null;
+      bakedFrom.push(
+        background?.isTexture === true &&
+          near(skyPixel(background, 'bottom'), DAYLIGHT_HORIZON) &&
+          (ground?.material as THREE.Material | undefined)?.type === 'MeshStandardMaterial',
+      );
       return step.call(this);
     });
     const handle = mountViewer(openContainer(480, 320), {
@@ -268,13 +275,16 @@ describe('a mounted viewer under a dark host backdrop', () => {
       return add.apply(this, objects);
     });
     // Every scene drawn into a target of its own is a capture here (360 draws no probes and no chain):
-    // whether the sky it drew was the daylight one.
+    // whether the sky it drew was the daylight one and the ground its lit self.
     let seen: boolean[] = [];
     const before = Object.getOwnPropertyDescriptor(THREE.Object3D.prototype, 'onBeforeRender')!.value as THREE.Object3D['onBeforeRender'];
     const drawn = vi.spyOn(THREE.Object3D.prototype, 'onBeforeRender').mockImplementation(function (this: THREE.Object3D, ...args) {
       const background = (this as THREE.Scene).isScene ? (this as THREE.Scene).background : null;
-      if (background instanceof THREE.Texture && background === scene?.background && args[3] !== null)
-        seen.push(near(skyPixel(background, 'bottom'), DAYLIGHT_HORIZON));
+      if (background instanceof THREE.Texture && background === scene?.background && args[3] !== null) {
+        const ground = findSiteGround(this);
+        const lit = (ground?.material as THREE.Material | undefined)?.type === 'MeshStandardMaterial';
+        seen.push(near(skyPixel(background, 'bottom'), DAYLIGHT_HORIZON) && lit);
+      }
       before.apply(this, args);
     });
     const handle = mountViewer(openContainer(480, 320), {
@@ -303,6 +313,49 @@ describe('a mounted viewer under a dark host backdrop', () => {
       caught.mockRestore();
       drawn.mockRestore();
       style.remove();
+    }
+  }, 300_000);
+});
+
+describe('the picture a mounted viewer draws in 360', () => {
+  /**
+   * Polls the viewer's top-left corner, as the compositor shows it (the page
+   * screenshot: what a visitor sees, canvas and CSS together), until it is
+   * `hex`. Each poll asks for a picture (`refreshTheme` repaints the sky and
+   * invalidates a resting view). The last colour seen is in the failure.
+   */
+  async function untilCorner(handle: { refreshTheme(): void }, host: HTMLElement, hex: string, what: string): Promise<void> {
+    const deadline = performance.now() + 30_000;
+    let seen: [number, number, number] | null = null;
+    while (seen === null || !near(seen, hex, 24)) {
+      if (performance.now() > deadline) throw new Error(`timed out waiting for ${what}; the corner is rgb(${seen?.join(', ')})`);
+      handle.refreshTheme();
+      await nextFrame();
+      await nextFrame();
+      const png = await page.screenshot({ save: false });
+      const bitmap = await createImageBitmap(await (await fetch(`data:image/png;base64,${png}`)).blob());
+      const box = host.getBoundingClientRect();
+      const scale = bitmap.width / window.innerWidth;
+      const read = new OffscreenCanvas(1, 1).getContext('2d')!;
+      read.drawImage(bitmap, Math.round((box.left + 4) * scale), Math.round((box.top + 4) * scale), 1, 1, 0, 0, 1, 1);
+      bitmap.close();
+      const [r, g, b] = read.getImageData(0, 0, 1, 1).data;
+      seen = [r!, g!, b!];
+    }
+  }
+
+  test('around the model it is the backdrop the host set, and refreshTheme repaints it', async () => {
+    const host = openContainer(480, 320);
+    // The options an embed that names only its scene gets, over the demo flat a landing shows.
+    const handle = mountViewer(host, { scene: { repository: new InlineSceneRepository(demoScene()) } });
+    try {
+      await handle.ready;
+      await untilCorner(handle, host, '#303640', 'the neutral backdrop around the model');
+
+      host.querySelector<HTMLElement>('.jeex-viewer')!.style.setProperty('--jeex-backdrop', 'red');
+      await untilCorner(handle, host, '#ff0000', 'the red backdrop around the model');
+    } finally {
+      handle.dispose();
     }
   }, 300_000);
 });

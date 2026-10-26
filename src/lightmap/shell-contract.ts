@@ -39,6 +39,7 @@ import { DEFAULT_WALL_FINISH, faceFinishRefOf, floorFinishRefOf } from '../scene
 import { isFaceKey, type FaceKey, type FinishRef, type OpeningType, type SceneData } from '../scene/types.js';
 import { FINISH } from '../materials/finish-ids.js';
 import { unseenTriangles } from '../geometry/shell-unseen.js';
+import { litMaterialOf } from '../geometry/site-ground.js';
 import { LightBakeError } from './light-bake-error.js';
 import type { ShellMaterialExtras, ShellNodeExtras } from './shell-extras.schema.js';
 
@@ -197,7 +198,7 @@ export function shellEntries(shell: THREE.Object3D, scene: SceneData, ctx: Pick<
   return meshes.map((mesh) => {
     if (Array.isArray(mesh.material)) throw new LightBakeError('shell', `shell mesh ${mesh.name} has more than one material`);
     const { extras, finish } = describe(mesh, shell, scene, ordinals);
-    return { mesh, extras, material: { finish }, albedo: albedoOf(finish, mesh.material, ctx) };
+    return { mesh, extras, material: { finish }, albedo: albedoOf(finish, litMaterialOf(mesh, mesh.material), ctx) };
   });
 }
 

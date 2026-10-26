@@ -125,6 +125,8 @@ export type CaptureDeps = {
   postChain?: (() => Promise<PostProcessor | null>) | undefined;
   /** Puts the current colour temperature on the artificial lights of the offscreen «as is» build. */
   artificialLights?: ((root: THREE.Object3D) => void) | undefined;
+  /** Gives the offscreen «as is» build the live scene's ground look (`ViewerStage.groundLike`). */
+  groundLike?: ((root: THREE.Object3D) => void) | undefined;
   /**
    * Runs a camera-view capture under the daylight sky walk and tour see
    * (`ViewerStage.underDaylightSky`). Optional: a mount without one captures
@@ -141,6 +143,7 @@ type CaptureStage = {
     | undefined;
   captureChain(): Promise<PostProcessor | null>;
   underDaylightSky<T>(take: () => Promise<T>): Promise<T>;
+  groundLike(root: THREE.Object3D): void;
 };
 
 /**
@@ -150,13 +153,14 @@ type CaptureStage = {
  */
 export function stageCaptureDeps(
   stage: () => CaptureStage | undefined,
-): Pick<CaptureDeps, 'runtime' | 'livePose' | 'tour' | 'postChain' | 'daylightSky'> {
+): Pick<CaptureDeps, 'runtime' | 'livePose' | 'tour' | 'postChain' | 'daylightSky' | 'groundLike'> {
   return {
     runtime: () => stage()?.runtime,
     livePose: () => poseOf(stage()?.director?.controller.getPose()),
     tour: () => stage()?.director?.tour,
     postChain: () => stage()?.captureChain() ?? Promise.resolve(null),
     daylightSky: (take) => stage()?.underDaylightSky(take) ?? take(),
+    groundLike: (root) => stage()?.groundLike(root),
   };
 }
 
@@ -228,6 +232,7 @@ export function captureCommands(deps: CaptureDeps): CaptureCommands {
       shellLike(deps.shellState(), offscreen, built.root, eye);
       scene.add(built.root);
       deps.artificialLights?.(built.root);
+      deps.groundLike?.(built.root);
       // The same orientation, ceiling slabs and fitting policy as the live
       // view, over this build's own geometry.
       sun = prepareSunShadow(built.root, offscreen.scene, offscreen.plan, rig);

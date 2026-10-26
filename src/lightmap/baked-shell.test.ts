@@ -28,6 +28,7 @@ import { adoptShippedShell, parseShellFile } from './shell-adopt.js';
 import { exportShellForBake, SHIPPED_FINISHES } from './shell-export.js';
 import { shellInputsHash } from './shell-inputs.js';
 import { unseenTriangles } from '../geometry/shell-unseen.js';
+import { findSiteGround, setSiteGroundLit } from '../geometry/site-ground.js';
 import { writeGlb, type GlbMaterial, type GlbMesh } from './glb-write.js';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import CALIBRATION from '../../tests/fixtures/lightmap-calibration/sidecar.json' with { type: 'json' };
@@ -186,6 +187,20 @@ describe('the stand-in unwrap', () => {
     const accessors = (json: typeof before) => (json as unknown as { accessors: Array<{ count: number }> }).accessors;
     const count = (json: typeof before, i: number) => accessors(json)[json.meshes[i]!.primitives[0].attributes.POSITION]!.count;
     expect(before.meshes.some((_, i) => count(before, i) !== count(after, i))).toBe(true);
+  });
+});
+
+describe('liveShellEntries', () => {
+  test('the site ground answers its lit albedo while 360 shows its shadow catcher', () => {
+    const { root } = live();
+    const ground = findSiteGround(root);
+    const albedo = (): readonly number[] | undefined => liveShellEntries(root, apartmentScene).find(({ mesh }) => mesh === ground)?.albedo;
+    const lit = albedo();
+    setSiteGroundLit(ground, false);
+
+    expect(ground).not.toBeNull();
+    expect(lit).toBeDefined();
+    expect(albedo()).toEqual(lit);
   });
 });
 
