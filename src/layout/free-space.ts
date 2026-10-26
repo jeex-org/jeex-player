@@ -34,7 +34,7 @@ import { distanceToPolygon, obbQuad, pointInPolygon, signedArea, type Obb } from
 import { doorSweepQuads } from '../plan/door-swing.js';
 import { overlapDepth, roomCentroid } from './layout-geometry.js';
 import { lintContext, lintLayout, shippedFacts, type LayoutCatalogue, type LayoutFacts } from './layout-lint.js';
-import { DOOR_CLEAR_M, DOOR_CLEAR_SPAN, TOUCH_TOL_M, boxGap, nearestFace, sideZone, type LintContext } from './rules/context.js';
+import { TOUCH_TOL_M, boxGap, doorClearZone, nearestFace, type LintContext } from './rules/context.js';
 import type { LayoutIssue } from './layout-issue.js';
 import { judge, poseItem, wallPose, type DragContext, type DragPose } from './asset-legality.js';
 import type { RoomFace, SolvedPlan, WallFace } from '../plan/plan-solver.js';
@@ -252,7 +252,7 @@ function blockedZones(ctx: LintContext, roomId: string): Vec2[][] {
   for (const door of ctx.doors) {
     const sides = door.sides.filter((side) => side.roomId === roomId);
     if (sides.length === 0) continue;
-    for (const side of sides) zones.push(sideZone(door, side.normal, door.width * DOOR_CLEAR_SPAN, DOOR_CLEAR_M));
+    for (const side of sides) zones.push(doorClearZone(door, side.normal));
     if (door.swing) for (const quad of doorSweepQuads(door.swing)) zones.push(quad);
   }
   return zones;
