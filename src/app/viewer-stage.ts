@@ -16,6 +16,7 @@ import type { AssetFactsSource } from '../assets/asset-facts.js';
 import type { UsageSink } from '../shared/usage.js';
 import * as THREE from 'three';
 import { createRenderRuntime, type FrameHook, type RenderRuntime } from '../render/render-runtime.js';
+import { DEFAULT_MINIMAP_ACCENT, resolveBackdrop, resolveThemeColour } from '../ui/theme-colour.js';
 import { mountCameraDirector, type CameraDirector, type CameraStackDeps } from '../camera/camera-director.js';
 import { AUTHORING_MODES, CheckpointOverlay } from '../camera/checkpoint-overlay.js';
 import { CheckpointPilot } from '../camera/checkpoint-pilot.js';
@@ -210,6 +211,8 @@ export class ViewerStage {
   /** The document the room lighting is built for, and the end of its edit subscription. */
   private lightingDocument: { document: () => WalkDocument | null; off: () => void } | null = null;
   private disposed = false;
+  /** Camera-view captures in flight (`underDaylightSky`): the live sky stays the daylight one until the last is done. */
+  private daylightCaptures = 0;
   /** The asset move tool's switch, once `handle.setAssetMoveTool` was first called (`asset-move-wiring.ts`). */
   assetMove: AssetMoveControl | null = null;
 
@@ -297,6 +300,8 @@ export class ViewerStage {
       },
       signal: deps.signal,
     });
+    // The host's theme on the backdrop and the map before the first frame, not after it.
+    this.applyTheme();
     this.walkCameras = new WalkCameraBar({
       container: deps.roots.viewport,
       messages: deps.messages,
@@ -494,6 +499,8 @@ export class ViewerStage {
       this.overlay.frame();
       // Walk and tour render through the chain, once it has loaded.
       this.walkPost.update(mode);
+      // Walk and tour see and are lit by the daylight sky, never the host's backdrop: before the bake below.
+      this.runtime.setDaylightSky(this.daylightSky());
       // The room lighting bakes after the chain is attached and shows once baked;
       // a change of its look is a new picture in walk and tour.
       if (this.walkLighting.update(mode)) this.runtime.demand.invalidate();
@@ -513,6 +520,30 @@ export class ViewerStage {
   /** The chain a still or video frame taken now renders through (`capture-commands.ts`). */
   captureChain(): Promise<PostProcessor | null> {
     return this.walkPost.forCapture(this.mode);
+  }
+
+  /**
+   * Runs a camera-view capture (a room or tour camera, a panorama, tour frames)
+   * under the daylight sky walk and tour look out at, whatever the mode on
+   * screen: a room photographed from 360 or plan shows the windows as a walk
+   * shows them, not the host's backdrop. The live view shows that sky while it
+   * runs, and the mode's own the moment the last capture is done.
+   */
+  async underDaylightSky<T>(take: () => Promise<T>): Promise<T> {
+    this.daylightCaptures += 1;
+    this.runtime.setDaylightSky(true);
+    try {
+      return await take();
+    } finally {
+      this.daylightCaptures -= 1;
+      this.runtime.setDaylightSky(this.daylightSky());
+    }
+  }
+
+  /** Whether the sky is the daylight one now: in walk and tour, and while a camera-view capture runs. */
+  private daylightSky(): boolean {
+    const mode = this.mode;
+    return mode === 'walk' || mode === 'tour' || this.daylightCaptures > 0;
   }
 
   /** Re-measures the container; normally the `ResizeObserver` has already. */
@@ -540,6 +571,16 @@ export class ViewerStage {
   private marker(): { x: number; z: number; yaw: number; fov: number } | null {
     const controller = this.cameraDirector?.controller;
     return controller ? cameraMarker(this.camera, controller.getPose()) : null;
+  }
+
+  /**
+   * Hands the root's resolved theme to what CSS cannot colour
+   * (`ui/theme-colour.ts`): the runtime's backdrop and the mini-map's canvas.
+   */
+  applyTheme(): void {
+    const root = this.deps.roots.root;
+    this.runtime.setBackdrop(resolveBackdrop(root));
+    this.minimap.setAccent(resolveThemeColour(root, '--jeex-minimap-accent', DEFAULT_MINIMAP_ACCENT));
   }
 
   dispose(): void {

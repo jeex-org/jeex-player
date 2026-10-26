@@ -177,3 +177,20 @@ describe('paintPlan primitive order', () => {
     expect(calls).toEqual([]);
   });
 });
+
+describe('paintPlan accent', () => {
+  test("a host accent replaces the palette's own in the highlight, the view cone and the camera dot", () => {
+    const { ctx, calls } = recordingContext();
+    paintPlan(ctx, DRAWING, TRANSFORM, 'minimap', {
+      highlightRoom: ROOM_ID,
+      camera: { x: 0.5, z: 0.5, yaw: 0 },
+      coneRadius: 2,
+      accent: '#4f8cff',
+    });
+    const fills = calls.filter((call) => call.method === 'fill').map((call) => call.fillStyle);
+    expect(fills).toContain('rgba(79, 140, 255, 0.25)');
+    expect(fills).toContain('rgba(79, 140, 255, 0.35)');
+    expect(fills).toContain('#4f8cff');
+    expect(fills.some((fill) => /224, 138, 60|#e08a3c/.test(fill))).toBe(false);
+  });
+});

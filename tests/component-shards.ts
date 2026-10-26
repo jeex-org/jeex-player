@@ -48,6 +48,8 @@ export const COMPONENT_FILE_COST_S: Readonly<Record<string, number>> = {
   'baked-surface-walk.test.ts': 216,
   'camera-preview.test.ts': 1,
   'capture-commands.test.ts': 44,
+  // Measured on this machine's SwiftShader with one worker (2026-10-26), not on the hosted runner.
+  'compact-hint.test.ts': 1,
   'door-hud.test.ts': 1,
   'element.test.ts': 355,
   'export-glb-conformance.test.ts': 2,
@@ -108,6 +110,8 @@ export const COMPONENT_FILE_COST_S: Readonly<Record<string, number>> = {
   'viewer-chrome.test.ts': 2,
   'viewer-edits.test.ts': 91,
   'viewer-shell.test.ts': 1,
+  // Measured on this machine's SwiftShader with one worker (2026-10-26), not on the hosted runner.
+  'viewer-theme.test.ts': 1,
   'viewer-ui.test.ts': 1,
   // Skipped on the software rasteriser it is measured on: GPU measurements only.
   'walk-glossy.test.ts': 1,

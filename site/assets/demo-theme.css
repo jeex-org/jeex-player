@@ -1,0 +1,18 @@
+/*
+ * The player site's own look for the viewer in its demo frame
+ * (`scripts/site-build.ts` links it into `demo/embed.html` only). The
+ * package's defaults are a neutral graphite; this keeps the site's warm
+ * palette. Unlayered and on the viewer root itself: the package declares its
+ * defaults on that root inside its component cascade layer, so only a rule like this
+ * one wins over them.
+ */
+.jeex-viewer {
+  --jeex-accent: light-dark(#a8813a, #dfbd7d);
+  --jeex-on-accent: light-dark(#fffdf7, #19211f);
+  --jeex-surface: light-dark(rgb(250 247 240 / 82%), rgb(14 22 21 / 76%));
+  --jeex-surface-text: light-dark(#1c2523, #f5efe4);
+  --jeex-state-surface: radial-gradient(circle at 50% 40%, rgb(61 79 73 / 92%), rgb(13 19 19 / 98%) 72%);
+  --jeex-backdrop: #c6b8a3;
+  --jeex-backdrop-top: #dcd3c2;
+  --jeex-minimap-accent: #e08a3c;
+}

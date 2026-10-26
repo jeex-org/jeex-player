@@ -125,6 +125,12 @@ export type CaptureDeps = {
   postChain?: (() => Promise<PostProcessor | null>) | undefined;
   /** Puts the current colour temperature on the artificial lights of the offscreen «as is» build. */
   artificialLights?: ((root: THREE.Object3D) => void) | undefined;
+  /**
+   * Runs a camera-view capture under the daylight sky walk and tour see
+   * (`ViewerStage.underDaylightSky`). Optional: a mount without one captures
+   * under whatever sky is up.
+   */
+  daylightSky?: (<T>(take: () => Promise<T>) => Promise<T>) | undefined;
 };
 
 /** What `stageCaptureDeps` reads of the stage (`viewer-stage.ts`), named structurally: the stage reaches this module through its own imports. */
@@ -134,6 +140,7 @@ type CaptureStage = {
     | { readonly controller: { getPose(): { position: THREE.Vector3; target: THREE.Vector3 } }; readonly tour: TourPlayer }
     | undefined;
   captureChain(): Promise<PostProcessor | null>;
+  underDaylightSky<T>(take: () => Promise<T>): Promise<T>;
 };
 
 /**
@@ -141,12 +148,15 @@ type CaptureStage = {
  * the walk chain. Read through `stage` at every call, because a Retry
  * replaces the stage under the commands.
  */
-export function stageCaptureDeps(stage: () => CaptureStage | undefined): Pick<CaptureDeps, 'runtime' | 'livePose' | 'tour' | 'postChain'> {
+export function stageCaptureDeps(
+  stage: () => CaptureStage | undefined,
+): Pick<CaptureDeps, 'runtime' | 'livePose' | 'tour' | 'postChain' | 'daylightSky'> {
   return {
     runtime: () => stage()?.runtime,
     livePose: () => poseOf(stage()?.director?.controller.getPose()),
     tour: () => stage()?.director?.tour,
     postChain: () => stage()?.captureChain() ?? Promise.resolve(null),
+    daylightSky: (take) => stage()?.underDaylightSky(take) ?? take(),
   };
 }
 
@@ -232,6 +242,23 @@ export function captureCommands(deps: CaptureDeps): CaptureCommands {
     }
   }
 
+  /**
+   * `inState` for a camera view: a room or tour camera, a panorama or tour
+   * frames look out of the windows at the daylight sky walk and tour see, not
+   * at the host's backdrop the 360 and plan views show. A still of the live
+   * view is what is on screen, and takes `inState` as it is.
+   */
+  function inCameraView<T>(
+    state: SceneState,
+    runtime: RenderRuntime,
+    model: SceneModel,
+    eye: Vec3,
+    take: (root: THREE.Object3D) => Promise<T>,
+  ): Promise<T> {
+    const run = (): Promise<T> => inState(state, runtime, model, eye, take);
+    return deps.daylightSky?.(run) ?? run();
+  }
+
   /** The caption a request gets, or `null` when it asked for none. */
   function captionFor(wanted: boolean | undefined): string | null {
     const disclosure = deps.options().capture.disclosure;
@@ -259,7 +286,8 @@ export function captureCommands(deps: CaptureDeps): CaptureCommands {
       const state = request.state ?? 'current';
       const pose = poseFor(model.scene, request.camera);
       const post = (await deps.postChain?.()) ?? null;
-      const shot = await inState(state, runtime, model, pose.position, (root) =>
+      const shoot = request.camera === 'live' ? inState : inCameraView;
+      const shot = await shoot(state, runtime, model, pose.position, (root) =>
         captureStill(runtime.renderer, root, { width: request.width, height: request.height, pose, fov: request.fov, post }),
       );
       return artefact(shot, model, 'still', state, request.caption, { camera: pose });
@@ -271,7 +299,7 @@ export function captureCommands(deps: CaptureDeps): CaptureCommands {
       const position = eyePoint(model, request.roomId);
       // The walk chain's white balance, when there is a chain: the panorama keeps its direct path otherwise.
       const whiteBalance = (await deps.postChain?.())?.whiteBalance ?? null;
-      const shot = await inState(state, runtime, model, position, (root) =>
+      const shot = await inCameraView(state, runtime, model, position, (root) =>
         capturePanorama(runtime.renderer, root, { width: request.width, position, whiteBalance }),
       );
       return artefact(shot, model, 'panorama', state, request.caption, { roomId: request.roomId });
@@ -297,7 +325,7 @@ export function captureCommands(deps: CaptureDeps): CaptureCommands {
           model,
           tour,
           livePose: deps.livePose,
-          withRoot: (take) => inState(state, runtime, model, eye, take),
+          withRoot: (take) => inCameraView(state, runtime, model, eye, take),
           captionFor,
           post,
         },

@@ -66,6 +66,14 @@ export const THEME_PROPERTIES = [
   '--jeex-color-scheme',
   /** Corner inset of the corner slots, before `env(safe-area-inset-*)` raises it. */
   '--jeex-slot-inset',
+  /** The 3D backdrop at the horizon, and the background before the first frame (`refreshTheme()` after a live change). */
+  '--jeex-backdrop',
+  /** The 3D backdrop at the zenith; a little lighter than the horizon by default. */
+  '--jeex-backdrop-top',
+  /** Text and icons on the accent. */
+  '--jeex-on-accent',
+  /** The loading and error cards. */
+  '--jeex-state-surface',
 ] as const;
 
 /**
@@ -147,6 +155,7 @@ export const SHELL_NAMES = [
   'replace-popup-list',
   'replace-popup-empty',
   'hint-card',
+  'hint-toggle',
   'hint-text',
   'degraded-notice',
   'reveal-controls',
@@ -479,9 +488,22 @@ export const VIEWER_SHELL_TREE: ShellNode = {
           children: [
             { tag: 'span', attrs: { class: 'hint-icon', 'aria-hidden': 'true' }, text: '✦' },
             {
+              // Shown only in a narrow viewer, where the text waits behind it (`hint-toggle.ts`).
+              name: 'hint-toggle',
+              tag: 'button',
+              attrs: {
+                class: 'hint-toggle',
+                type: 'button',
+                'aria-expanded': 'false',
+                'aria-label': 'Viewer controls',
+                'data-i18n-attr': 'aria-label:controls.label',
+              },
+              children: [{ tag: 'span', attrs: { 'aria-hidden': 'true' }, text: '✦' }],
+            },
+            {
               name: 'hint-text',
               tag: 'span',
-              attrs: { 'aria-live': 'polite', 'data-i18n': 'hint.orbit' },
+              attrs: { class: 'hint-text', 'aria-live': 'polite', 'data-i18n': 'hint.orbit' },
               text: 'Drag to orbit · Space or right button + drag to pan · Scroll to zoom · Double-click to focus',
             },
           ],

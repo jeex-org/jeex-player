@@ -255,6 +255,9 @@ export class ViewerUI implements DirectorChrome {
   wakeControls(force = false): void {
     this.chrome.wake(force);
   }
+  collapseHint(): void {
+    this.chrome.collapseHint();
+  }
 
   /**
    * The director announces every mode switch here (`applyPlanMode`). The tour

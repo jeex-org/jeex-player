@@ -486,20 +486,27 @@ export function fabricBumpTexture(options: WeaveOptions = {}): THREE.Texture | n
 
 /* --------------------------------------------------------------------- sky */
 
+/** Side of the square sky canvas, in pixels: a soft gradient needs no more. */
+export const SKY_SIZE = 256;
+
+/**
+ * Paints the viewer sky onto `ctx`: `top` at the zenith, `horizon` a little
+ * below the middle, a shade darker at the bottom. Shared by the cached
+ * `skyTexture` and the runtime's own repaintable sky (`render/sky-backdrop.ts`),
+ * so both draw the same gradient.
+ */
+export function paintSky(ctx: Ctx, size: number, top: string, horizon: string): void {
+  const gradient = ctx.createLinearGradient(0, 0, 0, size);
+  gradient.addColorStop(0, top);
+  gradient.addColorStop(0.62, horizon);
+  gradient.addColorStop(1, shadeHex(horizon, 14));
+  ctx.fillStyle = gradient;
+  ctx.fillRect(0, 0, size, size);
+  // A whisper of cloud keeps the large flat gradient from banding.
+  overlayNoise(ctx, size, noiseTile(SKY_VEIL), 0.3);
+}
+
 /** Soft vertical gradient used as the viewer sky. */
 export function skyTexture(top: string, horizon: string): THREE.Texture | null {
-  return cached(
-    `sky:${top}:${horizon}`,
-    (ctx, size) => {
-      const gradient = ctx.createLinearGradient(0, 0, 0, size);
-      gradient.addColorStop(0, top);
-      gradient.addColorStop(0.62, horizon);
-      gradient.addColorStop(1, shadeHex(horizon, 14));
-      ctx.fillStyle = gradient;
-      ctx.fillRect(0, 0, size, size);
-      // A whisper of cloud keeps the large flat gradient from banding.
-      overlayNoise(ctx, size, noiseTile(SKY_VEIL), 0.3);
-    },
-    { size: 256, repeatWrap: false },
-  );
+  return cached(`sky:${top}:${horizon}`, (ctx, size) => paintSky(ctx, size, top, horizon), { size: SKY_SIZE, repeatWrap: false });
 }

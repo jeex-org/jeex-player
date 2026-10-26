@@ -330,6 +330,7 @@ type ViewerHandle = {
   getFurnitureVisible(): boolean;
   setLocale(locale: Locale): void;    // any of the seven shipped tags, an alias like 'sr', or a registered code
   setLightTemperature(temperature: number | null): void;  // 2700..6500 K in steps of 100, null = «Original»; anything else throws bad-params
+  refreshTheme(): void;               // re-read the root's CSS theme after a live change (the WebGL backdrop); see Theming
   setSelection(target: { kind: 'wall' | 'opening' | 'room' | 'furniture'; id: string } | null): void;  // highlight by UUID; null clears
   describeSelection(target: ViewerSelection): SelectionDescription | null;  // what the built-in panel would offer, as data
   getLocale(): Locale;
@@ -624,12 +625,39 @@ The chrome is themed with custom properties. Set them on the VIEWER'S OWN ROOT �
   --jeex-focus: #e0b04a;
   --jeex-color-scheme: light;
   --jeex-slot-inset: 24px;
+  --jeex-backdrop: #20242a;
+  --jeex-backdrop-top: #2c323b;
+  --jeex-on-accent: #19211f;
+  --jeex-state-surface: rgb(20 20 24 / 0.95);
 }
 ```
 
 **Not on an ancestor.** The sheet declares each property's default ON that root, and a declaration is exactly what an inherited value cannot beat — a rule on `<jeex-viewer>`, on your container or on `body` is shadowed and does nothing. An UNLAYERED rule on the root itself wins, because the sheet's own rules live in `@layer component`. (Checked: `body { --jeex-accent }` has no effect, `.jeex-viewer { --jeex-accent }` takes effect.) Inside the custom element the root lives in a shadow root, where a page rule cannot reach it: add a sheet to that shadow root, or set the properties on the root element directly.
 
-Those ten are the contract (`THEME_PROPERTIES` in the package); everything else in the sheet derives from them.
+Those fourteen are the contract (`THEME_PROPERTIES` in the package); everything else in the sheet derives from them. The defaults are a neutral graphite, so an embed that sets nothing brings no colour of its own onto your page.
+
+**The accent drives its companions.** The pressed mode button, the hint icon, the loading marks and track, the tour knob, the focus ring and the mini-map's view cone and camera dot all derive from `--jeex-accent` (`color-mix()`), so setting the accent alone recolours them. The mini-map is a canvas: it takes `--jeex-minimap-accent` (the accent darkened for its white card) when the viewer mounts and on `refreshTheme()`. `--jeex-focus` defaults to the accent. No fixed text colour stays readable on every accent: with a very light or very dark accent, set `--jeex-on-accent` too.
+
+**The backdrop is drawn by WebGL.** `--jeex-backdrop` is the colour behind the model in 360, at the horizon (the fog follows it), and the root's background before the first frame; `--jeex-backdrop-top` is the zenith and defaults to the horizon a little lighter. CSS cannot reach a WebGL scene, so the viewer resolves both to opaque colours when it mounts. After changing them live (a theme class, a stylesheet, the properties themselves), call `viewer.refreshTheme()`. Walk and tour keep their real sky, which lights the rooms too; the new backdrop shows on the way back to 360. Captures from a room, tour or scene camera, panoramas and tour frames show that sky from any mode; a still of the live view (`camera: 'live'`) shows what is on screen. A value that is not a colour falls back to the neutral default, and alpha is ignored. The frame embed is themed inside the frame's own page: a parent page's CSS cannot reach it.
+
+**The loading and error cards** paint `--jeex-state-surface`, by default the strong surface.
+
+To keep the look of earlier releases, set the former warm values:
+
+```css
+.jeex-viewer {
+  --jeex-accent: light-dark(#a8813a, #dfbd7d);
+  --jeex-on-accent: light-dark(#fffdf7, #19211f);
+  --jeex-surface: light-dark(rgb(250 247 240 / 82%), rgb(14 22 21 / 76%));
+  --jeex-surface-text: light-dark(#1c2523, #f5efe4);
+  --jeex-state-surface: radial-gradient(circle at 50% 40%, rgb(61 79 73 / 92%), rgb(13 19 19 / 98%) 72%);
+  --jeex-backdrop: #c6b8a3;
+  --jeex-backdrop-top: #dcd3c2;
+  --jeex-minimap-accent: #e08a3c;
+}
+```
+
+**In a narrow viewer** (under 480 px wide) the controls hint shows only its icon, as a button that opens the full text; the first camera gesture closes it again. The `hint` part and its live region are unchanged.
 
 `--jeex-color-scheme` (`light`, `dark` or `light dark`) decides which half of every `light-dark()` colour in the sheet resolves — one line and the whole chrome follows, with no `::part` and no `!important`. Because that `color-scheme` is a `var()` and not a literal, `light-dark()` must reach the browser **unpolyfilled**: a bundler that down-levels it (Lightning CSS does, below its `light-dark()` baseline) rewrites every such colour into two companion `var()`s it then never defines, and the whole chrome silently loses its backgrounds and inherits the host page's text colour. The package's own builds pin the CSS baseline for that reason (`vite.css-target.ts`) and `scripts/css-contract-check.ts` fails the build that breaks it; a host that re-processes `jeex-viewer/style.css` needs the same floor (Chrome/Edge 123, Firefox 120, Safari 17.5). `--jeex-slot-inset` (18px) is how far a corner [slot](#host-slots-handleslots) sits from the viewport edge, before `env(safe-area-inset-*)` raises it on a notched screen. For anything a property cannot express, the shell exposes seven shadow parts (`SHELL_PARTS`): `canvas`, `control-bar`, `mode-bar`, `tour-bar`, `minimap`, `panel`, `hint`:
 

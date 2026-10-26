@@ -229,6 +229,14 @@ export type ViewerHandle = {
    * keeps the current one; an unchanged value raises no event.
    */
   setLightTemperature(temperature: number | null): void;
+  /**
+   * Re-reads the theme from the viewer root's CSS and applies what CSS alone
+   * cannot reach: the 3D backdrop (`--jeex-backdrop`, `--jeex-backdrop-top`).
+   * The mount reads it once before the first frame; call this after changing
+   * a theme class, a stylesheet or the properties themselves. In walk and
+   * tour the sky stays the HDRI and the new backdrop shows back in 360.
+   */
+  refreshTheme(): void;
   /** Re-translates the chrome in place; the scene is not rebuilt. */
   setLocale(locale: Locale): void;
   /**

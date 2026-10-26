@@ -22,6 +22,7 @@ import { chromeLayout } from './chrome-layout.js';
 import { MODE_LABELS } from './mode-labels.js';
 import type { FullscreenController } from './fullscreen-controller.js';
 import { adoptFallbackCanvas, paintWebglFallback } from './webgl-fallback.js';
+import { HintToggle } from './hint-toggle.js';
 
 /** Idle before the control bar collapses to its reveal pill, milliseconds. */
 const HIDE_CONTROLS_MS = 4200;
@@ -94,6 +95,7 @@ export class ViewerChrome {
   private readonly brandLockup: HTMLElement;
   private readonly modeSwitcher: HTMLElement;
   private readonly hintCard: HTMLElement;
+  private readonly hintToggle: HintToggle;
   private readonly hintText: HTMLElement;
   private readonly degradedNotice: HTMLElement;
   private readonly revealControls: HTMLButtonElement;
@@ -172,6 +174,7 @@ export class ViewerChrome {
     this.modeSwitcher = byName('mode-switcher');
     this.hintCard = byName('hint-card');
     this.hintText = byName('hint-text');
+    this.hintToggle = new HintToggle(this.hintCard, byName<HTMLButtonElement>('hint-toggle'), this.hintText);
     this.degradedNotice = byName('degraded-notice');
     this.revealControls = byName<HTMLButtonElement>('reveal-controls');
     this.furnitureButton = byName<HTMLButtonElement>('furniture-button');
@@ -202,6 +205,7 @@ export class ViewerChrome {
     if (this.bound) return;
     this.bound = true;
     const listener = listenerOptions(this.deps.signal);
+    this.hintToggle.bind(this.deps.signal);
     // Scoped to the bar on purpose: `[data-mode]` alone also matches the
     // mini-map card, whose `data-mode` reports which mode it is showing FOR.
     // Bound unscoped, a click on the map was read as a sixth mode button and
@@ -372,6 +376,11 @@ export class ViewerChrome {
   setHint(message: string): void {
     this.hintText.textContent = message;
     this.announce(message);
+  }
+
+  /** Closes a narrow viewer's opened hint (`hint-toggle.ts`); a wide viewer has nothing to close. */
+  collapseHint(): void {
+    this.hintToggle.collapse();
   }
 
   setHintForMode(mode: ViewerMode): void {
