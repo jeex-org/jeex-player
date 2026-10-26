@@ -40,7 +40,7 @@ import { EPS, add, dist, leftN, norm, sub } from '../plan/plan-geometry.js';
 import { clamp } from '../shared/math.js';
 import { DEFAULT_WALL_FINISH } from '../scene/scene-ops.js';
 import { ShellPaint } from './shell-paint.js';
-import { createSiteGround } from './site-ground.js';
+import { createSiteGround, SITE_SLAB_COLOUR } from './site-ground.js';
 import { resolveFinish } from '../materials/material-catalogue.js';
 import { FINISH } from '../materials/finish-ids.js';
 import { effectiveRoom, isDoorLike, type Vec2 } from '../scene/types.js';
@@ -196,7 +196,7 @@ export class ShellBuilder {
     const depth = bounds.maxZ - bounds.minZ + 2.6;
     const slab = new THREE.Mesh(
       new THREE.BoxGeometry(width, 0.34, depth),
-      new THREE.MeshStandardMaterial({ color: '#9d8f7c', roughness: 0.9 }),
+      new THREE.MeshStandardMaterial({ color: SITE_SLAB_COLOUR, roughness: 0.9 }),
     );
     slab.position.set((bounds.minX + bounds.maxX) / 2, -0.171, (bounds.minZ + bounds.maxZ) / 2);
     slab.name = 'site-slab';
