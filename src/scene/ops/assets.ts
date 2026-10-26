@@ -244,6 +244,11 @@ function anchorPair(object: CatalogueArchetype): string {
   return `${object.anchor ?? 'floor'}${object.onSurface === true ? ' on a surface' : ''}`;
 }
 
+/** The one word a host can say for how an asset is mounted: on-surface wins over the anchor, no anchor is the floor. */
+function mountOf(object: CatalogueArchetype): 'floor' | 'wall' | 'ceiling' | 'surface' {
+  return object.onSurface === true ? 'surface' : (object.anchor ?? 'floor');
+}
+
 /**
  * Gives a placement another asset, keeping the placement itself.
  *
@@ -263,7 +268,16 @@ export function applyReplaceAsset(scene: Draft<SceneData>, op: ReplaceAssetOp, r
   const current = registries.resolvePlacement(asset)?.object;
   if (current === undefined) throw new OpError(`Asset ${op.assetId} names no asset the catalogue knows`);
   if (anchorPair(current) !== anchorPair(target)) {
-    throw new OpError(`replace_asset: ${op.asset} is anchored ${anchorPair(target)}, asset ${op.assetId} ${anchorPair(current)}`);
+    throw new OpError(
+      `replace_asset: ${op.assetId} is anchored ${anchorPair(current)}, asset ${op.asset} ${anchorPair(target)}`,
+      'replace_asset',
+      {
+        reason: 'anchor_mismatch',
+        assetId: op.assetId,
+        mount: mountOf(target),
+        currentMount: mountOf(current),
+      },
+    );
   }
   const mirror = asset.mirror ?? {};
   const refused = disallowedMirrorAxes(mirror, target.mirror);
