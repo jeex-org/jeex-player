@@ -180,11 +180,12 @@ describe('jeex-viewer/ops entry', () => {
   });
 
   test('a host builds a purpose picker and version checks without its own copy of the vocabulary', () => {
-    // The 13 values, in spec order, and the readable versions in reading order.
+    // The 14 values, in spec order, and the readable versions in reading order.
     expect([...ROOM_PURPOSES]).toEqual([
       'living',
       'kitchen',
       'kitchen-living',
+      'dining',
       'bedroom',
       'kids',
       'study',

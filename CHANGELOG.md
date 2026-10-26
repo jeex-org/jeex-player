@@ -9,6 +9,10 @@ as described under [Versioning](#versioning).
 
 ### Added
 
+- **`dining` is a room purpose.** `ROOM_PURPOSES` gains `dining` after
+  `kitchen-living`, fourteen values in all, for a room set aside for meals.
+  It is additive: every document that was valid stays valid, and
+  `set_room_purpose` and the schema 2.4 validator accept the new value.
 - **Escape clears the selection.** In the built-in editor, Escape on the
   viewer deselects as a tap on nothing does: the aura fades and the panel
   closes. An open settings panel or replace popup closes on the first Escape

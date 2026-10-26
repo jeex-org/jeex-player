@@ -56,6 +56,7 @@ const EVERY_ROOM_PURPOSE = {
   living: true,
   kitchen: true,
   'kitchen-living': true,
+  dining: true,
   bedroom: true,
   kids: true,
   study: true,
