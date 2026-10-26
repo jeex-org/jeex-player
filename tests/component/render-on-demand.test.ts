@@ -17,7 +17,7 @@ import * as THREE from 'three';
 import { InlineSceneRepository, mountViewer } from '../../src/app/viewer-api.js';
 import type { ViewerHandle } from '../../src/app/viewer-handle.js';
 import { RenderDemand, type DemandCounters } from '../../src/render/render-demand.js';
-import { RenderRuntime } from '../../src/render/render-runtime.js';
+import { KEEP_WARM_MS, RenderRuntime } from '../../src/render/render-runtime.js';
 import { trackLibraryMaps, type LibraryMaps } from './library-maps.js';
 import { WalkLighting } from '../../src/render/walk-post.js';
 import { FloorRing } from '../../src/camera/floor-ring.js';
@@ -638,10 +638,15 @@ describe('the editing modes draw on demand', { timeout: MOUNT_TIMEOUT_MS }, () =
     handle.setMode('plan2d');
     await ticks(5);
     const start = counters();
+    const since = performance.now();
     await delay(2000);
+    const elapsed = performance.now() - since;
     const flat = { ticks: counters().ticks - start.ticks, draws: counters().draws - start.draws };
     expect(flat.draws).toBeGreaterThanOrEqual(1);
-    expect(flat.draws).toBeLessThan(flat.ticks);
+    // Only the heartbeat: one draw per KEEP_WARM_MS at most, whatever the tick
+    // rate. On a 4-vCPU software rasteriser a tick can take longer than that,
+    // and then every tick rightly draws (3 ticks, 3 draws in 2 s).
+    expect(flat.draws).toBeLessThanOrEqual(Math.ceil(elapsed / KEEP_WARM_MS) + 1);
     handle.setMode('orbit');
     await rest('back in orbit');
   });
