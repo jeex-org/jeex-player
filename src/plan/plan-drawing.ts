@@ -106,19 +106,18 @@ const MITER_LIMIT = 4;
 
 /**
  * Category paths whose objects are FIXTURES: they belong to the building, not
- * to the furnishing, and a classic plan draws them. Everything else — seating,
- * beds, storage, decor, lighting — is left out.
+ * to the furnishing, and a classic plan draws them. The paths are the store's
+ * category tree (`asset-category@1`), which the built-in bank files under too.
+ * Everything else — seating, beds, storage, decor, lighting — is left out.
  */
-const FIXTURE_PREFIXES = ['sanitary/', 'appliances/'];
-const FIXTURE_SEGMENT = 'kitchen';
-/** A hood hangs above the worktop: it has no footprint on the floor plan. */
-const FIXTURE_EXCLUDED = new Set(['appliances/ventilation']);
+const FIXTURE_PREFIXES = ['bathroom/', 'kitchen/', 'appliances/'];
+/** A hood hangs above the worktop and a kettle stands on it: neither has a footprint on the floor plan. */
+const FIXTURE_EXCLUDED = new Set(['appliances/cooker-hoods', 'appliances/kettles']);
 
 /** Whether a catalogue category is drawn as a fixture on the 2D plan. */
 export function isPlanFixtureCategory(category: string): boolean {
   if (FIXTURE_EXCLUDED.has(category)) return false;
-  if (FIXTURE_PREFIXES.some((prefix) => category.startsWith(prefix))) return true;
-  return category.split('/').includes(FIXTURE_SEGMENT);
+  return FIXTURE_PREFIXES.some((prefix) => category.startsWith(prefix));
 }
 
 /**

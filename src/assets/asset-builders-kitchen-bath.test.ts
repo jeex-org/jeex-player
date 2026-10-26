@@ -27,7 +27,7 @@ function hoodAsset(dims: [number, number, number]): ResolvedAsset {
     variantId: VARIANT.hood_extractor_steel,
     variantName: 'Test hood',
     version: '1.0.0',
-    category: 'appliances/ventilation',
+    category: 'appliances/cooker-hoods',
     tags: ['kitchen'],
     dims,
     anchor: 'wall',

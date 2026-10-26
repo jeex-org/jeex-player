@@ -39,7 +39,7 @@ const DEFAULT_CLEARANCE_M = 0.6;
 export type AssetFacts = {
   readonly archetype: string;
   readonly anchor: AssetAnchor;
-  /** Slash-delimited category path (`sanitary/baths`); empty when the bank names none. */
+  /** Slash-delimited category path of the store's tree (`bathroom/baths`); empty when the bank names none. */
   readonly category: string;
   readonly wallSnap: boolean;
   readonly clearance: number;

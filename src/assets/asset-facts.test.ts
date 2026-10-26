@@ -81,7 +81,7 @@ const LIBRARY: FactsLibrary = {
     {
       id: IDS.vanity,
       anchor: 'floor',
-      category: 'sanitary/vanities',
+      category: 'bathroom/vanity-units',
       // Overall height includes the tap; the basin rim is what blocks.
       dims: [1.0, 1.1, 0.6],
       layout: { blockingHeight: 0.85, footprint: 0.5 },
@@ -178,7 +178,7 @@ describe('a project library over the shipped bank', () => {
       ...apartmentScene,
       assets: [placed(IDS.vanity, { asset: IDS.vanity }), placed(IDS.plant, { asset: IDS.plant })],
     };
-    expect(planFixtures(scene, facts).map((fixture) => fixture.category)).toEqual(['sanitary/vanities']);
+    expect(planFixtures(scene, facts).map((fixture) => fixture.category)).toEqual(['bathroom/vanity-units']);
     expect(planFixtures(scene)).toEqual([]);
   });
 });
@@ -212,15 +212,15 @@ describe('the demo flat with store ids', () => {
         .map((fixture) => fixture.category)
         .sort(),
     ).toEqual([
-      'appliances/cooking',
-      'appliances/refrigeration',
-      'furniture/kitchen/counters',
-      'furniture/kitchen/islands',
-      'sanitary/baths',
-      'sanitary/vanities',
-      'sanitary/vanities',
-      'sanitary/wc',
-      'sanitary/wc',
+      'appliances/cookers',
+      'appliances/refrigerators',
+      'bathroom/baths',
+      'bathroom/toilets',
+      'bathroom/toilets',
+      'bathroom/vanity-units',
+      'bathroom/vanity-units',
+      'kitchen/base-units',
+      'kitchen/islands',
     ]);
   });
 });
