@@ -101,10 +101,12 @@ function requireFinish(scene: Draft<SceneData>, registries: SceneRegistries, fin
  * its pivot IS the floor centre (the scene contract), so a
  * non-zero `y` is a sofa hovering. A wall-hung or ceiling-mounted one keeps
  * what it was given — that number is the mounting height, and only the editor
- * and the layout linter know what it should be.
+ * and the layout linter know what it should be. So does a piece that stands on
+ * a surface (`onSurface`, a table lamp on a nightstand): its `y` is the top it
+ * stands on, and whether a top is there is the linter's to say.
  */
 function seatedY(object: CatalogueArchetype, y: number): number {
-  return (object.anchor ?? 'floor') === 'floor' ? 0 : y;
+  return (object.anchor ?? 'floor') === 'floor' && object.onSurface !== true ? 0 : y;
 }
 
 export function applyPlaceObject(scene: Draft<SceneData>, op: PlaceObjectOp, registries: SceneRegistries): OpOutcome {
