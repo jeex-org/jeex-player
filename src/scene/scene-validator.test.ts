@@ -213,9 +213,11 @@ describe('scene validator — room purpose (schema 2.4)', () => {
     const scene = withPurpose('kitchen-living') as SceneData;
     expect(validateScene(scene, CATALOGUE_REGISTRIES)).toBe(scene);
     expect(scene.rooms[0]!.purpose).toBe('kitchen-living');
+    const dining = withPurpose('dining') as SceneData;
+    expect(validateScene(dining, CATALOGUE_REGISTRIES)).toBe(dining);
   });
 
-  test.each(['dining', 'Kitchen', '', 5])(
+  test.each(['garage', 'Kitchen', '', 5])(
     'a 2.4 document with the unknown value %j is refused at that room purpose, naming the value',
     (purpose) => {
       const error = errorOf(() => validateScene(withPurpose(purpose), CATALOGUE_REGISTRIES));
@@ -234,12 +236,12 @@ describe('scene validator — room purpose (schema 2.4)', () => {
   });
 
   test('a purpose is refused for the version first: a 2.3 document with an out-of-vocabulary value names 2.4, not the value', () => {
-    const error = errorOf(() => validateScene(withPurpose('dining', '2.3'), CATALOGUE_REGISTRIES));
+    const error = errorOf(() => validateScene(withPurpose('garage', '2.3'), CATALOGUE_REGISTRIES));
     expect(error.rule).toBe('room-purpose-needs-schema-2-4');
     expect(error.path).toBe('rooms[0].purpose');
     expect(error.message).toContain('2.4');
     expect(error.message).toContain('2.3');
-    expect(error.message).not.toContain('dining');
+    expect(error.message).not.toContain('garage');
   });
 
   test.each(['2.2', '2.3'] as const)('a %s document with a purpose is refused at that room purpose, naming 2.4', (version) => {

@@ -25,6 +25,7 @@ export const ROOM_PURPOSES = [
   'living',
   'kitchen',
   'kitchen-living',
+  'dining',
   'bedroom',
   'kids',
   'study',

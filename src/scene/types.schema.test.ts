@@ -364,13 +364,14 @@ describe('sceneSchema — room purpose (schema 2.4)', () => {
 
   test('a 2.4 document with a known value is a whole scene document, and one without a purpose stays one', () => {
     expect(documentPaths(at('kitchen-living'))).toEqual([]);
+    expect(documentPaths(at('dining'))).toEqual([]);
     const absent = draftOf(lShapePlan);
     (absent as { schemaVersion: string }).schemaVersion = '2.4';
     expect(documentPaths(absent)).toEqual([]);
     expect('purpose' in absent.rooms[0]!).toBe(false);
   });
 
-  test.each(['dining', 'Kitchen', '', 5])('an out-of-vocabulary value %j is refused at that room purpose', (purpose) => {
+  test.each(['garage', 'Kitchen', '', 5])('an out-of-vocabulary value %j is refused at that room purpose', (purpose) => {
     expect(documentPaths(at(purpose))).toEqual(['rooms[0].purpose']);
   });
 
@@ -385,7 +386,7 @@ describe('sceneSchema — room purpose (schema 2.4)', () => {
     // Zod reports the room-level refusal alone here (a failed enum stops the
     // document refinement); the VERSION-first ordering is the runtime
     // validator's, pinned in `scene-validator.test.ts`.
-    expect(documentPaths(at('dining', '2.3'))).toEqual(['rooms[0].purpose']);
+    expect(documentPaths(at('garage', '2.3'))).toEqual(['rooms[0].purpose']);
   });
 
   test('a purpose in a 2.2 document is refused the same way', () => {
@@ -678,7 +679,7 @@ const RULE_CASES: readonly RuleCase[] = [
     document: () =>
       brokenScene((scene) => {
         put(scene, 'schemaVersion', '2.4');
-        put(scene.rooms[0]!, 'purpose', 'dining');
+        put(scene.rooms[0]!, 'purpose', 'garage');
       }),
   },
   {
@@ -1321,6 +1322,7 @@ describe('set_room_purpose in the op schema', () => {
       { op: 'set_room_purpose', roomId: ROOM.a, purpose: 'kitchen-living' },
       { op: 'set_room_purpose', roomId: ROOM.a, purpose: null },
       { op: 'set_room_purpose', roomId: ROOM.a, purpose: 'balcony' },
+      { op: 'set_room_purpose', roomId: ROOM.a, purpose: 'dining' },
     ];
     expect(sceneOpsIssues(ops)).toEqual([]);
   });
@@ -1329,7 +1331,7 @@ describe('set_room_purpose in the op schema', () => {
     expect(sceneOpsIssues([{ op: 'set_room_purpose', roomId: ROOM.a }]).map((issue) => issuePath(issue))).toEqual(['[0].purpose']);
   });
 
-  test.each(['dining', '', 5, true])('the out-of-vocabulary value %j is refused naming the field purpose', (purpose) => {
+  test.each(['garage', '', 5, true])('the out-of-vocabulary value %j is refused naming the field purpose', (purpose) => {
     const issues = sceneOpsIssues([{ op: 'set_room_purpose', roomId: ROOM.a, purpose }]);
     expect(issues.map((issue) => issuePath(issue))).toEqual(['[0].purpose']);
   });
