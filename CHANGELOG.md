@@ -607,6 +607,11 @@ as described under [Versioning](#versioning).
 
 ### Fixed
 
+- **A piece placed on a top stays on it.** `place_object` and `move_object`
+  put a table lamp on a nightstand, or a TV on its unit, back on the floor,
+  because every floor-standing archetype was pinned to `y = 0`. A piece that
+  stands on a surface (`onSurface`) now keeps the height it was given, so the
+  objects an `assetEdit` carries on a moved top land where they were shown.
 - **The host's backdrop shows around the model in 360 and the 3D plan.** The
   warm site ground under the flat filled the whole frame from those cameras,
   so the themed sky behind it never showed and the view stayed beige. There

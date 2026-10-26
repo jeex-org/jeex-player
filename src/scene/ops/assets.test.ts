@@ -37,6 +37,7 @@ const NEW = {
   library: '01a12ff3-0a4d-7b52-8d1e-6c39f0a4b2d8',
   libraryObject: '01a12ff3-0a4e-7e86-9f03-1b7d5c2a9e64',
   libraryVariant: '01a12ff3-0a4f-7a19-b2c7-48e60d3f1b95',
+  surfacePiece: '01a17893-f1e8-77a7-8a32-3808e8318bed',
 } as const;
 
 /** The shipped registries with one project library layered on them. */
@@ -156,6 +157,20 @@ describe('place_object', () => {
     expect(scene.assets.find((asset) => asset.id === NEW.hungPiece)!.position.y).toBe(1.5);
   });
 
+  test('a piece that stands on a surface keeps the height it was given, the top it stands on', () => {
+    const scene = opDraft();
+
+    const outcome = apply(scene, {
+      op: 'place_object',
+      id: NEW.surfacePiece,
+      asset: ARCHETYPE.lamp_table,
+      position: { x: 2, y: 0.5, z: 2 },
+    });
+
+    expect(scene.assets.find((asset) => asset.id === NEW.surfacePiece)!.position.y).toBe(0.5);
+    expect(outcome.summary).toContain('(2.00, 0.50, 2.00)');
+  });
+
   test('normalises the yaw into (−π, π]', () => {
     const scene = opDraft();
 
@@ -225,6 +240,18 @@ describe('move_object', () => {
     expect(scene.assets[0]!.position).toEqual({ x: 3.5, y: 0, z: 6 });
     expect(outcome.summary).toBe(`Object ${SOFA}: moved to (3.50, 0.00, 6.00)`);
     expect(outcome.touched).toEqual([touchedAsset(SOFA)]);
+  });
+
+  test('a piece that stands on a surface moves to the height it was given, by position or by delta', () => {
+    const scene = opDraft();
+    apply(scene, { op: 'place_object', id: NEW.surfacePiece, asset: ARCHETYPE.lamp_table, position: { x: 2, y: 0.5, z: 2 } });
+    const lamp = () => scene.assets.find((asset) => asset.id === NEW.surfacePiece)!;
+
+    apply(scene, { op: 'move_object', assetId: NEW.surfacePiece, position: { x: 3, y: 0.72, z: 2 } });
+    expect(lamp().position).toEqual({ x: 3, y: 0.72, z: 2 });
+
+    apply(scene, { op: 'move_object', assetId: NEW.surfacePiece, dposition: { x: 0.5, y: 0, z: 0 } });
+    expect(lamp().position).toEqual({ x: 3.5, y: 0.72, z: 2 });
   });
 
   test('adds a delta to the current position', () => {
