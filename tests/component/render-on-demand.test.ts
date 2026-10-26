@@ -529,7 +529,16 @@ describe('the editing modes draw on demand', { timeout: MOUNT_TIMEOUT_MS }, () =
 
   let maps: LibraryMaps;
 
+  /** The page's diagnostic flags global (`src/shared/debug-flags.ts`). */
+  const debugGlobal = globalThis as { __JEEX_DEBUG_FLAGS__?: unknown };
+
   beforeAll(async () => {
+    // The cooker's smoked oven glass is the demo's only transmissive mesh. On an
+    // NVIDIA GPU three's transmission pass leaves state that the next frame reads,
+    // so two forced draws of an unchanged scene differ by a few pixels and no
+    // kept-equals-forced comparison can hold. These tests are about draw
+    // requests, so this mount draws without the transmission pass.
+    debugGlobal.__JEEX_DEBUG_FLAGS__ = { noTransmission: true };
     maps = trackLibraryMaps();
     const addFrameHook = Object.getOwnPropertyDescriptor(RenderRuntime.prototype, 'addFrameHook')!.value as RenderRuntime['addFrameHook'];
     vi.spyOn(RenderRuntime.prototype, 'addFrameHook').mockImplementation(function (this: RenderRuntime, hook) {
@@ -568,6 +577,7 @@ describe('the editing modes draw on demand', { timeout: MOUNT_TIMEOUT_MS }, () =
     handle.dispose();
     vi.restoreAllMocks();
     closeContainers();
+    delete debugGlobal.__JEEX_DEBUG_FLAGS__;
   });
 
   // Every test starts from the same resting orbit, whatever the one before it left behind.

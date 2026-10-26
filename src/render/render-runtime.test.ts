@@ -10,6 +10,7 @@
 import { describe, expect, test } from 'bun:test';
 import * as THREE from 'three';
 import { KEEP_WARM_MS, RenderRuntime, createRenderRuntime } from './render-runtime.js';
+import { NEW_RESOURCES_SETTLE_MS } from './settle-window.js';
 import { measureEntry } from './viewport-box.js';
 import { stubLighting, stubRuntime } from '../fixtures/stubs.js';
 import { apartmentEnvironmentIntensity, LIGHTING_STANDARD } from '../lighting/lighting-standard.js';
@@ -1012,18 +1013,57 @@ describe('WebGL context loss', () => {
     runtime.dispose();
   });
 
-  test('a resting walk draws a complete picture after the context comes back', () => {
-    const { canvas, fire } = fakeCanvas();
-    const { runtime, stub, tick } = harness({ canvas, mode: () => 'walk' });
+  test('a picture that brings new GPU resources keeps every tick drawing for NEW_RESOURCES_SETTLE_MS from it, then the view rests', () => {
+    const { runtime, stub, tick } = harness({ mode: () => 'walk' });
+    const memory = (runtime.renderer.info as unknown as { memory: { textures: number; geometries: number } }).memory;
     runtime.setCamera(new THREE.PerspectiveCamera());
     runtime.start();
     tick(16);
     tick(16);
-    fire('webglcontextlost');
-    fire('webglcontextrestored');
-    tick(16);
+    expect(stub.renders).toBe(1);
+    // A change that brought a new texture: its picture opens the window.
+    memory.textures += 1;
+    runtime.demand.invalidate();
     tick(16);
     expect(stub.renders).toBe(2);
+    const inside = Math.floor((NEW_RESOURCES_SETTLE_MS - 1) / 16);
+    for (let i = 0; i < inside; i += 1) tick(16);
+    expect(stub.renders).toBe(2 + inside);
+    tick(NEW_RESOURCES_SETTLE_MS);
+    tick(16);
+    tick(16);
+    expect(stub.renders).toBe(2 + inside);
+    // Nothing new: a change draws once and rests.
+    runtime.demand.invalidate();
+    tick(16);
+    tick(16);
+    expect(stub.renders).toBe(3 + inside);
+    runtime.dispose();
+  });
+
+  test('after a context restore the first picture opens the settle window, however late it comes', () => {
+    const { canvas, fire } = fakeCanvas();
+    const { runtime, stub, tick } = harness({ canvas, mode: () => 'walk' });
+    const memory = (runtime.renderer.info as unknown as { memory: { textures: number; geometries: number } }).memory;
+    memory.textures = 3;
+    runtime.setCamera(new THREE.PerspectiveCamera());
+    runtime.start();
+    for (let i = 0; i < 30; i += 1) tick(16);
+    const settled = stub.renders;
+    tick(16);
+    expect(stub.renders).toBe(settled);
+    fire('webglcontextlost');
+    fire('webglcontextrestored');
+    // The same three textures, uploaded again on the new context; the picture comes late,
+    // as when the programs take long to compile again.
+    tick(NEW_RESOURCES_SETTLE_MS + 100);
+    expect(stub.renders).toBe(settled + 1);
+    const inside = Math.floor((NEW_RESOURCES_SETTLE_MS - 1) / 16);
+    for (let i = 0; i < inside; i += 1) tick(16);
+    expect(stub.renders).toBe(settled + 1 + inside);
+    tick(NEW_RESOURCES_SETTLE_MS);
+    tick(16);
+    expect(stub.renders).toBe(settled + 1 + inside);
     runtime.dispose();
   });
 
