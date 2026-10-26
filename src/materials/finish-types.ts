@@ -129,6 +129,8 @@ export type LibraryPbr = {
   readonly opacity?: number;
   readonly sheen?: number;
   readonly sheenColour?: string;
+  /** How far a sheen without `sheenColour` moves from the tint toward white, linear light; the reader's default is 0.2. */
+  readonly sheenLift?: number;
   readonly sheenRoughness?: number;
   readonly clearcoat?: number;
   readonly clearcoatRoughness?: number;

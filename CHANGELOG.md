@@ -9,6 +9,10 @@ as described under [Versioning](#versioning).
 
 ### Added
 
+- **A library material states its sheen lift.** `facts.pbr.sheenLift`, in
+  [0, 1], is how far a sheen without `sheenColour` moves from the tint toward
+  white in linear light; absent, it is 0.2 as before. Dark dyed pile such as
+  chenille and velvet throws a much lighter grazing sheen than its body.
 - **`replace_asset`'s anchor refusal names its reason.** It carries
   `detail: { reason: 'anchor_mismatch', assetId, mount, currentMount }`, each
   mounting one of `floor`, `wall`, `ceiling` or `surface`, so a host can say
