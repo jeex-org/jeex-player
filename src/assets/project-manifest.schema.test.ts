@@ -717,6 +717,7 @@ describe('library member: PBR ranges', () => {
       'metalness',
       'opacity',
       'sheen',
+      'sheenLift',
       'sheenRoughness',
       'clearcoat',
       'clearcoatRoughness',
@@ -749,6 +750,7 @@ describe('library member: PBR ranges', () => {
       expect(pbrIssues('roughness', value)).toEqual([`${AT}.facts.pbr.roughness`]);
       expect(pbrIssues('emissiveIntensity', value)).toEqual([`${AT}.facts.pbr.emissiveIntensity`]);
       expect(pbrIssues('sheenRoughness', value)).toEqual([`${AT}.facts.pbr.sheenRoughness`]);
+      expect(pbrIssues('sheenLift', value)).toEqual([`${AT}.facts.pbr.sheenLift`]);
       expect(issuePaths(withLibrary(naturalScan, (library) => void (library['facts']['tileM'] = [value, 1])))).toEqual([
         `${AT}.facts.tileM.0`,
       ]);
