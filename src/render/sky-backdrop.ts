@@ -20,6 +20,9 @@ import * as THREE from 'three';
 import { createCanvas2D, type Canvas2D } from '../materials/canvas-2d.js';
 import { getTextureAnisotropy, paintSky, SKY_SIZE } from '../materials/textures.js';
 
+/** The sky walk and tour light the rooms with, whatever the host's theme: it is a light source there, not chrome. */
+export const DAYLIGHT_SKY = { top: '#dcd3c2', horizon: '#c6b8a3' } as const;
+
 export class SkyBackdrop {
   /** The texture to set as `scene.background`; the same object for this backdrop's whole life. */
   readonly texture: THREE.Texture | null;
