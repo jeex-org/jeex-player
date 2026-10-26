@@ -130,6 +130,23 @@ describe('replace_asset', () => {
     expect(placement(scene, SOFA).type).toBe('sofa');
   });
 
+  test("the anchor refusal names its reason and both mountings, the placement with its own and the target with the target's", () => {
+    const scene = opDraft();
+    const pendant = refused(scene, { op: 'replace_asset', assetId: SOFA, asset: ARCHETYPE.pendant });
+    expect(pendant.detail).toEqual({
+      op: 'replace_asset',
+      reason: 'anchor_mismatch',
+      assetId: SOFA,
+      mount: 'ceiling',
+      currentMount: 'floor',
+    });
+    expect(pendant.message).toBe(`replace_asset: ${SOFA} is anchored floor, asset ${ARCHETYPE.pendant} ceiling`);
+
+    const vase = refused(scene, { op: 'replace_asset', assetId: SOFA, asset: OFFERS.asset.budVase, library: OFFERS.library });
+    expect(vase.detail).toMatchObject({ reason: 'anchor_mismatch', mount: 'surface', currentMount: 'floor' });
+    expect(scene).toEqual(opDraft());
+  });
+
   test('refuses a target whose mirror facts forbid the mirror the placement carries', () => {
     const scene = dressedDraft();
     const error = refused(scene, { op: 'replace_asset', assetId: SOFA, asset: OFFERS.asset.hallBench, library: OFFERS.library });
