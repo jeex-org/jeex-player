@@ -179,15 +179,29 @@ describe('buildPlanDrawing: fixtures', () => {
     expect(buildPlanDrawing(plan, scene, { frameWidthOf: openingFrameWidth }).primitives.some((p) => p.kind === 'fixture')).toBe(false);
   });
 
-  test('the category predicate names bath and kitchen, and nothing else', () => {
-    expect(isPlanFixtureCategory('sanitary/wc')).toBe(true);
-    expect(isPlanFixtureCategory('sanitary/baths')).toBe(true);
-    expect(isPlanFixtureCategory('furniture/kitchen/counters')).toBe(true);
-    expect(isPlanFixtureCategory('furniture/storage/kitchen')).toBe(true);
-    expect(isPlanFixtureCategory('appliances/cooking')).toBe(true);
-    expect(isPlanFixtureCategory('furniture/sofas')).toBe(false);
-    expect(isPlanFixtureCategory('decor/rugs')).toBe(false);
-    expect(isPlanFixtureCategory('lighting/pendants')).toBe(false);
+  test('the category predicate names bathroom, kitchen and floor appliances, and nothing else', () => {
+    for (const fixture of [
+      'bathroom/toilets',
+      'bathroom/baths',
+      'bathroom/vanity-units',
+      'kitchen/base-units',
+      'kitchen/tall-units',
+      'kitchen/islands',
+      'appliances/cookers',
+      'appliances/refrigerators',
+      'appliances/washing-machines',
+    ])
+      expect({ fixture, drawn: isPlanFixtureCategory(fixture) }).toEqual({ fixture, drawn: true });
+    // A hood hangs above the worktop and a kettle stands on it: neither has a footprint on the plan.
+    for (const other of [
+      'appliances/cooker-hoods',
+      'appliances/kettles',
+      'furniture/sofas',
+      'decor/rugs',
+      'lighting/pendants',
+      'sanitary/wc',
+    ])
+      expect({ other, drawn: isPlanFixtureCategory(other) }).toEqual({ other, drawn: false });
   });
 });
 

@@ -70,6 +70,15 @@ as described under [Versioning](#versioning).
 
 ### Changed
 
+- **The built-in bank files under the store's category tree.** Every bundled
+  archetype's `category` is now a leaf of the store's tree (`sanitary/wc` is
+  `bathroom/toilets`, `furniture/kitchen/islands` is `kitchen/islands`,
+  `appliances/ventilation` is `appliances/cooker-hoods`, `lighting/table` is
+  `lighting/table-lamps`, and so on), so bundled and store assets classify
+  alike. The 2D plan outlines `bathroom/`, `kitchen/` and `appliances/`
+  objects except cooker hoods and kettles, and the replace popup groups the
+  bundled bank under Kitchen and Bathroom instead of Furniture and Sanitary.
+  A host reading `category` from the facts sees the new paths.
 - **The plinth under the flat is a neutral grey.** The slab the model stands
   on in every mode was the last warm colour around it in 360; it is now a
   concrete grey (`#b4b4b0`), still lit and still taking the contact shadow.
