@@ -81,6 +81,14 @@ as described under [Versioning](#versioning).
   door with no leaf, keeps 0.9 m on both sides; the zone's width is
   unchanged. A toilet beside an outward-opening WC door, or a unit opposite
   a door that opens into its room, no longer reports.
+- **A small room asks for a standing spot, not a corridor.** The layout
+  linter's `circulation` rule treats a room whose plan rectangle is under
+  2 m on both sides (a WC, a compact bathroom, a closet) as small: it needs
+  0.6 m of free floor in front of each door and a 0.6 m path between its
+  doors, and no longer a path to its centre. A furnished 1.2 × 1.25 m WC can
+  now pass. Larger rooms keep the 0.8 m path, and its grid now frees a cell
+  half a step short of 0.4 m, so a gap of 0.8 m or more passes wherever the
+  grid falls and one under 0.7 m never does.
 
 - **The built-in bank files under the store's category tree.** Every bundled
   archetype's `category` is now a leaf of the store's tree (`sanitary/wc` is
