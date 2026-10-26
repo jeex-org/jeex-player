@@ -76,7 +76,8 @@ const DOT_RADIUS_PX = 7;
 const DOT_PICK_PX = 10;
 /** The dots' own palette: graphite with a white rim, the current one in the tour-camera accent. */
 const DOT_FILL = '#2b302f';
-const DOT_CURRENT = '#dfbd7d';
+/** The accent before the host's theme is read (`setAccent`): the neutral default, darkened for the white card. */
+const DEFAULT_ACCENT = '#5c6675';
 
 type PaintKey = {
   w: number;
@@ -103,6 +104,8 @@ export class Minimap {
   private painted: PaintKey | null = null;
   /** Bumped by every new document and every resize, to force one repaint. */
   private revision = 0;
+  /** The view cone's and the current camera dot's colour: the host's theme (`setAccent`). */
+  private accent = DEFAULT_ACCENT;
 
   constructor(deps: MinimapDeps) {
     this.deps = deps;
@@ -186,8 +189,20 @@ export class Minimap {
       highlightRoom: this.hoverRoom,
       camera,
       coneRadius: CONE_RADIUS_M,
+      accent: this.accent,
     });
-    paintCameraDots(fitted.ctx, this.transform, cameras);
+    paintCameraDots(fitted.ctx, this.transform, cameras, this.accent);
+  }
+
+  /**
+   * The host's accent for the view cone and the current camera dot, as opaque
+   * `#rrggbb` (`--jeex-minimap-accent`, resolved by the stage at mount and on
+   * `refreshTheme()`): the card is a canvas, which CSS cannot colour.
+   */
+  setAccent(accent: string): void {
+    if (accent === this.accent) return;
+    this.accent = accent;
+    this.revision += 1;
   }
 
   /**
@@ -351,6 +366,7 @@ function paintCameraDots(
   ctx: CanvasRenderingContext2D,
   transform: PlanTransform,
   cameras: { readonly points: readonly Vec2[]; readonly current: number | null } | undefined,
+  accent: string,
 ): void {
   if (!cameras) return;
   ctx.save();
@@ -362,12 +378,12 @@ function paintCameraDots(
     const current = index === cameras.current;
     ctx.beginPath();
     ctx.arc(at.x, at.y, DOT_RADIUS_PX, 0, Math.PI * 2);
-    ctx.fillStyle = current ? DOT_CURRENT : DOT_FILL;
+    ctx.fillStyle = current ? accent : DOT_FILL;
     ctx.fill();
     ctx.lineWidth = 1.5;
     ctx.strokeStyle = '#ffffff';
     ctx.stroke();
-    ctx.fillStyle = current ? '#1c2523' : '#ffffff';
+    ctx.fillStyle = '#ffffff';
     ctx.fillText(String(index + 1), at.x, at.y + 0.5);
   });
   ctx.restore();

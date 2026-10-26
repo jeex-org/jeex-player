@@ -13,7 +13,21 @@ as described under [Versioning](#versioning).
   `detail: { reason: 'anchor_mismatch', assetId, mount, currentMount }`, each
   mounting one of `floor`, `wall`, `ceiling` or `surface`, so a host can say
   why a floor armchair cannot become a wall sconce.
-
+- **The host themes the 3D backdrop.** `--jeex-backdrop` (the horizon, which
+  the fog follows) and the new `--jeex-backdrop-top` (the zenith) colour the
+  sky behind the model in 360, not only the CSS background before the first
+  frame. The viewer resolves them when it mounts; after a live change call the
+  new `handle.refreshTheme()`. Walk and tour keep their real sky, which also
+  lights the rooms, and the new backdrop shows back in 360. Stills from a room,
+  tour or scene camera, panoramas and tour frames show that sky from any mode;
+  a still of the live view shows what is on screen.
+- **`--jeex-on-accent` and `--jeex-state-surface` join the theme contract.**
+  The accent's text colour, and the surface of the loading and error cards,
+  which painted a fixed green-black gradient before.
+- **A compact hint in a narrow viewer.** Under 480 px wide, the controls hint
+  shows only its icon, as a button that opens the full text; the first camera
+  gesture closes it again. The card, its `hint` part and its live region are
+  unchanged.
 - **Replace an object with another asset.** Under the Replace panel's
   variants, "Replace with another…" opens a popup of the assets the selected
   object can become, grouped by category: the same anchor and on-surface flag,
@@ -48,6 +62,13 @@ as described under [Versioning](#versioning).
 
 ### Changed
 
+- **Neutral theme defaults.** The package's defaults move from warm beige and
+  gold to a neutral graphite: the accent, the surfaces, the text, the backdrop
+  and the state cards. The accent's strong and muted shades and the focus ring
+  now derive from `--jeex-accent`, so overriding the accent alone recolours
+  the pressed mode button, the loading marks, the tour knob and the mini-map's
+  view cone and camera dot too. To keep the earlier look, set the former
+  values on the viewer root (the snippet is under Theming in the README).
 - **A second tap deselects in 360.** A tap on the furniture item or opening
   that is already selected clears its selection aura and closes its panel; a
   third tap selects it again. A double tap still selects once and flies in,
@@ -404,7 +425,8 @@ as described under [Versioning](#versioning).
   `MAX_PROJECT_TEXTURE_BYTES` (48 MiB per document) and
   `MAX_PROJECT_TEXTURE_FILES` (512 listed files) in the shared limits module;
   a manifest listing more than 512 texture files is refused.
-- **Scene schema 2.3: library finishes** (the same 2.3 as `site`). A finish value may be a finish object,
+- **Scene schema 2.3: library finishes** (the same 2.3 as `site`). A finish
+  value may be a finish object,
   `{ material, colour?, rotation? }`, naming a project library material with a
   tint or a texture rotation, wherever a finish UUID stands; a room may name
   its `ceiling` and its `trim`. 2.2 documents are still read; a 2.2 document
@@ -584,6 +606,9 @@ as described under [Versioning](#versioning).
 - **`replace_asset`'s anchor refusal names each side with its own
   mounting.** The message described the placement with the target's anchor
   and the target with the placement's.
+- **The "•••" reveal button no longer shows over the fading control bar.**
+  When the bar auto-hides, the button now starts to appear only after the bar
+  has faded out, and leaves at once when the bar comes back.
 - **A merge is reported by the rooms' names before the batch.** A
   `set_room` in the same batch as the `remove_wall`, before or after it, no
   longer renames what `ApplyOk.roomMerges[].summary` says was merged.

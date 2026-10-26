@@ -72,19 +72,23 @@
 @layer component {
   .jeex-viewer {
     /*
-      The theming surface. Seven properties, every one of them with the value
-      it replaced as its default, so overriding none of them changes nothing.
-      A host sets them on the element (or on any ancestor, since they inherit):
+      The theming surface. The defaults are a neutral graphite, so an embed
+      that sets nothing brings no colour of its own onto the host's page. A
+      host sets them on the viewer root (see the README for the shadow root):
 
         jeex-viewer { --jeex-accent: #4f8cff; --jeex-radius: 4px; }
     */
 
-    /* The one colour that says "this control is doing something". */
-    --jeex-accent: light-dark(#a8813a, #dfbd7d);
+    /* The one colour that says "this control is doing something". Its strong
+       and muted shades and the focus ring follow it. */
+    --jeex-accent: light-dark(#536174, #b8c2cf);
+    /* Text and icons ON the accent. Set it too when the accent is very light
+       or very dark: no fixed colour stays readable on every accent. */
+    --jeex-on-accent: light-dark(#ffffff, #161a20);
     /* Behind every panel, bar and card: a translucent plate over the scene. */
-    --jeex-surface: light-dark(rgb(250 247 240 / 82%), rgb(14 22 21 / 76%));
+    --jeex-surface: light-dark(rgb(250 250 252 / 82%), rgb(23 27 33 / 76%));
     /* Text and icons on that plate. */
-    --jeex-surface-text: light-dark(#1c2523, #f5efe4);
+    --jeex-surface-text: light-dark(#20242b, #eef0f3);
     /* Corner radius of the panels; the pills and dots derive from it. */
     --jeex-radius: 16px;
     /* Every string the chrome writes. */
@@ -95,10 +99,16 @@
     --jeex-minimap-paper: light-dark(#fdfcf9, #fdfcf9);
     /* How solid the chrome is over the scene; the reveal animation scales it. */
     --jeex-chrome-opacity: 1;
-    /* Behind the canvas: what shows before the first frame paints. */
-    --jeex-backdrop: #c6b8a3;
+    /* Behind the model in 360, at the horizon, and behind the canvas before
+       the first frame paints. WebGL draws it from the resolved colour
+       (`ui/theme-colour.ts`): after changing it live, call `refreshTheme()`. */
+    --jeex-backdrop: #303640;
+    /* The 3D backdrop at the zenith: a little lighter than the horizon. */
+    --jeex-backdrop-top: color-mix(in srgb, var(--jeex-backdrop), white 8%);
+    /* The loading and error cards, over the whole viewer. */
+    --jeex-state-surface: var(--jeex-surface-strong);
     /* The keyboard-focus ring, on every focusable element in the shell. */
-    --jeex-focus: light-dark(#a8813a, #dfbd7d);
+    --jeex-focus: var(--jeex-accent);
     /* Which half of every `light-dark()` colour above resolves. A host page sets
        this to `light` from its own stylesheet and the whole chrome follows —
        one variable, no `::part`, no `!important`. */
@@ -112,14 +122,20 @@
       these follow. They exist so one accent override reaches the mode buttons,
       the tour knob and the focus rings together.
     */
-    --jeex-accent-strong: light-dark(#8d6b2c, #e9cd8f);
-    --jeex-accent-muted: light-dark(#b08d47, #d5b274);
-    --jeex-on-accent: light-dark(#fffdf7, #19211f);
+    /* Plain `color-mix()` inside `light-dark()`, never the other way round. */
+    --jeex-accent-strong: light-dark(
+      color-mix(in oklch, var(--jeex-accent), black 22%),
+      color-mix(in oklch, var(--jeex-accent), white 22%)
+    );
+    --jeex-accent-muted: color-mix(in oklch, var(--jeex-accent), var(--jeex-surface-text) 18%);
+    /* The mini-map's view cone and current camera dot, on its white card:
+       the accent, darkened so a light dark-scheme accent still reads there. */
+    --jeex-minimap-accent: color-mix(in oklch, var(--jeex-accent), black 35%);
     /* One step brighter than the body text: a pressed or hovered control. */
     --jeex-surface-text-bright: light-dark(#000, #fff);
-    --jeex-surface-strong: light-dark(rgb(252 250 245 / 92%), rgb(14 22 21 / 88%));
-    --jeex-surface-soft: light-dark(rgb(250 247 240 / 66%), rgb(14 22 21 / 66%));
-    --jeex-hairline: light-dark(rgb(20 26 25 / 14%), rgb(255 255 255 / 17%));
+    --jeex-surface-strong: light-dark(rgb(252 252 253 / 92%), rgb(23 27 33 / 88%));
+    --jeex-surface-soft: light-dark(rgb(250 250 252 / 66%), rgb(23 27 33 / 66%));
+    --jeex-hairline: light-dark(rgb(20 24 30 / 14%), rgb(255 255 255 / 17%));
     /* The one warm colour that is NOT the accent: a door that will not open. */
     --jeex-alert: light-dark(#b0533a, #d4866c);
 
@@ -201,7 +217,7 @@
     justify-items: center;
     padding: 24px;
     text-align: center;
-    background: radial-gradient(circle at 50% 40%, rgba(61, 79, 73, 0.92), rgba(13, 19, 19, 0.98) 72%);
+    background: var(--jeex-state-surface);
   }
   .jeex-viewer .loading-state h1,
   .jeex-viewer .state-card h1 {
@@ -462,6 +478,44 @@
     font-size: 15px;
     line-height: 1;
   }
+  /* The narrow viewer's hint toggle (`hint-toggle.ts`): not displayed, so no
+     tab stop, until the container query below shows it in place of the icon. */
+  .jeex-viewer .hint-toggle {
+    display: none;
+    place-items: center;
+    inline-size: 24px;
+    block-size: 24px;
+    padding: 0;
+    border: 0;
+    border-radius: 50%;
+    background: transparent;
+    color: var(--jeex-accent);
+    font: inherit;
+    font-size: 15px;
+    line-height: 1;
+    cursor: pointer;
+  }
+  .jeex-viewer .hint-toggle:focus-visible {
+    outline: 2px solid var(--jeex-focus);
+    outline-offset: 2px;
+  }
+  /* Below 480px the full hint covered about half of a small canvas: the
+     text waits behind the toggle until it is asked for. */
+  @container (max-width: 479.98px) {
+    .jeex-viewer .hint-icon {
+      display: none;
+    }
+    .jeex-viewer .hint-toggle {
+      display: grid;
+    }
+    .jeex-viewer .hint-card:not([data-expanded]) {
+      gap: 0;
+      padding: 4px;
+    }
+    .jeex-viewer .hint-card:not([data-expanded]) .hint-text {
+      display: none;
+    }
+  }
   .jeex-viewer .tour-status {
     position: absolute;
     inset-block-start: max(76px, calc(env(safe-area-inset-top) + 62px));
@@ -721,6 +775,10 @@
   .jeex-viewer .reveal-controls.is-visible {
     opacity: 1;
     transform: translateX(-50%) translateY(0);
+    /* Only once the bar has finished fading out (0.34s, `.control-bar`): the
+       two share the top centre and must never show together. Leaving has no
+       delay, so the button is gone the moment the bar comes back. */
+    transition-delay: 0.34s;
   }
   .jeex-viewer .reveal-controls span {
     align-self: center;

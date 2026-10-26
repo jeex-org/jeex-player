@@ -40,6 +40,8 @@ export type PlanPaintOptions = {
   camera?: PlanCameraMarker | null;
   /** Radius of the view cone in plan metres. */
   coneRadius?: number;
+  /** `#rrggbb` replacing the style's own accent: the host's theme (`ui/theme-colour.ts`), for the highlight, the cone and the dot. */
+  accent?: string;
 };
 
 type Palette = {
@@ -233,7 +235,7 @@ export function paintPlan(
   style: PlanStyle,
   options: PlanPaintOptions = {},
 ): void {
-  const palette = PALETTES[style];
+  const palette = options.accent === undefined ? PALETTES[style] : { ...PALETTES[style], accent: options.accent };
   const at = (point: { x: number; z: number }): { x: number; y: number } => planPoint(transform, point);
 
   const matrix = ctx.getTransform();

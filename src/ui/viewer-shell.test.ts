@@ -290,9 +290,15 @@ describe('releaseViewerStyles', () => {
 });
 
 describe('THEME_PROPERTIES', () => {
-  test('is the ten properties the library promises, and nothing is listed twice', () => {
-    expect(THEME_PROPERTIES).toHaveLength(10);
+  test('is the fourteen properties the library promises, and nothing is listed twice', () => {
+    expect(THEME_PROPERTIES).toHaveLength(14);
     expect(new Set(THEME_PROPERTIES).size).toBe(THEME_PROPERTIES.length);
+  });
+
+  test('carries the four the backdrop and the accent theming added', () => {
+    for (const name of ['--jeex-backdrop', '--jeex-backdrop-top', '--jeex-on-accent', '--jeex-state-surface'] as const) {
+      expect(THEME_PROPERTIES).toContain(name);
+    }
   });
 
   test('carries the two the host slots added', () => {

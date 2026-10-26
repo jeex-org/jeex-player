@@ -91,6 +91,8 @@ export const FORCED_NAMES: readonly ForcedName[] = [
   { name: 'borderColor', reason: 'DOM: CSSStyleDeclaration.borderColor' },
   { name: 'color-scheme', reason: 'CSS: the `color-scheme` property' },
   { name: 'accent-color', reason: 'CSS: the `accent-color` property' },
+  { name: 'color-mix(', reason: 'CSS: the `color-mix()` function' },
+  { name: 'color(srgb', reason: 'CSS: the `color()` function, the computed form of a mix' },
   // ---- GLSL uniforms and varyings (the shading language is American)
   { name: 'uColor', reason: 'GLSL uniform naming, selection-glow-shader.ts' },
   { name: 'vCenter', reason: 'GLSL varying naming, selection-glow-shader.ts' },

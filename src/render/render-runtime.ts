@@ -46,7 +46,8 @@
  */
 import * as THREE from 'three';
 import { Fanout } from '../shared/fanout.js';
-import { setTextureAnisotropy, skyTexture } from '../materials/textures.js';
+import { setTextureAnisotropy } from '../materials/textures.js';
+import { SkyBackdrop } from './sky-backdrop.js';
 import { sharedTextureCache } from '../materials/texture-cache.js';
 import { linkedAbortController } from '../shared/abort.js';
 import { SwatchPreview, type PreviewRenderer } from './swatch-preview.js';
@@ -81,6 +82,8 @@ export const MAX_FRAME_DELTA = 0.05;
 export const KEEP_WARM_MS = 500;
 const SKY_TOP = '#dcd3c2';
 const SKY_BOTTOM = '#c6b8a3';
+/** The sky walk and tour light the rooms with, whatever the host's theme: it is a light source there, not chrome. */
+const DAYLIGHT_SKY = { top: SKY_TOP, horizon: SKY_BOTTOM } as const;
 const FOG_NEAR = 34; // metres
 const FOG_FAR = 72; // metres
 
@@ -129,6 +132,14 @@ function defaultRenderer(canvas: HTMLCanvasElement): THREE.WebGLRenderer {
 export class RenderRuntime {
   readonly renderer: THREE.WebGLRenderer;
   readonly scene = new THREE.Scene();
+  /** The fallback sky this runtime owns and repaints (`setBackdrop`); the HDRI sky saves and restores it. */
+  private readonly sky: SkyBackdrop;
+  /** The fog this runtime owns: off the scene while the HDRI is up, recoloured all the same. */
+  private readonly fog: THREE.Fog;
+  /** The host's backdrop (`setBackdrop`), kept while walk or tour shows the daylight sky instead. */
+  private backdrop: { readonly top: string; readonly horizon: string } = DAYLIGHT_SKY;
+  /** Whether the sky and the fog are the daylight sky now (`setDaylightSky`). */
+  private daylight = false;
   /** Sun shadow map size the apartment rigs of this runtime are built with. */
   readonly shadowMapSize: number;
   /** The lighting context now; replaced after a context restore. */
@@ -205,9 +216,10 @@ export class RenderRuntime {
     this.canvas = options.canvas;
     this.pixelRatioCap = options.pixelRatioCap ?? PIXEL_RATIO_CAP;
 
-    const sky = skyTexture(SKY_TOP, SKY_BOTTOM);
-    if (sky) this.scene.background = sky;
-    this.scene.fog = new THREE.Fog(SKY_BOTTOM, FOG_NEAR, FOG_FAR);
+    this.sky = new SkyBackdrop(SKY_TOP, SKY_BOTTOM);
+    if (this.sky.texture) this.scene.background = this.sky.texture;
+    this.fog = new THREE.Fog(SKY_BOTTOM, FOG_NEAR, FOG_FAR);
+    this.scene.fog = this.fog;
 
     this.renderer = (options.createRenderer ?? defaultRenderer)(options.canvas);
     this.renderer.setPixelRatio(this.pixelRatio());
@@ -438,6 +450,37 @@ export class RenderRuntime {
   }
 
   /**
+   * The host's theme behind the model (`ui/theme-colour.ts`), opaque CSS hex.
+   * Shown at once in 360 and the plans; while walk or tour shows the daylight
+   * sky it is only kept, and shown on the way out (`setDaylightSky`).
+   */
+  setBackdrop(backdrop: { readonly top: string; readonly horizon: string }): void {
+    this.backdrop = backdrop;
+    if (!this.daylight) this.paintSky(backdrop);
+  }
+
+  /**
+   * Walk and tour light the rooms from the sky (the room probes capture it
+   * through the windows) and look out at it, so there the sky is the fixed
+   * daylight one and a host's chrome colour can neither dim the rooms nor
+   * tint the view; the theme comes back on the way out. Call before the walk
+   * lighting bakes. The sky and the fog are repainted IN PLACE, never
+   * replaced: with an HDRI up, the very objects `HdriSky` saved and restores
+   * change, and the live scene is left alone.
+   */
+  setDaylightSky(daylight: boolean): void {
+    if (daylight === this.daylight) return;
+    this.daylight = daylight;
+    this.paintSky(daylight ? DAYLIGHT_SKY : this.backdrop);
+  }
+
+  private paintSky(sky: { readonly top: string; readonly horizon: string }): void {
+    this.sky.repaint(sky.top, sky.horizon);
+    this.fog.color.set(sky.horizon);
+    this.demand.invalidate();
+  }
+
+  /**
    * Whether the loop draws every frame. `false` keeps every frame hook
    * running and draws only a keep-warm frame every `KEEP_WARM_MS`, which is
    * what the flat 2D mode wants: the drawing overlays an opaque canvas, so
@@ -584,10 +627,10 @@ export class RenderRuntime {
     // Disposes the apartment rig (which restores the scene's environment)
     // and then the prefiltered environment itself.
     this.lightingContext.dispose();
-    // The sky comes from the shared texture cache, whose ref count the
-    // `release` below settles. Clearing the reference is what stops the scene
-    // pointing at a texture the last holder may already have freed.
+    // The sky is this runtime's own texture, never shared: freed here, and the
+    // scene no longer points at it.
     this.scene.background = null;
+    this.sky.dispose();
     this.renderer.dispose();
     // `dispose()` frees the GPU resources; the CONTEXT itself only goes when
     // it is explicitly lost. Browsers cap a page at ~16 live contexts, so a

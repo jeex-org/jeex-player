@@ -803,6 +803,13 @@ describe('the degraded notice clears whatever sits under it', () => {
     shell = openShell(390, 844);
   }
 
+  /** The hint card opened the way its toggle opens it: below 480px it is otherwise one button, beside the notice rather than under it. */
+  function openedHint(): HTMLElement {
+    const hint = shell.roots.byName('hint-card');
+    hint.dataset['expanded'] = '';
+    return hint;
+  }
+
   test('a bottom-center host at 390x844', async () => {
     phone();
     const slots = build(['bottom-center']);
@@ -815,11 +822,24 @@ describe('the degraded notice clears whatever sits under it', () => {
     expect(intersects(notice.getBoundingClientRect(), hint.getBoundingClientRect())).toBe(false);
   });
 
-  test('no host boxes at 390x844: the notice stands above the hint card', async () => {
+  test('no host boxes at 390x844: the compact hint sits beside the notice, which keeps its own inset', async () => {
     phone();
     build([]);
     const notice = shownNotice();
     const hint = shell.roots.byName('hint-card');
+    expect(rendered(hint)).toBe(true);
+    await nextFrame();
+    await nextFrame();
+    expect(sideBySide(notice.getBoundingClientRect(), hint.getBoundingClientRect())).toBe(false);
+    const viewport = shell.container.getBoundingClientRect();
+    expect(viewport.bottom - notice.getBoundingClientRect().bottom).toBeCloseTo(18, 0);
+  });
+
+  test('no host boxes at 390x844: the notice stands above the opened hint card', async () => {
+    phone();
+    build([]);
+    const notice = shownNotice();
+    const hint = openedHint();
     expect(rendered(hint)).toBe(true);
     expect(sideBySide(notice.getBoundingClientRect(), hint.getBoundingClientRect())).toBe(true);
     await until(() => clear(notice, [hint]), 'the notice above the hint');
@@ -852,7 +872,7 @@ describe('the degraded notice clears whatever sits under it', () => {
     const box = slots.get('bottom-center');
     fillSlot(box);
     const notice = shownNotice();
-    const hint = shell.roots.byName('hint-card');
+    const hint = openedHint();
     await until(() => clear(notice, [box, hint]), 'the notice above the 56px box');
     const before = notice.getBoundingClientRect().bottom;
     (box.firstElementChild as HTMLElement).style.setProperty('block-size', '160px');
@@ -864,11 +884,11 @@ describe('the degraded notice clears whatever sits under it', () => {
     );
   });
 
-  test('it follows the hint card: down when it hides, up when the tour bar lifts it', async () => {
+  test('it follows the opened hint card: down when it hides, up when the tour bar lifts it', async () => {
     phone();
     build([]);
     const notice = shownNotice();
-    const hint = shell.roots.byName('hint-card');
+    const hint = openedHint();
     await until(() => clear(notice, [hint]), 'the notice above the hint');
     const viewport = shell.container.getBoundingClientRect();
     hint.hidden = true;

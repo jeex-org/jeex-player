@@ -44,9 +44,9 @@ import { isPlanMode } from '../scene/types.js';
 import type { MessageKey, Messages } from '../shared/messages.js';
 
 /**
- * The six things the director drives on the chrome — hints, mode buttons, the
- * plan-mode veil, the tour status pill and progress bar, and the auto-hide
- * wake — declared HERE (the role camera code depends on) rather than imported
+ * The seven things the director drives on the chrome — hints, mode buttons, the
+ * plan-mode veil, the tour status pill and progress bar, the auto-hide wake
+ * and the narrow-viewer hint's collapse — declared HERE (the role camera code depends on) rather than imported
  * from `ui/viewer-ui.ts` (the class that happens to implement it today): a
  * camera module names what it needs, not who provides it, which is what lets
  * `camera` stay below `ui` in the layer order. `ViewerUI`
@@ -61,6 +61,8 @@ export type DirectorChrome = {
   setTourState(state: TourState): void;
   setTourProgress(progress: TourProgress): void;
   wakeControls(): void;
+  /** Scene input closes a narrow viewer's opened hint (`ui/hint-toggle.ts`). */
+  collapseHint(): void;
 };
 
 type CameraDirectorDeps = {
@@ -639,6 +641,7 @@ export class CameraDirector {
     const { tour, controller, ui } = this.deps;
     // A plan mode swallows input entirely; nothing can reach here from one.
     if (isPlanMode(controller.getMode())) return;
+    ui.collapseHint();
     // A walk entry or a step stops where it stands and stays a walk; the
     // input that ended it (a drag, a key, a tap) goes on to the walk rig.
     if (this.stepper.isMoving()) {
