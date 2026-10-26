@@ -241,19 +241,27 @@ describe('wall joints', () => {
     expect(box.max.x).toBeCloseTo(6.05, 5);
   });
 
-  test('joint cores share one material and never take a face override', () => {
-    const { root, builder, plan } = bound();
+  test('a joint core wears the wall finish of a room its walls bound, behind the faces, never a face override', () => {
+    const { root, plan, paint } = bound();
     const joints = meshes(root).filter((mesh) => mesh.userData['wallJoint'] === true);
-    const materials = new Set(joints.map((mesh) => mesh.material));
-    expect(materials.size).toBe(1);
-    const jointMaterial = [...materials][0] as THREE.MeshStandardMaterial;
+    const colourOf = (mesh: THREE.Mesh): string => (mesh.material as THREE.MeshStandardMaterial).color.getHexString();
+    const roomFace = (): THREE.Mesh => wallMeshes(root).find((mesh) => mesh.userData['roomId'] !== undefined)!;
+    expect(joints.length).toBeGreaterThan(0);
+
+    // White room walls on the default sand facade: the cores' tops read as the rooms' walls, not as sand.
+    paint({ op: 'set_material', target: 'walls', material: FINISH.white });
+    for (const joint of joints)
+      expect({ joint: joint.name, colour: colourOf(joint) }).toEqual({ joint: joint.name, colour: colourOf(roomFace()) });
+    paint({ op: 'set_material', target: 'walls', material: FINISH.graphite });
+    for (const joint of joints)
+      expect({ joint: joint.name, colour: colourOf(joint) }).toEqual({ joint: joint.name, colour: colourOf(roomFace()) });
+
     // Coplanar with a wall face wherever a core edge lies in it: the core must
     // lose that depth test, never flicker with the paint in front of it.
-    expect(jointMaterial.polygonOffset).toBe(true);
+    for (const joint of joints) expect((joint.material as THREE.Material).polygonOffset).toBe(true);
     expect(wallMeshes(root).length).toBe(plan.faces.size);
-    for (const mesh of wallMeshes(root)) expect(mesh.material).not.toBe(jointMaterial);
-    builder.setAllWalls(FINISH.graphite);
-    for (const joint of joints) expect(joint.material).toBe(jointMaterial);
+    const jointMaterials = new Set(joints.map((joint) => joint.material));
+    for (const mesh of wallMeshes(root)) expect(jointMaterials.has(mesh.material as THREE.Material)).toBe(false);
   });
 });
 

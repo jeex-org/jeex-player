@@ -58,6 +58,12 @@ export class ShellPaint {
   /** Per-face overrides; a face without one wears its room's or the facade's material. */
   private readonly faceMaterials = new FaceMap<THREE.MeshStandardMaterial>();
   private facadeMaterial: THREE.MeshStandardMaterial;
+  /**
+   * The junction cores' materials, one per owner: the room whose walls a core
+   * wears (`null`: the facade's). Flat in the owner's colour and pushed behind
+   * anything coplanar, so a core never takes a face's map or wins its depth test.
+   */
+  private readonly jointMaterials = new Map<string | null, THREE.MeshStandardMaterial>();
   /** The ceiling and baseboard meshes of each room, with the shared material they fall back to. */
   private readonly ceilingMeshes = new Map<string, { meshes: THREE.Mesh[]; fallback: THREE.Material }>();
   private readonly trimMeshes = new Map<string, { meshes: THREE.Mesh[]; fallback: THREE.Material }>();
@@ -244,13 +250,49 @@ export class ShellPaint {
       applyFinishToMaterial(material, finish, repeat, repeat);
       return;
     }
-    // A library finish painted into a material the builder owns (the
-    // junction cores): flat in its first-frame colour, never a generated map.
+    this.paintFlat(material, resolved.draw);
+  }
+
+  /** A library finish painted into a material the builder owns (the junction cores): flat in its first-frame colour, never a generated map. */
+  private paintFlat(material: THREE.MeshStandardMaterial, draw: LibraryDraw): void {
     material.map = null;
     material.bumpMap = null;
-    material.color.copy(firstFrameColour(resolved.draw));
-    material.roughness = resolved.draw.material.facts.pbr.roughness ?? 1;
+    material.color.copy(firstFrameColour(draw));
+    material.roughness = draw.material.facts.pbr.roughness ?? 1;
     material.needsUpdate = true;
+  }
+
+  // ---------------------------------------------------------- joint cores ----
+
+  /**
+   * Hands a junction core over, wearing the walls of `owner` (a room id; `null`
+   * for the facade) — the shell builder picks the owner, the first room by id
+   * the core's walls bound. Every core of one owner shares one material, and
+   * a repaint of the owner recolours it.
+   */
+  registerJoint(mesh: THREE.Mesh, owner: string | null): void {
+    let material = this.jointMaterials.get(owner);
+    if (!material) {
+      material = new THREE.MeshStandardMaterial({
+        color: '#ffffff',
+        roughness: 0.85,
+        polygonOffset: true,
+        polygonOffsetFactor: 1,
+        polygonOffsetUnits: 1,
+      });
+      const scene = this.source();
+      this.paintJoint(material, owner === null ? facadeFinishRefOf(scene) : roomWallFinishRefOf(scene, owner));
+      this.jointMaterials.set(owner, material);
+    }
+    mesh.material = material;
+  }
+
+  /** `material` in the flat colour of `finish`; the unpainted plaster when nothing resolves it. */
+  private paintJoint(material: THREE.MeshStandardMaterial, finish: FinishRef): void {
+    const resolved = this.ctx.resolve(finish) ?? this.ctx.resolve(DEFAULT_WALL_FINISH);
+    if (resolved === null) return;
+    if (resolved.kind === 'library') this.paintFlat(material, resolved.draw);
+    else this.paintWall(material, resolved.finish);
   }
 
   // ----------------------------------------------------------- lifecycle ----
@@ -267,6 +309,7 @@ export class ShellPaint {
     for (const material of this.faceMaterials.values()) into.add(material);
     for (const material of this.ceilingMaterials.values()) into.add(material);
     for (const material of this.trimMaterials.values()) into.add(material);
+    for (const material of this.jointMaterials.values()) into.add(material);
   }
 
   /** Drops every mesh and override reference; the materials are already handed over. */
@@ -279,6 +322,7 @@ export class ShellPaint {
     this.trimMaterials.clear();
     this.ceilingMeshes.clear();
     this.trimMeshes.clear();
+    this.jointMaterials.clear();
   }
 
   // -------------------------------------------------------------- floors ----
@@ -314,6 +358,8 @@ export class ShellPaint {
     const material = old === undefined ? null : this.repaint(old, finish, 'wall');
     if (!old || !material) return false;
     this.roomWallMaterials.set(roomId, material);
+    const joint = this.jointMaterials.get(roomId);
+    if (joint) this.paintJoint(joint, finish);
     for (const face of this.facesOfRoom(roomId)) {
       this.clearFaceOverride(face, material);
       const mesh = this.faceMeshes.get(face);
@@ -359,6 +405,8 @@ export class ShellPaint {
     const material = this.repaint(old, finish, 'facade');
     if (!material) return false;
     this.facadeMaterial = material;
+    const joint = this.jointMaterials.get(null);
+    if (joint) this.paintJoint(joint, finish);
     for (const face of this.ctx.plan.facade) {
       this.clearFaceOverride(face.key, material);
       const mesh = this.faceMeshes.get(face.key);

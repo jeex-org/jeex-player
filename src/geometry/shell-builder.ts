@@ -33,12 +33,11 @@ import * as THREE from 'three';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import type { BuilderContext } from './builder-context.js';
 import { floorOutline } from '../plan/floor-outline.js';
-import type { WallFace } from '../plan/plan-solver.js';
+import type { SolvedPlan, WallFace } from '../plan/plan-solver.js';
 import { jointCores } from '../plan/plan-joints.js';
 import type { FaceOpening, FaceQuad } from '../plan/plan-openings.js';
 import { EPS, add, dist, leftN, norm, sub } from '../plan/plan-geometry.js';
 import { clamp } from '../shared/math.js';
-import { DEFAULT_WALL_FINISH } from '../scene/scene-ops.js';
 import { ShellPaint } from './shell-paint.js';
 import { createSiteGround, SITE_SLAB_COLOUR } from './site-ground.js';
 import { resolveFinish } from '../materials/material-catalogue.js';
@@ -114,7 +113,6 @@ export class ShellBuilder {
   private readonly ceilingMaterial: THREE.MeshStandardMaterial;
   private readonly trimMaterial: THREE.MeshStandardMaterial;
   /** Wall core at the junctions and — through the face prisms — the wall top. */
-  private readonly jointMaterial: THREE.MeshStandardMaterial;
   /** Materials this builder created outside a mesh; freed by `dispose`. */
   private readonly ownedMaterials: THREE.Material[] = [];
   /** Group the last `build` filled; `dispose` frees every mesh under it. */
@@ -133,20 +131,7 @@ export class ShellBuilder {
       metalness: ceiling?.metalness ?? 0,
     });
     this.trimMaterial = new THREE.MeshStandardMaterial({ color: '#eae2d2', roughness: 0.7 });
-    // The core of a junction belongs to no room, so it wears the plaster every
-    // unpainted wall starts from — the same tone the face prisms show on the
-    // wall top. `polygonOffset` pushes it BEHIND anything coplanar: a core edge
-    // that lies in a room's wall plane must never win the depth test against
-    // the painted face in front of it.
-    this.jointMaterial = new THREE.MeshStandardMaterial({
-      color: '#ffffff',
-      roughness: 0.85,
-      polygonOffset: true,
-      polygonOffsetFactor: 1,
-      polygonOffsetUnits: 1,
-    });
-    this.paint.paintWall(this.jointMaterial, this.ctx.findFinish(DEFAULT_WALL_FINISH)!);
-    this.ownedMaterials.push(this.ceilingMaterial, this.trimMaterial, this.jointMaterial);
+    this.ownedMaterials.push(this.ceilingMaterial, this.trimMaterial);
   }
 
   /** Builds the whole shell into `root` and applies the authored face overrides. */
@@ -416,7 +401,10 @@ export class ShellBuilder {
     for (const core of jointCores(this.ctx.scene)) {
       const geometry = this.slabGeometry(core.polygon, height, height, { bottom: true, sides: false });
       if (!geometry) continue;
-      const mesh = new THREE.Mesh(geometry, this.jointMaterial);
+      const mesh = new THREE.Mesh(geometry);
+      // Its top shows between the wall tops around it: it wears the walls of a
+      // room those walls bound, the first by id (`ShellPaint.registerJoint`).
+      this.paint.registerJoint(mesh, jointOwner(core.wallIds, this.ctx.plan));
       mesh.name = `joint-${core.nodeId}`;
       mesh.userData['wallJoint'] = true;
       mesh.userData['nodeId'] = core.nodeId;
@@ -632,6 +620,16 @@ function metreBoardUVs(box: THREE.BoxGeometry, frame: BoardFrame): void {
     uv.setXY(index, u, v);
   }
   uv.needsUpdate = true;
+}
+
+/** The room a junction core wears the walls of: the first by id its walls bound, `null` (the facade) when they bound none. */
+function jointOwner(wallIds: readonly string[], plan: SolvedPlan): string | null {
+  const walls = new Set(wallIds);
+  let owner: string | null = null;
+  for (const face of plan.faces.values()) {
+    if (face.roomId !== null && walls.has(face.wallId) && (owner === null || face.roomId < owner)) owner = face.roomId;
+  }
+  return owner;
 }
 
 /** Frees a material and the colour map cloned for it; shared bump clones stay. */
