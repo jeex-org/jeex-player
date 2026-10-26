@@ -55,7 +55,7 @@ export type ReplaceGroup = {
 /** Renders one variant of a candidate placement, or `null` to fall back to the chip. */
 export type CandidatePreview = (candidate: DemoAsset, variantId: string) => string | null;
 
-/** The top segment of a category path: `furniture/tables/dining` -> `furniture`. */
+/** The top segment of a category path: `furniture/dining-tables` -> `furniture`. */
 export function topCategory(category: string): string {
   return category.split('/').find((segment) => segment.length > 0) ?? category;
 }

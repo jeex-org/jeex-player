@@ -107,7 +107,7 @@ function manifest(): BakedProjectManifest {
         {
           id: ID.archetype,
           name: 'Side table',
-          category: 'furniture/tables',
+          category: 'furniture/dining-tables',
           dims: [2.1, 0.85, 0.95],
           anchor: 'floor',
           wallSnap: false,

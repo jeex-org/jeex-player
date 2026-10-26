@@ -306,7 +306,7 @@ A `loadScene` whose document is the one on screen, edited — the same scene `id
 
 Offers are loaded before the document is validated, so a mount with offers by URL waits for them, and a document may name the offers library in a placement's `library`. An offers library that cannot be fetched or is not valid, or whose `id` is the project library's, is reported as `offers-invalid` through [`onLog`](#logging); the scene still opens and the bundled bank is offered instead. Assets resolve in the project library first, then in offers, then in the bundled bank, for drawing, validation and the panels alike.
 
-The Replace panel lists every variant of the selected object; its list scrolls inside the viewer. Under it, "Replace with another…" (shown unless `edits` is `off` or the viewer is read-only) opens a popup of the assets of `offers`, or of the bundled bank without them, that the selected object can become: the same anchor and on-surface flag, a mirror the asset allows, its own design excluded. They are grouped by `category`, each group labelled by the last segment of the category path. A pick commits [`replace_asset`](#scene-operations-entry-jeex-viewerops) naming the asset's default variant, locally or as a `jeex-edit` under `edits: 'emit'`.
+The Replace panel lists every variant of the selected object; its list scrolls inside the viewer. Under it, "Replace with another…" (shown unless `edits` is `off` or the viewer is read-only) opens a popup of the assets of `offers`, or of the bundled bank without them, that the selected object can become: the same anchor and on-surface flag, a mirror the asset allows, its own design excluded. They are grouped by `category`, each group labelled by the first segment of the category path (Furniture, Kitchen, Bathroom, Appliances, Lighting, Decor for the bundled bank). A pick commits [`replace_asset`](#scene-operations-entry-jeex-viewerops) naming the asset's default variant, locally or as a `jeex-edit` under `edits: 'emit'`.
 
 A host that validates such a document itself uses the same pair the viewer does: `registriesFromLibrary(libraryOf(parseProjectLibrary(offers)), CATALOGUE_REGISTRIES)` from `jeex-viewer/ops`.
 
@@ -909,7 +909,7 @@ type ProjectLibraryManifest = {
 
 type ProjectObject = {                // `CatalogueObject` with `model` required and no `builder`
   id: string;                        // UUID v7, like every variant and material id below
-  name: string; category: string; dims: [number, number, number];
+  name: string; category: string; dims: [number, number, number]; // category: a leaf of the store's category tree, e.g. `bathroom/baths`; the 2D plan outlines `bathroom/`, `kitchen/` and `appliances/` (not cooker hoods or kettles)
   anchor: 'floor' | 'wall' | 'ceiling'; wallSnap: boolean; clearance: number; tags: string[];
   model: string;                     // relative; the archetype's GLB
   lods?: string[]; materialSlots?: Record<string, string>; options?: AssetOptions;

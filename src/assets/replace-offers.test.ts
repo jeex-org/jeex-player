@@ -81,7 +81,7 @@ describe('replaceOffers', () => {
     const labels = groups.map((group) => group.label);
     expect(labels[0]).toBe('Furniture');
     expect(new Set(labels).size).toBe(labels.length);
-    expect(labels).toEqual(expect.arrayContaining(['Furniture', 'Lighting', 'Sanitary', 'Appliances', 'Decor']));
+    expect(labels).toEqual(expect.arrayContaining(['Furniture', 'Kitchen', 'Appliances', 'Bathroom', 'Lighting', 'Decor']));
   });
 
   test('a bundled on-surface object has nothing to offer: the popup shows its empty state', () => {

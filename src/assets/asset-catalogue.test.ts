@@ -13,6 +13,7 @@ import { BUILDERS } from './asset-builders.js';
 import { apartmentScene } from '../demo/scene-data.js';
 import { isUuidV7 } from '../scene/types.js';
 import { ARCHETYPE, VARIANT } from './catalogue-ids.js';
+import STORE_CATEGORIES from '../../tests/fixtures/store-categories/asset-category-1.json' with { type: 'json' };
 
 const objects = listCatalogueObjects();
 
@@ -23,6 +24,12 @@ describe('object bank manifest', () => {
     expect(interiorLibrary.publisher).toBe('jeex');
     expect(interiorLibrary.license.length).toBeGreaterThan(0);
     expect(objects.length).toBeGreaterThan(30);
+  });
+
+  test('every archetype files under a leaf of the store category tree', () => {
+    const tree = new Set(STORE_CATEGORIES.paths);
+    const outside = objects.filter((object) => !tree.has(object.category)).map((object) => `${object.slug}: ${object.category}`);
+    expect(outside).toEqual([]);
   });
 
   test('archetype ids are unique UUID v7 and their slugs snake_case', () => {

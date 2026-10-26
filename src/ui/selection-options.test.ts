@@ -350,7 +350,7 @@ describe('access and allowed reach a host card, and gate nothing here', () => {
         {
           id: ID.chairCatalogue,
           name: 'Catalogue chair',
-          category: 'furniture/chairs',
+          category: 'furniture/dining-chairs',
           dims: [0.5, 0.9, 0.5],
           anchor: 'floor',
           wallSnap: false,
