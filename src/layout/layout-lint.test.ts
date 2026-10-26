@@ -1,6 +1,7 @@
 import { describe, expect, test } from 'bun:test';
 
 import { lShapePlan } from '../fixtures/plan-l-shape.js';
+import { WC_HALL, wcHallPlan } from '../fixtures/plan-wc-hall.js';
 import { L_SHAPE } from '../fixtures/plan-l-shape-ids.js';
 import { solvePlan } from '../plan/plan-solver.js';
 import { LEAF_REST_ANGLE_RAD, doorLeafQuad, doorSweepQuads, resolveDoorSwing } from '../plan/door-swing.js';
@@ -390,5 +391,76 @@ describe('rule hall', () => {
   test('the same piece away from the axis is not', () => {
     const blocker: DemoAsset = { id: ITEM.aDresser, type: 'dresser', position: { x: 4.6, y: 0, z: 4 } };
     expect(ofRule(lint(sceneWith([blocker])), 'hall').some((issue) => issue.message.includes('on the axis'))).toBe(false);
+  });
+});
+
+describe('rule 3 follows the swing: 0.9 m on the pull side, 0.6 m on the push side', () => {
+  const TOILET = '01a17a10-4c20-7b5e-9d31-6e8f2a4c7b01';
+  const UNIT = '01a17a10-4c20-7b5e-9d31-6e8f2a4c7b02';
+  type DoorSide = { opening: string; into: string; type?: Opening['type'] };
+
+  /** The WC-and-hall plan with `assets`, each listed door swinging into the named room (or made a passage). */
+  function wcHall(assets: DemoAsset[], doors: DoorSide[]): SceneData {
+    const base: SceneData = { ...wcHallPlan, assets };
+    const plan = solvePlan(base);
+    const walls = base.walls.map((wall) => {
+      if (!wall.openings) return wall;
+      const openings = wall.openings.map((opening) => {
+        const door = doors.find((entry) => entry.opening === opening.id);
+        if (!door) return opening;
+        if (door.type === 'passage') return { ...opening, type: 'passage' as const };
+        const swing = (['in', 'out'] as const).find(
+          (side) => resolveDoorSwing(base, plan, wall, { ...opening, swing: side }, openingFrameWidth).roomId === door.into,
+        );
+        return { ...opening, swing };
+      });
+      return { ...wall, openings };
+    });
+    return { ...base, walls };
+  }
+
+  function clearIds(scene: SceneData): string[][] {
+    return ofRule(lint(scene), 'door-clear-zone').map((issue) => issue.ids);
+  }
+
+  // Beside the WC door, against the west wall: its front edge 0.79 m from the
+  // door face, inside 0.9 m and outside 0.6 m.
+  const toiletBeside: DemoAsset = { id: TOILET, type: 'toilet', position: { x: 0.4, y: 0, z: 2.6 }, rotationY: Math.PI / 2 };
+  // A wardrobe 0.64 m deep on the hall's north wall, opposite the room door: 0.81 m before that door's face.
+  const unitOpposite: DemoAsset = { id: UNIT, type: 'wardrobe', position: { x: 2.3, y: 0, z: 0.37 }, rotationY: 0 };
+
+  test('a WC door opening outward leaves the WC its 0.6 m push side, and a toilet beside the door fits', () => {
+    const scene = wcHall([toiletBeside], [{ opening: WC_HALL.opening.doorWc, into: WC_HALL.room.hall }]);
+    expect(clearIds(scene)).toEqual([]);
+  });
+
+  test('the same WC door opening inward makes the WC its pull side, and the same toilet stands in its 0.9 m zone', () => {
+    const scene = wcHall([toiletBeside], [{ opening: WC_HALL.opening.doorWc, into: WC_HALL.room.wc }]);
+    expect(clearIds(scene)).toEqual([[WC_HALL.opening.doorWc, TOILET]]);
+  });
+
+  test('the push side still keeps 0.6 m: a toilet 0.49 m from the door face is in it', () => {
+    const near: DemoAsset = { ...toiletBeside, position: { x: 0.4, y: 0, z: 2.3 } };
+    const scene = wcHall([near], [{ opening: WC_HALL.opening.doorWc, into: WC_HALL.room.hall }]);
+    expect(clearIds(scene)).toEqual([[WC_HALL.opening.doorWc, TOILET]]);
+  });
+
+  test('in a small hall of three doors, a 0.64 m unit opposite a door that opens into its room clears that door', () => {
+    const scene = wcHall(
+      [unitOpposite],
+      [
+        { opening: WC_HALL.opening.doorWc, into: WC_HALL.room.hall },
+        { opening: WC_HALL.opening.doorRoom, into: WC_HALL.room.room },
+      ],
+    );
+    expect(clearIds(scene)).toEqual([]);
+  });
+
+  test('the same unit blocks that door when it opens into the hall, and when it is a passage', () => {
+    const intoHall = wcHall([unitOpposite], [{ opening: WC_HALL.opening.doorRoom, into: WC_HALL.room.hall }]);
+    expect(clearIds(intoHall)).toEqual([[WC_HALL.opening.doorRoom, UNIT]]);
+
+    const passage = wcHall([unitOpposite], [{ opening: WC_HALL.opening.doorRoom, into: WC_HALL.room.room, type: 'passage' }]);
+    expect(clearIds(passage)).toEqual([[WC_HALL.opening.doorRoom, UNIT]]);
   });
 });

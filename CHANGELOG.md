@@ -74,6 +74,14 @@ as described under [Versioning](#versioning).
 
 ### Changed
 
+- **A door's clear zone follows its swing.** The layout linter's
+  `door-clear-zone` (and the free floor `suggestPlacement` samples) keeps
+  0.9 m clear on the side a leaf swings into, and 0.6 m on the side it swings
+  away from, as in front of a WC whose door opens outward. A passage, or a
+  door with no leaf, keeps 0.9 m on both sides; the zone's width is
+  unchanged. A toilet beside an outward-opening WC door, or a unit opposite
+  a door that opens into its room, no longer reports.
+
 - **The built-in bank files under the store's category tree.** Every bundled
   archetype's `category` is now a leaf of the store's tree (`sanitary/wc` is
   `bathroom/toilets`, `furniture/kitchen/islands` is `kitchen/islands`,

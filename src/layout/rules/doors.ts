@@ -1,5 +1,6 @@
 /**
- * Rule 3 (hard): a door keeps a clear zone on every side that owns a room.
+ * Rule 3 (hard): a door keeps a clear zone on every side that owns a room,
+ * 0.9 m deep where its leaf swings in and 0.6 m where it swings away.
  * Rule 4 (hard): a leaf sweeps through neither a wall nor an object.
  *
  * The swept quads come from `door-swing.ts`, the same authority
@@ -12,11 +13,9 @@
 import { overlapDepth, quadCentre } from '../layout-geometry.js';
 import { doorSweepQuads } from '../../plan/door-swing.js';
 import {
-  DOOR_CLEAR_M,
-  DOOR_CLEAR_SPAN,
   TOUCH_TOL_M,
   apart,
-  sideZone,
+  doorClearZone,
   type DoorZone,
   type LayoutIssue,
   type LayoutRuleModule,
@@ -44,7 +43,7 @@ function zonesOf(doors: readonly DoorZone[]): { clear: ClearZone[]; sweeps: Swee
   const sweeps: Sweep[] = [];
   for (const door of doors) {
     for (const side of door.sides) {
-      clear.push({ door, roomId: side.roomId, quad: sideZone(door, side.normal, door.width * DOOR_CLEAR_SPAN, DOOR_CLEAR_M) });
+      clear.push({ door, roomId: side.roomId, quad: doorClearZone(door, side.normal) });
     }
     if (door.swing) sweeps.push({ door: door as Sweep['door'], quads: doorSweepQuads(door.swing) });
   }
