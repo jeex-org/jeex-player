@@ -205,6 +205,20 @@ describe('createLibraryMaterial: the sheen lobe of a cloth', () => {
     expect(closeTo(cloth(CLOTH, '#5a6b8c').sheenColor, lifted('#5a6b8c'))).toBe(true);
   });
 
+  test('a stated sheen lift replaces the default of 0.2 for a sheen without a colour', () => {
+    const lift = (hex: string, by: number): THREE.Color => new THREE.Color(hex).lerp(new THREE.Color('#ffffff'), by);
+    expect(closeTo(cloth({ ...CLOTH, sheenLift: 0.5 }, '#5a6b8c').sheenColor, lift('#5a6b8c', 0.5))).toBe(true);
+    expect(closeTo(cloth({ ...CLOTH, sheenLift: 0 }, '#5a6b8c').sheenColor, lift('#5a6b8c', 0))).toBe(true);
+  });
+
+  test('a sheen lift beside a stated sheen colour leaves the colour as stated', () => {
+    expect(closeTo(cloth({ ...CLOTH, sheenColour: '#d0c8b8', sheenLift: 0.5 }).sheenColor, new THREE.Color('#d0c8b8'))).toBe(true);
+  });
+
+  test('a sheen lift alone keeps the standard material model', () => {
+    expect(createLibraryMaterial(withPbr(NATURAL_SCAN, { sheenLift: 0.5 }))).not.toBeInstanceOf(THREE.MeshPhysicalMaterial);
+  });
+
   test('a sheen without a colour or a finish colour takes the first suggested colour lifted toward white', () => {
     expect(closeTo(cloth(CLOTH).sheenColor, lifted('#c9d6df'))).toBe(true);
   });
