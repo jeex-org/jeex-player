@@ -360,6 +360,55 @@ describe('the picture a mounted viewer draws in 360', () => {
   }, 300_000);
 });
 
+describe('the plinth under the model', () => {
+  test('reads neutral grey in 360, on the graphite default as on any theme', async () => {
+    let scene: THREE.Scene | null = null;
+    const add = Object.getOwnPropertyDescriptor(THREE.Object3D.prototype, 'add')!.value as THREE.Object3D['add'];
+    const caught = vi.spyOn(THREE.Object3D.prototype, 'add').mockImplementation(function (this: THREE.Object3D, ...objects) {
+      if ((this as THREE.Scene).isScene && objects.some((object) => object.name === 'jeex-lighting-apartment-rig'))
+        scene ??= this as THREE.Scene;
+      return add.apply(this, objects);
+    });
+    const host = openContainer(960, 540);
+    const handle = mountViewer(host, { scene: { repository: new InlineSceneRepository(demoScene()) }, debug: true });
+    try {
+      await handle.ready;
+      await until(() => scene?.getObjectByName('site-slab') !== undefined, 'the plinth', 60_000);
+      caught.mockRestore();
+      const debug = (
+        window as unknown as { __viewerDebug: { projectPoint(x: number, y: number, z: number): { x: number; y: number } | null } }
+      ).__viewerDebug;
+      const canvas = host.querySelector<HTMLCanvasElement>('[data-jeex="scene-canvas"]')!;
+      // The slab's top, on the strip it shows in front of the walls (the presentation camera looks from −z).
+      const box = new THREE.Box3().setFromObject(scene!.getObjectByName('site-slab')!);
+      const at = debug.projectPoint((box.min.x + box.max.x) / 2, box.max.y, box.min.z + 0.25)!;
+      const rect = canvas.getBoundingClientRect();
+      let seen: [number, number, number] = [0, 0, 0];
+      for (let attempt = 0; attempt < 60; attempt += 1) {
+        handle.refreshTheme();
+        await nextFrame();
+        await nextFrame();
+        const png = await page.screenshot({ save: false });
+        const bitmap = await createImageBitmap(await (await fetch(`data:image/png;base64,${png}`)).blob());
+        const scale = bitmap.width / window.innerWidth;
+        const read = new OffscreenCanvas(1, 1).getContext('2d')!;
+        read.drawImage(bitmap, Math.round((rect.left + at.x) * scale), Math.round((rect.top + at.y) * scale), 1, 1, 0, 0, 1, 1);
+        bitmap.close();
+        const [r, g, b] = read.getImageData(0, 0, 1, 1).data;
+        seen = [r!, g!, b!];
+        // A frame that drew nothing reads black: poll until the plinth is on screen.
+        if (Math.max(...seen) > 60) break;
+      }
+      // Neutral: no channel apart from another by more than a sun-warmed grey shows (the tan read 53 red over blue).
+      const [r, g, b] = seen;
+      expect(Math.max(r, g, b) - Math.min(r, g, b), `the plinth reads rgb(${seen.join(', ')})`).toBeLessThanOrEqual(16);
+    } finally {
+      handle.dispose();
+      caught.mockRestore();
+    }
+  }, 300_000);
+});
+
 describe('theme tokens', () => {
   test('the backdrop, backdrop top, on-accent and state surface are documented theme properties', () => {
     expect(THEME_PROPERTIES).toEqual(

@@ -23,6 +23,14 @@ export const SITE_GROUND_NAME = 'site-ground';
 /** How dark the model's sun shadow lies on the host's backdrop in 360 and plan, 0..1. */
 export const SITE_GROUND_SHADOW_OPACITY = 0.3;
 
+/**
+ * The plinth slab under the flat (`site-slab`), in every mode: a neutral
+ * concrete grey that sits on any host theme. It stays lit and takes the
+ * contact shadow; a thin band of it at the foot of a window view is all walk
+ * and tour see, too little to move their light.
+ */
+export const SITE_SLAB_COLOUR = '#b4b4b0';
+
 const looks = new WeakMap<THREE.Mesh, { readonly lit: THREE.Material; readonly catcher: THREE.ShadowMaterial }>();
 
 /** A lit disc of `radius` metres with its shadow catcher beside it; both materials are pushed onto `owned`. */
