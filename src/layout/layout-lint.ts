@@ -35,6 +35,7 @@ import {
 } from '../assets/asset-types.js';
 import { footprintOf } from '../assets/asset-footprint.js';
 import { LAYOUT_RULES } from './rules/index.js';
+import { clearZonesOf } from './rules/doors.js';
 import { layoutRuleOrder, LAYOUT_RULE_IDS } from './rules/context.js';
 import type { DoorZone, LayoutIssue, LayoutRule, LintContext, LintItem, Solid } from './rules/context.js';
 import type { SolvedPlan, WallFace } from '../plan/plan-solver.js';
@@ -303,6 +304,20 @@ export function lintLayout(scene: SceneData, plan: SolvedPlan, catalogue?: Layou
   const issues: LayoutIssue[] = [];
   for (const rule of LAYOUT_RULES) rule.run(ctx, issues);
   return issues.sort((a, b) => layoutRuleOrder(a.rule) - layoutRuleOrder(b.rule) || a.ids.join().localeCompare(b.ids.join()));
+}
+
+/** One side of a door that rule 3 keeps clear: the door, the room on that side, and the rectangle. */
+export type DoorClearZone = { openingId: string; roomId: string; quad: Vec2[] };
+
+/**
+ * The clear zones rule 3 (`door-clear-zone`) checks, one per door side that
+ * owns a room: 0.9 m deep where the leaf swings in and on both sides of a
+ * passage, 0.6 m where it swings away. A host's own cheap placement filter
+ * reads these rather than sizing a door's zone itself, so it never disagrees
+ * with the lint.
+ */
+export function doorClearZones(scene: SceneData, plan: SolvedPlan): DoorClearZone[] {
+  return clearZonesOf(doorsOf(scene, plan)).map((zone) => ({ openingId: zone.door.openingId, roomId: zone.roomId, quad: [...zone.quad] }));
 }
 
 export type LayoutIssueCounts = { errors: number; warnings: number; byRule: Partial<Record<LayoutRule, number>> };

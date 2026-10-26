@@ -79,6 +79,9 @@
  * composes `place_object`. `catalogue` is optional — without it the shipped
  * bank is read; `projectLayoutCatalogue` is the one public bank builder, and
  * a catalogue dialog asks about the BAKED PROJECT with it, not the shipped one.
+ * Beside it, `doorClearZones` (type `DoorClearZone`) hands a host's own cheap
+ * placement filter the clear zones the linter checks, so the filter never
+ * sizes a door's zone itself.
  *
  * A name that is not re-exported here is not public, whatever module it lives
  * in — the same façade rule the library's other entries follow. Widening it is
@@ -207,8 +210,8 @@ export type {
 export { solvePlan } from '../plan/plan-solver.js';
 export type { SolvedPlan } from '../plan/plan-solver.js';
 
-export { lintLayout, countIssues, describeIssues } from '../layout/layout-lint.js';
-export type { LayoutIssue, LayoutRule, LayoutIssueCounts } from '../layout/layout-lint.js';
+export { lintLayout, countIssues, describeIssues, doorClearZones } from '../layout/layout-lint.js';
+export type { DoorClearZone, LayoutIssue, LayoutRule, LayoutIssueCounts } from '../layout/layout-lint.js';
 export type { LayoutLinter } from '../layout/layout-issue.js';
 
 /**
