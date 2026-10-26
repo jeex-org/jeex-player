@@ -236,6 +236,7 @@ describe('jeex-viewer/ops entry', () => {
       'lintLayout',
       'countIssues',
       'describeIssues',
+      'doorClearZones',
       'applyPresetBatch',
       'findPreset',
       'standardPreset',

@@ -9,7 +9,16 @@ import { LEAF_REST_ANGLE_RAD, doorLeafQuad, doorSweepQuads, resolveDoorSwing } f
 import { openingFrameWidth } from '../assets/opening-frame.js';
 import { overlapDepth, quadContains } from './layout-geometry.js';
 import { obbQuad, spanQuad } from '../plan/plan-geometry.js';
-import { countIssues, describeIssues, lintLayout, projectLayoutCatalogue, type LayoutIssue, type LayoutRule } from './layout-lint.js';
+import {
+  countIssues,
+  describeIssues,
+  doorClearZones,
+  lintLayout,
+  projectLayoutCatalogue,
+  type LayoutCatalogue,
+  type LayoutIssue,
+  type LayoutRule,
+} from './layout-lint.js';
 import type { DemoAsset, Opening, SceneData, Wall } from '../scene/types.js';
 
 /** Ids of the placements the tests furnish the L-shape plan with (and of the one project archetype and its variant), keyed by the readable id each replaces. */
@@ -530,6 +539,75 @@ describe('rule 6 asks a small room for a 0.6 m standing spot, and every 0.8 m ga
     // Between 0.70 and 0.80 m a gap passes or not by where the 0.1 m grid falls; under 0.70 it never passes.
     for (const shift of [0, 0.03, 0.05, 0.07]) {
       expect({ shift, failed: circulationIn(shiftedHall(shift, 0.68), WC_HALL.room.hall).length > 0 }).toEqual({ shift, failed: true });
+    }
+  });
+});
+
+describe('doorClearZones is the zone rule 3 checks', () => {
+  const PROBE = '01a17a5d-e384-716e-b00c-b6e6d4909dae';
+  // A 0.1 m floor cube: the rule sees exactly the box the test places.
+  const probeCatalogue: LayoutCatalogue = () => ({
+    archetype: 'probe',
+    anchor: 'floor',
+    wallSnap: false,
+    clearance: 0,
+    dims: [0.1, 0.5, 0.1],
+    yaw: 0,
+    layout: undefined,
+    footprint: { hx: 0.05, hz: 0.05 },
+  });
+  const scene = wcHall(
+    [],
+    [
+      { opening: WC_HALL.opening.doorWc, into: WC_HALL.room.hall },
+      { opening: WC_HALL.opening.doorRoom, into: WC_HALL.room.room },
+    ],
+  );
+  const zones = doorClearZones(scene, solvePlan(scene));
+
+  /** Which plan axis a zone runs along, the wall's centreline on it, and the zone's far edge: the entry is in the x = 0 wall, the others in z = 1.55. */
+  function farEdge(zone: (typeof zones)[number]): { axis: 'x' | 'z'; line: number; far: number; mid: number } {
+    const axis = zone.openingId === WC_HALL.opening.doorEntry ? 'x' : 'z';
+    const across = axis === 'x' ? 'z' : 'x';
+    const line = axis === 'x' ? 0 : 1.55;
+    const sorted = [...zone.quad].sort((a, b) => Math.abs(b[axis] - line) - Math.abs(a[axis] - line));
+    return { axis, line, far: sorted[0]![axis], mid: (sorted[0]![across] + sorted[1]![across]) / 2 };
+  }
+
+  function depth(zone: (typeof zones)[number]): number {
+    const { line, far } = farEdge(zone);
+    return Number((Math.abs(far - line) - 0.05).toFixed(3));
+  }
+
+  test('one zone per door side that owns a room: 0.6 m on the push side, 0.9 m on the pull side', () => {
+    expect(zones.map((zone) => ({ openingId: zone.openingId, roomId: zone.roomId, depth: depth(zone) }))).toEqual(
+      expect.arrayContaining([
+        { openingId: WC_HALL.opening.doorWc, roomId: WC_HALL.room.hall, depth: 0.9 },
+        { openingId: WC_HALL.opening.doorWc, roomId: WC_HALL.room.wc, depth: 0.6 },
+        { openingId: WC_HALL.opening.doorRoom, roomId: WC_HALL.room.hall, depth: 0.6 },
+        { openingId: WC_HALL.opening.doorRoom, roomId: WC_HALL.room.room, depth: 0.9 },
+      ]),
+    );
+    expect(zones.filter((zone) => zone.openingId === WC_HALL.opening.doorEntry).map((zone) => zone.roomId)).toEqual([WC_HALL.room.hall]);
+  });
+
+  test('rule 3 flags a piece just inside each zone and not one just beyond it', () => {
+    for (const zone of zones) {
+      const { axis, line, far, mid } = farEdge(zone);
+      const out = Math.sign(far - line);
+      const probeAt = (offset: number): string[][] => {
+        const along = far + out * offset;
+        const position = axis === 'x' ? { x: along, y: 0, z: mid } : { x: mid, y: 0, z: along };
+        const probed: SceneData = { ...scene, assets: [{ id: PROBE, type: 'probe', position, rotationY: 0 }] };
+        return ofRule(lintLayout(probed, solvePlan(probed), probeCatalogue), 'door-clear-zone')
+          .map((issue) => issue.ids)
+          .filter((ids) => ids[0] === zone.openingId);
+      };
+      expect({ zone: [zone.openingId, zone.roomId], inside: probeAt(-0.05) }).toEqual({
+        zone: [zone.openingId, zone.roomId],
+        inside: [[zone.openingId, PROBE]],
+      });
+      expect({ zone: [zone.openingId, zone.roomId], beyond: probeAt(0.07) }).toEqual({ zone: [zone.openingId, zone.roomId], beyond: [] });
     }
   });
 });
