@@ -20,7 +20,7 @@ import { buildLamp } from '../../src/assets/asset-builders-lighting-decor.js';
 import { GeometryCache, makeBuildKit } from '../../src/assets/asset-kit.js';
 import { FinishRegistry } from '../../src/assets/asset-finishes.js';
 import type { ResolvedAsset } from '../../src/assets/asset-resolver.js';
-import { closeContainers, demoScene, nextFrame, openContainer, until } from './support.js';
+import { closeContainers, demoScene, nextFrame, openContainer, softwareRasteriser, until } from './support.js';
 import { InlineSceneRepository, mountViewer } from '../../src/app/viewer-api.js';
 import type { ViewerHandle } from '../../src/app/viewer-handle.js';
 import type { SceneOp } from '../../src/scene/types.js';
@@ -1020,7 +1020,8 @@ describe('lamp edits in walk through the real commands (demo apartment)', { time
     expect(light.userData['jeexLampRoom']).toBe(-2);
   });
 
-  test('every lamp removed in turn, the last one included, re-bakes each time', async () => {
+  // One full walk bake per removed lamp: minutes each on a software rasteriser (`softwareRasteriser`).
+  test.skipIf(softwareRasteriser())('every lamp removed in turn, the last one included, re-bakes each time', async () => {
     const ids = lampPlacements().map((p) => p.userData['assetId'] as string);
     expect(ids.length).toBeGreaterThan(0);
     for (const id of ids) {

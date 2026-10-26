@@ -26,7 +26,7 @@ import { atlasLayout, setRoomBoxes, type WalkUniforms } from '../../src/render/w
 import type { RoomBox, RoomProbe } from '../../src/render/walk-lighting/room-volumes.js';
 import { whiteBalanceMatrix, type Mat3, type Rgb } from '../../src/render/white-balance.js';
 import { openingMaterialFacts } from '../../src/geometry/opening-kinds.js';
-import { closeContainers, demoScene, nextFrame, openContainer, until } from './support.js';
+import { closeContainers, demoScene, nextFrame, openContainer, rendererName, softwareRasteriser, until } from './support.js';
 
 const MOUNT_TIMEOUT_MS = 300_000;
 const LIVING = '01a15f1b-dbbd-7634-b8b8-af9c8008284d';
@@ -53,17 +53,8 @@ const MASK_CLASSES = 64;
 /** Mask classes from here on are candidate furniture meshes. */
 const FURNITURE_CLASS0 = 10;
 
-/** The renderer string of a fresh WebGL2 context, and whether it is a hardware one. */
-function rendererString(): string {
-  const gl = document.createElement('canvas').getContext('webgl2');
-  if (!gl) return 'none';
-  const info = gl.getExtension('WEBGL_debug_renderer_info');
-  const name = String(gl.getParameter(info ? info.UNMASKED_RENDERER_WEBGL : gl.RENDERER));
-  gl.getExtension('WEBGL_lose_context')?.loseContext();
-  return name;
-}
-const RENDERER = rendererString();
-const HARDWARE = !/swiftshader|llvmpipe|softpipe|none/i.test(RENDERER);
+const RENDERER = rendererName();
+const HARDWARE = !softwareRasteriser();
 
 const results: Record<string, unknown> = { renderer: RENDERER };
 const record = (name: string, value: unknown): void => {

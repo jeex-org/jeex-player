@@ -21,7 +21,7 @@ import type { HdriEntry } from '../../src/lighting/hdri-entry.js';
 import { createLightingContext } from '../../src/lighting/lighting-context.js';
 import { prepareSunShadow } from '../../src/render/sun-shadow.js';
 import type { SceneData } from '../../src/scene/types.js';
-import { closeContainers, demoScene, nextFrame, openContainer, until } from './support.js';
+import { closeContainers, demoScene, nextFrame, openContainer, softwareRasteriser, until } from './support.js';
 
 const MOUNT_TIMEOUT_MS = 300_000;
 const DEG = Math.PI / 180;
@@ -263,44 +263,50 @@ describe('walk on the demo apartment with a host sky', { timeout: MOUNT_TIMEOUT_
   const fetched: string[] = [];
   const requests = (): string[] => fetched.filter((name) => name.includes('/tests/fixtures/hdri/sky-'));
 
-  test('nothing in orbit; both files on the first walk; live after the swap; orbit unchanged; no refetch', async () => {
-    const entry = await fixtureEntry();
-    const realFetch = globalThis.fetch.bind(globalThis);
-    vi.spyOn(globalThis, 'fetch').mockImplementation((input, init) => {
-      fetched.push(typeof input === 'string' ? input : input instanceof URL ? input.href : input.url);
-      return realFetch(input, init);
-    });
-    const scene: SceneData = { ...demoScene(), site: { northDeg: 30, sun: 'noon' } };
-    handle = mountViewer(openContainer(480, 320), {
-      scene: { repository: new InlineSceneRepository(scene) },
-      tour: { mode: 'off' },
-      doors: { autoOpen: false },
-      debug: true,
-      lighting: { hdri: { noon: entry } },
-    });
-    await handle.ready;
-    for (let i = 0; i < 10; i += 1) await nextFrame();
-    expect(requests()).toEqual([]);
-    const orbitBefore = new Uint8Array(await (await handle.capture.still({ width: 200, height: 150, caption: false })).blob.arrayBuffer());
-    handle.setMode('walk');
-    await until(() => debug().hdri().state === 'live', `the sky live (now ${JSON.stringify(debug().hdri())})`, MOUNT_TIMEOUT_MS - 60_000);
-    expect(debug().walkLighting().state).toBe('live');
-    expect(debug().hdri()).toMatchObject({ preset: 'noon', cubeSize: 256 });
-    expect(requests().sort()).toEqual([entry.environmentUrl, entry.skyUrl].sort());
-    expect(debug().sunShadow()!.elevation).toBeCloseTo(entry.sun.elevationDeg, 6);
-    results['demoWalk'] = { hdri: debug().hdri(), sun: debug().sunShadow(), lighting: debug().walkLighting().stats };
-    handle.setMode('orbit');
-    for (let i = 0; i < 5; i += 1) await nextFrame();
-    expect(debug().sunShadow()!.elevation).toBe(55);
-    const orbitAfter = new Uint8Array(await (await handle.capture.still({ width: 200, height: 150, caption: false })).blob.arrayBuffer());
-    expect(orbitAfter.length).toBe(orbitBefore.length);
-    expect(orbitAfter.every((value, i) => value === orbitBefore[i])).toBe(true);
-    handle.setMode('tour');
-    for (let i = 0; i < 5; i += 1) await nextFrame();
-    handle.setMode('walk');
-    await until(() => debug().hdri().state === 'live', 'the sky live again', 120_000);
-    expect(requests()).toHaveLength(2);
-    handle.dispose();
-    vi.restoreAllMocks();
-  });
+  // Two full walk bakes, the first walk's and the swap's: past any sensible wait on a software rasteriser (`softwareRasteriser`).
+  test.skipIf(softwareRasteriser())(
+    'nothing in orbit; both files on the first walk; live after the swap; orbit unchanged; no refetch',
+    async () => {
+      const entry = await fixtureEntry();
+      const realFetch = globalThis.fetch.bind(globalThis);
+      vi.spyOn(globalThis, 'fetch').mockImplementation((input, init) => {
+        fetched.push(typeof input === 'string' ? input : input instanceof URL ? input.href : input.url);
+        return realFetch(input, init);
+      });
+      const scene: SceneData = { ...demoScene(), site: { northDeg: 30, sun: 'noon' } };
+      handle = mountViewer(openContainer(480, 320), {
+        scene: { repository: new InlineSceneRepository(scene) },
+        tour: { mode: 'off' },
+        doors: { autoOpen: false },
+        debug: true,
+        lighting: { hdri: { noon: entry } },
+      });
+      await handle.ready;
+      for (let i = 0; i < 10; i += 1) await nextFrame();
+      expect(requests()).toEqual([]);
+      const orbitBefore = new Uint8Array(
+        await (await handle.capture.still({ width: 200, height: 150, caption: false })).blob.arrayBuffer(),
+      );
+      handle.setMode('walk');
+      await until(() => debug().hdri().state === 'live', `the sky live (now ${JSON.stringify(debug().hdri())})`, MOUNT_TIMEOUT_MS - 60_000);
+      expect(debug().walkLighting().state).toBe('live');
+      expect(debug().hdri()).toMatchObject({ preset: 'noon', cubeSize: 256 });
+      expect(requests().sort()).toEqual([entry.environmentUrl, entry.skyUrl].sort());
+      expect(debug().sunShadow()!.elevation).toBeCloseTo(entry.sun.elevationDeg, 6);
+      results['demoWalk'] = { hdri: debug().hdri(), sun: debug().sunShadow(), lighting: debug().walkLighting().stats };
+      handle.setMode('orbit');
+      for (let i = 0; i < 5; i += 1) await nextFrame();
+      expect(debug().sunShadow()!.elevation).toBe(55);
+      const orbitAfter = new Uint8Array(await (await handle.capture.still({ width: 200, height: 150, caption: false })).blob.arrayBuffer());
+      expect(orbitAfter.length).toBe(orbitBefore.length);
+      expect(orbitAfter.every((value, i) => value === orbitBefore[i])).toBe(true);
+      handle.setMode('tour');
+      for (let i = 0; i < 5; i += 1) await nextFrame();
+      handle.setMode('walk');
+      await until(() => debug().hdri().state === 'live', 'the sky live again', 120_000);
+      expect(requests()).toHaveLength(2);
+      handle.dispose();
+      vi.restoreAllMocks();
+    },
+  );
 });
