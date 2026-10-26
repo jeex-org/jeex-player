@@ -9,6 +9,7 @@ import { validateScene } from '../src/scene/scene-validator.js';
 import { SCHEMA_HOST, writeSchemas } from './schema-gen.ts';
 import {
   DEMO_SCENE_PATH,
+  DEMO_THEME_PATH,
   SITE_ORIGIN,
   type SchemaWriter,
   buildSite,
@@ -93,7 +94,7 @@ describe('buildSite', () => {
     write(join(repo, 'site', 'install.md'), '# Install');
     write(join(repo, 'dist', 'index.html'), 'demo index');
     write(join(repo, 'dist', 'assets', 'app.js'), 'js');
-    if (withEmbed) write(join(repo, 'dist', 'embed.html'), 'embed');
+    if (withEmbed) write(join(repo, 'dist', 'embed.html'), '<head></head>embed');
     return { repo, out: join(repo, 'site-out') };
   }
 
@@ -104,7 +105,9 @@ describe('buildSite', () => {
     expect(readFileSync(join(out, 'index.html'), 'utf8')).toBe('<p data-viewer-sha>viewer 642e6f8</p>');
     expect(readFileSync(join(out, 'assets', 'site.css'), 'utf8')).toBe('body{}');
     expect(readFileSync(join(out, 'demo', 'index.html'), 'utf8')).toBe('demo index');
-    expect(readFileSync(join(out, 'demo', 'embed.html'), 'utf8')).toBe('embed');
+    expect(readFileSync(join(out, 'demo', 'embed.html'), 'utf8')).toBe(
+      `<head><link rel="stylesheet" href="../${DEMO_THEME_PATH}" /></head>embed`,
+    );
     expect(readFileSync(join(out, 'demo', 'assets', 'app.js'), 'utf8')).toBe('js');
     expect(readFileSync(join(out, 'llms.txt'), 'utf8')).toBe('# JEEX Player');
     expect(readFileSync(join(out, 'install.md'), 'utf8')).toBe('# Install');
@@ -115,6 +118,26 @@ describe('buildSite', () => {
     expect(JSON.parse(readFileSync(join(out, 'schema', 'scene.schema.json'), 'utf8')).title).toBe('scene');
     expect(JSON.parse(readFileSync(join(out, 'schema', 'scene', '1.2.3.json'), 'utf8')).title).toBe('scene');
     expect(JSON.parse(readFileSync(join(out, 'schema', 'viewer-options', '1.2.3.json'), 'utf8')).title).toBe('viewer-options');
+  });
+
+  test("links the site's warm theme into the demo frame only; the package's own pages stay neutral", () => {
+    const { repo, out } = tree(false);
+    write(join(repo, 'dist', 'embed.html'), '<html><head><title>e</title></head><body>embed</body></html>');
+    buildSite(repo, out, fakeSchemas(['scene']), null);
+    const frame = readFileSync(join(out, 'demo', 'embed.html'), 'utf8');
+    expect(frame).toContain(`<link rel="stylesheet" href="../${DEMO_THEME_PATH}" /></head>`);
+    expect(readFileSync(join(out, 'demo', 'index.html'), 'utf8')).toBe('demo index');
+    // The package build itself is never touched.
+    expect(readFileSync(join(repo, 'dist', 'embed.html'), 'utf8')).not.toContain(DEMO_THEME_PATH);
+  });
+
+  test('the site theme keeps the warm look: the former backdrop pair and accent, on the viewer root, unlayered', () => {
+    const css = readFileSync(join(import.meta.dirname, '..', 'site', DEMO_THEME_PATH), 'utf8');
+    expect(css).toContain('.jeex-viewer');
+    expect(css).not.toContain('@layer');
+    expect(css).toMatch(/--jeex-backdrop:\s*#c6b8a3/);
+    expect(css).toMatch(/--jeex-backdrop-top:\s*#dcd3c2/);
+    expect(css).toMatch(/--jeex-accent:/);
   });
 
   test('fails with a clear message when the demo build is missing', () => {

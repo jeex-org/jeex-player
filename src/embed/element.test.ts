@@ -56,6 +56,8 @@ type Recorder = {
   modes: ViewerMode[];
   /** Every `setLightTemperature` the running viewer was given, oldest first. */
   temperatures: Array<number | null>;
+  /** How many times the running viewer was asked to re-read its theme. */
+  themeRefreshes: () => number;
   disposals: number;
   /** Custom states the element was put in, newest last. */
   states: string[];
@@ -90,6 +92,7 @@ function harness(
   const loaded: SceneSource[] = [];
   const modes: ViewerMode[] = [];
   const temperatures: Array<number | null> = [];
+  let themeRefreshes = 0;
   const states: string[] = [];
   const boxes: Array<string | null> = [];
   let disposals = 0;
@@ -121,6 +124,9 @@ function harness(
     },
     setLightTemperature: (temperature: number | null) => {
       temperatures.push(temperature);
+    },
+    refreshTheme: () => {
+      themeRefreshes += 1;
     },
     on: (event: string, callback: (payload: never) => void) => subscribe(event, callback),
     dispose: () => {
@@ -179,6 +185,7 @@ function harness(
       loaded,
       modes,
       temperatures,
+      themeRefreshes: () => themeRefreshes,
       states,
       boxes,
       get disposals() {
@@ -1047,5 +1054,18 @@ describe('the light temperature', () => {
     record.start();
     record.fire('ready', { sceneId: 'flat-a', options: {} });
     expect(record.temperatures).toEqual([2700]);
+  });
+
+  test('refreshTheme before the start does nothing, and after it reaches the running viewer', async () => {
+    const { controller, record } = harness({ src: '/a.json' }, { deferred: true });
+    controller.connect();
+    const viewer = controller.viewer!;
+    // The mount resolves the theme itself: nothing to queue.
+    viewer.refreshTheme();
+    record.start();
+    record.fire('ready', { sceneId: 'flat-a', options: {} });
+    expect(record.themeRefreshes()).toBe(0);
+    viewer.refreshTheme();
+    expect(record.themeRefreshes()).toBe(1);
   });
 });

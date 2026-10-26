@@ -68,6 +68,8 @@ export type HandleCommands = {
   focusRoom(roomId: string): boolean;
   stepCamera(to: 'next' | 'previous' | 'first' | 'last' | number): boolean;
   setLocale(locale: Locale): void;
+  /** Re-reads the root's theme into what CSS cannot paint; before the stage exists its construction reads it anyway. */
+  refreshTheme(): void;
   setSelection(target: ViewerSelectionTarget | null): void;
   describeSelection(target: ViewerSelection): SelectionDescription | null;
   resize(): void;
@@ -205,6 +207,10 @@ export function handleCommands(deps: HandleCommandsDeps): HandleCommands {
 
     getLocale() {
       return deps.messages().locale;
+    },
+
+    refreshTheme() {
+      deps.stage()?.applyTheme();
     },
 
     /** One consistent read of the whole graph (`viewer-state.ts`). */

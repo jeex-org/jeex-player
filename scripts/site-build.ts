@@ -39,6 +39,14 @@ import { apartmentScene } from '../src/demo/scene-data.js';
 /** Where the demo apartment's scene document lands, relative to the output root. */
 export const DEMO_SCENE_PATH = 'demo/demo-apartment.json';
 
+/**
+ * The site's own theme for the viewer in its demo frame, relative to the site
+ * root. The package's defaults are a neutral graphite; the player site keeps
+ * its warm look by setting the theme properties itself, in the one page that
+ * frame loads, and nowhere in the package build.
+ */
+export const DEMO_THEME_PATH = 'assets/demo-theme.css';
+
 /** The origin the site is served from; every published schema's `$id` lives under it. */
 export const SITE_ORIGIN = 'https://player.jeex.org';
 
@@ -154,6 +162,13 @@ export function publishSchemas(out: string, write: SchemaWriter): readonly strin
   });
 }
 
+/** Links the site's theme into the copied demo frame page (`DEMO_THEME_PATH`), just before `</head>`. */
+function linkDemoTheme(page: string): void {
+  const html = readFileSync(page, 'utf8');
+  if (!html.includes('</head>')) throw new Error(`site-build: ${page} has no </head> to link the demo theme into`);
+  writeFileSync(page, html.replace('</head>', `<link rel="stylesheet" href="../${DEMO_THEME_PATH}" /></head>`));
+}
+
 /** Every `.html` file under `dir`, recursively, as absolute paths. */
 function htmlFiles(dir: string): string[] {
   return readdirSync(dir, { recursive: true, encoding: 'utf8' })
@@ -186,6 +201,7 @@ export function buildSite(
   cpSync(site, out, { recursive: true, filter: (source) => isPublished(site, source) });
   for (const page of htmlFiles(out)) writeFileSync(page, stamp(readFileSync(page, 'utf8'), sha));
   cpSync(dist, join(out, 'demo'), { recursive: true });
+  linkDemoTheme(join(out, 'demo', 'embed.html'));
   writeFileSync(join(out, DEMO_SCENE_PATH), demoSceneJson());
   publishSchemas(out, writeSchemas);
 }

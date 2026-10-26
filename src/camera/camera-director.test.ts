@@ -88,6 +88,7 @@ function harness(options: { pauseOnInput?: boolean; scene?: SceneData; wireInput
   const planModeCalls: string[] = [];
   const uiPlanModes: string[] = [];
   const modeButtons: string[] = [];
+  const hintCollapses = { count: 0 };
   const ui = {
     setTourState: () => undefined,
     setTourProgress: () => undefined,
@@ -101,6 +102,9 @@ function harness(options: { pauseOnInput?: boolean; scene?: SceneData; wireInput
       uiPlanModes.push(mode);
     },
     wakeControls: () => undefined,
+    collapseHint: () => {
+      hintCollapses.count += 1;
+    },
   } satisfies DirectorChrome;
   let keepExteriors = false;
   const dollhouse = {
@@ -148,6 +152,7 @@ function harness(options: { pauseOnInput?: boolean; scene?: SceneData; wireInput
   });
   return {
     director,
+    hintCollapses,
     walkCameras,
     controller,
     tour,
@@ -397,6 +402,17 @@ describe('the tour walks through a rest-closed door and leaves it shut behind', 
     expect(states.get(L_SHAPE.opening.doorAb)!.phase).toBe('closing');
     animator.update(now + DOOR_ANIMATION_MS);
     expect(states.get(L_SHAPE.opening.doorAb)).toMatchObject({ phase: 'closed', rest: 'closed', auto: false, armed: true });
+  });
+});
+
+describe('manual input and the hint', () => {
+  test('scene input collapses the narrow-canvas hint, whether or not a tour runs', () => {
+    const { director, hintCollapses } = harness();
+    director.handleManualInput();
+    expect(hintCollapses.count).toBe(1);
+    director.toggleTour();
+    director.handleManualInput();
+    expect(hintCollapses.count).toBe(2);
   });
 });
 

@@ -290,6 +290,10 @@ export class PendingViewer implements ViewerHandle {
     if (!this.booted) this.temperature = value;
     this.command((handle) => handle.setLightTemperature(value));
   }
+  /** Not queued: the mount reads the theme itself, so a refresh before the start has nothing to do. */
+  refreshTheme(): void {
+    this.direct()?.refreshTheme();
+  }
   setLocale(locale: Locale): void {
     if (!this.booted) this.locale = locale;
     this.command((handle) => handle.setLocale(locale));

@@ -113,6 +113,23 @@ describe('painting', () => {
     expect(canvasHasInk(canvas)).toBe(true);
   });
 
+  test('setAccent repaints the view cone and the camera dot in the host accent, with no former orange left', async () => {
+    await paint(harness);
+    harness.map.setAccent('#ff0000');
+    harness.map.update();
+    const canvas = harness.map.element.querySelector('canvas')!;
+    const data = canvas.getContext('2d')!.getImageData(0, 0, canvas.width, canvas.height).data;
+    let red = 0;
+    let orange = 0;
+    for (let i = 0; i < data.length; i += 4) {
+      const [r, g, b] = [data[i]!, data[i + 1]!, data[i + 2]!];
+      if (r > 240 && g < 20 && b < 20) red += 1;
+      if (Math.abs(r - 224) < 6 && Math.abs(g - 138) < 6 && Math.abs(b - 60) < 6) orange += 1;
+    }
+    expect(red).toBeGreaterThan(0);
+    expect(orange).toBe(0);
+  });
+
   test('a camera that has not moved does not earn a second paint', async () => {
     await paint(harness);
     const canvas = harness.map.element.querySelector('canvas')!;
