@@ -28,8 +28,10 @@ import type { LayoutIssue, LayoutRule } from '../layout-issue.js';
 
 /** Penetration deeper than this counts as an intersection, metres. */
 export const TOUCH_TOL_M = 0.02;
-/** Depth of the clear zone in front of a door, metres (rule 3). */
+/** Depth of the clear zone in front of a door, metres (rule 3): the pull side, and both sides of a passage. */
 export const DOOR_CLEAR_M = 0.9;
+/** Depth of the clear zone on the side a leaf swings away from, metres (rule 3): the push side, as in front of a WC. */
+export const DOOR_PUSH_CLEAR_M = 0.6;
 /** Fraction of the opening width the clear zone spans (rule 3). */
 export const DOOR_CLEAR_SPAN = 0.9;
 
@@ -150,6 +152,16 @@ export function sideZone(door: DoorZone, normal: Vec2, span: number, depth: numb
   const near = door.thickness / 2;
   const range: [number, number] = sign > 0 ? [near, near + depth] : [-(near + depth), -near];
   return spanQuad(door.centre, door.tangent, [-span / 2, span / 2], range);
+}
+
+/**
+ * Rule 3's clear zone on one side of a door: `DOOR_PUSH_CLEAR_M` deep on the
+ * side its leaf swings away from, `DOOR_CLEAR_M` on the side it swings into
+ * and on both sides of a passage, spanning `DOOR_CLEAR_SPAN` of the width.
+ */
+export function doorClearZone(door: DoorZone, normal: Vec2): Vec2[] {
+  const push = door.swing !== null && dot(normal, door.swing.open) < 0;
+  return sideZone(door, normal, door.width * DOOR_CLEAR_SPAN, push ? DOOR_PUSH_CLEAR_M : DOOR_CLEAR_M);
 }
 
 /** Support radius of an oriented box along `axis` — half its extent in that direction. */
