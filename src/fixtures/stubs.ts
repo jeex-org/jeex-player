@@ -185,7 +185,7 @@ export function stubRuntime(): { renderer: THREE.WebGLRenderer; calls: StubRende
     render() {
       calls.renders += 1;
     },
-    info: { programs: null },
+    info: { programs: null, memory: { textures: 0, geometries: 0 } },
     getRenderTarget: () => null,
     setRenderTarget: () => undefined,
     dispose() {

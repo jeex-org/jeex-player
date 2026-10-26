@@ -47,7 +47,7 @@
 import * as THREE from 'three';
 import { Fanout } from '../shared/fanout.js';
 import { setTextureAnisotropy } from '../materials/textures.js';
-import { SkyBackdrop } from './sky-backdrop.js';
+import { DAYLIGHT_SKY, SkyBackdrop } from './sky-backdrop.js';
 import { sharedTextureCache } from '../materials/texture-cache.js';
 import { linkedAbortController } from '../shared/abort.js';
 import { SwatchPreview, type PreviewRenderer } from './swatch-preview.js';
@@ -59,6 +59,7 @@ import { withScenePass } from '../shared/scene-pass.js';
 import type { PostProcessor } from './post-processor.js';
 import { RenderDemand } from './render-demand.js';
 import { FirstDrawGate, FirstDrawSignal } from './first-draw.js';
+import { SettleWindow, gpuResources } from './settle-window.js';
 import { compileScene } from './scene-compile.js';
 import { devicePixelRatioOf, measureEntry, observeBox, watchPixelRatio, type ObservedBox, type ViewportBox } from './viewport-box.js';
 
@@ -80,10 +81,6 @@ export const MAX_FRAME_DELTA = 0.05;
  * second keep it resident; one was measured to suffice, so this has a margin.
  */
 export const KEEP_WARM_MS = 500;
-const SKY_TOP = '#dcd3c2';
-const SKY_BOTTOM = '#c6b8a3';
-/** The sky walk and tour light the rooms with, whatever the host's theme: it is a light source there, not chrome. */
-const DAYLIGHT_SKY = { top: SKY_TOP, horizon: SKY_BOTTOM } as const;
 const FOG_NEAR = 34; // metres
 const FOG_FAR = 72; // metres
 
@@ -153,6 +150,8 @@ export class RenderRuntime {
   private renderEnabled = true;
   /** `now()` of the last frame actually drawn, for the keep-warm heartbeat. */
   private lastDrawn = Number.NEGATIVE_INFINITY;
+  /** Keeps every tick drawing briefly after a picture that brought new GPU resources. */
+  private readonly settle = new SettleWindow();
   /**
    * `now()` read right AFTER the last display draw returned: the keep-warm
    * heartbeat counts from the end of a draw, so a draw slower than
@@ -216,9 +215,9 @@ export class RenderRuntime {
     this.canvas = options.canvas;
     this.pixelRatioCap = options.pixelRatioCap ?? PIXEL_RATIO_CAP;
 
-    this.sky = new SkyBackdrop(SKY_TOP, SKY_BOTTOM);
+    this.sky = new SkyBackdrop(DAYLIGHT_SKY.top, DAYLIGHT_SKY.horizon);
     if (this.sky.texture) this.scene.background = this.sky.texture;
-    this.fog = new THREE.Fog(SKY_BOTTOM, FOG_NEAR, FOG_FAR);
+    this.fog = new THREE.Fog(DAYLIGHT_SKY.horizon, FOG_NEAR, FOG_FAR);
     this.scene.fog = this.fog;
 
     this.renderer = (options.createRenderer ?? defaultRenderer)(options.canvas);
@@ -389,6 +388,7 @@ export class RenderRuntime {
       'webglcontextrestored',
       () => {
         this.contextLost = false;
+        this.settle.reset();
         // three built a new shadow map with the context; wrap it again.
         installShadowLayerPass(this.renderer);
         this.renewLighting();
@@ -658,6 +658,7 @@ export class RenderRuntime {
     // removed itself must not skip the NEXT one, and a throwing hook must not
     // abort the frame (the render with it) with nothing reported.
     this.hooks.emit(delta, now);
+    if (this.settle.holds(now)) this.demand.invalidate();
     // Committed only after the draw returned: a throwing draw keeps the demand.
     const camera = this.camera;
     // While the first-picture gate holds, the tick is counted and nothing commits or counts as drawn.
@@ -671,6 +672,7 @@ export class RenderRuntime {
       this.lastDrawn = now;
       this.keptWarm = this.now();
       this.demand.commit(camera);
+      this.settle.drawn(now, gpuResources(this.renderer.info));
       this.firstDraw.drawn();
       this.releaseCompile?.(); // the real background drew with the stand-in's program
       this.releaseCompile = null;

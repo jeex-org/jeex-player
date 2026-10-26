@@ -25,7 +25,8 @@ import { LIGHTING_STANDARD } from '../../src/lighting/lighting-standard.js';
 import type { FurnitureBox, RoomBox, Vec3 } from '../../src/render/walk-lighting/room-volumes.js';
 import type { SceneOp } from '../../src/scene/types.js';
 import { RenderDemand } from '../../src/render/render-demand.js';
-import { closeContainers, demoScene, nextFrame, openContainer, until } from './support.js';
+import { NEW_RESOURCES_SETTLE_MS } from '../../src/render/settle-window.js';
+import { closeContainers, delay, demoScene, nextFrame, openContainer, until } from './support.js';
 
 const MOUNT_TIMEOUT_MS = 300_000;
 const results: Record<string, unknown> = {};
@@ -543,7 +544,7 @@ describe('room lighting on the demo apartment', { timeout: MOUNT_TIMEOUT_MS }, (
     expect(refresh.mock.calls[0]![0]).toEqual({ all: false, grids: [], probes: [ROOM.living], lamps: true });
   });
 
-  test('a floor lamp moved next to the living probe moves the probe; the refresh draws once and the view rests', async () => {
+  test('a floor lamp moved next to the living probe moves the probe; the refresh draws and the view rests', async () => {
     const internals = lighting as unknown as {
       volumes: { probes: Array<{ roomId: string; position: Vec3 }>; boxes: RoomBox[] };
       uniforms: { jeexProbe: { value: THREE.Vector3[] } };
@@ -593,8 +594,10 @@ describe('room lighting on the demo apartment', { timeout: MOUNT_TIMEOUT_MS }, (
     internals.volumes.boxes.forEach((roomBox, i) => {
       if (roomBox.roomId === ROOM.living) expect(internals.uniforms.jeexProbe.value[i]!.toArray()).toEqual([after.x, after.y, after.z]);
     });
-    // The refresh is drawn, then the view rests.
+    // The refresh is drawn, then the view rests: once the settle window its new
+    // probe targets opened has passed (`NEW_RESOURCES_SETTLE_MS`).
     await until(() => debug().renderDemand().draws > drawsAtRefresh, 'a draw after the refresh', 10_000);
+    await delay(NEW_RESOURCES_SETTLE_MS);
     for (let i = 0; i < 3; i += 1) await nextFrame();
     const settled = debug().renderDemand().draws;
     for (let i = 0; i < 30; i += 1) await nextFrame();
