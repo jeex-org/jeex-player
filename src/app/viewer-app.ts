@@ -188,11 +188,10 @@ export class ViewerApp {
       messages: this.messages,
       commands: this.commands,
       onPanelClose: () => this.mount.editor?.forgetPanelTarget(),
-      // Re-runs THIS instance's boot; `location.reload()` would reload a host
-      // page the viewer does not own.
-      onRetry: () => {
-        void this.retry();
-      },
+      // Escape deselects like a tap on nothing (`ViewerEditor.handleFurniturePick`).
+      onEscape: () => this.mount.editor?.handleFurniturePick(null),
+      // Re-runs THIS instance's boot; `location.reload()` would reload a host page the viewer does not own.
+      onRetry: () => void this.retry(),
       signal: this.context.signal,
       usage: this.usage,
     });
