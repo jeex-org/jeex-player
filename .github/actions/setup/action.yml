@@ -37,6 +37,7 @@ runs:
       run: |
         version=$(bun --print 'require("@playwright/test/package.json").version')
         echo "version=$version" >> "$GITHUB_OUTPUT"
+        echo "month=$(date -u +%Y-%m)" >> "$GITHUB_OUTPUT"
 
     - uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
       id: playwright-cache
@@ -52,7 +53,31 @@ runs:
       shell: bash
       run: bunx playwright install --with-deps chromium
 
+    # The system libraries come from the runners' apt mirror, which on
+    # 2026-10-26 served them at tens of kB/s: 15 minutes and more for the
+    # same 26 MB of fonts every job. So the .deb files are kept in a cache of
+    # their own and apt downloads only what that cache misses. Playwright's
+    # dry run names what is missing (it simulates its own `apt-get install`
+    # and exits 1 when something is); the list is installed the way it would
+    # install it, with the cache as apt's archive directory.
+    - uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
+      if: inputs.browser == 'true' && steps.playwright-cache.outputs.cache-hit == 'true'
+      with:
+        path: ~/.cache/apt-debs
+        # A month in the key: the mirror's packages move on, and a cache hit is
+        # never saved again, so a fresh entry each month starts from the last.
+        key: apt-debs-${{ runner.os }}-${{ steps.playwright.outputs.version }}-${{ steps.playwright.outputs.month }}
+        restore-keys: apt-debs-${{ runner.os }}-${{ steps.playwright.outputs.version }}-
+
     - name: install chromium (system deps only)
       if: inputs.browser == 'true' && steps.playwright-cache.outputs.cache-hit == 'true'
       shell: bash
-      run: bunx playwright install-deps chromium
+      run: |
+        sudo apt-get update -qq
+        missing=$(bunx playwright install-deps --dry-run chromium | sed -n 's/^  \([^ ]*\)$/\1/p' || true)
+        if [ -n "$missing" ]; then
+          mkdir -p ~/.cache/apt-debs/partial
+          # shellcheck disable=SC2086 # one package per word
+          sudo apt-get install -y --no-install-recommends -o Dir::Cache::archives="$HOME/.cache/apt-debs" $missing
+          sudo chown -R "$(id -u):$(id -g)" ~/.cache/apt-debs
+        fi

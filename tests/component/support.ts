@@ -16,6 +16,36 @@ import { planDrawingInputs } from '../../src/assets/plan-fixtures.js';
 import { apartmentScene } from '../../src/demo/scene-data.js';
 import type { SceneData } from '../../src/scene/types.js';
 
+/** The renderer string of a fresh WebGL2 context: `none` without WebGL2. */
+function rendererString(): string {
+  const gl = document.createElement('canvas').getContext('webgl2');
+  if (!gl) return 'none';
+  const info = gl.getExtension('WEBGL_debug_renderer_info');
+  const name = String(gl.getParameter(info ? info.UNMASKED_RENDERER_WEBGL : gl.RENDERER));
+  gl.getExtension('WEBGL_lose_context')?.loseContext();
+  return name;
+}
+
+let renderer: string | undefined;
+
+/** What renders this page's WebGL: the GPU's name, or a software rasteriser's. Asked once, on first use. */
+export function rendererName(): string {
+  renderer ??= rendererString();
+  return renderer;
+}
+
+/**
+ * Whether WebGL runs on a software rasteriser (SwiftShader, llvmpipe), not a
+ * GPU. A test that waits for the walk's full grid and probe bake, or for
+ * several of them, is skipped there with its reason: one bake takes about
+ * 130 s on a 16-thread machine's SwiftShader and 100 to 300 s on a 4-vCPU
+ * hosted runner, past any wait a test can sensibly hold. The local gate
+ * renders on the GPU and runs every such test.
+ */
+export function softwareRasteriser(): boolean {
+  return /swiftshader|llvmpipe|softpipe|none/i.test(rendererName());
+}
+
 /** Every container this module handed out, so a test file can drop them all. */
 const OPENED: HTMLElement[] = [];
 

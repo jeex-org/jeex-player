@@ -26,7 +26,7 @@ import type { LogEntry } from '../../src/shared/logger.js';
 import type { HdriEntry } from '../../src/lighting/hdri-entry.js';
 import type { SceneData } from '../../src/scene/types.js';
 import CALIBRATION from '../fixtures/lightmap-calibration/sidecar.json' with { type: 'json' };
-import { closeContainers, demoScene, nextFrame, openContainer, until } from './support.js';
+import { closeContainers, demoScene, nextFrame, openContainer, softwareRasteriser, until } from './support.js';
 import { FIXTURE } from './lightmap-support.js';
 
 const MOUNT_TIMEOUT_MS = 180_000;
@@ -214,7 +214,9 @@ describe('the debug light bake', () => {
     MOUNT_TIMEOUT_MS,
   );
 
-  test(
+  // Its last step waits for the walk's full grid and probe bake after the
+  // drop: past any sensible wait on a software rasteriser (`softwareRasteriser`).
+  test.skipIf(softwareRasteriser())(
     'a host sky over a bake: held while the bake loads, the sky alone once applied, full lighting once dropped',
     async () => {
       const log: LogEntry[] = [];
