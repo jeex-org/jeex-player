@@ -333,6 +333,15 @@ describe('set_room_purpose', () => {
     expect(cleared.summary).toBe(`Room ${ROOM_B}: purpose none → none`);
   });
 
+  test('dining is a purpose of its own, set like any other', () => {
+    const scene = draft24();
+
+    const outcome = apply(scene, { op: 'set_room_purpose', roomId: ROOM_A, purpose: 'dining' });
+
+    expect(scene.rooms[0]!.purpose).toBe('dining');
+    expect(outcome.summary).toBe(`Room ${ROOM_A}: purpose none → dining`);
+  });
+
   test('refuses an unknown room, naming it, and the scene is unchanged', () => {
     const scene = draft24();
     expect(rejectsOp(scene, { op: 'set_room_purpose', roomId: NEW.ghost, purpose: 'kitchen' })).toContain(`Unknown room ${NEW.ghost}`);
@@ -340,7 +349,7 @@ describe('set_room_purpose', () => {
 
   test('refuses an out-of-vocabulary value from a caller that skipped the op schema, naming the value', () => {
     const scene = draft24();
-    for (const purpose of ['dining', '', 5, undefined]) {
+    for (const purpose of ['garage', '', 5, undefined]) {
       const op = { op: 'set_room_purpose', roomId: ROOM_A, purpose } as unknown as SceneOp;
       expect(rejectsOp(scene, op)).toContain(`Unknown room purpose ${String(purpose)}`);
     }

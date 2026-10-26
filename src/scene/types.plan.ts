@@ -53,6 +53,7 @@ export type RoomPurpose =
   | 'living'
   | 'kitchen'
   | 'kitchen-living'
+  | 'dining'
   | 'bedroom'
   | 'kids'
   | 'study'

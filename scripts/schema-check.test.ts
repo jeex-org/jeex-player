@@ -176,7 +176,7 @@ describe('the Zod schema and the published JSON Schema accept the same documents
       'a room purpose outside the vocabulary',
       () => {
         const scene = draftOf({ ...lShapePlan, schemaVersion: '2.4' });
-        (scene.rooms[0] as unknown as Record<string, unknown>)['purpose'] = 'dining';
+        (scene.rooms[0] as unknown as Record<string, unknown>)['purpose'] = 'garage';
         return scene;
       },
     ],
