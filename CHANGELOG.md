@@ -623,6 +623,11 @@ as described under [Versioning](#versioning).
 
 ### Fixed
 
+- **Wall junctions take the walls' colour.** The core where walls meet (a
+  corner, a T-junction) wore the unpainted sand plaster whatever the walls
+  were painted, so white walls showed beige squares on their tops in 360. A
+  core now wears the wall finish of a room its walls bound (the first by id;
+  the facade's when they bound none) and follows that room's repaints.
 - **A piece placed on a top stays on it.** `place_object` and `move_object`
   put a table lamp on a nightstand, or a TV on its unit, back on the floor,
   because every floor-standing archetype was pinned to `y = 0`. A piece that
