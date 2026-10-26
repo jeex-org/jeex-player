@@ -2,6 +2,11 @@
  * Rule 6 (hard): every room has a 0.80 m path from each of its doors to the
  * others and into its main zone.
  *
+ * A small room, whose plan rectangle is under `SMALL_ROOM_M` on both sides (a
+ * WC, a compact bathroom, a closet), is not walked around: it asks for a
+ * 0.60 m standing spot in front of each door and a 0.60 m path between its
+ * doors, and has no main zone to reach.
+ *
  * The test is a flood fill over a free-space grid: cells at least half a
  * corridor from the walls and from every footprint. A door is entered at a
  * POINT, not at a grid cell, so the free cells within half its clear zone are
@@ -20,8 +25,19 @@ import type { Vec2 } from '../../scene/types.js';
 
 /** Half-width of the circulation corridor, metres: a 0.8 m path. */
 const CORRIDOR_HALF_M = 0.4;
+/** Half-width of a small room's standing spot and path, metres: 0.6 m. */
+const STANDING_HALF_M = 0.3;
+/** A room whose plan rectangle is under this on both sides is small, metres. */
+const SMALL_ROOM_M = 2.0;
 /** Grid step of the circulation search, metres. */
 const CORRIDOR_STEP_M = 0.1;
+/**
+ * A cell is free this much short of the half-width: any band of free floor at
+ * least one step wide then holds a cell wherever the grid falls, so a gap of
+ * the full width always passes, and one under it by more than a step never
+ * does.
+ */
+const GRID_TOL_M = CORRIDOR_STEP_M / 2;
 /**
  * How far into the room a door is approached from, beyond the wall face: the
  * middle of its `DOOR_CLEAR_M` clear zone. Rule 3 already owns the threshold
@@ -40,8 +56,39 @@ type Grid = {
   near: (p: Vec2, radius: number) => number[];
 };
 
-/** Free-space grid of one room: cells at least `CORRIDOR_HALF_M` from walls and furniture. */
-function corridorGrid(room: SolvedPlan['rooms'][number], boxes: Obb[]): Grid {
+/**
+ * Whether both sides of the room's plan rectangle are under `SMALL_ROOM_M`.
+ * The rectangle is the smallest-area one over the polygon's own edge
+ * directions, the walls a plan room is drawn with.
+ */
+function isSmallRoom(polygon: readonly Vec2[]): boolean {
+  let best: { area: number; long: number } | null = null;
+  for (let i = 0; i < polygon.length; i += 1) {
+    const a = polygon[i]!;
+    const b = polygon[(i + 1) % polygon.length]!;
+    const length = dist(a, b);
+    if (length === 0) continue;
+    const u = { x: (b.x - a.x) / length, z: (b.z - a.z) / length };
+    let minU = Infinity;
+    let maxU = -Infinity;
+    let minV = Infinity;
+    let maxV = -Infinity;
+    for (const p of polygon) {
+      const along = p.x * u.x + p.z * u.z;
+      const across = p.z * u.x - p.x * u.z;
+      minU = Math.min(minU, along);
+      maxU = Math.max(maxU, along);
+      minV = Math.min(minV, across);
+      maxV = Math.max(maxV, across);
+    }
+    const area = (maxU - minU) * (maxV - minV);
+    if (!best || area < best.area) best = { area, long: Math.max(maxU - minU, maxV - minV) };
+  }
+  return best !== null && best.long < SMALL_ROOM_M;
+}
+
+/** Free-space grid of one room: cells at least `half` (less the grid tolerance) from walls and furniture. */
+function corridorGrid(room: SolvedPlan['rooms'][number], boxes: Obb[], half: number): Grid {
   const { minX, maxX, minZ, maxZ } = room.bbox;
   const cols = Math.max(1, Math.ceil((maxX - minX) / CORRIDOR_STEP_M) + 1);
   const rows = Math.max(1, Math.ceil((maxZ - minZ) / CORRIDOR_STEP_M) + 1);
@@ -50,10 +97,10 @@ function corridorGrid(room: SolvedPlan['rooms'][number], boxes: Obb[]): Grid {
   for (let i = 0; i < free.length; i += 1) {
     const p = at(i);
     if (!pointInPolygon(p, room.polygon)) continue;
-    if (distanceToPolygon(p, room.polygon).distance < CORRIDOR_HALF_M) continue;
+    if (distanceToPolygon(p, room.polygon).distance < half - GRID_TOL_M) continue;
     let blocked = false;
     for (const box of boxes) {
-      if (pointToBox(box, p) < CORRIDOR_HALF_M) {
+      if (pointToBox(box, p) < half - GRID_TOL_M) {
         blocked = true;
         break;
       }
@@ -110,7 +157,10 @@ function flood(grid: Grid, seeds: readonly number[]): Uint8Array {
 function ruleCirculation(ctx: LintContext, out: LayoutIssue[]): void {
   const boxes = ctx.items.filter((item) => item.box).map((item) => item.box!);
   for (const room of ctx.plan.rooms) {
-    const grid = corridorGrid(room, boxes);
+    const small = isSmallRoom(room.polygon);
+    const half = small ? STANDING_HALF_M : CORRIDOR_HALF_M;
+    const width = (2 * half).toFixed(2);
+    const grid = corridorGrid(room, boxes, half);
     const approaches: Array<{ openingId: string; point: Vec2 }> = [];
     for (const door of ctx.doors) {
       for (const side of door.sides) {
@@ -131,7 +181,7 @@ function ruleCirculation(ctx: LintContext, out: LayoutIssue[]): void {
           rule: 'circulation',
           severity: 'error',
           ids: [approach.openingId, room.roomId],
-          message: `${approach.openingId} has no 0.80 m of free floor in front of it inside ${room.roomId}`,
+          message: `${approach.openingId} has no ${width} m of free floor in front of it inside ${room.roomId}`,
           at: approach.point,
         });
         continue;
@@ -149,10 +199,12 @@ function ruleCirculation(ctx: LintContext, out: LayoutIssue[]): void {
         rule: 'circulation',
         severity: 'error',
         ids: [first.openingId, target.openingId, room.roomId],
-        message: `no 0.80 m path from ${first.openingId} to ${target.openingId} across ${room.roomId}`,
+        message: `no ${width} m path from ${first.openingId} to ${target.openingId} across ${room.roomId}`,
         at: target.point,
       });
     }
+    // A small room's standing spot is its main zone.
+    if (small) continue;
     const centre = roomCentroid(room.polygon);
     let reachesCentre = false;
     for (let i = 0; i < seen.length; i += 1) {

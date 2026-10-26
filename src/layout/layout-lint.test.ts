@@ -1,6 +1,7 @@
 import { describe, expect, test } from 'bun:test';
 
 import { lShapePlan } from '../fixtures/plan-l-shape.js';
+import { BATH_TWO_DOORS, bathTwoDoorsPlan } from '../fixtures/plan-bath-two-doors.js';
 import { WC_HALL, wcHallPlan } from '../fixtures/plan-wc-hall.js';
 import { L_SHAPE } from '../fixtures/plan-l-shape-ids.js';
 import { solvePlan } from '../plan/plan-solver.js';
@@ -394,40 +395,41 @@ describe('rule hall', () => {
   });
 });
 
-describe('rule 3 follows the swing: 0.9 m on the pull side, 0.6 m on the push side', () => {
-  const TOILET = '01a17a10-4c20-7b5e-9d31-6e8f2a4c7b01';
-  const UNIT = '01a17a10-4c20-7b5e-9d31-6e8f2a4c7b02';
-  type DoorSide = { opening: string; into: string; type?: Opening['type'] };
+const TOILET = '01a17a10-4c20-7b5e-9d31-6e8f2a4c7b01';
+const UNIT = '01a17a10-4c20-7b5e-9d31-6e8f2a4c7b02';
 
-  /** The WC-and-hall plan with `assets`, each listed door swinging into the named room (or made a passage). */
-  function wcHall(assets: DemoAsset[], doors: DoorSide[]): SceneData {
-    const base: SceneData = { ...wcHallPlan, assets };
-    const plan = solvePlan(base);
-    const walls = base.walls.map((wall) => {
-      if (!wall.openings) return wall;
-      const openings = wall.openings.map((opening) => {
-        const door = doors.find((entry) => entry.opening === opening.id);
-        if (!door) return opening;
-        if (door.type === 'passage') return { ...opening, type: 'passage' as const };
-        const swing = (['in', 'out'] as const).find(
-          (side) => resolveDoorSwing(base, plan, wall, { ...opening, swing: side }, openingFrameWidth).roomId === door.into,
-        );
-        return { ...opening, swing };
-      });
-      return { ...wall, openings };
+// Beside the WC door, against the west wall: its front edge 0.79 m from the
+// door face, inside 0.9 m and outside 0.6 m.
+const toiletBeside: DemoAsset = { id: TOILET, type: 'toilet', position: { x: 0.4, y: 0, z: 2.6 }, rotationY: Math.PI / 2 };
+// A wardrobe 0.64 m deep on the hall's north wall, opposite the room door: 0.81 m before that door's face.
+const unitOpposite: DemoAsset = { id: UNIT, type: 'wardrobe', position: { x: 2.3, y: 0, z: 0.37 }, rotationY: 0 };
+
+type DoorSide = { opening: string; into: string; type?: Opening['type'] };
+
+/** The WC-and-hall plan (or `plan`, a variant of it) with `assets`, each listed door swinging into the named room (or made a passage). */
+function wcHall(assets: DemoAsset[], doors: DoorSide[], plan: SceneData = wcHallPlan): SceneData {
+  const base: SceneData = { ...plan, assets };
+  const solved = solvePlan(base);
+  const walls = base.walls.map((wall) => {
+    if (!wall.openings) return wall;
+    const openings = wall.openings.map((opening) => {
+      const door = doors.find((entry) => entry.opening === opening.id);
+      if (!door) return opening;
+      if (door.type === 'passage') return { ...opening, type: 'passage' as const };
+      const swing = (['in', 'out'] as const).find(
+        (side) => resolveDoorSwing(base, solved, wall, { ...opening, swing: side }, openingFrameWidth).roomId === door.into,
+      );
+      return { ...opening, swing };
     });
-    return { ...base, walls };
-  }
+    return { ...wall, openings };
+  });
+  return { ...base, walls };
+}
 
+describe('rule 3 follows the swing: 0.9 m on the pull side, 0.6 m on the push side', () => {
   function clearIds(scene: SceneData): string[][] {
     return ofRule(lint(scene), 'door-clear-zone').map((issue) => issue.ids);
   }
-
-  // Beside the WC door, against the west wall: its front edge 0.79 m from the
-  // door face, inside 0.9 m and outside 0.6 m.
-  const toiletBeside: DemoAsset = { id: TOILET, type: 'toilet', position: { x: 0.4, y: 0, z: 2.6 }, rotationY: Math.PI / 2 };
-  // A wardrobe 0.64 m deep on the hall's north wall, opposite the room door: 0.81 m before that door's face.
-  const unitOpposite: DemoAsset = { id: UNIT, type: 'wardrobe', position: { x: 2.3, y: 0, z: 0.37 }, rotationY: 0 };
 
   test('a WC door opening outward leaves the WC its 0.6 m push side, and a toilet beside the door fits', () => {
     const scene = wcHall([toiletBeside], [{ opening: WC_HALL.opening.doorWc, into: WC_HALL.room.hall }]);
@@ -462,5 +464,72 @@ describe('rule 3 follows the swing: 0.9 m on the pull side, 0.6 m on the push si
 
     const passage = wcHall([unitOpposite], [{ opening: WC_HALL.opening.doorRoom, into: WC_HALL.room.room, type: 'passage' }]);
     expect(clearIds(passage)).toEqual([[WC_HALL.opening.doorRoom, UNIT]]);
+  });
+});
+
+describe('rule 6 asks a small room for a 0.6 m standing spot, and every 0.8 m gap passes wherever the grid falls', () => {
+  const STOOL = '01a17a4d-9154-73ba-983d-9a46bf98d557';
+  const CABINET = '01a17a4d-9154-73bb-a857-2f496387c7f4';
+  const SIDE = '01a17a4d-9154-73bc-9bb9-69d1516ce3cc';
+  const outwardWc: DoorSide[] = [{ opening: WC_HALL.opening.doorWc, into: WC_HALL.room.hall }];
+
+  function circulationIn(scene: SceneData, roomId: string): LayoutIssue[] {
+    return ofRule(lint(scene), 'circulation').filter((issue) => issue.ids.includes(roomId));
+  }
+
+  /** The WC-and-hall plan with the hall `by` metres deeper and everything south of it moved with its south wall. */
+  function hallDeeper(by: number): SceneData {
+    const south = new Set<string>([WC_HALL.node.g, WC_HALL.node.h, WC_HALL.node.i]);
+    return {
+      ...wcHallPlan,
+      nodes: wcHallPlan.nodes.map((node) => (south.has(node.id) ? { ...node, p: { x: node.p.x, z: node.p.z + by } } : node)),
+    };
+  }
+
+  /** The hall `shift` metres deeper with the wardrobe `shift` metres off its north wall: the same gap, a different grid alignment. */
+  function shiftedHall(shift: number, gap: number): SceneData {
+    // Flush on the north wall the wardrobe leaves 0.81 m; pushing it south narrows the gap.
+    const unit: DemoAsset = { ...unitOpposite, position: { ...unitOpposite.position, z: unitOpposite.position.z + shift + (0.81 - gap) } };
+    return wcHall([unit], [{ opening: WC_HALL.opening.doorRoom, into: WC_HALL.room.room }], hallDeeper(shift));
+  }
+
+  test('a1: a toilet beside an outward WC door leaves a 0.6 m standing spot, and the WC passes', () => {
+    expect(circulationIn(wcHall([toiletBeside], outwardWc), WC_HALL.room.wc)).toEqual([]);
+  });
+
+  test('a2: a second piece standing on that spot fails the WC', () => {
+    const stool: DemoAsset = { id: STOOL, type: 'nightstand', position: { x: 0.65, y: 0, z: 1.9 }, rotationY: 0 };
+    const issues = circulationIn(wcHall([toiletBeside, stool], outwardWc), WC_HALL.room.wc);
+    expect(issues.map((issue) => issue.ids)).toEqual([[WC_HALL.opening.doorWc, WC_HALL.room.wc]]);
+  });
+
+  test('a3: a 4 m hall is not small: a unit leaving 0.65 m before a door still fails', () => {
+    expect(circulationIn(shiftedHall(0, 0.65), WC_HALL.room.hall).length).toBeGreaterThan(0);
+  });
+
+  test('a4: in a 1.3 x 1.9 bathroom a 0.66 m path joins its two doors; a piece across it fails', () => {
+    // A wardrobe turned along the west wall, 0.64 deep: x 0.05..0.69, leaving 0.66 m to the east wall.
+    const cabinet: DemoAsset = { id: CABINET, type: 'wardrobe', position: { x: 0.37, y: 0, z: 1.0 }, rotationY: Math.PI / 2 };
+    expect(circulationIn({ ...bathTwoDoorsPlan, assets: [cabinet] }, BATH_TWO_DOORS.room.bath)).toEqual([]);
+
+    // A nightstand against the east wall halfway: the doors keep their spots, the path between them is gone.
+    const side: DemoAsset = { id: SIDE, type: 'nightstand', position: { x: 1.08, y: 0, z: 1.0 }, rotationY: 0 };
+    const closed = circulationIn({ ...bathTwoDoorsPlan, assets: [cabinet, side] }, BATH_TWO_DOORS.room.bath);
+    expect(closed.map((issue) => issue.ids)).toEqual([
+      [BATH_TWO_DOORS.opening.doorNorth, BATH_TWO_DOORS.opening.doorSouth, BATH_TWO_DOORS.room.bath],
+    ]);
+  });
+
+  test('b1: a 0.81 m gap in the hall passes at every grid alignment', () => {
+    for (const shift of [0, 0.03, 0.05, 0.07]) {
+      expect({ shift, issues: circulationIn(shiftedHall(shift, 0.81), WC_HALL.room.hall) }).toEqual({ shift, issues: [] });
+    }
+  });
+
+  test('b2: a gap more than one grid step under 0.8 m fails at every grid alignment', () => {
+    // Between 0.70 and 0.80 m a gap passes or not by where the 0.1 m grid falls; under 0.70 it never passes.
+    for (const shift of [0, 0.03, 0.05, 0.07]) {
+      expect({ shift, failed: circulationIn(shiftedHall(shift, 0.68), WC_HALL.room.hall).length > 0 }).toEqual({ shift, failed: true });
+    }
   });
 });
