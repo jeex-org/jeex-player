@@ -31,9 +31,9 @@ import type { ViewerMode } from '../scene/types.js';
 const SCRATCH_LEAF_CENTRE = new THREE.Vector3();
 
 type DoorControllerDeps = {
-  /** The viewport the HUD is positioned inside, and the canvas it dismisses on. */
+  /** The viewport the HUD is positioned inside, and the canvas it dismisses on (read per boot: a Retry boots on a fresh one). */
   container: HTMLElement;
-  canvas: HTMLElement;
+  canvas: () => HTMLElement;
   messages: Messages;
   /** `options.doors.interactive`: the whole feature, on or off. */
   interactive: boolean;
@@ -103,6 +103,8 @@ export class DoorController {
   seed(): void {
     this.states.reset(this.interactiveDoors().map((door) => door.id));
     this.animator.applyAll();
+    // A teardown took the HUD with the stage; the next boot's first document brings it back.
+    if (!this.hud) this.mountHud();
     this.hud?.hide();
   }
 
@@ -202,7 +204,7 @@ export class DoorController {
     if (!this.deps.interactive) return;
     this.hud = new DoorHud({
       container: this.deps.container,
-      canvas: this.deps.canvas,
+      canvas: this.deps.canvas(),
       messages: this.deps.messages,
       signal: this.deps.signal,
       screenPoint: (openingId) => this.screenPoint(openingId),

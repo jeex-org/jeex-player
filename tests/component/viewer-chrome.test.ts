@@ -109,12 +109,15 @@ describe('shell states', () => {
     // afterwards with nothing left to retry. A canvas with a WebGL context can
     // never give a 2D one, so the card would otherwise have nothing to paint
     // into.
-    expect(harness.shell.roots.canvas.getContext('webgl2')).not.toBeNull();
+    const taken = harness.shell.roots.canvas;
+    expect(taken.getContext('webgl2')).not.toBeNull();
     harness.chrome.showError('Boot failed', 'the scene did not build', false);
     const canvas = harness.shell.roots.root.querySelector<HTMLCanvasElement>('[data-jeex="scene-canvas"]');
     expect(canvas).not.toBeNull();
-    expect(canvas).not.toBe(harness.shell.roots.canvas);
-    expect(canvas!.className).toBe(harness.shell.roots.canvas.className);
+    expect(canvas).not.toBe(taken);
+    // The shell's own reference follows the replacement.
+    expect(harness.shell.roots.canvas).toBe(canvas);
+    expect(canvas!.className).toBe(taken.className);
     expect(canvas!.getAttribute('aria-label')).toBe(harness.shell.messages.t('canvas.fallbackLabel'));
     expect(canvasHasInk(canvas!)).toBe(true);
   });
