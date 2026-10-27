@@ -655,6 +655,13 @@ as described under [Versioning](#versioning).
 
 ### Fixed
 
+- **`strict-new` keeps a door the merged room had boxed in.** Removing a
+  wall can give a door the furniture had boxed in a sliver of floor; the same
+  furniture then reports as «no path» to that door in the merged room, and
+  the edit was refused. Such a path error is now old when the door had «no
+  free floor in front of it» in a merged room before, at the same approach
+  point, and the batch moves no furniture. Rule 6 writes its three sentences
+  through `circulationSentence` (`layout/layout-issue.ts`).
 - **`strict-new` keeps a blockage the merged room already had.** Removing
   the walls of a furnished room merges it into its neighbour, and the same
   furniture that left its doors with no free floor then reports as a blocked
