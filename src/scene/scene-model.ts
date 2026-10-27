@@ -114,6 +114,12 @@ export type ApplyFailure = {
   message: string;
   /** Every issue the linter found, when `layout_failed` is why the batch was refused. */
   issues?: LayoutIssue[];
+  /**
+   * Under `lint: 'strict-new'`, the hard issues the batch itself brought in:
+   * what has to change for it to pass. `issues` also holds the ones the
+   * document already had, which this batch neither caused nor has to fix.
+   */
+  newIssues?: LayoutIssue[];
 };
 
 /** What a model may be built with beyond its document and its registries. */
@@ -422,6 +428,7 @@ export class SceneModel {
       error: 'layout_failed',
       message: `Layout lint refused the batch: ${errors.length} ${what}, first is ${errors[0]!.rule} — ${errors[0]!.message}`,
       issues,
+      ...(mode === 'strict-new' ? { newIssues: errors } : {}),
     };
   }
 

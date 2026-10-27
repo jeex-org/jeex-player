@@ -28,7 +28,7 @@ import { boundsOf, signedArea, type Bounds } from './plan-geometry.js';
 import type { Vec2 } from '../scene/types.js';
 
 /** What this module reads and writes of a solved room (`RoomFace`); the rest rides along. */
-type Floor = { readonly roomId: string; readonly polygon: readonly Vec2[]; readonly bbox: Bounds };
+type Floor = { readonly roomId: string; readonly polygon: readonly Vec2[]; readonly face?: readonly Vec2[]; readonly bbox: Bounds };
 
 /** Something about the plan's floors the solver could not settle, and left as the source drew it. */
 export type PlanCaveat = {
@@ -137,7 +137,8 @@ export function ownFloors<R extends Floor>(rooms: readonly R[], zoneIds: Readonl
       caveats.push({ code, roomId: room.roomId, zoneIds: inside.map((zone) => zone.roomId) });
       continue;
     }
-    solved.set(room.roomId, withPolygon(room, pointsOf(largest[0]!, room.polygon)));
+    // The face itself is kept beside the cut floor: a zone's floor is still floor to walk on.
+    solved.set(room.roomId, { ...withPolygon(room, pointsOf(largest[0]!, room.polygon)), face: room.polygon });
     for (const piece of smaller) {
       // Read the zones as they stand now: an earlier piece may have grown one.
       let heir = inside[0]!;

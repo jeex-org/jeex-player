@@ -614,6 +614,10 @@ describe('layout lint', () => {
     expect(result.message).toContain('new error(s)');
     expect(result.message).not.toContain('first is on-floor');
     expect(subject.rev).toBe(0);
+    // Every issue for the host to show, and the new ones apart: those are what the batch has to fix.
+    expect(result.issues?.some((issue) => issue.ids.includes(L_SHAPE.asset.sofa))).toBe(true);
+    expect(result.newIssues?.length).toBeGreaterThan(0);
+    expect(result.newIssues?.every((issue) => issue.ids.includes(L_SHAPE.asset.table))).toBe(true);
   });
 
   describe("'strict-new' follows a wall or room id through the batch to the ids that replaced it", () => {

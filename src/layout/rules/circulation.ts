@@ -16,11 +16,10 @@
  * Pure module: no `three`, no DOM.
  */
 
-import { add, dist, distanceToPolygon, mul, pointInPolygon } from '../../plan/plan-geometry.js';
+import { add, boundsOf, dist, distanceToPolygon, mul, pointInPolygon } from '../../plan/plan-geometry.js';
 import { roomCentroid } from '../layout-geometry.js';
 import type { Obb } from '../../plan/plan-geometry.js';
 import { DOOR_CLEAR_M, pointToBox, type LayoutIssue, type LayoutRuleModule, type LintContext } from './context.js';
-import type { SolvedPlan } from '../../plan/plan-solver.js';
 import { circulationSentence } from '../layout-issue.js';
 import type { Vec2 } from '../../scene/types.js';
 
@@ -88,17 +87,22 @@ function isSmallRoom(polygon: readonly Vec2[]): boolean {
   return best !== null && best.long < SMALL_ROOM_M;
 }
 
-/** Free-space grid of one room: cells at least `half` (less the grid tolerance) from walls and furniture. */
-function corridorGrid(room: SolvedPlan['rooms'][number], boxes: Obb[], half: number): Grid {
-  const { minX, maxX, minZ, maxZ } = room.bbox;
+/**
+ * Free-space grid of one room's floor: cells at least `half` (less the grid
+ * tolerance) from its walls and from furniture. The floor is the whole face,
+ * zones included (`RoomFace.face`): a zone outlined in a room is still floor
+ * a person walks across to reach its doors.
+ */
+function corridorGrid(floor: readonly Vec2[], boxes: Obb[], half: number): Grid {
+  const { minX, maxX, minZ, maxZ } = boundsOf(floor);
   const cols = Math.max(1, Math.ceil((maxX - minX) / CORRIDOR_STEP_M) + 1);
   const rows = Math.max(1, Math.ceil((maxZ - minZ) / CORRIDOR_STEP_M) + 1);
   const at = (i: number): Vec2 => ({ x: minX + (i % cols) * CORRIDOR_STEP_M, z: minZ + Math.floor(i / cols) * CORRIDOR_STEP_M });
   const free = Array.from<boolean>({ length: cols * rows }).fill(false);
   for (let i = 0; i < free.length; i += 1) {
     const p = at(i);
-    if (!pointInPolygon(p, room.polygon)) continue;
-    if (distanceToPolygon(p, room.polygon).distance < half - GRID_TOL_M) continue;
+    if (!pointInPolygon(p, floor)) continue;
+    if (distanceToPolygon(p, floor).distance < half - GRID_TOL_M) continue;
     let blocked = false;
     for (const box of boxes) {
       if (pointToBox(box, p) < half - GRID_TOL_M) {
@@ -158,10 +162,11 @@ function flood(grid: Grid, seeds: readonly number[]): Uint8Array {
 function ruleCirculation(ctx: LintContext, out: LayoutIssue[]): void {
   const boxes = ctx.items.filter((item) => item.box).map((item) => item.box!);
   for (const room of ctx.plan.rooms) {
-    const small = isSmallRoom(room.polygon);
+    const floor = room.face ?? room.polygon;
+    const small = isSmallRoom(floor);
     const half = small ? STANDING_HALF_M : CORRIDOR_HALF_M;
     const width = (2 * half).toFixed(2);
-    const grid = corridorGrid(room, boxes, half);
+    const grid = corridorGrid(floor, boxes, half);
     const approaches: Array<{ openingId: string; point: Vec2 }> = [];
     for (const door of ctx.doors) {
       for (const side of door.sides) {
@@ -206,7 +211,7 @@ function ruleCirculation(ctx: LintContext, out: LayoutIssue[]): void {
     }
     // A small room's standing spot is its main zone.
     if (small) continue;
-    const centre = roomCentroid(room.polygon);
+    const centre = roomCentroid(floor);
     let reachesCentre = false;
     for (let i = 0; i < seen.length; i += 1) {
       if (!seen[i]) continue;
