@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'bun:test';
-import { heirsOf, inheritedKeys, issueKey } from './issue-heirs.js';
+import { heirsOf, inheritedCirculation, inheritedKeys, issueKey } from './issue-heirs.js';
 
 /** Readable stand-ins: the module only compares strings, so the ids need not be UUIDs. */
 const W = 'wall-w';
@@ -51,5 +51,40 @@ describe('inheritedKeys', () => {
   test('an id the batch never touched keeps its own key', () => {
     const keys = inheritedKeys([{ rule: 'on-floor', ids: [SOFA] }], new Map());
     expect([...keys]).toEqual([issueKey({ rule: 'on-floor', ids: [SOFA] })]);
+  });
+});
+
+describe('inheritedCirculation', () => {
+  /** A kitchen merged into a terrace; door DOOR and passage PASSAGE are the kitchen's, door OTHER_DOOR the terrace's. */
+  const KITCHEN = 'kitchen';
+  const TERRACE = 'terrace';
+  const DOOR = 'door-d';
+  const PASSAGE = 'passage-p';
+  const OTHER_DOOR = 'door-e';
+  const merges = [{ from: KITCHEN, to: TERRACE, summary: '' }];
+  const openings = new Set([DOOR, PASSAGE, OTHER_DOOR]);
+  const blocked = (opening: string, room: string) => ({ rule: 'circulation' as const, ids: [opening, room] });
+  const noPath = { rule: 'circulation' as const, ids: [DOOR, PASSAGE, TERRACE] };
+
+  test('a: every opening the new error names was already blocked in a merged room, so it is inherited', () => {
+    expect(inheritedCirculation(noPath, [blocked(DOOR, KITCHEN), blocked(PASSAGE, KITCHEN)], merges, openings)).toBe(true);
+  });
+
+  test('b: both openings were clear before: the blocked path is new', () => {
+    expect(inheritedCirculation(noPath, [], merges, openings)).toBe(false);
+  });
+
+  test('c: one opening was blocked and the other clear: the error is new', () => {
+    expect(inheritedCirculation(noPath, [blocked(DOOR, KITCHEN)], merges, openings)).toBe(false);
+  });
+
+  test('a blockage counts only where it was in one of the merged rooms', () => {
+    expect(inheritedCirculation(noPath, [blocked(DOOR, 'elsewhere'), blocked(PASSAGE, KITCHEN)], merges, openings)).toBe(false);
+  });
+
+  test('only circulation errors in a merge survivor, naming at least one opening', () => {
+    expect(inheritedCirculation({ rule: 'inside-a-wall', ids: [DOOR, TERRACE] }, [blocked(DOOR, KITCHEN)], merges, openings)).toBe(false);
+    expect(inheritedCirculation({ rule: 'circulation', ids: [DOOR, KITCHEN] }, [blocked(DOOR, KITCHEN)], [], openings)).toBe(false);
+    expect(inheritedCirculation({ rule: 'circulation', ids: [TERRACE] }, [], merges, openings)).toBe(false);
   });
 });
