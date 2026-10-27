@@ -423,7 +423,7 @@ describe('room lighting on the demo apartment', { timeout: MOUNT_TIMEOUT_MS }, (
     let nan = 0;
     try {
       const probe = (lighting as unknown as { atlas: ProbeAtlas }).atlas.capture(point);
-      const target = (probe.texture as THREE.Texture & { renderTarget?: THREE.WebGLRenderTarget }).renderTarget!;
+      const target = probe.texture.renderTarget as THREE.WebGLRenderTarget;
       const buffer = new Uint16Array(target.width * target.height * 4);
       lighting.renderer.readRenderTargetPixels(target, 0, 0, target.width, target.height, buffer);
       for (const value of buffer) if (Number.isNaN(THREE.DataUtils.fromHalfFloat(value))) nan += 1;
