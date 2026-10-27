@@ -30,6 +30,14 @@
  * finishes and the preset instructions naming it are dropped. `applyRemoveRoom`
  * is deliberately not reused: it unbinds the objects and drops the paint.
  *
+ * An open-plan kitchen is still a kitchen: when the two rooms both carry a
+ * `purpose` and the purposes differ, the absorbed room is KEPT as a zone of
+ * the survivor (`RoomMerge.kept`) instead: the same id, name, purpose, floor,
+ * camera, room finishes and objects, outlined by its solved floor from before
+ * the batch (`Room.polygon`), so `solvePlan` cuts it out of the survivor's
+ * floor. Only its wall faces go to the survivor, whose walls they now are. A
+ * room without a purpose has nothing to say what it was, and merges as before.
+ *
  * Pure module: no `three`, no DOM.
  */
 
@@ -57,8 +65,12 @@ import type { SceneData } from './types.js';
 /** One face's rooms folded into one: the survivor and the rooms it absorbs, the latter sorted by id. */
 export type RoomMergeGroup = { readonly survivor: string; readonly absorbed: readonly string[] };
 
-/** One absorbed room, as `ApplyOk.roomMerges` reports it: `summary` names both rooms as they were called before the batch. */
-export type RoomMerge = { readonly from: string; readonly to: string; readonly summary: string };
+/**
+ * One absorbed room, as `ApplyOk.roomMerges` reports it: `summary` names both
+ * rooms as they were called before the batch; `kept: 'zone'` when the room
+ * stayed as a zone of the survivor (it is not gone, and its id still names it).
+ */
+export type RoomMerge = { readonly from: string; readonly to: string; readonly summary: string; readonly kept?: 'zone' };
 
 /**
  * The merge groups of `draft`'s final plan, one per face holding the anchors
@@ -106,12 +118,14 @@ export function applyRoomMerges(
   draft: Draft<SceneData>,
   groups: readonly RoomMergeGroup[],
   base: SceneData,
+  basePlan: SolvedPlan,
 ): { merges: RoomMerge[]; touched: TouchedEntity[] } {
   // The names the rooms had BEFORE the batch: the merge runs at commit, after
   // every op, so a `set_room` anywhere in the same batch (before or after the
   // removal) must not rename what the report says was merged. Every merged
   // room was in `base` by construction (`planRoomMerges`).
   const names = new Map(base.rooms.map((room) => [room.id, room.name]));
+  const purposes = new Map(base.rooms.map((room) => [room.id, room.purpose]));
   const merges: RoomMerge[] = [];
   const touched: TouchedEntity[] = [TOUCHED_SHELL];
   const touch = (entity: TouchedEntity): void => {
@@ -120,6 +134,22 @@ export function applyRoomMerges(
 
   for (const group of groups) {
     for (const id of group.absorbed) {
+      const own = purposes.get(id);
+      const theirs = purposes.get(group.survivor);
+      const outline = basePlan.rooms.find((room) => room.roomId === id)?.polygon;
+      if (own !== undefined && theirs !== undefined && own !== theirs && outline) {
+        merges.push({
+          from: id,
+          to: group.survivor,
+          summary: `${names.get(id)} kept as a zone of ${names.get(group.survivor)}`,
+          kept: 'zone',
+        });
+        const kept = draft.rooms.find((room) => room.id === id);
+        if (kept) kept.polygon = outline.map((point) => ({ x: point.x, z: point.z }));
+        for (const entity of [touchedFloor(id), touchedRoomWalls(id), touchedCeiling(id), touchedTrim(id)]) touch(entity);
+        rekeyFaces(draft, id, group.survivor, touch);
+        continue;
+      }
       merges.push({ from: id, to: group.survivor, summary: `${names.get(id)} merged into ${names.get(group.survivor)}` });
       draft.rooms = draft.rooms.filter((room) => room.id !== id);
 

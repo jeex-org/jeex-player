@@ -42,8 +42,8 @@ export function heirsOf(ops: readonly SceneOp[], roomMerges: readonly RoomMerge[
     if (op.op === 'split_wall') replace(op.wallId, op.ids);
     else if (op.op === 'merge_wall') for (const wallId of op.wallIds) replace(wallId, [op.id]);
   }
-  // Room merges run at commit, after every op.
-  for (const merge of roomMerges) replace(merge.from, [merge.to]);
+  // Room merges run at commit, after every op. A room kept as a zone is not gone: its id still names it.
+  for (const merge of roomMerges) if (merge.kept === undefined) replace(merge.from, [merge.to]);
   return heirs;
 }
 

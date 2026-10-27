@@ -231,7 +231,8 @@ describe('removing the wall between two rooms merges them', () => {
         [0, 6, 9],
         [
           { name: 'Living room', purpose: 'living', accent: '#c8a46e', floorMaterial: FINISH.walnut },
-          { name: 'Kitchen', purpose: 'kitchen', accent: '#7a9e7e' },
+          // No purpose of its own: a kitchen with one would stay as a zone (below).
+          { name: 'Kitchen', accent: '#7a9e7e' },
         ],
       ),
     );
@@ -351,6 +352,57 @@ describe('what the absorbed room hands over and what it leaves behind', () => {
       touchedFace(faceKey(ROOM_B, W.wE, 'L')),
       touchedFace(faceKey(ROOM_A, W.wE, 'L')),
     ]);
+  });
+});
+
+describe('an open-plan merge keeps the absorbed room as a zone', () => {
+  /** A living room (bays 0..6) and a kitchen (6..9), each with a camera and its own wall paint. */
+  function livingAndKitchen(kitchenPurpose: Room['purpose']): Draft<SceneData> {
+    const scene = draftOf(
+      strip(
+        [0, 6, 9],
+        [
+          { name: 'Living room', purpose: 'living' },
+          { name: 'Kitchen', ...(kitchenPurpose === undefined ? {} : { purpose: kitchenPurpose }) },
+        ],
+      ),
+    );
+    scene.roomCameras = { [STRIP.room[0]]: POSE, [STRIP.room[1]]: { ...POSE, position: { x: 7, y: 1.6, z: 2 } } };
+    scene.finishes = { rooms: { [STRIP.room[0]]: { walls: FINISH.sage }, [STRIP.room[1]]: { walls: FINISH.terra } } };
+    return scene;
+  }
+
+  test('a kitchen merged into a living room stays a room of its own, outlined where its floor was', () => {
+    const model = new SceneModel(livingAndKitchen('kitchen'), CATALOGUE_REGISTRIES);
+    const outline = model.plan.rooms.find((room) => room.roomId === STRIP.room[1])!.polygon;
+
+    const result = commit(model, [{ op: 'remove_wall', wallId: STRIP.partition[0] }]);
+
+    expect(result.roomMerges).toEqual([
+      { from: STRIP.room[1], to: STRIP.room[0], summary: 'Kitchen kept as a zone of Living room', kept: 'zone' },
+    ]);
+    const kitchen = model.scene.rooms.find((room) => room.id === STRIP.room[1])!;
+    expect(kitchen).toMatchObject({ name: 'Kitchen', purpose: 'kitchen', polygon: outline });
+    expect(model.scene.roomCameras[STRIP.room[1]]).toBeDefined();
+    expect(model.scene.finishes?.rooms?.[STRIP.room[1]]).toEqual({ walls: FINISH.terra });
+    // One floor each: the living room's face gives up the kitchen's (the floor ownership of `solvePlan`).
+    const living = model.plan.rooms.find((room) => room.roomId === STRIP.room[0])!;
+    // The merged face, 8.75 x 3.75, less the kitchen's 2.75 x 3.75: the old living room and the partition's strip.
+    expect(Math.abs(signedArea(living.polygon))).toBeCloseTo(8.75 * 3.75 - 2.75 * 3.75, 6);
+    expect(model.plan.caveats).toEqual([]);
+  });
+
+  test('two rooms of the same purpose still merge into one', () => {
+    const model = new SceneModel(livingAndKitchen('living'), CATALOGUE_REGISTRIES);
+    const result = commit(model, [{ op: 'remove_wall', wallId: STRIP.partition[0] }]);
+    expect(result.roomMerges).toEqual([{ from: STRIP.room[1], to: STRIP.room[0], summary: 'Kitchen merged into Living room' }]);
+    expect(model.scene.rooms.map((room) => room.id)).toEqual([STRIP.room[0]]);
+  });
+
+  test('a room without a purpose still merges into one: nothing says what it was', () => {
+    const model = new SceneModel(livingAndKitchen(undefined), CATALOGUE_REGISTRIES);
+    commit(model, [{ op: 'remove_wall', wallId: STRIP.partition[0] }]);
+    expect(model.scene.rooms.map((room) => room.id)).toEqual([STRIP.room[0]]);
   });
 });
 
