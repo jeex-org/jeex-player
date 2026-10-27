@@ -108,18 +108,41 @@ const COPY_SHADER = {
   `,
 };
 
+/**
+ * The cube camera every probe capture renders with, kept for the life of the
+ * walk lighting: three keeps a transmission target per camera that draws
+ * glass and frees it only with the renderer, so a camera per capture (as
+ * `PMREMGenerator.fromScene` makes) would strand one target per capture.
+ */
+export class ProbeCamera {
+  readonly camera: THREE.CubeCamera;
+  readonly target: THREE.WebGLCubeRenderTarget;
+
+  constructor() {
+    this.target = new THREE.WebGLCubeRenderTarget(T.probeSize, { type: THREE.HalfFloatType });
+    this.target.texture.name = 'WalkLighting.probeCube';
+    this.camera = new THREE.CubeCamera(0.05, 100, this.target);
+  }
+
+  dispose(): void {
+    this.target.dispose();
+  }
+}
+
 /** The GPU side: the atlas target, the PMREM capture and the tile copy. */
 export class ProbeAtlas {
   readonly target: THREE.WebGLRenderTarget;
   private readonly renderer: THREE.WebGLRenderer;
   private readonly scene: THREE.Scene;
+  private readonly cube: ProbeCamera;
   private readonly pmrem: THREE.PMREMGenerator;
   private readonly quad: THREE.Mesh<THREE.PlaneGeometry, THREE.ShaderMaterial>;
   private readonly camera = new THREE.OrthographicCamera(-1, 1, 1, -1, 0, 1);
 
-  constructor(renderer: THREE.WebGLRenderer, scene: THREE.Scene, layout: AtlasLayout) {
+  constructor(renderer: THREE.WebGLRenderer, scene: THREE.Scene, layout: AtlasLayout, cube: ProbeCamera) {
     this.renderer = renderer;
     this.scene = scene;
+    this.cube = cube;
     this.target = new THREE.WebGLRenderTarget(layout.width, layout.height, {
       type: THREE.HalfFloatType,
       depthBuffer: false,
@@ -142,10 +165,11 @@ export class ProbeAtlas {
   }
 
   readonly capture: ProbeCapture = (position) => {
-    const target = this.pmrem.fromScene(this.scene, 0, 0.05, 100, {
-      size: T.probeSize,
-      position: new THREE.Vector3(position.x, position.y, position.z),
-    });
+    const { camera, target: cube } = this.cube;
+    camera.position.set(position.x, position.y, position.z);
+    camera.updateMatrixWorld();
+    camera.update(this.renderer, this.scene);
+    const target = this.pmrem.fromCubemap(cube.texture);
     return { texture: target.texture, width: target.width, height: target.height, dispose: () => target.dispose() };
   };
 
