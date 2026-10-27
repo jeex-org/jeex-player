@@ -302,7 +302,7 @@ export class ViewerStage {
       enabled: deps.minimapEnabled,
       onRoomPicked: deps.onRoomPicked,
       // The tour cameras as dots in walk and tour; a click steps there.
-      cameras: () => ({ points: this.cameraDots(), current: this.cameraDirector?.walkCamera().index ?? null }),
+      cameras: () => ({ points: this.cameraDots(), current: this.cameraDirector?.mapCamera() ?? null }),
       onCameraPicked: (index) => {
         if (this.cameraDirector?.stepCamera(index) !== true) return;
         deps.usage?.('minimap');

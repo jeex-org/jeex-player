@@ -31,6 +31,7 @@ import { obstaclesFor } from '../assets/asset-footprint.js';
 import type { AssetFactsSource } from '../assets/asset-facts.js';
 import { pointInPolygon } from '../plan/plan-geometry.js';
 import { TourPlayer } from './tour-player.js';
+import { TourCameraReach } from './tour-camera-reach.js';
 import { WalkStepper, type StepTarget, type WalkCamera } from './walk-stepper.js';
 import type { TourPose, TourProgress, TourState } from './tour-player.js';
 import { tourRouteOf } from '../scene/tour-route.js';
@@ -252,6 +253,7 @@ export class CameraDirector {
   private travellingTo: string | null = null;
   /** The walk entry glide and the camera steps. */
   private readonly stepper: WalkStepper;
+  private readonly tourReach = new TourCameraReach();
   /**
    * The walk-with-cameras hint waits for the walk's FIRST frame: every mode
    * switch is followed, synchronously, by the chrome's own hint for the mode
@@ -388,6 +390,12 @@ export class CameraDirector {
   /** The walk's current camera and the camera count (`getState().walk`). */
   walkCamera(): WalkCamera {
     return this.stepper.camera();
+  }
+
+  /** The camera the mini-map marks: in `tour` the one the run has reached, elsewhere the walk's current one. */
+  mapCamera(): number | null {
+    if (this.deps.controller.getMode() !== 'tour') return this.walkCamera().index;
+    return this.tourReach.reached(this.deps.scene(), this.deps.plan(), this.deps.tour.progress().distance);
   }
 
   /**

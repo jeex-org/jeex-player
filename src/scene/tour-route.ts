@@ -60,6 +60,8 @@ export type TourRoute = {
   readonly path: readonly Vec3[];
   readonly gaze?: readonly RouteGazeKey[];
   readonly zones?: SceneData['autotour']['zones'];
+  /** A checkpoint route's cameras: the `path` index of each, in tour order. */
+  readonly cameras?: readonly number[];
 };
 
 /** Cruise speed when `SceneData.autotour.speed` is not authored, metres/second. */
@@ -177,6 +179,7 @@ export function tourRouteOf(scene: Pick<SceneData, 'autotour' | 'tourCheckpoints
     ...(scene.autotour.speed === undefined ? {} : { speed: scene.autotour.speed }),
     path,
     gaze: gazeKeysOf(checkpoints, path, at),
+    cameras: at,
   };
 }
 
