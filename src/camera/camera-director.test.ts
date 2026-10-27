@@ -30,6 +30,7 @@ import { pointAt } from '../plan/door-swing.js';
 import type { Dollhouse } from '../geometry/dollhouse.js';
 import type { SceneData } from '../scene/types.js';
 import { isInDoorway, isNavigable } from '../navigation/navigation.js';
+import { tourNavigation } from '../navigation/tour-legs.js';
 import { createMessages } from '../ui/messages.js';
 import { fakeCanvas, fakeWindowHooks } from '../fixtures/stubs.js';
 
@@ -56,11 +57,11 @@ beforeEach(fakeWindow.install);
 afterEach(fakeWindow.restore);
 
 function harness(options: { pauseOnInput?: boolean; scene?: SceneData; wireInput?: boolean; assetFacts?: () => AssetFactsSource } = {}) {
-  const scene = options.scene ?? lShapePlan;
+  let scene = options.scene ?? lShapePlan;
   const camera = new THREE.PerspectiveCamera(55, 4 / 3, 0.1, 200);
   const canvasStub = fakeCanvas();
   const canvas = canvasStub as unknown as HTMLCanvasElement;
-  const plan = solvePlan(scene);
+  let plan = solvePlan(scene);
   const hints: string[] = [];
   const controller = new CameraController(camera, canvas, scene, plan, new Picker(canvas), {
     keys: canvas,
@@ -83,6 +84,8 @@ function harness(options: { pauseOnInput?: boolean; scene?: SceneData; wireInput
       controller.setPose(position, target);
     },
     { onState: () => undefined, onProgress: () => undefined },
+    // Over the plan's openings, as `mountCameraDirector` builds it.
+    tourNavigation(plan, scene),
   );
   const shell: string[] = [];
   const planModeCalls: string[] = [];
@@ -170,6 +173,12 @@ function harness(options: { pauseOnInput?: boolean; scene?: SceneData; wireInput
     modeButtons,
     canvas: canvasStub,
     keepExteriors: () => keepExteriors,
+    /** A newly committed document, adopted the way the stage does (`CameraDirector.setScene`). */
+    commit: (next: SceneData): void => {
+      scene = next;
+      plan = solvePlan(next);
+      director.setScene(scene, plan);
+    },
   };
 }
 
@@ -1131,6 +1140,44 @@ describe('walk is the user-driven tour', () => {
     h.director.stepCamera('first');
     run(h, GLIDE_SECONDS + 2 / 60);
     standsOn(h, cameras[0]!);
+  });
+
+  test('a step whose camera survives a plan change rides the new plan to the camera where it now is, without a jump', () => {
+    const h = entered();
+    expect(h.director.stepCamera('next')).toBe(true);
+    run(h, 1);
+    // The host moves camera 2 by 1.5 m while the walker is on the way to it.
+    const moved = { ...cameras[1]!, position: { x: 8, y: 1.6, z: 4 } };
+    h.commit({ ...withCameras, tourCheckpoints: [cameras[0]!, moved, cameras[2]!] });
+    let last = h.camera.position.clone();
+    let jump = 0;
+    for (let frame = 0; frame < 60 * 30 && h.director.walkCamera().index !== 1; frame += 1) {
+      run(h, 1 / 60);
+      jump = Math.max(jump, h.camera.position.distanceTo(last));
+      last = h.camera.position.clone();
+    }
+    standsOn(h, moved);
+    // Walking pace is under 0.05 m a frame; a leg ending where the camera used to be ends in a 1.5 m cut.
+    expect(jump).toBeLessThan(0.1);
+  });
+
+  test('in tour mode the map marks the camera the tour has reached, not the last one walked to', () => {
+    const h = entered();
+    h.director.stepCamera('last');
+    settle(h);
+    expect(h.director.walkCamera().index).toBe(2);
+    h.director.setMode('tour');
+    h.tour.play();
+    run(h, 1 / 60);
+    expect(h.director.mapCamera()).toBe(0);
+    const seen = new Set<number | null>();
+    for (let frame = 0; frame < 60 * 60 && h.tour.getState() === 'playing'; frame += 1) {
+      run(h, 1 / 60);
+      seen.add(h.director.mapCamera());
+    }
+    expect([...seen]).toEqual([0, 1, 2]);
+    // Walk keeps its own current camera.
+    expect(h.director.walkCamera().index).toBe(2);
   });
 
   test('asking for the camera a step already goes to does not restart it (an auto-repeating key)', () => {
