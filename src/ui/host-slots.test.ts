@@ -21,7 +21,7 @@ import { ViewerLibError } from '../shared/errors.js';
 import { TYPING_SELECTOR } from '../camera/camera-input.js';
 
 describe('SLOT_NAMES', () => {
-  test('is the eight slot names, in reading order', () => {
+  test('is the nine slot names, in reading order', () => {
     expect([...SLOT_NAMES]).toEqual([
       'top-left',
       'top-center',
@@ -31,6 +31,7 @@ describe('SLOT_NAMES', () => {
       'bottom-right',
       'modal-root',
       'selection-anchor',
+      'underlay',
     ]);
   });
 

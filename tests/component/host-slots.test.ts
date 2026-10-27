@@ -504,6 +504,57 @@ describe('the theme properties the slots added', () => {
   });
 });
 
+describe('the underlay: host content between the scene and the chrome', () => {
+  test('covers the viewport on layer 2: over the scene and the plan drawing, under every chrome layer', () => {
+    const slots = build(['underlay']);
+    const style = getComputedStyle(slots.get('underlay'));
+    expect([style.insetBlockStart, style.insetBlockEnd, style.insetInlineStart, style.insetInlineEnd]).toEqual([
+      '0px',
+      '0px',
+      '0px',
+      '0px',
+    ]);
+    expect(style.zIndex).toBe('2');
+    // The plan drawing is layer 1; the lowest chrome (the checkpoint badges) is 4.
+    expect(Number(style.zIndex)).toBeLessThan(Number(getComputedStyle(shell.roots.byName('viewer-ui')).zIndex));
+  });
+
+  test("neither the box nor the host's content takes the pointer unless the host says so", () => {
+    const slots = build(['underlay']);
+    const picture = document.createElement('img');
+    slots.get('underlay').append(picture);
+    expect(getComputedStyle(slots.get('underlay')).pointerEvents).toBe('none');
+    expect(getComputedStyle(picture).pointerEvents).toBe('none');
+    picture.style.pointerEvents = 'auto';
+    expect(getComputedStyle(picture).pointerEvents).toBe('auto');
+  });
+
+  test('in a mounted viewer the toolbar stays on top of a full-size underlay, which lies over the canvas', async () => {
+    // Small enough to sit wholly inside the test page's window: `elementFromPoint` answers null outside it.
+    const { handle } = mount(['underlay'], { width: 400, height: 320 });
+    await handle.ready;
+    handle.element.scrollIntoView();
+    const sheet = document.createElement('div');
+    sheet.style.cssText = 'position:absolute;inset:0;background:rgb(0 0 0 / 0.2)';
+    handle.slots.get('underlay').append(sheet);
+    const bar = handle.element.querySelector<HTMLElement>('[data-jeex="control-bar"]')!;
+    const barRect = bar.getBoundingClientRect();
+    const onBar = { x: barRect.left + barRect.width / 2, y: barRect.top + barRect.height / 2 };
+    const rootRect = handle.element.getBoundingClientRect();
+    const onScene = { x: rootRect.left + rootRect.width / 2, y: rootRect.top + rootRect.height / 2 };
+    const canvas = handle.element.querySelector('[data-jeex="scene-canvas"]');
+
+    // Inert by default: the scene below still takes the drag.
+    expect(document.elementFromPoint(onScene.x, onScene.y)).toBe(canvas);
+    expect(bar.contains(document.elementFromPoint(onBar.x, onBar.y))).toBe(true);
+
+    // Made hit-testable, it shows where it lies: over the canvas, under the toolbar.
+    sheet.style.pointerEvents = 'auto';
+    expect(document.elementFromPoint(onScene.x, onScene.y)).toBe(sheet);
+    expect(bar.contains(document.elementFromPoint(onBar.x, onBar.y))).toBe(true);
+  });
+});
+
 describe('the anchor', () => {
   test('starts parked: nothing to follow means nothing on screen', () => {
     const slots = build(['selection-anchor']);

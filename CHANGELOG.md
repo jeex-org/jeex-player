@@ -9,6 +9,12 @@ as described under [Versioning](#versioning).
 
 ### Added
 
+- **The `underlay` slot.** A ninth host slot covers the viewport BELOW the
+  viewer's chrome: above the scene canvas and the 2D plan drawing, under
+  every bar, panel and card. A host's picture over the scene (a plan traced
+  in 2D) no longer covers the toolbar. The box and its content are inert to
+  the pointer until the host sets `pointer-events` on its content, so the
+  scene under the picture still takes every drag.
 - **`doorClearZones` in `jeex-viewer/ops`.** `doorClearZones(scene, plan)`
   returns the rectangles the layout linter's `door-clear-zone` rule keeps
   clear, one `{ openingId, roomId, quad }` per door side that owns a room:

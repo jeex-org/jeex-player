@@ -31,6 +31,7 @@ export const SLOT_VALUES = [
   'bottom-right',
   'modal-root',
   'selection-anchor',
+  'underlay',
 ] as const satisfies readonly SlotName[];
 
 /** Exhaustiveness: fails to compile if `SLOT_VALUES` is missing a member of `SlotName`. */

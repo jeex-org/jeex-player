@@ -1778,6 +1778,18 @@
     inset-inline-start: 0;
     translate: calc(var(--jeex-anchor-x, 0) * 1px) calc(var(--jeex-anchor-y, 0) * 1px);
   }
+  /* The one slot BELOW the chrome: a host's picture over the scene (a plan
+   traced in 2D) lies above the scene canvas and the plan drawing (layer 1)
+   and under the lowest chrome layer (4). It is inert, its content included,
+   so the scene under it still takes every drag; a host that wants input there
+   sets `pointer-events` on its own content. */
+  .jeex-viewer [data-jeex-slot='underlay'] {
+    inset: 0;
+    z-index: 2;
+  }
+  .jeex-viewer [data-jeex-slot='underlay'] > * {
+    pointer-events: none;
+  }
   .jeex-viewer [data-jeex-slot][data-visible='false'] {
     display: none;
   }
