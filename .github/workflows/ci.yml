@@ -38,6 +38,9 @@ on:
   push:
     branches: [main]
   pull_request:
+  # `release.yml` runs this whole check before it publishes, so a release is
+  # gated by exactly the step list above rather than a copy of it.
+  workflow_call:
   # A vulnerability can appear in a dependency of a commit that never changes.
   schedule:
     - cron: '17 6 * * 1'

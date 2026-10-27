@@ -2,7 +2,7 @@
 
 Interactive 3D apartment player built on Three.js. It renders a parametric scene document (walls, openings, rooms, furniture, finishes) and offers five view modes (2D plan, 3D top view, 360 orbit, walk, guided tour), interactive doors, a mini-map with click-to-travel, finish and furniture editing, and interior presets.
 
-The package and the element are named `jeex-viewer` (`<jeex-viewer>`, `import … from 'jeex-viewer'`); the source lives at [github.com/jeex-org/jeex-player](https://github.com/jeex-org/jeex-player). It is not published to a package registry: build it from source ([Install and build](#install-and-build)) and serve the `dist-lib/` directory yourself.
+The element is `<jeex-viewer>` and code imports the package as `jeex-viewer` (`import … from 'jeex-viewer'`); the source lives at [github.com/jeex-org/jeex-player](https://github.com/jeex-org/jeex-player). A tagged release publishes it to GitHub Packages as `@jeex-org/jeex-viewer` ([Install and build](#install-and-build)); you can also build it from source and serve the `dist-lib/` directory yourself.
 
 This document is the integration reference.
 
@@ -39,11 +39,26 @@ This document is the integration reference.
 - [Rendering in walk and tour](#rendering-in-walk-and-tour)
 - [Settings and light temperature](#settings-and-light-temperature)
 - [Lighting standard (`jeex-viewer/lighting`)](#lighting-standard-jeex-viewerlighting)
+- [Document schema entry (`jeex-viewer/schema`)](#document-schema-entry-jeex-viewerschema)
+- [Light bake entry (`jeex-viewer/lightmap`)](#light-bake-entry-jeex-viewerlightmap)
 - [Development](#development)
 
 ## Install and build
 
-Requirements for building: Node 22.12+ and Bun (the pinned version is in `.bun-version`). `three` and `zod` (the `zod/mini` schemas the player checks scenes, manifests and messages with) are bundled into the library output, so a page that loads the built files needs nothing else. The package declares `zod` and `@types/three` as dependencies for its type declarations, which reference both.
+Install from GitHub Packages under the bare name, through an npm alias, so every import keeps reading `jeex-viewer`:
+
+```json
+{ "dependencies": { "jeex-viewer": "npm:@jeex-org/jeex-viewer@<version>" } }
+```
+
+GitHub Packages refuses anonymous installs, public packages included: point the `@jeex-org` scope at it with a token that has `read:packages` (in CI, the job's `GITHUB_TOKEN`). With Bun, in `bunfig.toml`:
+
+```toml
+[install.scopes]
+"@jeex-org" = { url = "https://npm.pkg.github.com", token = "$JEEX_PACKAGES_TOKEN" }
+```
+
+Requirements for building: Node 22.12+ and Bun (the pinned version is in `.bun-version`). The page entries (`jeex-viewer`, `jeex-viewer/element`, the IIFE, `jeex-viewer/host`, `jeex-viewer/ops`) bundle `three` and `zod` (the `zod/mini` schemas the player checks scenes, manifests and messages with), so a page that loads the built files needs nothing else. The tool entries leave them to you: `zod` is a peer dependency of the package (`jeex-viewer/schema` and `jeex-viewer/lightmap` import it), and `three` an optional one (`jeex-viewer/lighting` and `jeex-viewer/lightmap` build with yours). The package declares `@types/three` as a dependency for its type declarations.
 
 ```bash
 bun install
@@ -62,6 +77,11 @@ Package entry points:
 | `jeex-viewer/element` | registers `<jeex-viewer>` on import |
 | `jeex-viewer/host` | `embedViewer` for iframe hosts (no Three.js, under 4 KB gzip); `jeex-viewer-host.iife.js` exposes it as the global `JeexViewerHost` |
 | `jeex-viewer/style.css` | the component stylesheet, for hosts that want to override it |
+| `jeex-viewer/ops` | the scene-operation vocabulary for an editor host ([Scene operations entry](#scene-operations-entry-jeex-viewerops)) |
+| `jeex-viewer/lighting` | the lighting standard ([Lighting standard](#lighting-standard-jeex-viewerlighting)) |
+| `jeex-viewer/schema` | the document formats for a service that checks them without a player: `validateScene`, the scene and project-manifest schemas, the shipped catalogues and registries, the size limits ([Document schema entry](#document-schema-entry-jeex-viewerschema)) |
+| `jeex-viewer/lightmap` | the inputs of a light bake: `bakeLights` and `exportShellForBake` with their schemas ([Light bake entry](#light-bake-entry-jeex-viewerlightmap)) |
+| `jeex-viewer/demo-scene.json` | the demo apartment as a scene document |
 
 Styles are injected automatically by every integration path. The CSS file exists for overrides only.
 
@@ -1324,6 +1344,26 @@ lighting.dispose(); // disposes its rigs and the environment; never your rendere
 - **Lamp units:** `lampCandela(lumens)` turns a lamp's nominal lumens into a `PointLight` intensity, `lumens / 4π × LIGHTING_STANDARD.lamp.exposure`, with the exposure calibrated so 400 lm read as 1.2 cd (see [Lamp lights](#lamp-lights)); `blenderPower(candela)` is 4π · cd, the power a lightmap bake gives the same light. The exposure moves with any change of the display transform.
 - **Your content's own lights** (a lamp model with a point light) are left as they are.
 - **Captures:** a still or a panorama applies the display transform to the whole frame, and so does the live view in `walk` and `tour` (see «Rendering in walk and tour»), while the live view of the editing modes leaves a background texture, fog and content marked as not tone mapped out of it; lit surfaces agree between them.
+
+## Document schema entry (`jeex-viewer/schema`)
+
+`jeex-viewer/schema` (`dist-lib/jeex-viewer-schema.js`) is the entry for a service that checks scene documents and baked projects WITHOUT running a player, for example a catalogue that accepts uploads. It is the player's own validation, so a document the service accepts is one the player draws. It carries no `three` and no DOM, and imports `zod` from your install (a peer dependency).
+
+```ts
+import { CATALOGUE_REGISTRIES, parseProjectManifest, projectLibraryOf, registriesFromLibrary, validateScene } from 'jeex-viewer/schema';
+
+const manifest = parseProjectManifest(manifestJson); // throws a ViewerLibError `project-invalid`
+const registries = registriesFromLibrary(projectLibraryOf(manifest), CATALOGUE_REGISTRIES);
+const scene = validateScene(sceneJson, registries); // throws on the first error, logs warnings
+```
+
+It exports the scene check (`validateScene`, `parseSceneDocument`, `sceneSchema`, `isSceneShape`, `sceneShapeIssues`, `SCHEMA_VERSIONS`, and the vocabularies `ROOM_PURPOSES`, `ROOM_KINDS`, `OPENING_TYPES`, `WALL_ROLES`), the project manifest (`projectManifestSchema`, `parseProjectManifest`, `projectManifestIssues`, `parseProjectLibrary`, `lampLightSchema` with `LAMP_MAX_LUMENS`, `LAMP_MAX_CUTOFF`, `LAMP_MAX_LIGHTS`, and `projectLibraryOf`, `libraryOf`, `isProjectDocument`, `PROJECT_FORMAT`), the catalogues (`CATALOGUE_REGISTRIES`, `registriesFromLibrary`, `assetRefOf`, `CATALOGUE_ID_BY_SLUG`), and the size limits a project must keep to load (`MAX_SCENE_BYTES`, `MAX_PROJECT_MANIFEST_BYTES`, `MAX_MODEL_BYTES`, `MAX_PROJECT_BYTES`, `MAX_TEXTURE_FILE_BYTES`, `MAX_PROJECT_TEXTURE_BYTES`, `MAX_PROJECT_TEXTURE_FILES`). An editor host that also applies operations takes [`jeex-viewer/ops`](#scene-operations-entry-jeex-viewerops), which carries the same validator.
+
+## Light bake entry (`jeex-viewer/lightmap`)
+
+`jeex-viewer/lightmap` (`dist-lib/jeex-viewer-lightmap.js`) is the entry for a light-bake pipeline. It hands the bake its two inputs from the player itself, so the baked light matches the live one: `bakeLights(scene, SHIPPED_BANK)` (sun, sky and every lamp, in the units of the [lighting standard](#lighting-standard-jeex-viewerlighting), recorded under `BAKE_LIGHTS_RECIPE` and `BAKE_SKY_HEMISPHERE_RECIPE`; `bakeLightsSchema` and `judgeBakeLights` check an answer read back), and `exportShellForBake(scene, { mintId, finishes: SHIPPED_FINISHES })` (walls, floors and ceilings as a GLB whose node names your `mintId` gives; `shellGltfSchema` and `judgeShellGltf` check its glTF JSON). It builds geometry with YOUR `three` (an optional peer dependency, revision 186) and imports `zod` the same way; it needs no browser.
+
+The demo apartment these work on in the player's own tests is published as data: `jeex-viewer/demo-scene.json` (`dist-lib/demo-scene.json`).
 
 ## Development
 

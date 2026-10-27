@@ -150,6 +150,7 @@ describe('CI parity', () => {
     expect(CI_SOURCE).not.toMatch(/^\s+browser:\s*'true'/m);
     expect(BROWSER_SOURCE).toMatch(/^\s+browser:\s*'true'/m);
     expect(parseTriggers(BROWSER_SOURCE)).toEqual(['workflow_dispatch']);
-    expect(parseTriggers(CI_SOURCE)).toEqual(['push', 'pull_request', 'schedule']);
+    // `workflow_call`: `release.yml` runs this check before it publishes; no browser step rides along.
+    expect(parseTriggers(CI_SOURCE)).toEqual(['push', 'pull_request', 'workflow_call', 'schedule']);
   });
 });

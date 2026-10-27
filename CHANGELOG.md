@@ -9,6 +9,20 @@ as described under [Versioning](#versioning).
 
 ### Added
 
+- **`jeex-viewer/schema`: the document formats for a service.** A new entry
+  for a service that checks scene documents and baked projects without a
+  player: `validateScene`, the scene and project-manifest schemas with their
+  parsers, the shipped catalogues and registries, the closed vocabularies and
+  the size limits. No three.js, no DOM; Zod comes from the consumer.
+- **`jeex-viewer/lightmap`: the inputs of a light bake.** A new entry with
+  `bakeLights` and `exportShellForBake`, their recipes and schemas. It builds
+  with the consumer's own three.js and Zod.
+- **`jeex-viewer/demo-scene.json`.** The demo apartment, published as a scene
+  document.
+- **Releases to GitHub Packages.** A pushed tag `v<version>` runs the CI check,
+  refuses a tag that does not equal `package.json#version`, builds the library
+  and publishes it.
+
 - **Asset handles in the editor.** With the asset move tool armed, the
   selected floor or ceiling object carries a ring round its footprint: a drag
   along it turns the object by the angle swept, in the 15° steps of
@@ -90,6 +104,16 @@ as described under [Versioning](#versioning).
   instruction that names the room (a camera, a room edit, a purpose, either
   form of `set_material`), so a preset that dressed them no longer refuses the
   batch.
+
+### Changed (breaking)
+
+- **The package is `@jeex-org/jeex-viewer`.** GitHub Packages takes scoped
+  names only. Install it under the old name through an alias
+  (`"jeex-viewer": "npm:@jeex-org/jeex-viewer@<version>"`), and every import
+  stays as it is. The element stays `<jeex-viewer>`.
+- **`zod` is a peer dependency**, and `three` an optional one. The page
+  entries still bundle both, so a page needs nothing new. A project that
+  installs the package provides `zod` 4.6.7 or later in 4.x.
 
 ### Changed
 

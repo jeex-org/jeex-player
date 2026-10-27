@@ -130,6 +130,7 @@ const PURE_MODULES = [
   'app/viewer-options',
   'embed/protocol',
   'embed/ops',
+  'embed/schema',
   'shared/render-layers',
   'shared/uuid',
   'scene/finish-remap',

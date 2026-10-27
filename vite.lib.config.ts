@@ -14,8 +14,10 @@
  * | `host`    | `host`              | `es`+`iife` | `jeex-viewer-host.js`, `jeex-viewer-host.iife.js` (global `JeexViewerHost`) |
  * | `ops`     | `ops`               | `es`    | `jeex-viewer-ops.js` (the `jeex-viewer/ops` entry, `src/embed/ops.ts`) |
  * | `lighting` | `lighting`         | `es`    | `jeex-viewer-lighting.js` (the `jeex-viewer/lighting` entry, `src/lighting/index.ts`) |
+ * | `schema`   | `schema`           | `es`    | `jeex-viewer-schema.js` (the `jeex-viewer/schema` entry, `src/embed/schema.ts`) |
+ * | `lightmap` | `lightmap`         | `es`    | `jeex-viewer-lightmap.js` (the `jeex-viewer/lightmap` entry, `src/embed/lightmap.ts`) |
  *
- * `three` is BUNDLED, deliberately (the `lighting` pass excepted, see below): the point of the `<script>` and custom
+ * `three` is BUNDLED, deliberately (the `lighting` and `lightmap` passes excepted, see below): the point of the `<script>` and custom
  * element forms is a drop-in tag, an external `three` would force every host
  * into an import map, and the three `three/addons/*` subpath imports
  * have no matching CDN globals to map an `iife` onto.
@@ -26,6 +28,14 @@
  * safety net — a runtime import that slipped in would stay an import of the
  * consumer's own three rather than a second engine bundled into the entry —
  * and `scripts/lighting-entry-check.ts` fails the build on either.
+ *
+ * The `schema` and `lightmap` entries serve a TOOL (a catalogue service, a
+ * light bake), never a page, so they leave `zod` to the tool, a peer
+ * dependency: the tool's schemas and the player's are built by one Zod. The
+ * `lightmap` entry builds geometry with the tool's own three.js the same way.
+ * The page entries keep bundling Zod: a drop-in tag has no package manager
+ * behind it. `scripts/package-entry-check.ts` fails the build that bundles a
+ * peer into either entry.
  *
  * The ES output keeps its whitespace and the `iife` does not, and that is
  * Vite's decision, not an oversight: an ES library is minified by the host's
@@ -138,7 +148,7 @@ type Pass = {
   /** Only the first pass may empty `dist-lib`; the others add to it. */
   empty: boolean;
   plugins: Plugin[];
-  /** Packages left as imports instead of bundled; only the `lighting` pass names any. */
+  /** Packages left as imports instead of bundled; only the tool entries (`lighting`, `schema`, `lightmap`) name any. */
   external?: (string | RegExp)[];
 };
 
@@ -180,6 +190,20 @@ const PASSES: Record<string, Pass> = {
     empty: false,
     plugins: [],
     external: ['three', /^three\//],
+  },
+  schema: {
+    entry: { 'jeex-viewer-schema': from('src/embed/schema.ts') },
+    formats: ['es'],
+    empty: false,
+    plugins: [],
+    external: ['zod', /^zod\//],
+  },
+  lightmap: {
+    entry: { 'jeex-viewer-lightmap': from('src/embed/lightmap.ts') },
+    formats: ['es'],
+    empty: false,
+    plugins: [],
+    external: ['zod', /^zod\//, 'three', /^three\//],
   },
 };
 

@@ -1,5 +1,5 @@
 {
-  "name": "jeex-viewer",
+  "name": "@jeex-org/jeex-viewer",
   "version": "0.1.0",
   "type": "module",
   "description": "Embeddable 3D apartment viewer for the browser: an ES module, a custom element or an iframe. Three.js inside, no runtime dependencies.",
@@ -31,7 +31,7 @@
   },
   "packageManager": "bun@1.4.4",
   "publishConfig": {
-    "provenance": true
+    "registry": "https://npm.pkg.github.com"
   },
   "sideEffects": [
     "./dist-lib/jeex-viewer-element.js",
@@ -74,12 +74,23 @@
       "import": "./dist-lib/jeex-viewer-lighting.js",
       "default": "./dist-lib/jeex-viewer-lighting.js"
     },
+    "./schema": {
+      "types": "./dist-lib/embed/schema.d.ts",
+      "import": "./dist-lib/jeex-viewer-schema.js",
+      "default": "./dist-lib/jeex-viewer-schema.js"
+    },
+    "./lightmap": {
+      "types": "./dist-lib/embed/lightmap.d.ts",
+      "import": "./dist-lib/jeex-viewer-lightmap.js",
+      "default": "./dist-lib/jeex-viewer-lightmap.js"
+    },
     "./iife": "./dist-lib/jeex-viewer.iife.js",
     "./host/iife": "./dist-lib/jeex-viewer-host.iife.js",
     "./style.css": "./dist-lib/jeex-viewer.css",
     "./schema/scene.json": "./dist-lib/schema/scene.schema.json",
     "./schema/viewer-options.json": "./dist-lib/schema/viewer-options.schema.json",
     "./schema/telemetry.json": "./dist-lib/schema/telemetry.schema.json",
+    "./demo-scene.json": "./dist-lib/demo-scene.json",
     "./package.json": "./package.json"
   },
   "unpkg": "./dist-lib/jeex-viewer.iife.js",
@@ -92,7 +103,7 @@
     "dev:frames": "vite --open /dev/video-frames.html",
     "build": "tsc --noEmit && vite build && bun run scripts/css-contract-check.ts dist",
     "build:site": "bun run build && bun run scripts/site-build.ts",
-    "build:lib": "vite build --config vite.lib.config.ts --mode es && vite build --config vite.lib.config.ts --mode iife && vite build --config vite.lib.config.ts --mode host && vite build --config vite.lib.config.ts --mode ops && vite build --config vite.lib.config.ts --mode lighting && tsc -p tsconfig.lib.json && bun run scripts/schema-gen.ts --out dist-lib/schema && bun run scripts/css-contract-check.ts dist-lib && bun run scripts/lighting-entry-check.ts dist-lib",
+    "build:lib": "vite build --config vite.lib.config.ts --mode es && vite build --config vite.lib.config.ts --mode iife && vite build --config vite.lib.config.ts --mode host && vite build --config vite.lib.config.ts --mode ops && vite build --config vite.lib.config.ts --mode lighting && vite build --config vite.lib.config.ts --mode schema && vite build --config vite.lib.config.ts --mode lightmap && tsc -p tsconfig.lib.json && bun run scripts/schema-gen.ts --out dist-lib/schema && bun run scripts/demo-scene-gen.ts --out dist-lib && bun run scripts/css-contract-check.ts dist-lib && bun run scripts/lighting-entry-check.ts dist-lib && bun run scripts/package-entry-check.ts dist-lib",
     "lint": "oxlint --type-aware --deny-warnings src scripts dev tests",
     "format": "oxfmt src scripts dev tests vite.config.ts vite.css-target.ts vite.lib.config.ts vitest.config.ts playwright.config.ts index.html embed.html",
     "format:check": "oxfmt --check src scripts dev tests vite.config.ts vite.css-target.ts vite.lib.config.ts vitest.config.ts playwright.config.ts index.html embed.html",
@@ -117,8 +128,16 @@
   },
   "dependencies": {
     "@types/three": "0.186.0",
-    "polygon-clipping": "0.15.7",
-    "zod": "4.6.7"
+    "polygon-clipping": "0.15.7"
+  },
+  "peerDependencies": {
+    "three": "~0.186.1",
+    "zod": "^4.6.7"
+  },
+  "peerDependenciesMeta": {
+    "three": {
+      "optional": true
+    }
   },
   "devDependencies": {
     "@arethetypeswrong/cli": "0.18.5",
@@ -141,6 +160,7 @@
     "ts-json-schema-generator": "2.9.0",
     "typescript": "7.0.2",
     "vite": "8.3.5",
-    "vitest": "5.0.5"
+    "vitest": "5.0.5",
+    "zod": "4.6.7"
   }
 }
