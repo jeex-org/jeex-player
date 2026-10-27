@@ -39,23 +39,15 @@ describe("'strict-new' across a room merge", () => {
   });
 });
 
-describe("'strict-new' across a room merge, to doors that were boxed in", () => {
-  test('4.1: removing the wall is accepted: each blocked path ends at a door already boxed in at that point, and no furniture moved', () => {
+describe("'strict-new' across a room merge, to doors a zone's floor serves", () => {
+  test('4.1: removing the wall is accepted, and no door is short of floor: the dining zone is floor to walk on', () => {
+    // Until a zone's floor counted as floor (`RoomFace.face`), these doors opened onto a cut-out zone and
+    // reported as boxed in, before the edit and after it; the decision on those errors is pinned in issue-heirs.test.ts.
     const subject = model(DINING);
     const result = subject.apply({ baseRev: 0, ops: DINING.ops as SceneOp[], lint: 'strict-new' });
 
     if (!isApplyOk(result)) throw new Error(`expected a commit, got ${result.error}: ${result.message}`);
     expect(result.roomMerges?.length).toBe(1);
-    expect(result.issues?.filter((issue) => issue.message.startsWith('no 0.80 m path')).length).toBeGreaterThan(0);
-  });
-
-  test('the same edit with a piece of furniture moved in the batch is refused: the path may be blocked anew', () => {
-    const subject = model(DINING);
-    const piece = (DINING.scene as { assets: Array<{ id: string; position: { x: number; y: number; z: number } }> }).assets[0]!;
-    const moved: SceneOp = { op: 'move_object', assetId: piece.id, position: { ...piece.position, x: piece.position.x + 0.01 } };
-    const result = subject.apply({ baseRev: 0, ops: [...(DINING.ops as SceneOp[]), moved], lint: 'strict-new' });
-
-    if (isApplyOk(result)) throw new Error('expected the batch to be refused');
-    expect(result.message).toContain('no 0.80 m path');
+    expect((result.issues ?? []).filter((issue) => issue.rule === 'circulation')).toEqual([]);
   });
 });

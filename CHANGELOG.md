@@ -662,6 +662,15 @@ as described under [Versioning](#versioning).
 
 ### Fixed
 
+- **A zone's floor is still floor.** Since a room's solved floor gave up the
+  zones lying in it, the circulation rule judged a door that opens onto a
+  zone (a living room kept as a zone of an open-plan kitchen, a dining corner
+  outlined in a living room) as having no free floor in front of it, so an
+  edit that had passed was refused. The rule now walks the room's whole face
+  (`RoomFace.face`, kept beside the cut `polygon`).
+- **A strict-new refusal names what the batch brought in.** `ApplyFailure`
+  carries `newIssues` beside `issues` under `lint: 'strict-new'`: only the
+  hard issues the batch itself introduced.
 - **An open-plan kitchen stays a kitchen.** Removing the wall between a
   kitchen and a living room merged the kitchen away: its name and purpose
   vanished while its furniture stayed. When the two rooms carry different
