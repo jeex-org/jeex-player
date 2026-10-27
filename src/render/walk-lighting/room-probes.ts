@@ -168,7 +168,14 @@ export class ProbeAtlas {
     const { camera, target: cube } = this.cube;
     camera.position.set(position.x, position.y, position.z);
     camera.updateMatrixWorld();
-    camera.update(this.renderer, this.scene);
+    // Each face must start clear, or a face keeps the last probe's room where this one draws nothing.
+    const autoClear = this.renderer.autoClear;
+    try {
+      this.renderer.autoClear = true;
+      camera.update(this.renderer, this.scene);
+    } finally {
+      this.renderer.autoClear = autoClear;
+    }
     const target = this.pmrem.fromCubemap(cube.texture);
     return { texture: target.texture, width: target.width, height: target.height, dispose: () => target.dispose() };
   };
