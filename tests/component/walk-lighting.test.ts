@@ -20,13 +20,14 @@ import { createExteriorGrid, RoomGrid } from '../../src/render/walk-lighting/roo
 import { packAtlas, type Rgb } from '../../src/render/walk-lighting/exterior-sh.js';
 import { atlasLayout, createWalkUniforms, installWalkPatch, setRoomBoxes } from '../../src/render/walk-lighting/box-probe-patch.js';
 import { WALK_LIGHTING_TUNING as T } from '../../src/render/walk-lighting/walk-lighting-tuning.js';
+import type { ProbeAtlas } from '../../src/render/walk-lighting/room-probes.js';
 import { createLightingContext } from '../../src/lighting/lighting-context.js';
 import { LIGHTING_STANDARD } from '../../src/lighting/lighting-standard.js';
 import type { FurnitureBox, RoomBox, Vec3 } from '../../src/render/walk-lighting/room-volumes.js';
 import type { SceneOp } from '../../src/scene/types.js';
 import { RenderDemand } from '../../src/render/render-demand.js';
 import { NEW_RESOURCES_SETTLE_MS } from '../../src/render/settle-window.js';
-import { closeContainers, delay, demoScene, nextFrame, openContainer, until } from './support.js';
+import { closeContainers, delay, demoScene, nextFrame, openContainer, softwareRasteriser, until } from './support.js';
 
 const MOUNT_TIMEOUT_MS = 300_000;
 const results: Record<string, unknown> = {};
@@ -419,16 +420,15 @@ describe('room lighting on the demo apartment', { timeout: MOUNT_TIMEOUT_MS }, (
     rig.setState('capture');
     for (const grid of lighting.grids) grid.visible = true;
     lighting.exterior.visible = true;
-    const pmrem = new THREE.PMREMGenerator(lighting.renderer);
     let nan = 0;
     try {
-      const target = pmrem.fromScene(lighting.scene, 0, 0.05, 100, { size: T.probeSize, position: point });
+      const probe = (lighting as unknown as { atlas: ProbeAtlas }).atlas.capture(point);
+      const target = probe.texture.renderTarget as THREE.WebGLRenderTarget;
       const buffer = new Uint16Array(target.width * target.height * 4);
       lighting.renderer.readRenderTargetPixels(target, 0, 0, target.width, target.height, buffer);
       for (const value of buffer) if (Number.isNaN(THREE.DataUtils.fromHalfFloat(value))) nan += 1;
-      target.dispose();
+      probe.dispose();
     } finally {
-      pmrem.dispose();
       lighting.grids.forEach((grid, i) => (grid.visible = shown[i]!));
       lighting.exterior.visible = exteriorShown;
       rig.setState(state);
@@ -557,11 +557,10 @@ describe('room lighting on the demo apartment', { timeout: MOUNT_TIMEOUT_MS }, (
     // Move the lamp so its centre in plan is 0.1 m from the probe point.
     const to = { x: asset.position.x + (probe.x + 0.1 - centre.x), y: asset.position.y, z: asset.position.z + (probe.z - centre.z) };
     const captures: THREE.Vector3[] = [];
-    const fromScene = original(THREE.PMREMGenerator.prototype, 'fromScene');
-    const spy = vi.spyOn(THREE.PMREMGenerator.prototype, 'fromScene').mockImplementation(function (this: THREE.PMREMGenerator, ...args) {
-      const position = args[4]?.position;
-      if (position) captures.push(position.clone());
-      return fromScene.apply(this, args);
+    const update = original(THREE.CubeCamera.prototype, 'update');
+    const spy = vi.spyOn(THREE.CubeCamera.prototype, 'update').mockImplementation(function (this: THREE.CubeCamera, ...args) {
+      if (this.renderTarget.width === T.probeSize) captures.push(this.position.clone());
+      update.apply(this, args);
     });
     let drawsAtRefresh = -1;
     // Counted here: spying on a method an earlier test spied on hands back that spy, calls included.
@@ -602,6 +601,36 @@ describe('room lighting on the demo apartment', { timeout: MOUNT_TIMEOUT_MS }, (
     const settled = debug().renderDemand().draws;
     for (let i = 0; i < 30; i += 1) await nextFrame();
     expect(debug().renderDemand().draws).toBe(settled);
+  });
+
+  // Each full re-bake here waits minutes on a software rasteriser; the local gate renders on the GPU and runs it.
+  test.skipIf(softwareRasteriser())('a document reloaded and a light temperature changed in walk strand no GPU memory', async () => {
+    const textures = (): number => lighting.renderer.info.memory.textures;
+    const live = (what: string) => until(() => debug().walkLighting().state === 'live', what, 240_000);
+    const left = (from: string) => until(() => debug().walkLighting().state !== 'live', `${from}: the re-bake starts`, 60_000);
+    const demo = demoScene();
+    const moved = {
+      ...demo,
+      assets: demo.assets.map((asset) =>
+        asset.type === 'sofa' ? { ...asset, position: { ...asset.position, x: asset.position.x + 0.05 } } : asset,
+      ),
+    };
+    const documents = [moved, demoScene()];
+    if (handle.getMode() !== 'walk') handle.setMode('walk');
+    await handle.loadScene({ document: documents[1]! });
+    await live('live after the first reload');
+    const first = textures();
+    for (let i = 0; i < 2; i += 1) {
+      await handle.loadScene({ document: documents[i % 2]! });
+      await live(`live after reload ${i + 2}`);
+    }
+    for (const kelvin of [4000, 5000, null]) {
+      handle.setLightTemperature(kelvin);
+      await left(`${kelvin} K`);
+      await live(`live after ${kelvin} K`);
+    }
+    record('texturesAfterReloads', { first, after: textures() });
+    expect(textures()).toBe(first);
   });
 });
 
@@ -744,6 +773,43 @@ function lit(
 describe('reflections from the room probes', { timeout: MOUNT_TIMEOUT_MS }, () => {
   const A: Box = { x0: 0, x1: 4, z0: 0, z1: 4 };
 
+  test('twenty reloads and twenty re-bakes with glass in the room hold the texture count of the first', () => {
+    // three keeps a transmission target per camera that draws glass; the captures must not mint a camera each.
+    const loads: Parameters<WalkLighting['load']>[0][] = [];
+    const load = original(WalkLighting.prototype, 'load');
+    const spy = vi.spyOn(WalkLighting.prototype, 'load').mockImplementation(function (this: WalkLighting, doc) {
+      loads.push(doc);
+      load.call(this, doc);
+    });
+    const world = lit([{ id: 'a', box: A }], (scene) => {
+      room(scene, A);
+      floor(scene, A, 0.3);
+      const glass = new THREE.Mesh(new THREE.BoxGeometry(0.4, 0.6, 0.4), new THREE.MeshPhysicalMaterial({ transmission: 1, roughness: 0 }));
+      glass.position.set(1, 0.3, 1);
+      scene.add(glass);
+    });
+    spy.mockRestore();
+    const toLive = (): void => {
+      for (let frame = 0; frame < 2000 && world.lighting.phase !== 'live'; frame += 1) world.lighting.frame(true);
+      expect(world.lighting.phase).toBe('live');
+    };
+    const textures = (): number => world.gl.info.memory.textures;
+    const first = textures();
+    for (let i = 1; i < 20; i += 1) {
+      world.lighting.load(loads[0]!);
+      toLive();
+    }
+    const afterReloads = textures();
+    for (let i = 0; i < 20; i += 1) {
+      world.lighting.rebake();
+      toLive();
+    }
+    record('glassTextures', { first, afterReloads, afterRebakes: textures() });
+    expect(afterReloads).toBe(first);
+    expect(textures()).toBe(first);
+    world.dispose();
+  });
+
   test('a mirror-like floor reflects a stripe on the far wall in the stripe’s own screen column (2 px)', () => {
     const world = lit([{ id: 'a', box: A }], (scene) => {
       room(scene, A);
@@ -846,26 +912,34 @@ describe('reflections from the room probes', { timeout: MOUNT_TIMEOUT_MS }, () =
 
   test('a glossy floor in a closed room without a window reflects no window of the next room', () => {
     const lit2: Box = { x0: 4.1, x1: 8.1, z0: 0, z1: 4 };
-    const world = lit(
-      [
-        { id: 'dark', box: A },
-        { id: 'bright', box: lit2 },
-      ],
-      (scene) => {
-        room(scene, A);
-        room(scene, lit2);
-        floor(scene, A, 0.05);
-        floor(scene, lit2, 0.9);
-        light(scene, [0.04, 1.2, 2], [8.05, 1.4, 2]);
-      },
-    );
-    const { pixels } = world.shoot({ x: 1, y: 1.3, z: 2 }, { x: 4, y: 0.4, z: 2 });
-    let brightest = 0;
-    for (let y = 0; y < world.size.h * 0.35; y += 1)
-      for (let x = 0; x < world.size.w; x += 1) brightest = Math.max(brightest, world.lum(pixels, x, y));
-    record('closedRoomFloorMax', brightest);
-    expect(brightest).toBeLessThan(0.5);
-    world.dispose();
+    // The same shot with and without the next room's window: only the window's own share is the claim. The
+    // floor also mirrors the rig's sun, which lights it through the ceiling here (it takes no shadow), and a
+    // sliver of that hotspot reaches the frame's edge whatever the window does.
+    const brightest = (window: boolean): number => {
+      const world = lit(
+        [
+          { id: 'dark', box: A },
+          { id: 'bright', box: lit2 },
+        ],
+        (scene) => {
+          room(scene, A);
+          room(scene, lit2);
+          floor(scene, A, 0.05);
+          floor(scene, lit2, 0.9);
+          if (window) light(scene, [0.04, 1.2, 2], [8.05, 1.4, 2]);
+        },
+      );
+      const { pixels } = world.shoot({ x: 1, y: 1.3, z: 2 }, { x: 4, y: 0.4, z: 2 });
+      let peak = 0;
+      for (let y = 0; y < world.size.h * 0.35; y += 1)
+        for (let x = 0; x < world.size.w; x += 1) peak = Math.max(peak, world.lum(pixels, x, y));
+      world.dispose();
+      return peak;
+    };
+    const withWindow = brightest(true);
+    const without = brightest(false);
+    record('closedRoomFloorMax', { withWindow, without });
+    expect(withWindow - without).toBeLessThan(0.5);
   });
 
   // No sunlight on the strip, so the step measured is the probe blend's alone (with the sun on, its
@@ -947,8 +1021,8 @@ describe('reflections from the room probes', { timeout: MOUNT_TIMEOUT_MS }, () =
 
 /* ------------------------------------------- probe placement after furniture edits */
 
-/** Three's own probe capture, taken before any test wraps it. */
-const FROM_SCENE = original(THREE.PMREMGenerator.prototype, 'fromScene');
+/** Three's own cube capture, taken before any test wraps it. */
+const CUBE_UPDATE = original(THREE.CubeCamera.prototype, 'update');
 
 describe('probe placement follows furniture edits', { timeout: MOUNT_TIMEOUT_MS }, () => {
   afterEach(() => {
@@ -988,10 +1062,10 @@ describe('probe placement follows furniture edits', { timeout: MOUNT_TIMEOUT_MS 
     });
     const lighting = new WalkLighting(gl, scene);
     const captures: THREE.Vector3[] = [];
-    const spy = vi.spyOn(THREE.PMREMGenerator.prototype, 'fromScene').mockImplementation(function (this: THREE.PMREMGenerator, ...args) {
-      const position = args[4]?.position;
-      if (position) captures.push(position.clone());
-      return FROM_SCENE.apply(this, args);
+    // The grids' bake renders with a cube camera too, at its own size; only the room probes' are counted.
+    const spy = vi.spyOn(THREE.CubeCamera.prototype, 'update').mockImplementation(function (this: THREE.CubeCamera, ...args) {
+      if (this.renderTarget.width === T.probeSize) captures.push(this.position.clone());
+      CUBE_UPDATE.apply(this, args);
     });
     const live = (): void => {
       for (let frame = 0; frame < 2000 && lighting.phase !== 'live'; frame += 1) lighting.frame(true);

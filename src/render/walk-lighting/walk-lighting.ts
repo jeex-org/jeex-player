@@ -47,7 +47,7 @@ import { isArtificialLight } from '../../assets/artificial-light.js';
 import { LAMP_ROOM_KEY } from '../light-order.js';
 import { createExteriorGrid, RoomGrid } from './room-grid.js';
 import { GridBake } from './grid-bake.js';
-import { ProbeAtlas, RoomProbes } from './room-probes.js';
+import { ProbeAtlas, ProbeCamera, RoomProbes } from './room-probes.js';
 import { atlasLayout, installWalkPatch, walkUniformsFor, setRoomBoxes, type WalkUniforms } from './box-probe-patch.js';
 import { WalkRig } from './walk-rig.js';
 import { WALK_LIGHTING_TUNING as T } from './walk-lighting-tuning.js';
@@ -189,6 +189,8 @@ export class WalkLighting {
   private grids: RoomGrid[] = [];
   private exterior: LightProbeGridWebGL | null = null;
   private atlas: ProbeAtlas | null = null;
+  /** The probes' cube camera, shared by every document's atlas. */
+  private readonly probeCamera = new ProbeCamera();
   private bake: GridBake | null = null;
   private probes: RoomProbes | null = null;
   private current: WalkLightingPhase = 'baking';
@@ -265,7 +267,7 @@ export class WalkLighting {
       this.parent.add(grid);
     }
     const layout = atlasLayout(volumes.probes.length);
-    this.atlas = new ProbeAtlas(this.renderer, this.scene, layout);
+    this.atlas = new ProbeAtlas(this.renderer, this.scene, layout, this.probeCamera);
     this.uniforms.jeexAtlas.value = this.atlas.target.texture;
     setRoomBoxes(this.uniforms, volumes.boxes, volumes.probes, layout);
     this.restart();
@@ -388,6 +390,7 @@ export class WalkLighting {
     this.parent.removeFromParent();
     this.rig.dispose();
     this.sky.dispose();
+    this.probeCamera.dispose();
   }
 
   /** Gives every lamp its source room (an index in the probe order, or `NO_ROOM`) and records the lamps' signature. */

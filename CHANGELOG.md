@@ -683,6 +683,13 @@ as described under [Versioning](#versioning).
   are zones that cover a whole room (`zones-cover-room`). Adds
   the runtime dependency `polygon-clipping` (MIT), about 11 KB gzip in
   `jeex-viewer/ops`.
+- **Walk re-bakes no longer leak GPU memory.** Every room probe was
+  captured with a new camera, and three.js keeps a transmission target for
+  each camera that draws glass until the renderer is disposed. So each full
+  re-bake in walk (a `loadScene`, a light temperature change, an edit that
+  restarts the bake) stranded one target per room, about 9 MB on the demo
+  apartment. The probes now render with one cube camera that lives as long
+  as the walk lighting.
 - **`strict-new` follows a renamed wall or room.** A batch that removed a
   partition and joined the walls on either side (`merge_wall`), or split a
   wall (`split_wall`), gave those walls new ids, so a piece that already stood
