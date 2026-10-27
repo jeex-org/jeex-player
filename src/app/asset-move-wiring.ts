@@ -157,6 +157,26 @@ export function assetMoveWiring(deps: AssetMoveWiringDeps): AssetMoveControl {
             redraw: () => deps.stage()?.runtime.demand.invalidate(),
             tint: (state) => deps.stage()?.selection.tint(state === null ? null : TINTS[state]),
             viewYaw,
+            handles: {
+              addFrameHook: (hook) => deps.stage()?.runtime.addFrameHook(hook),
+              removeFrameHook: (hook) => deps.stage()?.runtime.removeFrameHook(hook),
+              project: (point) => {
+                const current = deps.stage();
+                if (!current) return null;
+                const ndc = new THREE.Vector3(point.x, point.y, point.z).project(current.pickCamera());
+                if (ndc.z > 1) return null;
+                const rect = deps.roots.canvas.getBoundingClientRect();
+                return { x: rect.left + ((ndc.x + 1) / 2) * rect.width, y: rect.top + ((1 - ndc.y) / 2) * rect.height };
+              },
+              screenUp: () => {
+                const yaw = viewYaw();
+                return { x: Math.sin(yaw), z: Math.cos(yaw) };
+              },
+              mode: () => {
+                const mode = deps.stage()?.mode;
+                return mode === 'orbit' || mode === 'plan3d' ? mode : null;
+              },
+            },
             onEdit: (edit) => deps.events.emit('assetEdit', edit),
             onRefused: (refusal) => deps.events.emit('assetEditRefused', refusal),
             onMoving: (moving) => {

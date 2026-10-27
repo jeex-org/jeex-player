@@ -9,6 +9,13 @@ as described under [Versioning](#versioning).
 
 ### Added
 
+- **Asset handles in the editor.** With the asset move tool armed, the
+  selected floor or ceiling object carries a ring round its footprint: a drag
+  along it turns the object by the angle swept, in the 15° steps of
+  `turnAsset` and Q/E, judged like a move. A wall object in `plan3d`, where
+  the top view has no height, carries a bar beside it: a drag up the screen
+  lifts it (5 mm a pixel), kept between the floor and the ceiling. A press on
+  the object itself still drags the object.
 - **The `underlay` slot.** A ninth host slot covers the viewport BELOW the
   viewer's chrome: above the scene canvas and the 2D plan drawing, under
   every bar, panel and card. A host's picture over the scene (a plan traced

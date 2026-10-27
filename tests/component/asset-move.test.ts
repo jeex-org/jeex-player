@@ -21,6 +21,8 @@ import { pointInPolygon } from '../../src/plan/plan-geometry.js';
 import { solvePlan } from '../../src/plan/plan-solver.js';
 import type { SceneData } from '../../src/scene/types.js';
 import type { SlotName } from '../../src/ui/host-slots.js';
+import { BAR_GAP_M, RING_MARGIN_M } from '../../src/edit/asset-handles.js';
+import { HEIGHT_M_PER_PX } from '../../src/edit/asset-move-tool.js';
 import { ASSET_MOVE_CHUNK_TIMEOUT_MS, closeContainers, demoScene, nextFrame, openContainer, until } from './support.js';
 
 type Debug = {
@@ -286,5 +288,42 @@ describe('the asset move tool', { timeout: MOUNT_PLUS_CHUNK_TIMEOUT_MS }, () => 
     expect(handle.turnAsset(DEMO.asset.studyDesk, 6)).toBe(true);
     expect(refusals.at(-1)?.assetId).toBe(DEMO.asset.studyDesk);
     expect(handle.turnAsset('01a12fe6-0000-7000-8000-000000000000', 1)).toBe(false);
+  });
+
+  test('a drag along the ring drawn round the selected chair turns it one 15° step', async () => {
+    const { canvas, scene, edits, refusals } = await mount('plan3d', DEMO.asset.livingChairA);
+    await nextFrame();
+    const context = dragContext(scene, solvePlan(scene), DEMO.asset.livingChairA)!;
+    const home = context.placement;
+    const item = poseItem(context, { position: home.position, rotationY: home.rotationY ?? 0 });
+    const radius = Math.hypot(item.dims[0] / 2, item.dims[2] / 2) + RING_MARGIN_M;
+    // On the ring at floor angle 0, then 17° round it: one step.
+    const on = (angle: number) =>
+      pixel('plan3d', home.position.x + radius * Math.sin(angle), 0, home.position.z + radius * Math.cos(angle));
+    drag(canvas, on(0), on((17 / 180) * Math.PI));
+    expect(refusals).toEqual([]);
+    expect(edits).toHaveLength(1);
+    expect(edits[0]!.gesture).toBe('turn');
+    const rotate = edits[0]!.ops.find((op) => op.op === 'rotate_object');
+    if (rotate?.op !== 'rotate_object') throw new Error('expected rotate_object');
+    expect(rotate.rotationY).toBeCloseTo((home.rotationY ?? 0) + Math.PI / 12, 6);
+  });
+
+  test('in plan3d a drag up the bar beside the hall mirror lifts it by the pixels dragged', async () => {
+    const { canvas, scene, edits, refusals } = await mount('plan3d', DEMO.asset.hallMirror);
+    await nextFrame();
+    const context = dragContext(scene, solvePlan(scene), DEMO.asset.hallMirror)!;
+    const home = context.placement;
+    const yaw = home.rotationY ?? 0;
+    const item = poseItem(context, { position: home.position, rotationY: yaw });
+    // The bar's middle: beside the body along its face, the gap past its half width.
+    const reach = item.dims[0] / 2 + BAR_GAP_M;
+    const middle = pixel('plan3d', home.position.x + Math.cos(yaw) * reach, home.position.y, home.position.z - Math.sin(yaw) * reach);
+    // 8 px up: 4 cm, inside the mirror's own mount band.
+    drag(canvas, middle, { x: middle.x, y: middle.y - 8 });
+    expect(refusals).toEqual([]);
+    const move = edits[0]!.ops[0]!;
+    if (move.op !== 'move_object') throw new Error('expected move_object');
+    expect(move.position!.y).toBeCloseTo(home.position.y + 8 * HEIGHT_M_PER_PX, 4);
   });
 });
