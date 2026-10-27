@@ -36,6 +36,14 @@
  * Relight: a new colour of the artificial light changes the lamps' bounce in
  * the grids, so it starts the bake over; the colour it was baked with changes
  * nothing.
+ *
+ * Camera balance: once the probes are written (a bake, a relight, a
+ * refresh), every room is measured as it shows from its probe point
+ * (`room-sampler.ts`) into its white balance and exposure (`room-balance.ts`). `followEye` eases the live
+ * balance towards the room the eye stands in, 95 % of the way in `balance.blendMs`, and
+ * holds the last room's outside every room; `balanceAt` answers a room's
+ * balance at once, for a capture from another camera. Neither answers before
+ * the lighting is live.
  */
 
 import { ViewerLibError } from '../../shared/errors.js';
@@ -53,6 +61,9 @@ import { WalkRig } from './walk-rig.js';
 import { WALK_LIGHTING_TUNING as T } from './walk-lighting-tuning.js';
 import { HdriSky, type HdriContent, type HdriSkyState, type HdriView } from '../hdri/hdri-sky.js';
 import type { LightProbeGridWebGL } from 'three/addons/lighting/LightProbeGridWebGL.js';
+import { EasedBalance, roomBalance } from './room-balance.js';
+import { RoomSampler } from './room-sampler.js';
+import type { Mat3 } from '../white-balance.js';
 
 /**
  * The document the lighting is built for, as the application reads it
@@ -197,6 +208,14 @@ export class WalkLighting {
   private last: WalkLightingStats | null = null;
   /** The host sky (`hdri/hdri-sky.ts`), shown in the states the rig picks. */
   private readonly sky: HdriSky;
+  /** Each room's camera balance, by room id, from its last measuring. */
+  private readonly balances = new Map<string, Mat3>();
+  /** The rooms are measured on the next live frame (after a bake, a relight). */
+  private measureDue = false;
+  /** Measures the rooms for their balances, kept for the life of the lighting. */
+  private readonly sampler: RoomSampler;
+  /** The live camera balance, easing towards the eye's room. */
+  private readonly eased = new EasedBalance();
   /** The live sun's direction authority, for the sky's elevation (`render/sun-shadow.ts`). */
   private sun: () => { override(elevationDeg: number | null): void } | null | undefined = () => null;
 
@@ -204,6 +223,7 @@ export class WalkLighting {
     this.renderer = renderer;
     this.scene = scene;
     this.uniforms = walkUniformsFor(scene);
+    this.sampler = new RoomSampler(this.uniforms);
     this.placeholder = this.uniforms.jeexAtlas.value;
     this.rig = new WalkRig({ scene, renderer, uniforms: this.uniforms });
     this.sky = new HdriSky({ scene, renderer, exterior: () => this.exterior, sun: () => this.sun() });
@@ -306,11 +326,28 @@ export class WalkLighting {
       if (!this.probes.step()) return;
       this.current = 'live';
       this.last = this.measure();
-    } else if (!this.probes.done) {
-      // A relight: one room's probe per frame, written into its tile in place.
-      this.probes.step();
+    } else if (!this.probes.done && this.probes.step()) {
+      // A relight: one room's probe per frame, written into its tile in place; the last one re-measures the rooms.
+      this.measureDue = true;
     }
     this.show(true);
+    if (this.measureDue) this.measureRooms();
+  }
+
+  /** Measures every room as it shows now, into its camera balance (`room-sampler.ts`), the mirrors hidden. */
+  private measureRooms(): void {
+    this.measureDue = false;
+    const hidden = mirrorsOf(this.scene).filter((mirror) => mirror.visible);
+    for (const mirror of hidden) mirror.visible = false;
+    try {
+      for (const probe of this.volumes!.probes) {
+        const light = this.sampler.sample(this.renderer, this.scene, probe.position);
+        if (light) this.balances.set(probe.roomId, roomBalance(light, T.walkExposure));
+        else this.balances.delete(probe.roomId);
+      }
+    } finally {
+      for (const mirror of hidden) mirror.visible = true;
+    }
   }
 
   /**
@@ -354,6 +391,7 @@ export class WalkLighting {
     this.probes.recapture([...scope.grids, ...scope.probes, ...moved]);
     while (!this.probes.step());
     this.show(true);
+    this.measureRooms();
   }
 
   /**
@@ -379,6 +417,33 @@ export class WalkLighting {
     return moved;
   }
 
+  /** The camera balance of the room at `position`; `null` before the lighting is live or outside every measured room. */
+  balanceAt(position: Vec3): Mat3 | null {
+    if (this.current !== 'live' || !this.volumes) return null;
+    const { x, y, z } = position;
+    const box = this.volumes.boxes.find(
+      ({ selection: { min, max } }) => x >= min.x && x <= max.x && y >= min.y && y <= max.y && z >= min.z && z <= max.z,
+    );
+    return box ? (this.balances.get(box.roomId) ?? null) : null;
+  }
+
+  /** The live camera balance; `null` before the lighting is live. */
+  get balance(): Mat3 | null {
+    return this.current === 'live' ? this.eased.value : null;
+  }
+
+  /**
+   * Eases the live balance towards the room at `eye`, `now` in milliseconds;
+   * answers whether it is still moving (each such frame is a new picture).
+   */
+  followEye(eye: Vec3, now: number): boolean {
+    if (this.current !== 'live') {
+      this.eased.reset();
+      return false;
+    }
+    return this.eased.step(this.balanceAt(eye), now);
+  }
+
   /** The last full bake's measurement; `null` before the first is done. */
   get stats(): WalkLightingStats | null {
     return this.last;
@@ -391,6 +456,7 @@ export class WalkLighting {
     this.rig.dispose();
     this.sky.dispose();
     this.probeCamera.dispose();
+    this.sampler.dispose();
   }
 
   /** Gives every lamp its source room (an index in the probe order, or `NO_ROOM`) and records the lamps' signature. */
@@ -428,6 +494,7 @@ export class WalkLighting {
       capture: this.atlas!.capture,
       copy: this.atlas!.copy,
     });
+    this.measureDue = true;
   }
 
   private gridBake(targets: readonly RoomGrid[], probesPerFrame = Number.POSITIVE_INFINITY): GridBake {
@@ -481,6 +548,8 @@ export class WalkLighting {
     this.grids = [];
     this.exterior = null;
     this.atlas = null;
+    this.balances.clear();
+    this.eased.reset();
     this.bake = null;
     this.probes = null;
     this.volumes = null;

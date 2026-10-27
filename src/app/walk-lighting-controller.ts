@@ -49,6 +49,9 @@ import { WALK_LIGHTING_TUNING } from '../render/walk-lighting/walk-lighting-tuni
 import type { HdriContent, HdriSkyState, HdriView } from '../render/hdri/hdri-sky.js';
 import type { HdriEntry } from '../lighting/hdri-entry.js';
 import type { HdriTarget } from './hdri-wiring.js';
+import type { Mat3 } from '../render/white-balance.js';
+
+type Vec3 = { x: number; y: number; z: number };
 
 /** What the controller drives: `render/walk-lighting/walk-lighting.ts`'s `WalkLighting`. */
 export type WalkLightingHandle<Doc = WalkDocument> = {
@@ -67,6 +70,10 @@ export type WalkLightingHandle<Doc = WalkDocument> = {
   setHdriView?(view: HdriView): void;
   setSun?(sun: () => { override(elevationDeg: number | null): void } | null | undefined): void;
   readonly hdriState?: HdriSkyState;
+  /** The camera balance (`render/walk-lighting/room-balance.ts`): eased towards the eye's room, live, and any room's at once. */
+  followEye?(eye: Vec3, now: number): boolean;
+  readonly balance?: Mat3 | null;
+  balanceAt?(position: Vec3): Mat3 | null;
   dispose(): void;
 };
 
@@ -123,6 +130,8 @@ export type WalkLightingDeps<Doc> = {
   /** The document on screen, `null` before the first. */
   document: () => Doc | null;
   now: () => number;
+  /** Where the live camera stands, for the camera balance; absent, the chain keeps its tuned balance. */
+  eye?: (() => Vec3) | undefined;
   /** The host sky; absent, none is ever shown. */
   hdri?: HdriDeps | undefined;
 };
@@ -203,6 +212,9 @@ export class WalkLightingController<Doc = WalkDocument> {
       if (eligible && !this.failed && lighting.recapturing) refreshed = true;
       if (this.updateHdri(lighting, eligible && !this.failed)) refreshed = true;
       lighting.frame(eligible && !this.failed);
+      // The camera eases into the room it entered: every frame of it is a new picture.
+      const eye = this.deps.eye;
+      if (eye && lighting.followEye?.(eye(), this.deps.now()) === true && eligible) refreshed = true;
     } catch (error) {
       // A bake or a capture that throws would throw again on every frame: one report, the direct look.
       this.failed = true;
@@ -354,6 +366,16 @@ export class WalkLightingController<Doc = WalkDocument> {
     if (this.failed) return 'failed';
     if (this.lighting) return this.lighting.phase;
     return this.pending ? 'loading' : 'off';
+  }
+
+  /** The live camera balance while the room lighting is shown; `null` keeps the chain's tuned balance. */
+  balance(): Mat3 | null {
+    return this.shown ? (this.lighting?.balance ?? null) : null;
+  }
+
+  /** The camera balance of the room at `position` while the room lighting is shown, for a capture from that point. */
+  balanceAt(position: Vec3): Mat3 | null {
+    return this.shown ? (this.lighting?.balanceAt?.(position) ?? null) : null;
   }
 
   stats(): WalkLightingStats | null {

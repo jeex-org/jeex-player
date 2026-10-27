@@ -40,10 +40,11 @@ export type PostProcessor = {
   /** Releases every GPU resource the chain owns. */
   dispose(): void;
   /**
-   * The camera white balance the chain applies before its display transform,
-   * nine numbers row-major; a panorama's display pass applies the same one.
+   * The camera white balance the chain applies before its display transform
+   * to a picture taken from `position`, nine numbers row-major; a panorama's
+   * display pass applies the same one.
    */
-  readonly whiteBalance?: readonly number[] | undefined;
+  whiteBalanceAt?(position: { x: number; y: number; z: number }): readonly number[];
 };
 
 /** The camera modes where nothing is edited and the chain is in use. */

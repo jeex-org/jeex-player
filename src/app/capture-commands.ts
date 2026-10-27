@@ -302,8 +302,8 @@ export function captureCommands(deps: CaptureDeps): CaptureCommands {
       const { runtime, model } = engaged();
       const state = request.state ?? 'current';
       const position = eyePoint(model, request.roomId);
-      // The walk chain's white balance, when there is a chain: the panorama keeps its direct path otherwise.
-      const whiteBalance = (await deps.postChain?.())?.whiteBalance ?? null;
+      // The walk chain's white balance for the panorama's room, when there is a chain: the panorama keeps its direct path otherwise.
+      const whiteBalance = (await deps.postChain?.())?.whiteBalanceAt?.(position) ?? null;
       const shot = await inCameraView(state, runtime, model, position, (root) =>
         capturePanorama(runtime.renderer, root, { width: request.width, position, whiteBalance }),
       );

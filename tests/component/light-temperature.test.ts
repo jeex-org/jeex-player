@@ -6,7 +6,7 @@
  * sun factor scales direct sun inside a room box only, never a lamp.
  *
  * On the demo apartment: «Original» draws the editing frame of a viewer that
- * never had a temperature, previews do not change, live and default-state
+ * started on «Original» and never had another temperature, previews do not change, live and default-state
  * stills and a panorama show the temperature, a context restore keeps it, and
  * the sunlit living-room floor in walk keeps its texture (evening preset).
  *
@@ -235,6 +235,8 @@ describe('on the demo apartment', { timeout: MOUNT_TIMEOUT_MS }, () => {
       scene: { repository: new InlineSceneRepository(demoScene()) },
       tour: { mode: 'off' },
       doors: { autoOpen: false },
+      // «Original» from the start (the default is 5000 K): the frame of record below is the unconverted one.
+      lighting: { temperature: null },
     });
     await handle.ready;
     await until(() => live !== null, 'the live scene', 60_000);
@@ -249,7 +251,7 @@ describe('on the demo apartment', { timeout: MOUNT_TIMEOUT_MS }, () => {
   const still = async (state: 'current' | 'default' = 'current'): Promise<Blob> =>
     (await handle.capture.still({ width: 160, height: 120, camera: LAMP_VIEW, state, caption: false })).blob;
 
-  test('«Original» after temperatures draws exactly the frame of a viewer that never had one; previews do not change', async () => {
+  test('«Original» after temperatures draws exactly the frame of a viewer that started on it; previews do not change', async () => {
     const lamp = demoScene().assets.find((asset) => asset.type === 'lamp')!;
     const preview = (): unknown => handle.describeSelection({ kind: 'furniture', id: lamp.id, mode: 'orbit' });
     const before = new Uint8Array(await (await still()).arrayBuffer());
