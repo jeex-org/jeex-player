@@ -655,6 +655,17 @@ as described under [Versioning](#versioning).
 
 ### Fixed
 
+- **Each piece of floor belongs to one room.** A room the walls enclose was
+  solved as its whole face, so a zone a source outlined inside it (a dining
+  corner, a kitchen run, a hall) claimed the same floor twice: in the room's
+  area, its floor slab, the layout linter and the 2D plan. `solvePlan` now
+  gives the room its face minus the zones lying in it; a remainder in pieces
+  keeps its largest piece and hands each smaller one to the zone it shares
+  the longest boundary with. A zone the room would surround as a ring is left
+  as drawn, with a `zone-ring` caveat in the new `SolvedPlan.caveats`, and so
+  are zones that cover a whole room (`zones-cover-room`). Adds
+  the runtime dependency `polygon-clipping` (MIT), about 11 KB gzip in
+  `jeex-viewer/ops`.
 - **`strict-new` follows a renamed wall or room.** A batch that removed a
   partition and joined the walls on either side (`merge_wall`), or split a
   wall (`split_wall`), gave those walls new ids, so a piece that already stood

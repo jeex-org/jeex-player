@@ -61,3 +61,18 @@ or the IIFE bundle. `bun audit` after the install: no vulnerabilities (364 packa
 | Package          | Version          | Was | Command                                         |
 | ---------------- | ---------------- | --- | ----------------------------------------------- |
 | `gltf-validator` | `2.0.0-dev.3.10` | new | `npm view gltf-validator version dist-tags`     |
+
+## 2026-10-27: polygon-clipping for floor ownership
+
+A new runtime dependency: `solvePlan` gives each piece of floor to one room, so a face's room
+gives up the source-outlined zones lying in it (`src/plan/floor-ownership.ts`), a polygon
+difference that has to stay exact where a zone shares an edge with a wall. `npm view
+polygon-clipping version dist-tags dependencies license` returned `0.15.7`, `latest: 0.15.7`,
+MIT, dependencies `robust-predicates ^3.0.2` (Unlicense, resolved `3.0.3`) and `splaytree
+^3.1.0` (MIT, resolved `3.2.3`). The package is bundled into `jeex-viewer-ops.js` (+11.1 KB
+gzip) and the IIFE (+9.9 KB gzip); `NOTICE` carries the three licences. `bun audit` after the
+install: no vulnerabilities (367 packages).
+
+| Package            | Version  | Was | Command                                            |
+| ------------------ | -------- | --- | -------------------------------------------------- |
+| `polygon-clipping` | `0.15.7` | new | `npm view polygon-clipping version dist-tags`      |
