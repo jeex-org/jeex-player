@@ -107,6 +107,25 @@ export const OPS_BUDGET_FAIL_BYTES = 97_115 + 1024;
 export const LIGHTING_BUDGET_FAIL_BYTES = 12_085 + 1024;
 
 /**
+ * Hard limits for the two TOOL entries, gzip bytes. Neither is loaded by a
+ * page: `jeex-viewer/schema` serves a service that checks scene documents and
+ * baked projects, `jeex-viewer/lightmap` a light-bake pipeline. Both leave
+ * Zod (and the lightmap three.js) to the consumer (`vite.lib.config.ts`), so a
+ * peer bundled by mistake shows here as a jump, and
+ * `scripts/package-entry-check.ts` names it.
+ *
+ * The gates are the measured sizes from `measureBundle('dist-lib')` right after
+ * `bun run build:lib`, when the entries were added (2026-10-27), plus 1 KB:
+ * `jeex-viewer-schema.js` 68,827 gzip bytes (the validator, the manifest and
+ * scene schemas, the shipped catalogues), `jeex-viewer-lightmap.js` 106,841
+ * (the scene builder and the bank the bake lights and the shell are built
+ * from). The fix for a crossing is to re-measure and update this comment,
+ * never to raise the number from memory.
+ */
+export const SCHEMA_BUDGET_FAIL_BYTES = 68_827 + 1024;
+export const LIGHTMAP_BUDGET_FAIL_BYTES = 106_841 + 1024;
+
+/**
  * The custom-element entry (`vite.lib.config.ts`) and the hard limit for it
  * PLUS every file it imports statically, gzip bytes: what a page that pastes
  * `<jeex-viewer>` downloads before any player is near the viewport. The viewer
@@ -144,6 +163,13 @@ const OPS_BUNDLE_PREFIX = 'jeex-viewer-ops';
  * fall through to the viewer's own budget.
  */
 const LIGHTING_BUNDLE_PREFIX = 'jeex-viewer-lighting.';
+/**
+ * File-name prefixes of the two tool entries, up to the dot for the same
+ * reason: shared chunks named after a module (`jeex-viewer-schema-sets-<hash>.js`,
+ * `jeex-viewer-lightmap-binding-<hash>.js`) are viewer code.
+ */
+const SCHEMA_BUNDLE_PREFIX = 'jeex-viewer-schema.';
+const LIGHTMAP_BUNDLE_PREFIX = 'jeex-viewer-lightmap.';
 
 /**
  * File-name prefix both vite configs give every dynamic-import chunk
@@ -260,6 +286,8 @@ export function limitFor(name: string): number {
   if (name.startsWith(HOST_BUNDLE_PREFIX)) return HOST_BUDGET_FAIL_BYTES;
   if (name.startsWith(OPS_BUNDLE_PREFIX)) return OPS_BUDGET_FAIL_BYTES;
   if (name.startsWith(LIGHTING_BUNDLE_PREFIX)) return LIGHTING_BUDGET_FAIL_BYTES;
+  if (name.startsWith(SCHEMA_BUNDLE_PREFIX)) return SCHEMA_BUDGET_FAIL_BYTES;
+  if (name.startsWith(LIGHTMAP_BUNDLE_PREFIX)) return LIGHTMAP_BUDGET_FAIL_BYTES;
   return BUDGET_FAIL_BYTES;
 }
 
