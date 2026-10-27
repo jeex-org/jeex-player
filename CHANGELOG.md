@@ -655,6 +655,12 @@ as described under [Versioning](#versioning).
 
 ### Fixed
 
+- **The mini-map follows the tour.** In `tour` the map's accented camera dot
+  is the camera the run has reached, not the last one the walker stood on.
+- **A camera step walks the new plan.** A step under way when a new document
+  is committed, to a camera that is still there, now walks on from where it
+  stands over the new plan to where the camera now is, instead of finishing
+  the old leg and cutting to the camera at the end.
 - **A lost context ends a frame capture.** `capture.frames` now rejects
   with a `ViewerLibError` of code `context-lost` (`detail.index`, the frame)
   when the WebGL context goes while the clip is produced, instead of

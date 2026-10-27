@@ -189,10 +189,22 @@ export class WalkStepper {
     this.report();
   }
 
-  /** A new document: a step to a camera that is gone stops, and the index is re-read. */
+  /**
+   * A new document: a step to a camera that is gone stops, one to a camera
+   * still there walks on from where it stands over the NEW plan to where the
+   * camera now is, and the index is re-read.
+   */
   sceneChanged(): void {
-    const ids = new Set(this.cameras().map((camera) => camera.id));
+    const cameras = this.cameras();
+    const ids = new Set(cameras.map((camera) => camera.id));
     if (this.targetId !== null && !ids.has(this.targetId)) this.cancel();
+    if (this.targetId !== null) {
+      const index = cameras.findIndex((camera) => camera.id === this.targetId);
+      this.player.stop();
+      this.glide = null;
+      this.targetId = null;
+      this.step(index);
+    }
     if (this.currentId !== null && !ids.has(this.currentId)) this.currentId = null;
     this.report();
   }
