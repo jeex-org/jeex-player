@@ -34,7 +34,7 @@ import { validateScene } from './scene-validator.js';
 import { ViewerLibError } from '../shared/errors.js';
 import { applyOp, OpError, sameTouched, type SceneOp, type TouchedEntity } from './scene-ops.js';
 import { applyRoomMerges, planRoomMerges, type RoomMerge } from './room-merge.js';
-import { heirsOf, inheritedKeys, issueKey } from './issue-heirs.js';
+import { heirsOf, inheritedCirculation, inheritedKeys, issueKey } from './issue-heirs.js';
 import { diffScenes, sameData } from './scene-diff.js';
 import { Fanout } from '../shared/fanout.js';
 import { draftOf, type Committed, type Draft } from '../shared/committed.js';
@@ -57,7 +57,9 @@ import type { SceneData } from './types.js';
  * refused because a wardrobe elsewhere already stood in a doorway. A wall or
  * room the batch split, joined or merged is followed to its new ids first
  * (`issue-heirs.ts`), so a piece already in a wall stays old in the wall that
- * replaced it. Pre-existing
+ * replaced it. After a room merge, a `circulation` error in the survivor is
+ * old when every opening it names was already blocked in a merged room, in
+ * whatever wording (`inheritedCirculation`). Pre-existing
  * hard issues still come back in `ApplyOk.issues`, so the host can show them
  * without blocking the edit.
  */
@@ -312,7 +314,7 @@ export class SceneModel {
       return { error: 'validation_failed', message };
     }
 
-    const linted = this.lint(batch.lint ?? 'off', candidate, candidatePlan, () => heirsOf(batch.ops, roomMerges));
+    const linted = this.lint(batch.lint ?? 'off', candidate, candidatePlan, batch.ops, roomMerges);
     if (!Array.isArray(linted)) return linted;
 
     this.committed = deepFreeze(draft);
@@ -383,12 +385,13 @@ export class SceneModel {
    * to lint without one is the CALLER's mistake and is refused rather than
    * answered with an empty list that would read as "no issues found".
    */
-  /** `heirs`: where the batch's renamed walls and rooms went (`issue-heirs.ts`), read only by `strict-new`. */
+  /** `ops` and `roomMerges`: what the batch renamed and merged (`issue-heirs.ts`), read only by `strict-new`. */
   private lint(
     mode: LintMode,
     candidate: SceneData,
     plan: SolvedPlan,
-    heirs: () => ReturnType<typeof heirsOf>,
+    ops: readonly SceneOp[],
+    roomMerges: readonly RoomMerge[],
   ): LayoutIssue[] | ApplyFailure {
     if (mode === 'off') return [];
     if (!this.linter) {
@@ -401,8 +404,10 @@ export class SceneModel {
     if (mode === 'report') return issues;
     let errors = issues.filter((issue) => issue.severity === 'error');
     if (mode === 'strict-new') {
-      const base = inheritedKeys(this.baseErrorIssues(this.linter), heirs());
-      errors = errors.filter((issue) => !base.has(issueKey(issue)));
+      const old = this.baseErrorIssues(this.linter);
+      const base = inheritedKeys(old, heirsOf(ops, roomMerges));
+      const openings = new Set(candidate.walls.flatMap((wall) => (wall.openings ?? []).map((opening) => opening.id)));
+      errors = errors.filter((issue) => !base.has(issueKey(issue)) && !inheritedCirculation(issue, old, roomMerges, openings));
     }
     if (errors.length === 0) return issues;
     const what = mode === 'strict-new' ? 'new error(s)' : 'error(s)';
