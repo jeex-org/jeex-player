@@ -36,7 +36,7 @@ const FORMER_BEIGE = 'rgb(198, 184, 163)';
 let container: HTMLElement;
 const runtimes: RenderRuntime[] = [];
 /** The daylight sky's horizon, which walk and tour keep whatever the theme (`render-runtime.ts`). */
-const DAYLIGHT_HORIZON = '#c6b8a3';
+const DAYLIGHT_HORIZON = '#b9b9b9';
 const DARK = '#101418';
 
 beforeEach(() => {

@@ -155,6 +155,44 @@ describe('the white balance in the output pass', () => {
     expect(chain.composer.passes).toHaveLength(4);
   });
 
+  test("a balance source drives it: the live frame takes the live balance, a capture its own camera's, and none keeps the chain's", async () => {
+    const live = whiteBalanceMatrix([1, 0.6, 0.35], 1);
+    const there = whiteBalanceMatrix([0.5, 0.8, 1.2], 1);
+    const colour = [0.4, 0.4, 0.4];
+    const gl = renderer();
+    const { scene, camera } = patch(colour);
+    const asked: THREE.Vector3[] = [];
+    let source: { live: Mat3 | null; at: Mat3 | null } = { live, at: there };
+    const chain = await createWalkPost(gl, scene, camera, {
+      whiteBalance: IDENTITY,
+      balance: {
+        live: () => source.live,
+        at: (position) => {
+          asked.push(new THREE.Vector3(position.x, position.y, position.z));
+          return source.at;
+        },
+      },
+    });
+    disposers.push(() => chain.dispose());
+    const uniform = (): number[] =>
+      (chain.output.material.uniforms['jeexWhiteBalance']!.value as THREE.Matrix3).clone().transpose().toArray();
+    chain.render(scene, camera, 0);
+    uniform().forEach((v, i) => expect(v).toBeCloseTo(live[i]!, 6));
+    const shot = new THREE.PerspectiveCamera(40, 1, 0.1, 50);
+    shot.position.set(3, 1.5, -2);
+    shot.updateMatrixWorld();
+    const target = new THREE.WebGLRenderTarget(16, 16);
+    disposers.push(() => target.dispose());
+    chain.renderTo(target, scene, shot, 16, 16);
+    uniform().forEach((v, i) => expect(v).toBeCloseTo(there[i]!, 6));
+    expect(asked.at(-1)!.toArray()).toEqual([3, 1.5, -2]);
+    expect(chain.whiteBalanceAt({ x: 3, y: 1.5, z: -2 })).toBe(there);
+    source = { live: null, at: null };
+    chain.render(scene, camera, 0);
+    uniform().forEach((v, i) => expect(v).toBeCloseTo(IDENTITY[i]!, 6));
+    expect(chain.whiteBalanceAt({ x: 0, y: 0, z: 0 })).toBe(IDENTITY);
+  });
+
   test('a shader without the anchor the white balance follows is refused', () => {
     expect(() => whiteBalancedOutput('void main() { gl_FragColor = vec4(1.0); }')).toThrow();
   });

@@ -21,10 +21,10 @@ import { afterAll, beforeAll, describe, expect, test, vi } from 'vitest';
 import { commands } from 'vitest/browser';
 import { InlineSceneRepository, mountViewer } from '../../src/app/viewer-api.js';
 import type { ViewerHandle } from '../../src/app/viewer-handle.js';
-import { WalkLighting, WalkPost, WALK_POST_TUNING, WALK_WHITE_BALANCE } from '../../src/render/walk-post.js';
+import { WalkLighting, WalkPost } from '../../src/render/walk-post.js';
 import { atlasLayout, setRoomBoxes, type WalkUniforms } from '../../src/render/walk-lighting/box-probe-patch.js';
 import type { RoomBox, RoomProbe } from '../../src/render/walk-lighting/room-volumes.js';
-import { whiteBalanceMatrix, type Mat3, type Rgb } from '../../src/render/white-balance.js';
+import type { Mat3, Rgb } from '../../src/render/white-balance.js';
 import { openingMaterialFacts } from '../../src/geometry/opening-kinds.js';
 import { closeContainers, demoScene, nextFrame, openContainer, rendererName, softwareRasteriser, until } from './support.js';
 
@@ -34,10 +34,11 @@ const LIVING = '01a15f1b-dbbd-7634-b8b8-af9c8008284d';
 const LIVING_FLOOR = /^floor-01a15f1b-dbbd-7634/;
 /**
  * The ceiling of the living room at the walk start, metered without the white balance (scene linear, R/B), in
- * the default state: the default sun and lamps, the lamps feeding the room grids. Re-recorded 2026-10-25 when
- * the lamps joined the grids (it was 2.086 while the grid bake hid them), on an NVIDIA GPU.
+ * the default state: the default sun and lamps, the lamps feeding the room grids. Re-recorded 2026-10-27 when
+ * the default light became 5000 K and the daylight sky neutral grey (2.453 at «Original» under the sand sky,
+ * 2.086 before the lamps fed the grids), on an NVIDIA GPU. Its paint alone reads 1.16 (an off-white).
  */
-const CEILING_RB_MEASURED = 2.453;
+const CEILING_RB_MEASURED = 1.907;
 /**
  * Where the 2D footprint placement put the living probe before the
  * clearance: beside the floor lamp's shade. The «before» reading and the ratio check against it use it.
@@ -68,6 +69,7 @@ type Internals = {
   volumes: { boxes: RoomBox[]; probes: RoomProbe[] };
   refresh: WalkLighting['refresh'];
   rebake: WalkLighting['rebake'];
+  balanceAt: WalkLighting['balanceAt'];
 };
 
 /** Window glass: the opening builder's glazing material (it names no pane). */
@@ -436,7 +438,7 @@ describe.skipIf(!HARDWARE)(`walk gloss and white balance in the demo living room
     expect(daylight.after.band).toBeGreaterThan(daylight.after.rest);
   });
 
-  test('white balance at the walk start: the ceiling reads warm white, a saturated finish and the sky keep their hue', () => {
+  test("the living room's camera balance at the walk start: the ceiling reads near white, a saturated finish and the sky keep their hue", () => {
     const start = walkStart!;
     const view = new THREE.PerspectiveCamera(start.fov, SIZE.w / SIZE.h, 0.05, 200);
     view.position.copy(start.position);
@@ -509,21 +511,38 @@ describe.skipIf(!HARDWARE)(`walk gloss and white balance in the demo living room
     const ceiling = mean(0);
     const walls = mean(1);
     const neutral = [0, 1, 2].map((c) => (sums[0]![c]! + sums[1]![c]!) / Math.max(1, sums[0]![3]! + sums[1]![3]!)) as unknown as Rgb;
-    // Calibration: the degree that puts the ceiling's red over blue at 1.45, by bisection.
-    let lo = 0;
-    let hi = 1;
-    for (let i = 0; i < 40; i += 1) {
-      const mid = (lo + hi) / 2;
-      const c = times(whiteBalanceMatrix(neutral, mid), ceiling);
-      if (c[0] / c[2] > 1.45) lo = mid;
-      else hi = mid;
-    }
-    const tuned = times(WALK_WHITE_BALANCE, ceiling);
+    // The living room's own balance (`room-balance.ts`), as the screen applies it at the walk start.
+    const balance = lighting.balanceAt(start.position)!;
+    expect(balance).not.toBeNull();
+    const tuned = times(balance, ceiling);
+    /** The ceiling paint's albedo: its colour times its colour map's mean, linear. */
+    const ceilingPaint = (): Rgb => {
+      let material: THREE.MeshStandardMaterial | null = null;
+      lighting.scene.traverse((object) => {
+        if (object.name === `ceiling-${LIVING}`) material = [(object as THREE.Mesh).material].flat()[0] as THREE.MeshStandardMaterial;
+      });
+      const m: THREE.MeshStandardMaterial = material!;
+      const average = [1, 1, 1];
+      const image = m.map?.image as CanvasImageSource | undefined;
+      if (image) {
+        const canvas = new OffscreenCanvas(8, 8);
+        const context = canvas.getContext('2d')!;
+        context.drawImage(image, 0, 0, 8, 8);
+        const { data } = context.getImageData(0, 0, 8, 8);
+        const decode = (v: number): number => (v <= 0.04045 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4);
+        for (let c = 0; c < 3; c += 1) {
+          let sum = 0;
+          for (let i = 0; i < data.length; i += 4) sum += decode(data[i + c]! / 255);
+          average[c] = sum / 64;
+        }
+      }
+      return [m.color.r * average[0]!, m.color.g * average[1]!, m.color.b * average[2]!];
+    };
     // Furniture from the gloss pose and sky from the bay pose: the walk start sees neither.
     const fabric = atGloss.mean(2);
     const sky = atWindow.mean(3);
-    const fabricAfter = times(WALK_WHITE_BALANCE, fabric);
-    const skyAfter = times(WALK_WHITE_BALANCE, sky);
+    const fabricAfter = times(balance, fabric);
+    const skyAfter = times(balance, sky);
     const argmax = (c: Rgb): number => c.indexOf(Math.max(...c));
     record('whiteBalance', {
       domain: 'scene linear (float target, no tone mapping, no exposure)',
@@ -532,11 +551,11 @@ describe.skipIf(!HARDWARE)(`walk gloss and white balance in the demo living room
       ceiling,
       walls,
       neutral,
-      calibratedDegree: (lo + hi) / 2,
-      tuning: WALK_POST_TUNING.whiteBalance,
+      balance,
       ceilingRbBefore: ceiling[0] / ceiling[2],
       ceilingAfter: tuned,
       ceilingRbAfter: tuned[0] / tuned[2],
+      ceilingPaint: ceilingPaint(),
       furnitureMeshes: { owned: atGloss.owned, candidates: atGloss.candidates },
       furniture: {
         mesh: furniture?.name,
@@ -547,10 +566,11 @@ describe.skipIf(!HARDWARE)(`walk gloss and white balance in the demo living room
       sky: { before: sky, after: skyAfter },
     });
     expect(Math.abs(ceiling[0] / ceiling[2] - CEILING_RB_MEASURED) / CEILING_RB_MEASURED).toBeLessThan(0.05);
-    expect(tuned[0] / tuned[2]).toBeGreaterThanOrEqual(1.3);
-    expect(tuned[0] / tuned[2]).toBeLessThanOrEqual(1.6);
-    expect(tuned[0]).toBeGreaterThanOrEqual(tuned[1]);
-    expect(tuned[1]).toBeGreaterThanOrEqual(tuned[2]);
+    // The light on the ceiling reads near neutral once its off-white paint is divided out, as the light on the
+    // white surfaces of interior photographs does (`room-white-balance.test.ts`).
+    const paint = ceilingPaint();
+    expect(tuned[0] / tuned[2] / (paint[0] / paint[2])).toBeGreaterThanOrEqual(0.98);
+    expect(tuned[0] / tuned[2] / (paint[0] / paint[2])).toBeLessThanOrEqual(1.14);
     expect(furniture).not.toBeNull();
     expect(argmax(fabricAfter)).toBe(argmax(fabric));
     expect(atWindow.sums[3]![3]!).toBeGreaterThan(100);

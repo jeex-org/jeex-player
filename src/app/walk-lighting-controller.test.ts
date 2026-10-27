@@ -52,7 +52,7 @@ class FakeLighting implements WalkLightingHandle<Doc> {
   }
 }
 
-function setup(options: { chainReady?: boolean; bakeFrames?: number } = {}) {
+function setup(options: { chainReady?: boolean; bakeFrames?: number; eye?: () => { x: number; y: number; z: number } } = {}) {
   const built: FakeLighting[] = [];
   const errors: unknown[] = [];
   let clock = 0;
@@ -72,6 +72,7 @@ function setup(options: { chainReady?: boolean; bakeFrames?: number } = {}) {
     chainReady: () => chainReady,
     document: () => doc,
     now: () => clock,
+    eye: options.eye,
   });
   return {
     controller,
@@ -327,5 +328,53 @@ describe('WalkLightingController.relit (a new colour of the artificial light)', 
     tick(10);
     controller.update('walk');
     expect(built[0]!.relights).toBe(0);
+  });
+});
+
+describe('WalkLightingController camera balance', () => {
+  const WARM = [1.2, 0, 0, 0, 1, 0, 0, 0, 0.8] as const;
+
+  /** A lighting whose balance eases for `easing` frames after each eye it is handed. */
+  function balanced(lighting: FakeLighting) {
+    const eyes: Array<{ x: number; y: number; z: number }> = [];
+    let easing = 0;
+    return Object.assign(lighting, {
+      balance: WARM,
+      balanceAt: (position: { x: number; y: number; z: number }) => (position.x > 0 ? WARM : null),
+      followEye(eye: { x: number; y: number; z: number }) {
+        eyes.push(eye);
+        return easing-- > 0;
+      },
+      ease: (frames: number) => (easing = frames),
+      eyes,
+    });
+  }
+
+  test('hands the eye over every frame, and each frame the balance eases is a new picture', async () => {
+    const eye = { x: 1, y: 1.6, z: 2 };
+    const { controller, built, finishBuild } = setup({ bakeFrames: 1, eye: () => eye });
+    controller.update('walk');
+    await finishBuild();
+    const lighting = balanced(built[0]!);
+    expect(controller.update('walk')).toBe(true);
+    expect(controller.update('walk')).toBe(false);
+    lighting.ease(2);
+    expect([controller.update('walk'), controller.update('walk'), controller.update('walk')]).toEqual([true, true, false]);
+    expect(lighting.eyes.at(-1)).toBe(eye);
+  });
+
+  test('answers the balance only while the room lighting is shown', async () => {
+    const { controller, built, finishBuild } = setup({ bakeFrames: 1, eye: () => ({ x: 1, y: 1, z: 1 }) });
+    expect(controller.balance()).toBeNull();
+    controller.update('walk');
+    await finishBuild();
+    balanced(built[0]!);
+    controller.update('walk');
+    expect(controller.balance()).toBe(WARM);
+    expect(controller.balanceAt({ x: 1, y: 1, z: 1 })).toBe(WARM);
+    expect(controller.balanceAt({ x: -1, y: 1, z: 1 })).toBeNull();
+    controller.update('orbit');
+    expect(controller.balance()).toBeNull();
+    expect(controller.balanceAt({ x: 1, y: 1, z: 1 })).toBeNull();
   });
 });

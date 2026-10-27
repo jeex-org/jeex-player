@@ -721,8 +721,8 @@ describe('reading the state back', () => {
       // camera tool is neither placing nor looking through one.
       walk: { camera: { index: null, count: 0 } },
       checkpoints: { lookThrough: null, placing: false },
-      // No host set a temperature: the interior keeps its original light.
-      lightTemperature: null,
+      // No host set a temperature: the interior light is the default neutral 5000 K.
+      lightTemperature: 5000,
     });
   });
 

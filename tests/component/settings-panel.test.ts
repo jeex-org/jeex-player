@@ -23,10 +23,12 @@ afterEach(() => {
   closeContainers();
 });
 
+/** Mounts the demo, on «Original» unless `options` name a temperature (the default is 5000 K). */
 async function mount(width: number, options: ViewerOptionsInput = {}, height = 420): Promise<ViewerHandle> {
   const viewer = mountViewer(openContainer(width, height), {
     scene: { repository: new InlineSceneRepository(demoScene()) },
     tour: { mode: 'off' },
+    lighting: { temperature: null },
     ...options,
   });
   viewers.push(viewer);
@@ -214,6 +216,16 @@ describe('the settings panel', { timeout: MOUNT_TIMEOUT_MS }, () => {
     press(panel.querySelector<HTMLButtonElement>('.settings-reset')!);
     expect(viewer.getState().lightTemperature).toBeNull();
     expect(events.at(-1)).toEqual({ temperature: null, source: 'panel' });
+  });
+
+  test('a viewer no host set a temperature for opens the panel on the default 5000 K, and «Original» is one press away', async () => {
+    const viewer = await mount(900, { settings: { show: true }, lighting: {} });
+    expect(viewer.getState().lightTemperature).toBe(5000);
+    const { panel, slider } = await open(viewer);
+    expect(slider.value).toBe('5000');
+    expect(slider.getAttribute('aria-valuetext')).toBe('5000 K · cool');
+    press(panel.querySelector<HTMLButtonElement>('.settings-reset')!);
+    expect(viewer.getState().lightTemperature).toBeNull();
   });
 
   test('a host change reaches the open panel and reports host', async () => {

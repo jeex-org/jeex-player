@@ -1024,7 +1024,7 @@ describe('the light temperature', () => {
     delete attributes['light-temperature'];
     controller.attributeChanged('light-temperature');
     await flushed();
-    expect(record.temperatures).toEqual([5000, null, null]);
+    expect(record.temperatures).toEqual([5000, null, 5000]);
   });
 
   test('an invalid `light-temperature` warns once and keeps the current value', async () => {
@@ -1047,7 +1047,7 @@ describe('the light temperature', () => {
     const { controller, record } = harness({ src: '/a.json' }, { deferred: true });
     controller.connect();
     const viewer = controller.viewer!;
-    expect(viewer.getState().lightTemperature).toBeNull();
+    expect(viewer.getState().lightTemperature).toBe(5000);
     viewer.setLightTemperature(2700);
     expect(viewer.getState().lightTemperature).toBe(2700);
     expect(() => viewer.setLightTemperature(3050)).toThrow(expect.objectContaining({ code: 'bad-params', path: 'lightTemperature' }));

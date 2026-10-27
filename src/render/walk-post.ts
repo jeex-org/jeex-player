@@ -71,7 +71,9 @@ export const WALK_POST_TUNING = Object.freeze({
    */
   denoise: Object.freeze({ depthPhi: 0.05, normalPhi: 8, lumaPhi: 10, radius: 6, samples: 16 }),
   /**
-   * The camera white balance: a partial adaptation from `source`, the
+   * The fixed camera white balance, applied while no room balance answers
+   * (before the room lighting is live; `walk-lighting/room-balance.ts` sets
+   * each room's once it is): a partial adaptation from `source`, the
    * measured linear colour of the neutral surfaces, towards the display
    * white, by `degree` (`white-balance.ts`). Measured 2026-10-25 on the demo
    * apartment's living-room ceiling at the walk start (the default sun preset
@@ -88,7 +90,7 @@ export const WALK_POST_TUNING = Object.freeze({
   whiteBalance: Object.freeze({ source: Object.freeze([1, 0.6846, 0.4076] as const), degree: 0.554 }),
 });
 
-/** The tuned white balance the chain applies by default. */
+/** The tuned white balance the chain applies when no room balance answers. */
 export const WALK_WHITE_BALANCE: Mat3 = whiteBalanceMatrix(WALK_POST_TUNING.whiteBalance.source, WALK_POST_TUNING.whiteBalance.degree);
 
 /** The line of three r186's `OutputShader` the white balance follows: the linear colour just read. */
@@ -109,8 +111,18 @@ export function whiteBalancedOutput(fragment: string): string {
     .replace(OUTPUT_READ, `${OUTPUT_READ}\ngl_FragColor.rgb = max( jeexWhiteBalance * gl_FragColor.rgb, vec3( 0.0 ) );`);
 }
 
-/** Options of a chain; the white balance defaults to the tuned one. */
-export type WalkPostOptions = { whiteBalance?: Mat3 | undefined };
+/**
+ * Where the chain takes a camera balance from (`walk-lighting/room-balance.ts`):
+ * the live one for the screen, a room's at a capture's camera; `null` keeps
+ * the chain's own.
+ */
+export type BalanceSource = {
+  live(): Mat3 | null;
+  at(position: { x: number; y: number; z: number }): Mat3 | null;
+};
+
+/** Options of a chain; the white balance defaults to the tuned one, and a balance source, when given, overrides it. */
+export type WalkPostOptions = { whiteBalance?: Mat3 | undefined; balance?: BalanceSource | undefined };
 
 /** The scene pass, drawing inside the beauty-pass scope a mirror captures in. */
 class BeautyPass extends RenderPass {
@@ -164,8 +176,9 @@ export class WalkPost implements PostProcessor {
   readonly occlusion: OcclusionPass;
   readonly smaa: SMAAPass;
   readonly output: OutputPass;
-  /** The white balance the output pass applies, row-major. */
+  /** The white balance the output pass applies when no balance source answers, row-major. */
   readonly whiteBalance: Mat3;
+  private readonly balance: BalanceSource | null;
   private readonly renderer: THREE.WebGLRenderer;
   /** The composer's size in device pixels now: the live size, or the last capture's until the next live frame. */
   private width: number;
@@ -197,6 +210,7 @@ export class WalkPost implements PostProcessor {
     this.smaa = new SMAAPass();
     this.output = new OutputPass();
     this.whiteBalance = options.whiteBalance ?? WALK_WHITE_BALANCE;
+    this.balance = options.balance ?? null;
     const material = this.output.material;
     material.fragmentShader = whiteBalancedOutput(material.fragmentShader);
     material.uniforms['jeexWhiteBalance'] = { value: new THREE.Matrix3().set(...this.whiteBalance) };
@@ -214,8 +228,14 @@ export class WalkPost implements PostProcessor {
     );
   }
 
+  /** The camera balance for a picture from `position`: the source's room balance, else the chain's own. */
+  whiteBalanceAt(position: { x: number; y: number; z: number }): Mat3 {
+    return this.balance?.at(position) ?? this.whiteBalance;
+  }
+
   render(scene: THREE.Scene, camera: THREE.Camera, delta: number): void {
     this.view(scene, camera);
+    this.setBalance(this.balance?.live() ?? this.whiteBalance);
     // A capture leaves its own size behind (a clip of N frames resizes once); the live frame takes its size back.
     this.resize(this.liveWidth, this.liveHeight);
     this.composer.render(delta);
@@ -226,6 +246,7 @@ export class WalkPost implements PostProcessor {
     const previous = this.renderer.getRenderTarget();
     try {
       this.view(scene, camera);
+      this.setBalance(this.whiteBalanceAt(camera.getWorldPosition(new THREE.Vector3())));
       this.resize(width, height);
       // Every pass but the last into the composer's buffers, then the output
       // pass once, into the caller's target.
@@ -282,6 +303,11 @@ export class WalkPost implements PostProcessor {
     this.disposed = true;
     this.composer.dispose();
     for (const pass of this.composer.passes) pass.dispose();
+  }
+
+  /** Sets the matrix the output pass applies. */
+  private setBalance(balance: Mat3): void {
+    (this.output.material.uniforms['jeexWhiteBalance']!.value as THREE.Matrix3).set(...balance);
   }
 
   /** Points the two scene-reading passes at `scene` and `camera`. */

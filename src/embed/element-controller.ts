@@ -25,6 +25,7 @@ import type { ViewerSelectionTarget } from '../app/selection.js';
 import { resolveLocaleTag } from '../ui/messages.js';
 import { parseRatio } from './ratio.js';
 import { isLightTemperature } from '../lighting/colour-temperature.js';
+import { TEMPERATURE_RANGE } from '../lighting/temperature-range.js';
 import { convertRaw } from '../app/option-raw.js';
 import { PendingViewer } from './pending-viewer.js';
 import type { ElementRuntime } from './element-runtime.js';
@@ -400,13 +401,14 @@ export class ViewerElementController {
   }
 
   /**
-   * `light-temperature` on a running viewer: a whole step of kelvin, or
-   * `original` / no attribute for «Original». Anything else warns once and
-   * keeps the temperature on screen. Before the start the mount reads it.
+   * `light-temperature` on a running viewer: a whole step of kelvin,
+   * `original` for «Original», no attribute for the default. Anything else
+   * warns once and keeps the temperature on screen. Before the start the
+   * mount reads it.
    */
   private applyTemperature(handle: ViewerHandle): void {
     const raw = this.host.attribute(TEMPERATURE_ATTRIBUTE);
-    const value = raw === null ? null : convertRaw('temperature', raw);
+    const value = raw === null ? TEMPERATURE_RANGE.default : convertRaw('temperature', raw);
     if (value === null || isLightTemperature(value)) {
       handle.setLightTemperature(value);
       return;
