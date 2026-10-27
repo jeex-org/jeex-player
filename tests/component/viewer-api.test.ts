@@ -169,6 +169,40 @@ describe('mounting', () => {
     expect(canvas?.width).toBeGreaterThan(0);
   });
 
+  test(
+    'Retry recovers after the GL context was lost and never came back',
+    async () => {
+      const { handle } = mount();
+      await handle.ready;
+      const errors: ViewerError[] = [];
+      handle.on('error', (error) => errors.push(error));
+      const readyEvents: ViewerReadyInfo[] = [];
+      handle.on('ready', (payload) => readyEvents.push(payload));
+      const lost = handle.element.querySelector<HTMLCanvasElement>('[data-jeex="scene-canvas"]')!;
+      const lose = lost.getContext('webgl2')?.getExtension('WEBGL_lose_context');
+      expect(lose, 'the browser must expose WEBGL_lose_context for this test to mean anything').toBeTruthy();
+      // Lost for good: nothing calls `restoreContext()`, as when a GPU process
+      // dies and the browser never hands the context back.
+      lose!.loseContext();
+      await until(() => errors.some((error) => error.code === 'context-lost'), 'the context-lost card');
+      const retryButton = handle.element.querySelector<HTMLButtonElement>('[data-jeex="retry-button"]');
+      // Guards against Retry booting again on the canvas whose context is
+      // lost: three asks it for its shader precision, gets null, and the
+      // card comes back with «Cannot read properties of null (reading 'precision')».
+      retryButton!.click();
+      await until(() => readyEvents.length > 0 || errors.length > 1, 'the retried boot to report ready', 60_000);
+      expect(errors.map((error) => error.code)).toEqual(['context-lost']);
+      expect(handle.element.querySelector('[data-jeex="error-state"]')?.classList.contains('is-hidden')).toBe(true);
+      const canvases = handle.element.querySelectorAll<HTMLCanvasElement>('[data-jeex="scene-canvas"]');
+      expect(canvases.length).toBe(1);
+      // `ready` waits for the first drawn frame, so this is the canvas the scene is on.
+      expect(canvases[0]!.getContext('webgl2')?.isContextLost()).toBe(false);
+      // The boot it retried had a door button; a teardown removes it, and the retried boot must put it back.
+      expect(handle.element.querySelectorAll('[data-jeex="door-hud"]').length).toBe(1);
+    },
+    MOUNT_PLUS_RELOAD_TIMEOUT_MS,
+  );
+
   test('ready resolves and the viewer root is inside the host’s container', async () => {
     const { container, handle } = mount();
     await handle.ready;

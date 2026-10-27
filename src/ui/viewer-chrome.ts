@@ -80,7 +80,6 @@ export type ViewerChromeDeps = {
 export class ViewerChrome {
   private readonly deps: ViewerChromeDeps;
   private messages: Messages;
-  private canvas: HTMLCanvasElement;
 
   private readonly loadingState: HTMLElement;
   private readonly loadingProgress: HTMLElement;
@@ -159,7 +158,6 @@ export class ViewerChrome {
     const { byName } = deps.roots;
     this.deps = deps;
     this.messages = deps.messages;
-    this.canvas = deps.roots.canvas;
     this.loadingState = byName('loading-state');
     this.loadingProgress = byName('loading-progress');
     this.loadingLabel = byName('loading-label');
@@ -359,9 +357,10 @@ export class ViewerChrome {
     this.retryButton.classList.toggle('is-hidden', !retry);
     this.errorState.classList.remove('is-hidden');
     if (keepCanvas || retry) return;
-    const adopted = adoptFallbackCanvas(this.canvas, 'scene-canvas', this.messages.t('canvas.fallbackLabel'));
-    this.canvas = adopted.canvas;
-    if (adopted.context) paintWebglFallback(this.canvas, adopted.context, this.deps.viewport);
+    const adopted = adoptFallbackCanvas(this.deps.roots.canvas, 'scene-canvas', this.messages.t('canvas.fallbackLabel'));
+    // The shell's own reference follows the replacement, as it does a Retry's fresh canvas (`ViewerApp.retry`).
+    this.deps.roots.canvas = adopted.canvas;
+    if (adopted.context) paintWebglFallback(adopted.canvas, adopted.context, this.deps.viewport);
   }
 
   /**
@@ -404,7 +403,7 @@ export class ViewerChrome {
    */
   setCanvasDescription(sceneName: string, roomNames: readonly string[]): void {
     this.lastDescription = { sceneName, roomNames };
-    this.canvas.setAttribute(
+    this.deps.roots.canvas.setAttribute(
       'aria-description',
       this.messages.t('canvas.description', {
         name: sceneName,

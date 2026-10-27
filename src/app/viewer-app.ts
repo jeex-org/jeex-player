@@ -177,7 +177,7 @@ export class ViewerApp {
     this.globals.claim();
     this.roots = this.context.roots;
     this.messages = this.context.messages;
-    this.picker = new Picker(this.roots.canvas);
+    this.picker = new Picker({ getBoundingClientRect: () => this.roots.canvas.getBoundingClientRect() }); // a new canvas per boot (`ViewerStage.dispose`)
     this.shell = new FullscreenController(this.roots.viewport, {
       onFullscreenChange: () => this.ui.updateFullscreenButton(),
       signal: this.context.signal,
@@ -200,7 +200,7 @@ export class ViewerApp {
     this.ui.bind();
     this.doors = new DoorController({
       container: this.roots.viewport,
-      canvas: this.roots.canvas,
+      canvas: () => this.roots.canvas,
       messages: this.messages,
       interactive: options.doors.interactive,
       autoOpen: () => options.doors.autoOpen,
@@ -434,6 +434,7 @@ export class ViewerApp {
     // A released instance has no shell left to boot into: its Retry button is
     // gone with the rest of the markup, but a host may still hold the closure.
     if (this.released) return;
+    this.teardown(); // a lost context's card sits over a live instance (`context-recovery.ts`)
     this.disposed = false;
     this.ui.showLoading();
     await this.init().catch((error: unknown) => {
