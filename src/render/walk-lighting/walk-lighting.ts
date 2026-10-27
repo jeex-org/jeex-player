@@ -38,12 +38,13 @@
  * nothing.
  *
  * Camera balance: once the probes are written (a bake, a relight, a
- * refresh), every room is measured as it shows from its probe point
- * (`room-sampler.ts`) into its white balance and exposure (`room-balance.ts`). `followEye` eases the live
- * balance towards the room the eye stands in, 95 % of the way in `balance.blendMs`, and
- * holds the last room's outside every room; `balanceAt` answers a room's
- * balance at once, for a capture from another camera. Neither answers before
- * the lighting is live.
+ * refresh), the light of every room is measured with a grey card from its
+ * probe point (`room-sampler.ts`) into its white balance and exposure
+ * (`room-balance.ts`). `followEye` eases the live balance towards the room
+ * the eye stands in, 95 % of the way in `balance.blendMs`, and holds the last
+ * room's outside every room; `balanceAt` answers a room's balance at once,
+ * for a capture from another camera. Neither answers before the lighting is
+ * live.
  */
 
 import { ViewerLibError } from '../../shared/errors.js';

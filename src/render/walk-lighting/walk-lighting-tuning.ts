@@ -97,22 +97,22 @@ export const WALK_LIGHTING_TUNING = Object.freeze({
    * set by the look of professional interior photographs of modern flats
    * (64 listing photographs, 2026-10-27): their bright neutral surfaces read
    * red over blue 1.02-1.06 in linear colour whatever lit the room, and their
-   * median lightness 176-187 of 255.
+   * median lightness 176-187 of 255. Measured on a grey card (`room-sampler.ts`).
    */
   balance: Object.freeze({
     /** Edge of the cube a room is measured with, texels. */
     sampleSize: 32,
-    /** A probe texel is a neutral surface under this saturation, display-encoded. */
+    /** A grey-card texel counts towards the room's light under this saturation, display-encoded, judged against the room's cast. */
     neutralSaturation: 0.25,
     /** Passes of the white's refinement: the band's mean, then the texels near it, twice. */
     whitePasses: 3,
-    /** Texels from this luminance quantile up are the bright surfaces the white is measured from. */
+    /** Texels from this luminance quantile up are the brightly lit surfaces the light is measured on. */
     neutralQuantile: 0.7,
     /** Texels at or above this luminance quantile are highlights (sky, glowing shades): out of the white, and the exposure's limit. */
     highlightQuantile: 0.97,
-    /** Red over blue a neutral surface keeps after the balance: a trace of warmth, as in the photographs. */
+    /** Red over blue the light on a white surface keeps after the balance: a trace of warmth, as in the photographs. */
     tintRB: 1.06,
-    /** The neutral surfaces' mean luminance after exposure and gain, before tone mapping. */
+    /** The grey card's mean luminance (a white surface's) after exposure and gain, before tone mapping. */
     targetLevel: 0.85,
     /** The most the gain opens a room up: 1.5 stops. */
     maxGain: 2 ** 1.5,
