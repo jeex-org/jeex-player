@@ -30,15 +30,21 @@ import type * as THREE from 'three';
 import { isPostProcessed, type PostProcessor } from '../render/post-processor.js';
 import { FirstDrawGate } from '../render/first-draw.js';
 import type { ViewerMode } from '../scene/types.js';
+import type { BalanceSource } from '../render/walk-post.js';
 
 /**
  * The production `build`: imports the chain's module on demand and builds it
  * on the runtime's renderer. The dynamic import is what keeps the chain out of
  * the boot bundle of the ES and demo builds (a `lazy-` chunk of its own).
  */
-export async function loadWalkPost(renderer: THREE.WebGLRenderer, scene: THREE.Scene, camera: THREE.Camera): Promise<PostProcessor> {
+export async function loadWalkPost(
+  renderer: THREE.WebGLRenderer,
+  scene: THREE.Scene,
+  camera: THREE.Camera,
+  balance?: BalanceSource,
+): Promise<PostProcessor> {
   const { createWalkPost } = await import('../render/walk-post.js');
-  return createWalkPost(renderer, scene, camera);
+  return createWalkPost(renderer, scene, camera, { balance });
 }
 
 export type WalkPostDeps = {

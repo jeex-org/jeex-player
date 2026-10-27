@@ -267,7 +267,11 @@ export class ViewerStage {
     this.camera.layers.enable(FLOOR_RING_LAYER);
     this.runtime.setCamera(this.camera);
     this.walkPost = new WalkPostController({
-      build: () => loadWalkPost(this.runtime.renderer, this.runtime.scene, this.camera),
+      build: () =>
+        loadWalkPost(this.runtime.renderer, this.runtime.scene, this.camera, {
+          live: () => this.walkLighting.balance(),
+          at: (position) => this.walkLighting.balanceAt(position),
+        }),
       attach: (chain) => this.runtime.setPostProcessor(chain),
       report: (error) => deps.onFrameError?.(error),
       // The scene's programs for the chain's own target, linked before the first frame through it.
@@ -284,6 +288,7 @@ export class ViewerStage {
       chainReady: () => this.walkPost.state() === 'on',
       document: () => this.lightingDocument?.document() ?? null,
       now: () => performance.now(),
+      eye: () => this.camera.position,
       hdri: deps.hdri === undefined ? undefined : { ...deps.hdri, loads: hdriLoads(this.runtime.renderer) },
     });
     this.planModes = new PlanModes({

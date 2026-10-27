@@ -92,6 +92,8 @@ export const COMPONENT_FILE_COST_S: Readonly<Record<string, number>> = {
   'render-on-demand.test.ts': 582,
   'render-runtime-lighting.test.ts': 2,
   'replace-popup.test.ts': 5,
+  // Not run on the hosted runners (skipped whole on a software rasteriser, as walk-glossy): the floor.
+  'room-white-balance.test.ts': 1,
   'selection-highlight.test.ts': 1,
   'selection-panel.test.ts': 1,
   'selection.test.ts': 49,

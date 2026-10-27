@@ -22,6 +22,15 @@ as described under [Versioning](#versioning).
 - **Releases to GitHub Packages.** A pushed tag `v<version>` runs the CI check,
   refuses a tag that does not equal `package.json#version`, builds the library
   and publishes it.
+- **A camera balance per room in walk and tour.** Every room is measured from
+  its probe point once its lighting is baked, and the camera balances it the
+  way an interior photographer would, on a grey card: the light on its white
+  surfaces reads near neutral whether warm lamps or a blue sky light them,
+  while every finish keeps its own colour, and a dim room is opened
+  up by at most 1.5 stops without flattening its window to white. The camera
+  settles into a room it enters over about half a second; stills, video
+  frames and panoramas take the balance of the room their own camera stands
+  in. This replaces the one fixed white balance of every room.
 
 - **Asset handles in the editor.** With the asset move tool armed, the
   selected floor or ceiling object carries a ring round its footprint: a drag
@@ -116,6 +125,15 @@ as described under [Versioning](#versioning).
   installs the package provides `zod` 4.6.7 or later in 4.x.
 
 ### Changed
+
+- **Cooler default light.** The interior's artificial light now defaults to a
+  neutral 5000 K instead of «Original», and the daylight sky walk and tour
+  are lit by is a neutral grey (`#d4d4d4` to `#b9b9b9`) instead of a warm
+  sand. Together with the per-room camera balance, interiors read cool and
+  modern rather than warm. To get the lights' own colours back, pass
+  `lighting: { temperature: null }`, `?lightTemperature=original` or
+  `light-temperature="original"`; a removed `light-temperature` attribute now
+  means the default, not «Original». The sky has no option.
 
 - **A door's clear zone follows its swing.** The layout linter's
   `door-clear-zone` (and the free floor `suggestPlacement` samples) keeps

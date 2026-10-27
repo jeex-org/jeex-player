@@ -117,7 +117,7 @@ describe('resolveViewerOptions', () => {
       offers: { url: undefined },
       analytics: { mode: 'on', endpoint: undefined },
       settings: { show: false, side: 'end' },
-      lighting: { temperature: null, hdri: {} },
+      lighting: { temperature: 5000, hdri: {} },
       onLog: logged.sink,
     });
     // The tour only engages at start in `view.mode: 'tour'`; `tour.mode` says
@@ -182,7 +182,7 @@ describe('resolveViewerOptions', () => {
       offers: { url: undefined },
       analytics: { mode: 'on', endpoint: undefined },
       settings: { show: false, side: 'end' },
-      lighting: { temperature: null, hdri: {} },
+      lighting: { temperature: 5000, hdri: {} },
       onLog: logged.sink,
     });
     expect(Object.keys(resolved)).toEqual([
@@ -1062,10 +1062,10 @@ describe('resolveTexture: a host object', () => {
 });
 
 describe('settings.show and lighting.temperature', () => {
-  test('the settings button is off and the temperature «Original» by default', () => {
+  test('the settings button is off and the temperature a neutral 5000 K by default', () => {
     const options = resolve();
     expect(options.settings).toEqual({ show: false, side: 'end' });
-    expect(options.lighting).toEqual({ temperature: null, hdri: {} });
+    expect(options.lighting).toEqual({ temperature: 5000, hdri: {} });
   });
 
   test('a host turns the button on and sets a temperature, or «Original» with null', () => {
@@ -1077,10 +1077,10 @@ describe('settings.show and lighting.temperature', () => {
     expect(warnings()).toEqual([]);
   });
 
-  test('a temperature outside the range, off its step or not a number falls back to «Original» with one warning each', () => {
+  test('a temperature outside the range, off its step or not a number falls back to the default with one warning each', () => {
     for (const bad of [2000, 7000, 3050, Number.NaN, '3000', true]) {
       logged.clear();
-      expect(resolve({ lighting: { temperature: bad as never } }).lighting.temperature).toBeNull();
+      expect(resolve({ lighting: { temperature: bad as never } }).lighting.temperature).toBe(5000);
       expect(warnings()).toHaveLength(1);
       expect(warnings()[0]).toContain('lighting.temperature');
     }
@@ -1089,7 +1089,7 @@ describe('settings.show and lighting.temperature', () => {
   test('?settings= and ?lightTemperature= are the query spellings; original means «Original»', () => {
     expect(optionsFromQuery('?settings=1&lightTemperature=3000')).toEqual({ settings: { show: true }, lighting: { temperature: 3000 } });
     expect(optionsFromQuery('?lightTemperature=original')).toEqual({ lighting: { temperature: null } });
-    expect(resolve(optionsFromQuery('?lightTemperature=warm') as ViewerOptionsInput).lighting.temperature).toBeNull();
+    expect(resolve(optionsFromQuery('?lightTemperature=warm') as ViewerOptionsInput).lighting.temperature).toBe(5000);
     expect(warnings()).toHaveLength(1);
   });
 

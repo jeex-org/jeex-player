@@ -58,6 +58,6 @@ describe('isLightTemperature', () => {
   });
 });
 
-test('the standard publishes the range with «Original» as the default', () => {
-  expect(LIGHTING_STANDARD.temperature).toEqual({ min: 2700, max: 6500, step: 100, default: null });
+test('the standard publishes the range with a neutral 5000 K as the default', () => {
+  expect(LIGHTING_STANDARD.temperature).toEqual({ min: 2700, max: 6500, step: 100, default: 5000 });
 });

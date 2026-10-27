@@ -8,10 +8,15 @@
  * Pure module: no `three`, no DOM.
  */
 
-/** Kelvin, whole steps; `default: null` is «Original» (no conversion). */
-export const TEMPERATURE_RANGE = Object.freeze({
+/**
+ * Kelvin, whole steps; `null` is «Original» (no conversion). The default is a
+ * neutral 5000 K: the interiors read cool and modern, as professional interior
+ * photographs of modern flats do; «Original» was the default until the
+ * per-room camera balance arrived.
+ */
+export const TEMPERATURE_RANGE: Readonly<{ min: number; max: number; step: number; default: number | null }> = Object.freeze({
   min: 2700,
   max: 6500,
   step: 100,
-  default: null,
+  default: 5000,
 });

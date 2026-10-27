@@ -64,10 +64,11 @@ test('demo page: the panel opens by keyboard, steps the temperature, closes on E
   await expect(button).toHaveAttribute('aria-expanded', 'true');
   const slider = panel.locator('input[type="range"]');
   await expect(slider).toBeFocused();
-  await expect(slider).toHaveAttribute('aria-valuetext', 'Original');
+  // The default light is 5000 K.
+  await expect(slider).toHaveAttribute('aria-valuetext', '5000 K · cool');
   await page.keyboard.press('ArrowLeft');
-  await expect(slider).toHaveAttribute('aria-valuetext', '3900 K · neutral');
-  expect(await page.evaluate(() => window.jeexViewer?.getState().lightTemperature)).toBe(3900);
+  await expect(slider).toHaveAttribute('aria-valuetext', '4900 K · cool');
+  expect(await page.evaluate(() => window.jeexViewer?.getState().lightTemperature)).toBe(4900);
   await expectNoNewA11yViolations(page, testInfo, 0);
   await page.keyboard.press('Escape');
   await expect(panel).toBeHidden();
@@ -129,7 +130,7 @@ test('element page: a second viewer with `settings` and `settings-side="start"` 
   await expect(panel).toBeVisible();
   await expect(panel.locator('output')).toHaveText('3000 K · warm');
   await expectNoNewA11yViolations(page, testInfo, 0);
-  // A live attribute change reaches the open panel; the first viewer stays at «Original».
+  // A live attribute change reaches the open panel; the first viewer stays at the default 5000 K.
   await page.evaluate(() => document.querySelector('#second')!.setAttribute('light-temperature', '6500'));
   await expect(panel.locator('output')).toHaveText('6500 K · cool');
   const states = await page.evaluate(() => {
@@ -137,5 +138,5 @@ test('element page: a second viewer with `settings` and `settings-side="start"` 
     const read = (selector: string): number | null | undefined => document.querySelector<El>(selector)?.viewer?.getState().lightTemperature;
     return [read('#viewer'), read('#second')];
   });
-  expect(states).toEqual([null, 6500]);
+  expect(states).toEqual([5000, 6500]);
 });

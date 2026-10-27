@@ -271,6 +271,20 @@ describe('room lighting on the demo apartment', { timeout: MOUNT_TIMEOUT_MS }, (
   let orbitBefore: Blob;
   const errors: string[] = [];
 
+  /**
+   * Runs `measure` with the camera's per-room balance off (`room-balance.ts`): the fixed balance only, as
+   * before the rooms are measured. The bake's calibration is of the light that reaches each room; the
+   * camera opening up a dim room is another layer, which `room-white-balance.test.ts` pins.
+   */
+  async function bakeOnly<T>(measure: () => Promise<T>): Promise<T> {
+    const spy = vi.spyOn(WalkLighting.prototype, 'balanceAt').mockReturnValue(null);
+    try {
+      return await measure();
+    } finally {
+      spy.mockRestore();
+    }
+  }
+
   /** The mean linear luminance of a patch, captured from its camera. */
   async function patch(name: keyof typeof PATCHES): Promise<number> {
     const { blob } = await handle.capture.still({ width: 160, height: 120, camera: PATCHES[name].camera, caption: false });
@@ -390,8 +404,8 @@ describe('room lighting on the demo apartment', { timeout: MOUNT_TIMEOUT_MS }, (
   });
 
   test('calibration: the windowless WC reads at most 0.35 of the living room; measured values recorded', async () => {
-    const wc = await patch('wc');
-    const living = await patch('living');
+    const wc = await bakeOnly(() => patch('wc'));
+    const living = await bakeOnly(() => patch('living'));
     record('walk', { wc, living, ratio: wc / living, ambient: T.ambientFloor, exposure: T.walkExposure });
     // The components, for the calibration: no ambient floor, exposure 1.
     const ambient = lighting.rig.ambient.intensity;
@@ -449,7 +463,9 @@ describe('room lighting on the demo apartment', { timeout: MOUNT_TIMEOUT_MS }, (
 
   test('facades look as in the editing modes within 5 %', async () => {
     const facade = { position: { x: 18, y: 1.6, z: 2 }, target: { x: 13.35, y: 1.6, z: 2 } };
-    const walk = await centreLuminance((await handle.capture.still({ width: 160, height: 120, camera: facade, caption: false })).blob, 16);
+    const walk = await bakeOnly(async () =>
+      centreLuminance((await handle.capture.still({ width: 160, height: 120, camera: facade, caption: false })).blob, 16),
+    );
     handle.setMode('orbit');
     await until(() => debug().walkLighting().state === 'live' && lighting.rig.state === 'editing', 'the editing look', 30_000);
     const editing = await centreLuminance(
@@ -476,15 +492,15 @@ describe('room lighting on the demo apartment', { timeout: MOUNT_TIMEOUT_MS }, (
     expect(b.every((value, i) => value === a[i])).toBe(true);
   });
 
-  test('a panorama in walk is darker in the windowless WC than in the living room, as on screen', async () => {
+  test('a panorama in walk is darker in the windowless WC than in the living room, as the bake lights them', async () => {
     handle.setMode('walk');
     await until(() => lighting.rig.state === 'walk', 'the walk look again', 60_000);
     const mean = async (roomId: string): Promise<number> => {
       const { blob } = await handle.capture.panorama({ width: 256, roomId, caption: false });
       return centreLuminance(blob, 64);
     };
-    const wc = await mean(ROOM.wc);
-    const living = await mean(ROOM.living);
+    const wc = await bakeOnly(() => mean(ROOM.wc));
+    const living = await bakeOnly(() => mean(ROOM.living));
     record('panorama', { wc, living });
     expect(wc).toBeLessThan(living);
   });

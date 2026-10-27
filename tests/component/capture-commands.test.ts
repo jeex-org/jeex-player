@@ -242,11 +242,18 @@ describe('capture.panorama', () => {
     expect(provenance.roomId).toBe(L_SHAPE.room.a);
   });
 
-  test('with the walk chain, its white balance is applied in the display pass; without it the picture is unbalanced', async () => {
+  test("with the walk chain, its white balance for the panorama's point is applied in the display pass; without it the picture is unbalanced", async () => {
     const runtime = openRuntime();
     const model = loadModel();
     const strong = whiteBalanceMatrix([1, 0.5, 0.25], 1);
-    const chain = (whiteBalance?: readonly number[]) => ({ whiteBalance }) as unknown as PostProcessor;
+    const asked: { x: number; y: number; z: number }[] = [];
+    const chain = (whiteBalance: readonly number[]) =>
+      ({
+        whiteBalanceAt: (position: { x: number; y: number; z: number }) => {
+          asked.push(position);
+          return whiteBalance;
+        },
+      }) as unknown as PostProcessor;
     const shot = async (extra: Partial<CaptureDeps>) =>
       meanColour(await decode((await commandsFor(runtime, model, true, extra).panorama({ width: 64, roomId: L_SHAPE.room.a })).blob));
     const plain = await shot({});
@@ -255,6 +262,9 @@ describe('capture.panorama', () => {
     identityChain.forEach((v, i) => expect(Math.abs(v - plain[i]!)).toBeLessThanOrEqual(1));
     // A strong cooling matrix: blue gains on red against the unbalanced picture.
     expect(balanced[2] / balanced[0]).toBeGreaterThan((plain[2] / plain[0]) * 1.1);
+    // The chain is asked for the balance where each panorama is taken: the room's eye point, at eye height.
+    expect(asked).toHaveLength(2);
+    for (const position of asked) expect(position.y).toBeGreaterThan(1);
   });
 
   test('a room the scene does not have is refused', async () => {

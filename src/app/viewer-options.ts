@@ -17,6 +17,7 @@
 
 import type { ViewerMode } from '../scene/types.js';
 import type { HdriOption } from '../lighting/hdri-entry.js';
+import { TEMPERATURE_RANGE } from '../lighting/temperature-range.js';
 // TYPE only, and it must be: `ui/host-slots.ts` touches the DOM. The runtime
 // copy of `SLOT_NAMES` this table validates against lives in `option-sets.ts`.
 import type { SlotName } from '../ui/host-slots.js';
@@ -247,8 +248,8 @@ export type ViewerOptions = {
   lighting: {
     /**
      * Colour temperature of the interior's artificial light (the lamps and the
-     * walk's ambient floor), kelvin in steps of 100, or `null` for «Original»
-     * (the default: every light keeps its own colour). Daylight never changes.
+     * walk's ambient floor), kelvin in steps of 100 (default 5000), or `null`
+     * for «Original» (every light keeps its own colour). Daylight never changes.
      * @minimum 2700
      * @maximum 6500
      * @multipleOf 100
@@ -318,7 +319,7 @@ export const DEFAULT_VIEWER_OPTIONS: ViewerOptions = {
   scene: {},
   analytics: { mode: 'on' },
   settings: { show: false, side: 'end' },
-  lighting: { temperature: null, hdri: {} },
+  lighting: { temperature: TEMPERATURE_RANGE.default, hdri: {} },
 };
 
 /**
@@ -468,7 +469,7 @@ export const OPTION_SCHEMA = {
     query: 'settingsSide',
     attr: 'settings-side',
   },
-  'lighting.temperature': { kind: 'temperature', default: null, query: 'lightTemperature', attr: 'light-temperature' },
+  'lighting.temperature': { kind: 'temperature', default: TEMPERATURE_RANGE.default, query: 'lightTemperature', attr: 'light-temperature' },
 } as const satisfies Record<OptionPath, OptionSpec>;
 
 /** `overlay="kiosk"`/`"embed"`/`"unbranded"`: sugar over other options, not itself a `ViewerOptions` field. */
