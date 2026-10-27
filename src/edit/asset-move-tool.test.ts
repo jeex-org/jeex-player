@@ -17,7 +17,16 @@ import { mask, type LegalityMask } from '../layout/asset-mask.js';
 import { proposePose } from '../layout/asset-pose.js';
 import { pointInPolygon } from '../plan/plan-geometry.js';
 import { nearestFace } from '../layout/rules/context.js';
-import { AssetMoveTool, type AssetEdit, type AssetEditRefused, type AssetMoveHost, type PointerSample } from './asset-move-tool.js';
+import {
+  AssetMoveTool,
+  HEIGHT_M_PER_PX,
+  TURN_STEP_DEG,
+  type AssetEdit,
+  type AssetEditRefused,
+  type AssetHandle,
+  type AssetMoveHost,
+  type PointerSample,
+} from './asset-move-tool.js';
 import type { Scheduler } from './drag-kit.js';
 import type { DemoAsset, SceneData, SceneOp } from '../scene/types.js';
 
@@ -39,6 +48,8 @@ class FakeHost implements AssetMoveHost {
   edits: AssetEdit[] = [];
   refusals: AssetEditRefused[] = [];
   moving: boolean[] = [];
+  /** The handle under every press, as the drawn gizmo would answer it. */
+  handle: AssetHandle | null = null;
 
   active(): boolean {
     return this.armed;
@@ -85,6 +96,9 @@ class FakeHost implements AssetMoveHost {
   }
   onMoving(moving: boolean): void {
     this.moving.push(moving);
+  }
+  handleAt(): AssetHandle | null {
+    return this.handle;
   }
   last(): DragPose {
     return this.shown.at(-1)!.pose;
@@ -610,5 +624,114 @@ describe('edits before the host answers build on what is on screen', () => {
     const rotate = host.edits[1]!.ops.find((op) => op.op === 'rotate_object');
     if (rotate?.op !== 'rotate_object') throw new Error('expected rotate_object');
     expect(rotate.rotationY).toBeCloseTo((home.rotationY ?? 0) + Math.PI / 12, 6);
+  });
+});
+
+describe('the handles', () => {
+  /** A press `radius` metres from `centre` at floor angle `from`, swept round to `to` in small steps, released. */
+  function sweep(centre: { x: number; z: number }, from: number, to: number, radius = 1): void {
+    const point = (angle: number) => ({ x: centre.x + radius * Math.sin(angle), z: centre.z + radius * Math.cos(angle) });
+    const start = point(from);
+    expect(tool.down(at(start.x, start.z))).toBe(true);
+    for (let step = 1; step <= 8; step += 1) {
+      const p = point(from + ((to - from) * step) / 8);
+      tool.move(at(p.x, p.z));
+    }
+    const end = point(to);
+    tool.up(at(end.x, end.z));
+  }
+
+  test('the ring turns the object by the angle swept, in 15° steps, and commits it as a turn', () => {
+    host.selection = DEMO.asset.livingChairA;
+    host.handle = 'yaw';
+    const home = placement(DEMO.asset.livingChairA);
+    // 17° of sweep is one 15° step.
+    sweep(home.position, 0, (17 / 180) * Math.PI);
+    expect(host.refusals).toEqual([]);
+    expect(host.edits).toHaveLength(1);
+    const rotate = host.edits[0]!.ops.find((op) => op.op === 'rotate_object');
+    if (rotate?.op !== 'rotate_object') throw new Error('expected rotate_object');
+    expect(rotate.rotationY).toBeCloseTo((home.rotationY ?? 0) + (TURN_STEP_DEG / 180) * Math.PI, 6);
+    expect(host.edits[0]!.gesture).toBe('turn');
+  });
+
+  test('a press on the selected body drags the body even where a handle lies within reach', () => {
+    host.selection = DEMO.asset.livingChairA;
+    host.handle = 'yaw';
+    const home = placement(DEMO.asset.livingChairA).position;
+    const spot = legalSpot(DEMO.asset.livingChairA, 0.6, 'floor');
+    drag(tool, home, spot);
+    const op = host.edits[0]!.ops[0]!;
+    if (op.op !== 'move_object') throw new Error('expected move_object');
+    expect(op.position!.x).toBeCloseTo(spot.x, 6);
+    expect(host.edits[0]!.gesture).toBe('move');
+  });
+
+  test('a ring turn that does not fit is refused with the issue, and the object keeps its yaw', () => {
+    host.selection = DEMO.asset.studyDesk;
+    host.handle = 'yaw';
+    const home = placement(DEMO.asset.studyDesk);
+    sweep(home.position, 0, Math.PI / 2);
+    expect(host.edits).toEqual([]);
+    expect(host.refusals).toHaveLength(1);
+    const desk = host.shown.filter((entry) => entry.id === DEMO.asset.studyDesk).at(-1)!;
+    expect(desk.pose.rotationY).toBeCloseTo(home.rotationY ?? 0, 6);
+  });
+
+  test('in plan3d the height handle lifts a wall object by the vertical drag', () => {
+    host.selection = DEMO.asset.hallMirror;
+    host.handle = 'height';
+    const home = placement(DEMO.asset.hallMirror).position;
+    // Beside the body, where the bar is: a press on the body itself drags the body.
+    const bar = { x: home.x + 1, z: home.z };
+    expect(tool.down(at(bar.x, bar.z))).toBe(true);
+    // 0.08 of a test metre is 8 px up the screen: 4 cm, inside the mirror's own mount band (`wall-hung`).
+    tool.move(at(bar.x, bar.z - 0.04));
+    tool.move(at(bar.x, bar.z - 0.08));
+    tool.up(at(bar.x, bar.z - 0.08));
+    expect(host.refusals).toEqual([]);
+    const op = host.edits[0]!.ops[0]!;
+    if (op.op !== 'move_object') throw new Error('expected move_object');
+    expect(op.position!.y).toBeCloseTo(home.y + 8 * HEIGHT_M_PER_PX, 6);
+    // The face and the place along it stay.
+    expect(op.position!.x).toBeCloseTo(home.x, 6);
+    expect(op.position!.z).toBeCloseTo(home.z, 6);
+  });
+
+  test('the height handle stops where the body meets the ceiling: the height-fit band', () => {
+    host.selection = DEMO.asset.hallMirror;
+    host.handle = 'height';
+    const home = placement(DEMO.asset.hallMirror).position;
+    const context = dragContext(apartmentScene, plan, DEMO.asset.hallMirror)!;
+    const half = poseItem(context, { position: home, rotationY: placement(DEMO.asset.hallMirror).rotationY ?? 0 }).dims[1] / 2;
+    expect(tool.down(at(home.x + 1, home.z))).toBe(true);
+    tool.move(at(home.x + 1, home.z - 20));
+    expect(host.last().position.y).toBeCloseTo(apartmentScene.ceilingHeight - half, 6);
+    tool.move(at(home.x + 1, home.z + 40));
+    expect(host.last().position.y).toBeCloseTo(half, 6);
+  });
+});
+
+describe('what the tool leaves to others', () => {
+  test('a drag never judges circulation: the floor rule runs once, on the commit', () => {
+    // Every rule the drag judges per item; circulation floods a whole room and has none.
+    const context = dragContext(apartmentScene, plan, DEMO.asset.livingSofa)!;
+    const issues = judge(context.ctx, poseItem(context, { position: { x: 0, y: 0, z: 0 }, rotationY: 0 })).issues;
+    expect(issues.length).toBeGreaterThan(0);
+    expect(issues.some((issue) => issue.rule === 'circulation')).toBe(false);
+  });
+
+  test('a table lamp dropped onto a nightstand stands on its top, not on the floor', () => {
+    // The second nightstand's top made free: the lamp moves over from the first.
+    host.scene = { ...apartmentScene, assets: apartmentScene.assets.filter((asset) => asset.id !== DEMO.asset.bedroomLampB) };
+    host.selection = DEMO.asset.bedroomLampA;
+    const lamp = placement(DEMO.asset.bedroomLampA).position;
+    const target = placement(DEMO.asset.bedroomNightstandB).position;
+    drag(tool, lamp, target);
+    expect(host.refusals).toEqual([]);
+    const op = host.edits[0]!.ops[0]!;
+    if (op.op !== 'move_object') throw new Error('expected move_object');
+    expect(op.position!.y).toBeCloseTo(lamp.y, 6);
+    expect(op.position!.y).toBeGreaterThan(0.3);
   });
 });

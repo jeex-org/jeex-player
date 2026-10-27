@@ -15,6 +15,11 @@ import { listenerOptions } from '../shared/abort.js';
 import { claimPointer, releasePointer } from './drag-kit.js';
 import { AssetMoveTool, type AssetMoveHost, type AssetMoveState, type PointerSample } from './asset-move-tool.js';
 import { AssetSurfaceOverlay } from './asset-surface-overlay.js';
+import { AssetHandlesView } from './asset-handles-view.js';
+import { handleAt, handleShape, type HandlePixel, type HandlePoint } from './asset-handles.js';
+import { dragCatalogue } from './asset-move-catalogue.js';
+import { dragContext, poseItem, type DragContext } from '../layout/asset-legality.js';
+import { shippedFacts } from '../layout/layout-lint.js';
 
 /** `__viewerDebug.assetMove()`: the switch, the chunk, and the tool's own state once it is there. */
 export type AssetMoveDebug = { readonly enabled: boolean; readonly loaded: boolean; readonly state: AssetMoveState | null };
@@ -125,10 +130,25 @@ export type AssetMoveSession = {
   dispose(): void;
 };
 
-/** The tool's host as the wiring gives it: the field is the session's own, and `redraw` asks the viewer for a frame. */
-export type SessionHost = Omit<AssetMoveHost, 'drawMask'> & {
+/** What the handles need of the viewer: a frame to follow the object in, and the camera the mode draws with. */
+export type HandlesHost = {
+  /** Registers and drops the per-frame hook the handles follow the selection in (`RenderRuntime.addFrameHook`). */
+  addFrameHook(hook: () => void): void;
+  removeFrameHook(hook: () => void): void;
+  /** A plan point in client pixels through that camera, `null` behind it. */
+  project(point: HandlePoint): HandlePixel | null;
+  /** The plan direction pointing up the screen in the top view. */
+  screenUp(): { x: number; z: number };
+  /** `orbit` or `plan3d`, the modes the tool serves; `null` in any other. */
+  mode(): 'orbit' | 'plan3d' | null;
+};
+
+/** The tool's host as the wiring gives it: the field and the handles are the session's own, and `redraw` asks the viewer for a frame. */
+export type SessionHost = Omit<AssetMoveHost, 'drawMask' | 'handleAt'> & {
   /** Something the tool shows changed; the editing modes draw on demand (`RenderDemand.invalidate`). */
   redraw?: (() => void) | undefined;
+  /** Absent draws no handles: the body drag and the keys remain. */
+  handles?: HandlesHost | undefined;
 };
 
 /**
@@ -161,15 +181,72 @@ export function redrawingHost(host: SessionHost, drawField: AssetMoveHost['drawM
 export function startAssetMove(host: SessionHost, input: AssetMoveInputDeps, scene: THREE.Object3D): AssetMoveSession {
   const overlay = new AssetSurfaceOverlay();
   scene.add(overlay.group);
-  const tool = new AssetMoveTool(redrawingHost(host, (field) => overlay.show(field)));
+  const handles = host.handles;
+  const view = handles ? new AssetHandlesView() : null;
+  if (view) scene.add(view.group);
+  const toolHost = redrawingHost(host, (field) => overlay.show(field));
+  if (handles && view)
+    toolHost.handleAt = (clientX, clientY) => handleAt(view.current(), (point) => handles.project(point), { x: clientX, y: clientY });
+  const tool = new AssetMoveTool(toolHost);
   const unbind = bindAssetMoveInput(tool, input);
+  const follow = handles && view ? handleFollower(host, handles, view, tool) : null;
+  if (follow) handles?.addFrameHook(follow);
   return {
     tool,
     overlay,
     dispose: () => {
       unbind();
+      if (follow) handles?.removeFrameHook(follow);
+      view?.dispose();
       tool.dispose();
       overlay.dispose();
     },
+  };
+}
+
+/**
+ * The per-frame hook that keeps the handles on the selected object: where it
+ * is drawn (the drag's pose while one runs, else the document's), in the
+ * mode on screen. The object's facts are read once per object and revision.
+ */
+function handleFollower(host: SessionHost, handles: HandlesHost, view: AssetHandlesView, tool: AssetMoveTool): () => void {
+  const catalogue = dragCatalogue(
+    (assetId) => host.bodyFacts(assetId),
+    (placement) => (host.layoutCatalogue?.() ?? shippedFacts)(placement),
+  );
+  let cached: { key: string; context: DragContext } | null = null;
+  return () => {
+    const mode = handles.mode();
+    const id = host.selected();
+    const doc = host.document();
+    if (!host.active() || mode === null || id === null || !doc) {
+      view.show(null);
+      return;
+    }
+    const key = `${id}|${doc.rev}`;
+    if (cached?.key !== key) {
+      const context = dragContext(doc.scene, doc.plan, id, catalogue);
+      cached = context ? { key, context } : null;
+    }
+    if (!cached) {
+      view.show(null);
+      return;
+    }
+    const { context } = cached;
+    const state = tool.state();
+    const pose =
+      state.assetId === id && state.pose
+        ? state.pose
+        : { position: context.placement.position, rotationY: context.placement.rotationY ?? 0 };
+    const item = poseItem(context, pose);
+    const target = {
+      surface: context.facts.anchor,
+      position: pose.position,
+      hx: item.dims[0] / 2,
+      hz: item.dims[2] / 2,
+      rotationY: pose.rotationY,
+      ceiling: doc.scene.ceilingHeight,
+    };
+    view.show(handleShape(target, mode, handles.screenUp()));
   };
 }

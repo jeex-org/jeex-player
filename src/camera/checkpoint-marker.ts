@@ -35,8 +35,9 @@ import * as THREE from 'three';
 import { RoundedBoxGeometry } from 'three/addons/geometries/RoundedBoxGeometry.js';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import type { TourCheckpoint } from '../scene/types.js';
+import { EDITOR_ACCENT } from '../shared/editor-accent.js';
 
-export const ACCENT = 0xdfbd7d;
+export const ACCENT = EDITOR_ACCENT;
 const ACCENT_HOVER = 0xfff0c8;
 /** Mid graphite, not near-black: a lit body that keeps its shading at the 28 px floor. */
 const BODY_COLOUR = 0x4d565a;

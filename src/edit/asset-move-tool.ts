@@ -40,9 +40,11 @@ import {
 } from '../layout/asset-legality.js';
 import { carriedPoses, proposePose, type Placed, type PoseRequest, type Proposal } from '../layout/asset-pose.js';
 import { mask, type LegalityMask, type MaskSurface } from '../layout/asset-mask.js';
-import { DRAG_PX, IdleCommit, sameAngle, samePosition, wrapAngle, type Scheduler } from './drag-kit.js';
+import { DRAG_PX, IdleCommit, YawSweep, floorAngle, sameAngle, samePosition, snapAngle, wrapAngle, type Scheduler } from './drag-kit.js';
+import { assetEditOf } from './asset-edit-ops.js';
+import type { AssetHandle } from './asset-handles.js';
 import type { SolvedPlan, WallFace } from '../plan/plan-solver.js';
-import type { Mirror, MirrorAxis, SceneData, SceneOp } from '../scene/types.js';
+import type { Mirror, MirrorAxis, SceneData } from '../scene/types.js';
 import { isMirrorAxis } from '../scene/mirror.js';
 import { planMirror } from './mirror-edit.js';
 import { PendingEdits } from './pending-edits.js';
@@ -51,6 +53,7 @@ import type { AssetEdit, AssetEditRefused } from './asset-edit.js';
 /* ---------------------------------------------------------------- model --- */
 
 export type { AssetEdit, AssetEditRefused } from './asset-edit.js';
+export type { AssetHandle } from './asset-handles.js';
 
 /** The tool's state as `__viewerDebug.assetMove()` reports it. */
 export type AssetMoveState = {
@@ -78,6 +81,8 @@ export type AssetMoveHost = {
   selected(): string | null;
   /** The placement under a pixel, `null` for anything that is not furniture. */
   pickAsset(clientX: number, clientY: number): string | null;
+  /** The selected object's handle under a pixel (`asset-handles.ts`), `null` for none; absent draws none. */
+  handleAt?(clientX: number, clientY: number): AssetHandle | null;
   /** The ray through a pixel and the camera the mode draws with. */
   ray(clientX: number, clientY: number): THREE.Ray | null;
   document(): { scene: SceneData; plan: SolvedPlan; rev: number } | null;
@@ -109,6 +114,8 @@ const TURN_STEP_RAD = (TURN_STEP_DEG / 180) * Math.PI;
  * Shift switches to height at any time.
  */
 export const WALL_VERTICAL_PX = 8;
+/** The height bar's lift per pixel dragged up the screen, metres: half a centimetre. */
+export const HEIGHT_M_PER_PX = 0.005;
 
 const UP = new THREE.Vector3(0, 1, 0);
 /** Q turns left (counter-clockwise from above), E right. */
@@ -135,6 +142,11 @@ type Drag = {
   startPointer: { x: number; y: number } | null;
   /** An arrow key moved it (a key burst that is a move, not only a turn). */
   nudged: boolean;
+  /** A handle drag: the ring's running sweep, or the bar's height and pixel at the grab. */
+  handle:
+    | { readonly kind: 'yaw'; readonly sweep: YawSweep }
+    | { readonly kind: 'height'; readonly startY: number; readonly startClientY: number }
+    | null;
 };
 
 /** What is drawn for a proposal: the settled placement, else the pointer's. */
@@ -146,7 +158,7 @@ function drawn(proposal: Proposal): Placed {
 
 export class AssetMoveTool {
   private readonly host: AssetMoveHost;
-  private pressed: { assetId: string; sample: PointerSample; jump: boolean } | null = null;
+  private pressed: { assetId: string; sample: PointerSample; jump: boolean; handle: AssetHandle | null } | null = null;
   private moving: Drag | null = null;
   private nudging: Drag | null = null;
   private readonly pending = new PendingEdits();
@@ -202,9 +214,12 @@ export class AssetMoveTool {
     if (selected === null) return false;
     this.burst.flush();
     const jump = this.oneShot;
-    if (!jump && this.host.pickAsset(sample.clientX, sample.clientY) !== selected) return false;
+    // The body before its handles, as on the tour-camera tool: a press on it always drags it.
+    const onBody = !jump && this.host.pickAsset(sample.clientX, sample.clientY) === selected;
+    const handle = jump || onBody ? null : (this.host.handleAt?.(sample.clientX, sample.clientY) ?? null);
+    if (!jump && !onBody && handle === null) return false;
     this.oneShot = false;
-    this.pressed = { assetId: selected, sample, jump };
+    this.pressed = { assetId: selected, sample, jump, handle };
     // The «Move» toggle's press moves at once: there is nothing to tell apart from a click.
     if (jump) this.begin(sample);
     return true;
@@ -372,6 +387,9 @@ export class AssetMoveTool {
     const point = this.planHit(drag, sample);
     if (point && !pressed.jump) drag.offset = { x: point.x - drag.start.position.x, z: point.z - drag.start.position.z };
     drag.startPointer = { x: sample.clientX, y: sample.clientY };
+    if (pressed.handle === 'yaw' && point)
+      drag.handle = { kind: 'yaw', sweep: new YawSweep(drag.start.rotationY, floorAngle(drag.start.position, point)) };
+    if (pressed.handle === 'height') drag.handle = { kind: 'height', startY: drag.start.position.y, startClientY: sample.clientY };
     this.moving = drag;
     this.host.onMoving(true);
     this.redrawMask(drag);
@@ -407,6 +425,7 @@ export class AssetMoveTool {
       maskRoom: null,
       startPointer: null,
       nudged: false,
+      handle: null,
     };
   }
 
@@ -426,6 +445,10 @@ export class AssetMoveTool {
 
   /** One pointer sample applied to the drag in flight. */
   private follow(drag: Drag, sample: PointerSample): void {
+    if (drag.handle) {
+      this.followHandle(drag, drag.handle, sample);
+      return;
+    }
     if (drag.surface === 'wall' && this.wantsHeight(drag, sample)) {
       this.followHeight(drag, sample);
       return;
@@ -442,6 +465,26 @@ export class AssetMoveTool {
       return;
     }
     this.propose(drag, { ...drag.request, point: target, snap: true });
+  }
+
+  /** A handle drag: the ring turns it in place by the sweep in `TURN_STEP_DEG` steps; the bar lifts a wall object, kept in the `height-fit` band. */
+  private followHandle(drag: Drag, handle: NonNullable<Drag['handle']>, sample: PointerSample): void {
+    const request = drag.request;
+    if (handle.kind === 'height') {
+      if (request.kind !== 'face') return;
+      const y = handle.startY + (handle.startClientY - sample.clientY) * HEIGHT_M_PER_PX;
+      this.propose(drag, { ...request, y: this.clampHeight(drag, y) });
+      return;
+    }
+    const point = this.planHit(drag, sample);
+    if (!point || request.kind !== 'plan') return;
+    const yaw = snapAngle(handle.sweep.update(floorAngle(drag.start.position, point), false) - drag.start.rotationY, TURN_STEP_RAD);
+    this.propose(drag, {
+      ...request,
+      point: { x: drag.start.position.x, z: drag.start.position.z },
+      rotationY: wrapAngle(drag.start.rotationY + yaw),
+      snap: false,
+    });
   }
 
   /** Whether a wall drag changes the height: Shift, or a first movement that was mostly vertical. */
@@ -642,42 +685,8 @@ export class AssetMoveTool {
         after: { pose: at },
       })),
     ]);
-    this.host.onEdit(this.editOf(drag, placed, moved, turned));
-  }
-
-  /** The room an object binds to: its host's when it stands on a top, else the one under it. */
-  private roomFor(drag: Drag, placed: Placed): string | null {
-    const plan = drag.drag.ctx.plan;
-    const host = placed.host === null ? undefined : drag.drag.ctx.items.find((item) => item.placement.id === placed.host);
-    return roomOf(plan, host ? host.placement.position : placed.pose.position);
-  }
-
-  private editOf(drag: Drag, placed: Placed, moved: boolean, turned: boolean): AssetEdit {
-    const pose = placed.pose;
-    const ops: SceneOp[] = [];
-    const room = this.roomFor(drag, placed);
-    const move = (assetId: string, at: DragPose): void => {
-      ops.push({ op: 'move_object', assetId, position: { ...at.position }, ...(room === null ? {} : { room }) });
-    };
-    if (moved) move(drag.assetId, pose);
-    // A wall pose's yaw is the face's, unfolded; the payload carries it in (-PI, PI].
-    if (turned) ops.push({ op: 'rotate_object', assetId: drag.assetId, rotationY: wrapAngle(pose.rotationY) });
-    // What stands on a host's top goes with it, bound to the host's room.
-    const carried = carriedPoses(drag.drag, pose);
-    for (const { placement, pose: at } of carried) {
-      move(placement.id, at);
-      if (turned) ops.push({ op: 'rotate_object', assetId: placement.id, rotationY: wrapAngle(at.rotationY) });
-    }
-    let verb = moved ? 'moved' : 'turned';
-    if (moved && turned) verb = 'moved and turned';
-    return {
-      assetId: drag.assetId,
-      ops,
-      baseRev: drag.startRev,
-      summary: `Object ${drag.assetId} ${verb}`,
-      gesture: drag.pointerId === null && !drag.nudged ? 'turn' : 'move',
-      ...(carried.length === 0 ? {} : { carried: carried.map(({ placement }) => placement.id) }),
-    };
+    const kind = drag.handle?.kind === 'yaw' || (drag.pointerId === null && !drag.nudged) ? 'turn' : 'move';
+    this.host.onEdit(assetEditOf(drag.drag, { assetId: drag.assetId, startRev: drag.startRev, kind }, placed, { moved, turned }));
   }
 
   private end(): void {
