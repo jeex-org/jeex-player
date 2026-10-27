@@ -187,6 +187,7 @@ const SLOT_VALUES = [
   'bottom-right',
   'modal-root',
   'selection-anchor',
+  'underlay',
 ] as const;
 const EDITS_VALUES = ['local', 'emit', 'off'] as const;
 const SETTINGS_SIDE_VALUES = ['start', 'end'] as const;

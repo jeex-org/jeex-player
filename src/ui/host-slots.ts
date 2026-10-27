@@ -36,7 +36,7 @@ import { ViewerLibError } from '../shared/errors.js';
  * Every box a host may ask for, in reading order.
  *
  * The six corner and edge names are laid out by `styles/viewer.css`; the last
- * two are special:
+ * three are special:
  */
 export const SLOT_NAMES = [
   'top-left',
@@ -49,6 +49,12 @@ export const SLOT_NAMES = [
   'modal-root',
   /** Follows a scene point or an entity; `data-visible` says whether it is on screen. */
   'selection-anchor',
+  /**
+   * Covers the viewport BELOW all the chrome: over the scene and the 2D plan
+   * drawing, under every panel, bar and card. Inert to the pointer, content
+   * included, until the host sets `pointer-events` on it.
+   */
+  'underlay',
 ] as const;
 
 export type SlotName = (typeof SLOT_NAMES)[number];
