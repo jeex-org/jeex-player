@@ -209,6 +209,7 @@ export type {
 
 export { solvePlan } from '../plan/plan-solver.js';
 export type { SolvedPlan } from '../plan/plan-solver.js';
+export type { PlanCaveat } from '../plan/floor-ownership.js';
 
 export { lintLayout, countIssues, describeIssues, doorClearZones } from '../layout/layout-lint.js';
 export type { DoorClearZone, LayoutIssue, LayoutRule, LayoutIssueCounts } from '../layout/layout-lint.js';

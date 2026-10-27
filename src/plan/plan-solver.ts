@@ -30,6 +30,7 @@ import { faceQuads, openingsForFace } from './plan-openings.js';
 import type { FaceEdgeInput } from './plan-offset.js';
 import { offsetEdges } from './plan-offset.js';
 import { readonlyMapView, type ReadonlyKeyed } from '../shared/readonly-map.js';
+import { ownFloors, type PlanCaveat } from './floor-ownership.js';
 import type { FaceKey, SceneData, Vec2, Wall, WallSide } from '../scene/types.js';
 import { FaceMap, faceKey, isDoorLike } from '../scene/types.js';
 
@@ -90,6 +91,8 @@ export type SolvedPlan = {
   readonly faces: ReadonlyFaceMap<WallFace>;
   readonly centrelines: readonly WallCentreline[];
   readonly bounds: Bounds;
+  /** What the solver left as the source drew it (`floor-ownership.ts`); empty for a plan it settled. */
+  readonly caveats: readonly PlanCaveat[];
 };
 
 /** Centreline length of a wall as travelled by `edge` (arc length for arcs). */
@@ -268,24 +271,29 @@ export function solvePlan(scene: Pick<SceneData, 'nodes' | 'walls' | 'rooms' | '
   // AREA — navigation, the floor slab, the reachability check — works from
   // `polygon` and gets a real answer; everything that reads its wall FACES
   // gets an honest nothing.
+  const zoneIds = new Set<string>();
   for (const room of scene.rooms) {
     if (room.polygon === undefined) continue;
     rooms.push({ roomId: room.id, polygon: room.polygon, loop: [], bbox: boundsOf(room.polygon) });
+    zoneIds.add(room.id);
   }
+  // Each piece of floor to one room: a face's room gives up the zones lying in it.
+  const owned = zoneIds.size > 0 ? ownFloors(rooms, zoneIds) : { rooms, caveats: [] };
 
   const outer = solveFace(graph, graph.facade, null, scene.ceilingHeight);
   for (const wallFace of outer.faces) faces.set(wallFace.key, wallFace);
 
   const extent: Vec2[] = [...outer.polygon];
   for (const node of graph.nodes.values()) extent.push(node.p);
-  for (const room of rooms) extent.push(...room.polygon);
+  for (const room of owned.rooms) extent.push(...room.polygon);
 
   return {
-    rooms,
+    rooms: owned.rooms,
     facade: outer.faces,
     // The backing map goes out of scope here, so the view is the only handle.
     faces: readonlyMapView(faces),
     centrelines: scene.walls.map((wall) => centrelineOf(graph, wall)),
     bounds: boundsOf(extent),
+    caveats: owned.caveats,
   };
 }
