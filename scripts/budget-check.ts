@@ -192,10 +192,13 @@ export const LAZY_CHUNK_FAIL_BYTES = 256 * 1024;
  * room re-capture and the walk sun scale, the walk camera white balance and
  * the walk emissive cap, the host sky (`src/render/hdri/`: three's
  * gain-map loader, the decode adapter and the sky's scene state), and the
- * lamp scope (each lamp's source room and the lamp re-bake).
- * The limit is the last measured size of the ES build's chunk (71,186 gzip
+ * lamp scope (each lamp's source room and the lamp re-bake), and the
+ * per-room camera balance (`room-balance.ts`, `room-sampler.ts`: each room's
+ * grey-card measurement, its white balance and exposure, the easing).
+ * The limit is the last measured size of the ES build's chunk (72,926 gzip
  * bytes, from `measureBundle('dist-lib')` right after `bun run build:lib`; the
- * demo build's is 68,310; 69,848 and 67,016 before the lamp scope; 65,356 and
+ * demo build's is 69,814; 71,186 and 68,310 before the per-room camera
+ * balance; 69,848 and 67,016 before the lamp scope; 65,356 and
  * 63,016 before the host sky, 63,734 before
  * the walk white balance and emissive cap, 62,682 before the light
  * temperature, 50,773 before the room lighting) plus 1 KB, so a
@@ -203,7 +206,7 @@ export const LAZY_CHUNK_FAIL_BYTES = 256 * 1024;
  * code and carries the chain inline, inside the 700 KB boot budget.
  */
 export const LAZY_LIMITS: Readonly<Record<string, number>> = {
-  'lazy-jeex-viewer-walk-post': 71_186 + 1024,
+  'lazy-jeex-viewer-walk-post': 72_926 + 1024,
   // three's KTX2 loader with its container parser and Zstd decoder
   // (`src/materials/ktx2.ts`), loaded by the first KTX2 asset: 25,052 gzip
   // bytes in the ES build (24,175 in the demo build) from `measureBundle`
