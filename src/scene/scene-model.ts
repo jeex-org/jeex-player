@@ -34,7 +34,7 @@ import { validateScene } from './scene-validator.js';
 import { ViewerLibError } from '../shared/errors.js';
 import { applyOp, OpError, sameTouched, type SceneOp, type TouchedEntity } from './scene-ops.js';
 import { applyRoomMerges, planRoomMerges, type RoomMerge } from './room-merge.js';
-import { heirsOf, inheritedCirculation, inheritedKeys, issueKey } from './issue-heirs.js';
+import { heirsOf, inheritedCirculation, inheritedKeys, inheritedPath, issueKey } from './issue-heirs.js';
 import { diffScenes, sameData } from './scene-diff.js';
 import { Fanout } from '../shared/fanout.js';
 import { draftOf, type Committed, type Draft } from '../shared/committed.js';
@@ -59,7 +59,9 @@ import type { SceneData } from './types.js';
  * (`issue-heirs.ts`), so a piece already in a wall stays old in the wall that
  * replaced it. After a room merge, a `circulation` error in the survivor is
  * old when every opening it names was already blocked in a merged room, in
- * whatever wording (`inheritedCirculation`). Pre-existing
+ * whatever wording (`inheritedCirculation`), and a blocked path to a door
+ * that was already boxed in, when the batch moved no furniture
+ * (`inheritedPath`). Pre-existing
  * hard issues still come back in `ApplyOk.issues`, so the host can show them
  * without blocking the edit.
  */
@@ -407,7 +409,12 @@ export class SceneModel {
       const old = this.baseErrorIssues(this.linter);
       const base = inheritedKeys(old, heirsOf(ops, roomMerges));
       const openings = new Set(candidate.walls.flatMap((wall) => (wall.openings ?? []).map((opening) => opening.id)));
-      errors = errors.filter((issue) => !base.has(issueKey(issue)) && !inheritedCirculation(issue, old, roomMerges, openings));
+      errors = errors.filter(
+        (issue) =>
+          !base.has(issueKey(issue)) &&
+          !inheritedCirculation(issue, old, roomMerges, openings) &&
+          !inheritedPath(issue, old, roomMerges, ops),
+      );
     }
     if (errors.length === 0) return issues;
     const what = mode === 'strict-new' ? 'new error(s)' : 'error(s)';
