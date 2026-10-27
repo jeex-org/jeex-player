@@ -61,6 +61,13 @@ export type ReadonlyFaceMap<V> = ReadonlyKeyed<FaceKey, V>;
 export type RoomFace = {
   readonly roomId: string;
   readonly polygon: readonly Vec2[];
+  /**
+   * The whole face, zones included, when zones lying in it were cut out of
+   * `polygon` (`floor-ownership.ts`); absent when nothing was. A zone's floor
+   * is still floor to walk on: a reader that asks where a person can stand in
+   * this room reads this one.
+   */
+  readonly face?: readonly Vec2[];
   readonly loop: readonly WallFace[];
   readonly bbox: Bounds;
 };
