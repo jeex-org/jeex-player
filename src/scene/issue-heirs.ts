@@ -15,7 +15,7 @@
  * Pure module: no `three`, no DOM.
  */
 
-import type { LayoutIssue } from '../layout/layout-issue.js';
+import { circulationSentenceOf, type LayoutIssue } from '../layout/layout-issue.js';
 import type { RoomMerge } from './room-merge.js';
 import type { SceneOp } from './types.js';
 
@@ -91,5 +91,61 @@ export function inheritedCirculation(
   if (openings.length === 0) return false;
   return openings.every((opening) =>
     base.some((old) => old.rule === 'circulation' && old.ids.includes(opening) && old.ids.some((id) => merged.has(id))),
+  );
+}
+
+/** The operations that can change where furniture stands or how much floor it takes. */
+const PLACEMENT_OPS: ReadonlySet<SceneOp['op']> = new Set([
+  'place_object',
+  'move_object',
+  'rotate_object',
+  'set_object',
+  'remove_object',
+  'mirror_object',
+  'replace_asset',
+  'replace_asset_variant',
+]);
+
+/** Two report points closer than this are the same door side, metres. */
+const SAME_POINT_M = 0.01;
+
+/**
+ * Whether a «no path from A to B» error in a room merge's survivor is a door
+ * that was already boxed in, now reported in other words.
+ *
+ * Removing a wall can give a door boxed in by furniture a sliver of floor, and
+ * the same furniture then reports as a path that cannot reach it. Rule 6
+ * reports a path error at the TARGET door's approach point, which the door
+ * alone fixes, wherever the path actually breaks. So the point alone cannot
+ * tell an old blockage from a new one, and the rule is kept narrow on purpose:
+ *
+ * - the batch moves no furniture (`PLACEMENT_OPS`): then the only things that
+ *   can block the path are pieces that already stood there;
+ * - one of the two doors it names had «no free floor in front of it» in one of
+ *   the merged rooms before, at that same approach point (`SAME_POINT_M`).
+ *
+ * Any other earlier circulation error on a door does not excuse a path, and
+ * neither does an edit that moves, places, swaps or removes furniture. Do not
+ * widen it without a case that needs it.
+ */
+export function inheritedPath(
+  issue: Pick<LayoutIssue, 'rule' | 'ids' | 'message' | 'at'>,
+  base: readonly Pick<LayoutIssue, 'rule' | 'ids' | 'message' | 'at'>[],
+  roomMerges: readonly RoomMerge[],
+  ops: readonly SceneOp[],
+): boolean {
+  if (circulationSentenceOf(issue) !== 'no-path') return false;
+  if (ops.some((op) => PLACEMENT_OPS.has(op.op))) return false;
+  const survivor = issue.ids.find((id) => roomMerges.some((merge) => merge.to === id));
+  if (survivor === undefined) return false;
+  const merged = new Set([survivor, ...roomMerges.filter((merge) => merge.to === survivor).map((merge) => merge.from)]);
+  const at = issue.at;
+  const doors = issue.ids.filter((id) => id !== survivor);
+  return base.some(
+    (old) =>
+      circulationSentenceOf(old) === 'no-floor' &&
+      doors.includes(old.ids[0]!) &&
+      old.ids.some((id) => merged.has(id)) &&
+      Math.hypot(old.at.x - at.x, old.at.z - at.z) <= SAME_POINT_M,
   );
 }

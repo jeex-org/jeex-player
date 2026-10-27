@@ -21,6 +21,7 @@ import { roomCentroid } from '../layout-geometry.js';
 import type { Obb } from '../../plan/plan-geometry.js';
 import { DOOR_CLEAR_M, pointToBox, type LayoutIssue, type LayoutRuleModule, type LintContext } from './context.js';
 import type { SolvedPlan } from '../../plan/plan-solver.js';
+import { circulationSentence } from '../layout-issue.js';
 import type { Vec2 } from '../../scene/types.js';
 
 /** Half-width of the circulation corridor, metres: a 0.8 m path. */
@@ -181,7 +182,7 @@ function ruleCirculation(ctx: LintContext, out: LayoutIssue[]): void {
           rule: 'circulation',
           severity: 'error',
           ids: [approach.openingId, room.roomId],
-          message: `${approach.openingId} has no ${width} m of free floor in front of it inside ${room.roomId}`,
+          message: circulationSentence.noFloor(approach.openingId, width, room.roomId),
           at: approach.point,
         });
         continue;
@@ -199,7 +200,7 @@ function ruleCirculation(ctx: LintContext, out: LayoutIssue[]): void {
         rule: 'circulation',
         severity: 'error',
         ids: [first.openingId, target.openingId, room.roomId],
-        message: `no ${width} m path from ${first.openingId} to ${target.openingId} across ${room.roomId}`,
+        message: circulationSentence.noPath(first.openingId, target.openingId, width, room.roomId),
         at: target.point,
       });
     }
@@ -219,7 +220,7 @@ function ruleCirculation(ctx: LintContext, out: LayoutIssue[]): void {
         rule: 'circulation',
         severity: 'error',
         ids: [room.roomId, first.openingId],
-        message: `the main zone of ${room.roomId} is not reachable on a 0.80 m path from ${first.openingId}`,
+        message: circulationSentence.mainZone(room.roomId, first.openingId),
         at: centre,
       });
     }

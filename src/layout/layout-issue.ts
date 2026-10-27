@@ -115,3 +115,24 @@ export type LayoutIssue = {
  * review them.
  */
 export type LayoutLinter = (scene: SceneData, plan: SolvedPlan) => readonly LayoutIssue[];
+
+/**
+ * Rule 6's three sentences (`rules/circulation.ts` writes them through these),
+ * so a reader that tells them apart (`scene/issue-heirs.ts`) reads exactly the
+ * words the rule writes, and the two cannot drift apart.
+ */
+export const circulationSentence = {
+  noFloor: (opening: string, width: string, room: string): string =>
+    `${opening} has no ${width} m of free floor in front of it inside ${room}`,
+  noPath: (from: string, to: string, width: string, room: string): string => `no ${width} m path from ${from} to ${to} across ${room}`,
+  mainZone: (room: string, opening: string): string => `the main zone of ${room} is not reachable on a 0.80 m path from ${opening}`,
+} as const;
+
+/** Which of rule 6's sentences `issue` is, or `null` for any other issue. */
+export function circulationSentenceOf(issue: Pick<LayoutIssue, 'rule' | 'message'>): 'no-floor' | 'no-path' | 'main-zone' | null {
+  if (issue.rule !== 'circulation') return null;
+  if (/^no \d+\.\d+ m path from /.test(issue.message)) return 'no-path';
+  if (/ has no \d+\.\d+ m of free floor in front of it inside /.test(issue.message)) return 'no-floor';
+  if (issue.message.startsWith('the main zone of ')) return 'main-zone';
+  return null;
+}

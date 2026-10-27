@@ -1,5 +1,7 @@
 import { describe, expect, test } from 'bun:test';
-import { heirsOf, inheritedCirculation, inheritedKeys, issueKey } from './issue-heirs.js';
+import { heirsOf, inheritedCirculation, inheritedKeys, inheritedPath, issueKey } from './issue-heirs.js';
+import { circulationSentence } from '../layout/layout-issue.js';
+import type { SceneOp } from './types.js';
 
 /** Readable stand-ins: the module only compares strings, so the ids need not be UUIDs. */
 const W = 'wall-w';
@@ -86,5 +88,57 @@ describe('inheritedCirculation', () => {
     expect(inheritedCirculation({ rule: 'inside-a-wall', ids: [DOOR, TERRACE] }, [blocked(DOOR, KITCHEN)], merges, openings)).toBe(false);
     expect(inheritedCirculation({ rule: 'circulation', ids: [DOOR, KITCHEN] }, [blocked(DOOR, KITCHEN)], [], openings)).toBe(false);
     expect(inheritedCirculation({ rule: 'circulation', ids: [TERRACE] }, [], merges, openings)).toBe(false);
+  });
+});
+
+describe('inheritedPath', () => {
+  /** A dining room merged into a living room; the path runs from the terrace door T to door D, D the dining room's. */
+  const DINING = 'dining';
+  const LIVING = 'living';
+  const T = 'door-t';
+  const D = 'door-d';
+  const merges = [{ from: DINING, to: LIVING, summary: '' }];
+  /** D's approach point: where a path error to D is reported, and where its boxed-in error was. */
+  const D_POINT = { x: 7.56, z: 5.71 };
+  const noFloor = (opening: string, room: string, at: { x: number; z: number }) => ({
+    rule: 'circulation' as const,
+    ids: [opening, room],
+    message: circulationSentence.noFloor(opening, '0.80', room),
+    at,
+  });
+  const path = {
+    rule: 'circulation' as const,
+    ids: [T, D, LIVING],
+    message: circulationSentence.noPath(T, D, '0.80', LIVING),
+    at: D_POINT,
+  };
+  const wallsOnly: SceneOp[] = [{ op: 'remove_wall', wallId: 'wall' }];
+
+  test('the target door was boxed in at that same point before, and the batch moved no furniture: inherited', () => {
+    expect(inheritedPath(path, [noFloor(D, DINING, D_POINT)], merges, wallsOnly)).toBe(true);
+  });
+
+  test('4.2: both doors were clear before, the path between them blocked: new', () => {
+    expect(inheritedPath(path, [], merges, wallsOnly)).toBe(false);
+  });
+
+  test('4.3: an endpoint with another circulation error before does not excuse a new blockage', () => {
+    const mainZone = { rule: 'circulation' as const, ids: [DINING, D], message: circulationSentence.mainZone(DINING, D), at: D_POINT };
+    expect(inheritedPath(path, [mainZone], merges, wallsOnly)).toBe(false);
+  });
+
+  test('the weak point: a batch that moves furniture can block the path anew, so it never inherits', () => {
+    const moved: SceneOp[] = [...wallsOnly, { op: 'move_object', assetId: 'cabinet', position: { x: 6, y: 0, z: 6 } }];
+    expect(inheritedPath(path, [noFloor(D, DINING, D_POINT)], merges, moved)).toBe(false);
+  });
+
+  test('boxed in elsewhere, or in a room the merge did not join, does not count', () => {
+    expect(inheritedPath(path, [noFloor(D, DINING, { x: 7.6, z: 5.71 })], merges, wallsOnly)).toBe(false);
+    expect(inheritedPath(path, [noFloor(D, 'study', D_POINT)], merges, wallsOnly)).toBe(false);
+  });
+
+  test('only a path error in a merge survivor', () => {
+    expect(inheritedPath(noFloor(D, LIVING, D_POINT), [noFloor(D, DINING, D_POINT)], merges, wallsOnly)).toBe(false);
+    expect(inheritedPath(path, [noFloor(D, DINING, D_POINT)], [], wallsOnly)).toBe(false);
   });
 });

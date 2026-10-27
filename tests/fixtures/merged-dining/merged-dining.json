@@ -1,0 +1,1764 @@
+{
+  "note": "A furnished flat as a plan recogniser outlines it, with neutral names: removing one wall merges a dining room into the living room. Before the edit the dining room's doors already have no free floor in front of them; after it, with no furniture moved, the same pieces report as blocked paths to those doors, at the same approach points. `facts` are the layout facts each placement is linted with, by placement id.",
+  "scene": {
+    "schemaVersion": "2.4",
+    "units": "m",
+    "id": "01a17c1c-feb2-726d-a1c4-cfbee513082a",
+    "name": "Merged dining test plan",
+    "ceilingHeight": 2.7,
+    "nodes": [
+      {
+        "id": "01a17c1c-feb2-726e-9f20-65afb7d948b8",
+        "p": {
+          "x": 20,
+          "z": 31.889153811218783
+        }
+      },
+      {
+        "id": "01a17c1c-feb2-726f-ae7f-579cc755139b",
+        "p": {
+          "x": 20,
+          "z": 30
+        }
+      },
+      {
+        "id": "01a17c1c-feb2-7270-a844-ff027fbeeff6",
+        "p": {
+          "x": 20,
+          "z": 37.18806457923647
+        }
+      },
+      {
+        "id": "01a17c1c-feb2-7271-9662-b4cb6bfdfaae",
+        "p": {
+          "x": 21.889275778667372,
+          "z": 37.18806457923647
+        }
+      },
+      {
+        "id": "01a17c1c-feb2-7272-b3aa-103e1e70786a",
+        "p": {
+          "x": 21.889275778667372,
+          "z": 38.65918065222546
+        }
+      },
+      {
+        "id": "01a17c1c-feb2-7273-999e-cac822de10df",
+        "p": {
+          "x": 23.34559252472347,
+          "z": 30
+        }
+      },
+      {
+        "id": "01a17c1c-feb2-7274-9d88-cd64bf6e736f",
+        "p": {
+          "x": 23.34559252472347,
+          "z": 31.889153811218783
+        }
+      },
+      {
+        "id": "01a17c1c-feb2-7275-8c1f-eab04cb57942",
+        "p": {
+          "x": 23.34559252472347,
+          "z": 37.18806457923647
+        }
+      },
+      {
+        "id": "01a17c1c-feb2-7276-8ddc-2fdd9621230b",
+        "p": {
+          "x": 23.34559252472347,
+          "z": 38.65918065222546
+        }
+      },
+      {
+        "id": "01a17c1c-feb2-7277-9787-4edec80960f5",
+        "p": {
+          "x": 24.40831015022387,
+          "z": 37.18806457923647
+        }
+      },
+      {
+        "id": "01a17c1c-feb2-7278-a596-da14015f63fa",
+        "p": {
+          "x": 25.90398680833554,
+          "z": 30
+        }
+      },
+      {
+        "id": "01a17c1c-feb2-7279-927a-03ca907f829b",
+        "p": {
+          "x": 25.90398680833554,
+          "z": 31.605884411867265
+        }
+      },
+      {
+        "id": "01a17c1c-feb2-727a-871a-175562c11b2b",
+        "p": {
+          "x": 25.90398680833554,
+          "z": 35.195508391335274
+        }
+      },
+      {
+        "id": "01a17c1c-feb2-727b-899b-d5f993d53d58",
+        "p": {
+          "x": 25.90398680833554,
+          "z": 37.18806457923647
+        }
+      },
+      {
+        "id": "01a17c1c-feb2-727c-a15b-1442413ef554",
+        "p": {
+          "x": 25.90398680833554,
+          "z": 38.65918065222546
+        }
+      },
+      {
+        "id": "01a17c1c-feb2-727d-b309-41fb98077c79",
+        "p": {
+          "x": 25.90398680833554,
+          "z": 39.76125818978143
+        }
+      },
+      {
+        "id": "01a17c1c-feb2-727e-8bc7-32809fe6e5fc",
+        "p": {
+          "x": 28.89534012455888,
+          "z": 31.605884411867265
+        }
+      },
+      {
+        "id": "01a17c1c-feb2-727f-847c-f6b4c26dcca4",
+        "p": {
+          "x": 28.89534012455888,
+          "z": 35.195508391335274
+        }
+      },
+      {
+        "id": "01a17c1c-feb2-7280-93da-56b8e37604ee",
+        "p": {
+          "x": 28.89534012455888,
+          "z": 39.76125818978143
+        }
+      },
+      {
+        "id": "01a17c1c-feb2-7281-acae-fdad4f60177d",
+        "p": {
+          "x": 28.895340124558885,
+          "z": 37.18806457923647
+        }
+      },
+      {
+        "id": "01a17c1c-feb2-7282-81d8-367defb3f33b",
+        "p": {
+          "x": 31.33565467200424,
+          "z": 31.605884411867265
+        }
+      },
+      {
+        "id": "01a17c1c-feb2-7283-8030-3e89cacd7fcc",
+        "p": {
+          "x": 31.33565467200424,
+          "z": 37.18806457923647
+        }
+      }
+    ],
+    "walls": [
+      {
+        "id": "01a17c1c-feb2-7284-88f0-92aa4f55ca0a",
+        "a": "01a17c1c-feb2-726f-ae7f-579cc755139b",
+        "b": "01a17c1c-feb2-7273-999e-cac822de10df",
+        "thickness": 0.12,
+        "role": "facade",
+        "openings": [
+          {
+            "id": "01a17c1c-feb2-7285-90aa-32ad3cff6ac1",
+            "type": "window",
+            "center": 1.6531163063339513,
+            "width": 2.046715426889654,
+            "sill": 0.9,
+            "head": 2.2
+          }
+        ]
+      },
+      {
+        "id": "01a17c1c-feb2-7286-9824-fb1476821daa",
+        "a": "01a17c1c-feb2-7273-999e-cac822de10df",
+        "b": "01a17c1c-feb2-7278-a596-da14015f63fa",
+        "thickness": 0.12,
+        "role": "facade",
+        "openings": [
+          {
+            "id": "01a17c1c-feb2-7287-8433-befca942fd02",
+            "type": "window",
+            "center": 1.2988770978338189,
+            "width": 1.7318361304450918,
+            "sill": 0.9,
+            "head": 2.2
+          }
+        ]
+      },
+      {
+        "id": "01a17c1c-feb2-7288-8b47-6ece684c5c66",
+        "a": "01a17c1c-feb2-726f-ae7f-579cc755139b",
+        "b": "01a17c1c-feb2-726e-9f20-65afb7d948b8",
+        "thickness": 0.12,
+        "role": "facade"
+      },
+      {
+        "id": "01a17c1c-feb2-7289-92de-7e470a0b5294",
+        "a": "01a17c1c-feb2-7270-a844-ff027fbeeff6",
+        "b": "01a17c1c-feb2-7271-9662-b4cb6bfdfaae",
+        "thickness": 0.12,
+        "role": "facade"
+      },
+      {
+        "id": "01a17c1c-feb2-728a-b271-bd4c4e039f9c",
+        "a": "01a17c1c-feb2-7273-999e-cac822de10df",
+        "b": "01a17c1c-feb2-7274-9d88-cd64bf6e736f",
+        "thickness": 0.12,
+        "role": "partition"
+      },
+      {
+        "id": "01a17c1c-feb2-728b-86ee-9bc3c4eb8c9e",
+        "a": "01a17c1c-feb2-726e-9f20-65afb7d948b8",
+        "b": "01a17c1c-feb2-7274-9d88-cd64bf6e736f",
+        "thickness": 0.12,
+        "role": "partition",
+        "openings": [
+          {
+            "id": "01a17c1c-feb2-728c-8c75-044f97fa4263",
+            "type": "door",
+            "center": 1.8845525892207042,
+            "width": 1.2595171857782486,
+            "sill": 0,
+            "head": 2.1
+          }
+        ]
+      },
+      {
+        "id": "01a17c1c-feb2-728d-9497-f7c0b3b63fff",
+        "a": "01a17c1c-feb2-7278-a596-da14015f63fa",
+        "b": "01a17c1c-feb2-7279-927a-03ca907f829b",
+        "thickness": 0.12,
+        "role": "facade"
+      },
+      {
+        "id": "01a17c1c-feb2-728e-a7e5-9eb5f47c0b23",
+        "a": "01a17c1c-feb2-7279-927a-03ca907f829b",
+        "b": "01a17c1c-feb2-727e-8bc7-32809fe6e5fc",
+        "thickness": 0.12,
+        "role": "facade",
+        "openings": [
+          {
+            "id": "01a17c1c-feb2-728f-a6d1-0cbeda366f90",
+            "type": "window",
+            "center": 1.7381337163739832,
+            "width": 1.4169568340005296,
+            "sill": 0.9,
+            "head": 2.2
+          }
+        ]
+      },
+      {
+        "id": "01a17c1c-feb2-7290-819d-494b13a046de",
+        "a": "01a17c1c-feb2-7282-81d8-367defb3f33b",
+        "b": "01a17c1c-feb2-7283-8030-3e89cacd7fcc",
+        "thickness": 0.12,
+        "role": "facade",
+        "openings": [
+          {
+            "id": "01a17c1c-feb2-7291-bd3a-51abf7c5d572",
+            "type": "window",
+            "center": 2.9548273178357713,
+            "width": 1.2595171857782486,
+            "sill": 0.9,
+            "head": 2.2
+          }
+        ]
+      },
+      {
+        "id": "01a17c1c-feb2-7292-8b5a-872733750403",
+        "a": "01a17c1c-feb2-7281-acae-fdad4f60177d",
+        "b": "01a17c1c-feb2-7283-8030-3e89cacd7fcc",
+        "thickness": 0.12,
+        "role": "facade"
+      },
+      {
+        "id": "01a17c1c-feb2-7293-b98c-0436fabd3a5c",
+        "a": "01a17c1c-feb2-727e-8bc7-32809fe6e5fc",
+        "b": "01a17c1c-feb2-727f-847c-f6b4c26dcca4",
+        "thickness": 0.12,
+        "role": "partition"
+      },
+      {
+        "id": "01a17c1c-feb2-7294-897e-2acf48db3ce2",
+        "a": "01a17c1c-feb2-7279-927a-03ca907f829b",
+        "b": "01a17c1c-feb2-727a-871a-175562c11b2b",
+        "thickness": 0.12,
+        "role": "partition"
+      },
+      {
+        "id": "01a17c1c-feb2-7295-ba17-f2595df3a2eb",
+        "a": "01a17c1c-feb2-727a-871a-175562c11b2b",
+        "b": "01a17c1c-feb2-727f-847c-f6b4c26dcca4",
+        "thickness": 0.12,
+        "role": "partition",
+        "openings": [
+          {
+            "id": "01a17c1c-feb2-7296-8bd1-d9c86776c578",
+            "type": "door",
+            "center": 1.6542183838715074,
+            "width": 1.1020775375559675,
+            "sill": 0,
+            "head": 2.1
+          }
+        ]
+      },
+      {
+        "id": "01a17c1c-feb2-7297-aadf-9faa22cf3766",
+        "a": "01a17c1c-feb2-7271-9662-b4cb6bfdfaae",
+        "b": "01a17c1c-feb2-7272-b3aa-103e1e70786a",
+        "thickness": 0.12,
+        "role": "facade"
+      },
+      {
+        "id": "01a17c1c-feb2-7298-867d-db6c90b19d45",
+        "a": "01a17c1c-feb2-7272-b3aa-103e1e70786a",
+        "b": "01a17c1c-feb2-7276-8ddc-2fdd9621230b",
+        "thickness": 0.12,
+        "role": "facade"
+      },
+      {
+        "id": "01a17c1c-feb2-7299-949a-e171ed624330",
+        "a": "01a17c1c-feb2-7275-8c1f-eab04cb57942",
+        "b": "01a17c1c-feb2-7276-8ddc-2fdd9621230b",
+        "thickness": 0.12,
+        "role": "partition",
+        "openings": [
+          {
+            "id": "01a17c1c-feb2-729a-aff9-5d1f563762e9",
+            "type": "door",
+            "center": 1.0552367765444308,
+            "width": 0.6297585928891243,
+            "sill": 0,
+            "head": 2.1
+          }
+        ]
+      },
+      {
+        "id": "01a17c1c-feb2-729b-aaec-d332a60ba4d5",
+        "a": "01a17c1c-feb2-7277-9787-4edec80960f5",
+        "b": "01a17c1c-feb2-727b-899b-d5f993d53d58",
+        "thickness": 0.12,
+        "role": "partition"
+      },
+      {
+        "id": "01a17c1c-feb2-729c-9c8c-328a28101822",
+        "a": "01a17c1c-feb2-727b-899b-d5f993d53d58",
+        "b": "01a17c1c-feb2-7281-acae-fdad4f60177d",
+        "thickness": 0.12,
+        "role": "partition",
+        "openings": [
+          {
+            "id": "01a17c1c-feb2-729d-b20a-2adae8f27e18",
+            "type": "door",
+            "center": 1.1815845599082195,
+            "width": 1.023357713444827,
+            "sill": 0,
+            "head": 2.1
+          }
+        ]
+      },
+      {
+        "id": "01a17c1c-feb2-729e-9011-561185b14c58",
+        "a": "01a17c1c-feb2-727d-b309-41fb98077c79",
+        "b": "01a17c1c-feb2-7280-93da-56b8e37604ee",
+        "thickness": 0.12,
+        "role": "facade"
+      },
+      {
+        "id": "01a17c1c-feb2-729f-a26a-91d872ba4c97",
+        "a": "01a17c1c-feb2-7281-acae-fdad4f60177d",
+        "b": "01a17c1c-feb2-7280-93da-56b8e37604ee",
+        "thickness": 0.12,
+        "role": "facade",
+        "openings": [
+          {
+            "id": "01a17c1c-feb2-72a0-81ed-531e06abadef",
+            "type": "window",
+            "center": 1.346108992300503,
+            "width": 0.7871982411114054,
+            "sill": 0.9,
+            "head": 2.2
+          }
+        ]
+      },
+      {
+        "id": "01a17c1c-feb2-72a1-8638-1795e8cfc907",
+        "a": "01a17c1c-feb2-7275-8c1f-eab04cb57942",
+        "b": "01a17c1c-feb2-7277-9787-4edec80960f5",
+        "thickness": 0.12,
+        "openings": [
+          {
+            "id": "01a17c1c-feb2-72a2-afcc-65e9fe05c13e",
+            "type": "passage",
+            "center": 0.5116788567224135,
+            "width": 0.7084784170002648,
+            "sill": 0,
+            "head": 2.1
+          }
+        ]
+      },
+      {
+        "id": "01a17c1c-feb2-72a3-affb-60da476e8f1f",
+        "a": "01a17c1c-feb2-727b-899b-d5f993d53d58",
+        "b": "01a17c1c-feb2-727c-a15b-1442413ef554",
+        "thickness": 0.12,
+        "role": "facade"
+      },
+      {
+        "id": "01a17c1c-feb2-72a4-842d-87bd984560d8",
+        "a": "01a17c1c-feb2-727c-a15b-1442413ef554",
+        "b": "01a17c1c-feb2-727d-b309-41fb98077c79",
+        "thickness": 0.12,
+        "role": "facade"
+      },
+      {
+        "id": "01a17c1c-feb2-72a5-92e8-bbdd1ff671e9",
+        "a": "01a17c1c-feb2-726e-9f20-65afb7d948b8",
+        "b": "01a17c1c-feb2-7270-a844-ff027fbeeff6",
+        "thickness": 0.12,
+        "role": "facade"
+      },
+      {
+        "id": "01a17c1c-feb2-72a6-84b8-f46b43fd8676",
+        "a": "01a17c1c-feb2-7271-9662-b4cb6bfdfaae",
+        "b": "01a17c1c-feb2-7275-8c1f-eab04cb57942",
+        "thickness": 0.12,
+        "role": "facade",
+        "openings": [
+          {
+            "id": "01a17c1c-feb2-72a7-9586-8418fbe29275",
+            "type": "door",
+            "center": 0.8042779772781163,
+            "width": 1.1020775375559675,
+            "sill": 0,
+            "head": 2.1
+          }
+        ]
+      },
+      {
+        "id": "01a17c1c-feb2-72a8-a8ee-dee56104fb27",
+        "a": "01a17c1c-feb2-727e-8bc7-32809fe6e5fc",
+        "b": "01a17c1c-feb2-7282-81d8-367defb3f33b",
+        "thickness": 0.12,
+        "role": "facade"
+      },
+      {
+        "id": "01a17c1c-feb2-72a9-a181-6c8487404221",
+        "a": "01a17c1c-feb2-727f-847c-f6b4c26dcca4",
+        "b": "01a17c1c-feb2-7281-acae-fdad4f60177d",
+        "thickness": 0.12,
+        "role": "partition",
+        "openings": [
+          {
+            "id": "01a17c1c-feb2-72aa-bad6-9750a3e24f91",
+            "type": "door",
+            "center": 1.2597690892154034,
+            "width": 1.1020775375559675,
+            "sill": 0,
+            "head": 2.1
+          }
+        ]
+      },
+      {
+        "id": "01a17c1c-feb2-72ab-981e-044b59e97ea2",
+        "a": "01a17c1c-feb2-7276-8ddc-2fdd9621230b",
+        "b": "01a17c1c-feb2-727c-a15b-1442413ef554",
+        "thickness": 0.12,
+        "role": "facade",
+        "openings": [
+          {
+            "id": "01a17c1c-feb2-72ac-941b-44df425b6cb7",
+            "type": "door",
+            "center": 0.8094784170002648,
+            "width": 1.4169568340005296,
+            "sill": 0,
+            "head": 2.1,
+            "entrance": true
+          }
+        ]
+      },
+      {
+        "id": "01a17c1c-feb2-72ad-8ede-829bc2c5f499",
+        "a": "01a17c1c-feb2-7274-9d88-cd64bf6e736f",
+        "b": "01a17c1c-feb2-7275-8c1f-eab04cb57942",
+        "thickness": 0.12,
+        "role": "partition",
+        "openings": [
+          {
+            "id": "01a17c1c-feb2-72ae-8495-edda8f800ac0",
+            "type": "passage",
+            "center": 1.7338473776095777,
+            "width": 0.7871982411114054,
+            "sill": 0,
+            "head": 2.1
+          },
+          {
+            "id": "01a17c1c-feb2-72af-802e-7aa171ef8e4a",
+            "type": "door",
+            "center": 3.9367429355357344,
+            "width": 1.1020775375559675,
+            "sill": 0,
+            "head": 2.1
+          }
+        ]
+      }
+    ],
+    "rooms": [
+      {
+        "id": "01a17c1c-feb2-72b0-b2e1-b3bf15901710",
+        "name": "Room 1",
+        "anchor": {
+          "x": 21.672796262361736,
+          "z": 30.94457690560939
+        },
+        "floorMaterial": "01a12fdf-158e-7748-adfe-d397dde469ba"
+      },
+      {
+        "id": "01a17c1c-feb2-72b1-8473-f0941b1eec91",
+        "name": "Room 2",
+        "anchor": {
+          "x": 21.672796262361736,
+          "z": 34.53860919522762
+        },
+        "floorMaterial": "01a12fdf-158e-7748-adfe-d397dde469ba"
+      },
+      {
+        "id": "01a17c1c-feb2-72b2-bf73-2744f649f0c2",
+        "name": "Room 3",
+        "anchor": {
+          "x": 22.61743415169542,
+          "z": 37.923622615730956
+        },
+        "floorMaterial": "01a12fdf-158e-7748-adfe-d397dde469ba"
+      },
+      {
+        "id": "01a17c1c-feb2-72b3-b375-e48996232805",
+        "name": "Room 4",
+        "anchor": {
+          "x": 25.30401901647506,
+          "z": 34.22990657467364
+        },
+        "floorMaterial": "01a12fdf-158e-7748-adfe-d397dde469ba"
+      },
+      {
+        "id": "01a17c1c-feb2-72b4-aff5-1dc828d69c5f",
+        "name": "Room 5",
+        "anchor": {
+          "x": 24.62478966652951,
+          "z": 37.92362261573096
+        },
+        "floorMaterial": "01a12fdf-158e-7748-adfe-d397dde469ba"
+      },
+      {
+        "id": "01a17c1c-feb2-72b5-a73f-bf1f0cd08cc8",
+        "name": "Room 6",
+        "anchor": {
+          "x": 27.399663466447212,
+          "z": 33.40069640160127
+        },
+        "floorMaterial": "01a12fdf-158e-7748-adfe-d397dde469ba"
+      },
+      {
+        "id": "01a17c1c-feb2-72b6-96d4-24429b5a99b3",
+        "name": "Room 7",
+        "anchor": {
+          "x": 27.399663466447212,
+          "z": 38.47466138450894
+        },
+        "floorMaterial": "01a12fdf-158e-7748-adfe-d397dde469ba"
+      },
+      {
+        "id": "01a17c1c-feb2-72b7-91ce-93636acec404",
+        "name": "Room 8",
+        "anchor": {
+          "x": 30.115497398281562,
+          "z": 34.396974495551866
+        },
+        "floorMaterial": "01a12fdf-158e-7748-adfe-d397dde469ba"
+      },
+      {
+        "id": "01a17c1c-feb2-72b8-97f3-592abb6c0686",
+        "name": "Room 9",
+        "anchor": {
+          "x": 25.544342955194942,
+          "z": 36.43939910456609
+        },
+        "floorMaterial": "01a12fdf-158e-7748-adfe-d397dde469ba",
+        "polygon": [
+          {
+            "x": 23.384952436779045,
+            "z": 35.195508391335274
+          },
+          {
+            "x": 25.90398680833554,
+            "z": 35.195508391335274
+          },
+          {
+            "x": 25.90398680833554,
+            "z": 36.84862469766922
+          },
+          {
+            "x": 23.384952436779045,
+            "z": 36.84862469766922
+          }
+        ]
+      }
+    ],
+    "assets": [
+      {
+        "id": "01a17c1c-feb2-72b9-b48f-51cb29c80f07",
+        "type": "wardrobe",
+        "position": {
+          "x": 20.88,
+          "y": 0,
+          "z": 34.50806457923647
+        },
+        "room": "01a17c1c-feb2-72b1-8473-f0941b1eec91",
+        "rotationY": -1.5707963267948966
+      },
+      {
+        "id": "01a17c1c-feb2-72ba-aada-3438d533f4b0",
+        "type": "wardrobe",
+        "position": {
+          "x": 23.035592524723473,
+          "y": 0,
+          "z": 32.56915381121878
+        },
+        "room": "01a17c1c-feb2-72b1-8473-f0941b1eec91",
+        "rotationY": 1.5707963267948966
+      },
+      {
+        "id": "01a17c1c-feb2-72bb-aca0-38c81d9bb9b8",
+        "type": "wardrobe",
+        "position": {
+          "x": 23.035592524723473,
+          "y": 0.64,
+          "z": 32.56915381121878
+        },
+        "room": "01a17c1c-feb2-72b1-8473-f0941b1eec91",
+        "rotationY": 1.5707963267948966
+      },
+      {
+        "id": "01a17c1c-feb2-72bc-be44-1a2ad1ccda53",
+        "type": "wardrobe",
+        "position": {
+          "x": 30.109340124558884,
+          "y": 0,
+          "z": 32.91038441186727
+        },
+        "room": "01a17c1c-feb2-72b7-91ce-93636acec404",
+        "rotationY": 3.141592653589793
+      },
+      {
+        "id": "01a17c1c-feb2-72bd-8e78-4bf081bef255",
+        "type": "wardrobe",
+        "position": {
+          "x": 30.936154672004236,
+          "y": 0,
+          "z": 36.33588441186727
+        },
+        "room": "01a17c1c-feb2-72b7-91ce-93636acec404",
+        "rotationY": 1.5707963267948966
+      },
+      {
+        "id": "01a17c1c-feb2-72be-b810-37eaff66c781",
+        "type": "wardrobe",
+        "position": {
+          "x": 26.99498680833554,
+          "y": 0,
+          "z": 33.44350839133528
+        },
+        "room": "01a17c1c-feb2-72b5-a73f-bf1f0cd08cc8",
+        "rotationY": -1.5707963267948966
+      },
+      {
+        "id": "01a17c1c-feb2-72bf-9b82-f952b9c54df8",
+        "type": "wardrobe",
+        "position": {
+          "x": 26.28498680833554,
+          "y": 0,
+          "z": 34.71550839133528
+        },
+        "room": "01a17c1c-feb2-72b5-a73f-bf1f0cd08cc8",
+        "rotationY": -1.5707963267948966
+      },
+      {
+        "id": "01a17c1c-feb2-72c0-8c56-517cc620e621",
+        "type": "wardrobe",
+        "position": {
+          "x": 28.06534012455888,
+          "y": 0,
+          "z": 38.931258189781424
+        },
+        "room": "01a17c1c-feb2-72b6-96d4-24429b5a99b3",
+        "rotationY": 0
+      },
+      {
+        "id": "01a17c1c-feb2-72c1-991b-1313e8765577",
+        "type": "wardrobe",
+        "position": {
+          "x": 28.597340124558883,
+          "y": 0,
+          "z": 37.851064579236464
+        },
+        "room": "01a17c1c-feb2-72b6-96d4-24429b5a99b3",
+        "rotationY": 1.5707963267948948
+      },
+      {
+        "id": "01a17c1c-feb2-72c2-957e-5baee7bb52d4",
+        "type": "wardrobe",
+        "position": {
+          "x": 26.30898680833554,
+          "y": 0,
+          "z": 38.429180652225455
+        },
+        "room": "01a17c1c-feb2-72b6-96d4-24429b5a99b3",
+        "rotationY": -1.5707963267948966
+      },
+      {
+        "id": "01a17c1c-feb2-72c3-88a9-7da21436d867",
+        "type": "wardrobe",
+        "position": {
+          "x": 25.60998680833554,
+          "y": 0,
+          "z": 37.845564579236466
+        },
+        "room": "01a17c1c-feb2-72b4-aff5-1dc828d69c5f",
+        "rotationY": 1.5707963267948966
+      },
+      {
+        "id": "01a17c1c-feb2-72c4-b3e6-808a8c8db707",
+        "type": "wardrobe",
+        "position": {
+          "x": 22.294275778667373,
+          "y": 0,
+          "z": 38.069180652225455
+        },
+        "room": "01a17c1c-feb2-72b2-bf73-2744f649f0c2",
+        "rotationY": -1.5707963267948966
+      },
+      {
+        "id": "01a17c1c-feb2-72c5-9b19-6c7fd7e674cb",
+        "type": "wardrobe",
+        "position": {
+          "x": 26.110146280668964,
+          "y": 0,
+          "z": 36.16178648528587
+        },
+        "room": "01a17c1c-feb2-72b8-97f3-592abb6c0686",
+        "rotationY": 0
+      },
+      {
+        "id": "01a17c1c-feb2-72c6-9681-607639452783",
+        "type": "wardrobe",
+        "position": {
+          "x": 26.23048680833554,
+          "y": 0,
+          "z": 32.37650839133528
+        },
+        "room": "01a17c1c-feb2-72b5-a73f-bf1f0cd08cc8",
+        "rotationY": -1.5707963267948966
+      },
+      {
+        "id": "01a17c1c-feb2-72c7-83e6-c1528be21925",
+        "type": "wardrobe",
+        "position": {
+          "x": 26.27398680833554,
+          "y": 0,
+          "z": 39.379258189781424
+        },
+        "room": "01a17c1c-feb2-72b6-96d4-24429b5a99b3",
+        "rotationY": -1.5707963267948966
+      },
+      {
+        "id": "01a17c1c-feb2-72c8-8c2c-fcdede3d03af",
+        "type": "wardrobe",
+        "position": {
+          "x": 21.68,
+          "y": 0,
+          "z": 30.346
+        },
+        "room": "01a17c1c-feb2-72b0-b2e1-b3bf15901710",
+        "rotationY": 3.141592653589793
+      },
+      {
+        "id": "01a17c1c-feb2-72c9-bc50-8127d85ec6c5",
+        "type": "wardrobe",
+        "position": {
+          "x": 25.80898680833554,
+          "y": 1.6,
+          "z": 37.845564579236466
+        },
+        "room": "01a17c1c-feb2-72b4-aff5-1dc828d69c5f",
+        "rotationY": 1.5707963267948966
+      },
+      {
+        "id": "01a17c1c-feb2-72ca-bc38-88cb47fbf925",
+        "type": "wardrobe",
+        "position": {
+          "x": 29.19734012455888,
+          "y": 0,
+          "z": 34.945508391335274
+        },
+        "room": "01a17c1c-feb2-72b7-91ce-93636acec404",
+        "rotationY": -1.5707963267948966
+      },
+      {
+        "id": "01a17c1c-feb2-72cb-9e0c-32f5661a6506",
+        "type": "wardrobe",
+        "position": {
+          "x": 25.156148479279707,
+          "y": 1.5,
+          "z": 37.111564579236465
+        },
+        "room": "01a17c1c-feb2-72b8-97f3-592abb6c0686",
+        "rotationY": 0
+      },
+      {
+        "id": "01a17c1c-feb2-72cc-b1e0-c51232f304b0",
+        "type": "wardrobe",
+        "position": {
+          "x": 28.593340124558882,
+          "y": 0,
+          "z": 31.915884411867268
+        },
+        "room": "01a17c1c-feb2-72b5-a73f-bf1f0cd08cc8",
+        "rotationY": 1.5707963267948966
+      },
+      {
+        "id": "01a17c1c-feb2-72cd-abbe-10be058a99bf",
+        "type": "wardrobe",
+        "position": {
+          "x": 28.816340124558884,
+          "y": 1.696,
+          "z": 37.851064579236464
+        },
+        "room": "01a17c1c-feb2-72b6-96d4-24429b5a99b3",
+        "rotationY": 1.5707963267948948
+      },
+      {
+        "id": "01a17c1c-feb2-72ce-9f26-4af16f722f31",
+        "type": "wardrobe",
+        "position": {
+          "x": 20.2785,
+          "y": 0,
+          "z": 30.2785
+        },
+        "room": "01a17c1c-feb2-72b0-b2e1-b3bf15901710",
+        "rotationY": -1.5707963267948966
+      },
+      {
+        "id": "01a17c1c-feb2-72cf-a1d9-d58aea580246",
+        "type": "wardrobe",
+        "position": {
+          "x": 24.62478966652951,
+          "y": 0,
+          "z": 37.92362261573096
+        },
+        "room": "01a17c1c-feb2-72b4-aff5-1dc828d69c5f",
+        "rotationY": 0
+      },
+      {
+        "id": "01a17c1c-feb2-72d0-be2c-617ba247091e",
+        "type": "wardrobe",
+        "position": {
+          "x": 22.617434151695424,
+          "y": 0,
+          "z": 37.92362261573096
+        },
+        "room": "01a17c1c-feb2-72b2-bf73-2744f649f0c2",
+        "rotationY": 0
+      },
+      {
+        "id": "01a17c1c-feb2-72d1-bea0-57d668021cb0",
+        "type": "wardrobe",
+        "position": {
+          "x": 30.109340124558884,
+          "y": 0,
+          "z": 32.91038441186727
+        },
+        "room": "01a17c1c-feb2-72b7-91ce-93636acec404",
+        "rotationY": 3.141592653589793
+      },
+      {
+        "id": "01a17c1c-feb2-72d2-b402-70170ec0ae35",
+        "type": "wardrobe",
+        "position": {
+          "x": 26.99498680833554,
+          "y": 0,
+          "z": 33.44350839133528
+        },
+        "room": "01a17c1c-feb2-72b5-a73f-bf1f0cd08cc8",
+        "rotationY": -1.5707963267948966
+      },
+      {
+        "id": "01a17c1c-feb2-72d3-8c77-9802f66743f6",
+        "type": "wardrobe",
+        "position": {
+          "x": 27.399663466447212,
+          "y": 0,
+          "z": 38.47466138450895
+        },
+        "room": "01a17c1c-feb2-72b6-96d4-24429b5a99b3",
+        "rotationY": 0
+      },
+      {
+        "id": "01a17c1c-feb2-72d4-8582-0930ec5ff40d",
+        "type": "wardrobe",
+        "position": {
+          "x": 20.31,
+          "y": 0,
+          "z": 32.95956457923646
+        },
+        "room": "01a17c1c-feb2-72b1-8473-f0941b1eec91",
+        "rotationY": -1.5707963267948966
+      },
+      {
+        "id": "01a17c1c-feb2-72d5-8f96-b1762639475f",
+        "type": "wardrobe",
+        "position": {
+          "x": 30.109340124558884,
+          "y": 0,
+          "z": 32.91038441186727
+        },
+        "room": "01a17c1c-feb2-72b7-91ce-93636acec404",
+        "rotationY": 0
+      },
+      {
+        "id": "01a17c1c-feb2-72d6-ac22-3440742ee981",
+        "type": "wardrobe",
+        "position": {
+          "x": 26.99498680833554,
+          "y": 0,
+          "z": 33.44350839133528
+        },
+        "room": "01a17c1c-feb2-72b5-a73f-bf1f0cd08cc8",
+        "rotationY": 0
+      },
+      {
+        "id": "01a17c1c-feb2-72d7-a4df-48377389f190",
+        "type": "wardrobe",
+        "position": {
+          "x": 20.2785,
+          "y": 0,
+          "z": 36.909564579236466
+        },
+        "room": "01a17c1c-feb2-72b1-8473-f0941b1eec91",
+        "rotationY": 0
+      },
+      {
+        "id": "01a17c1c-feb2-72d8-817d-1a6c9a0886ad",
+        "type": "wardrobe",
+        "position": {
+          "x": 26.23048680833554,
+          "y": 0.56,
+          "z": 32.37650839133528
+        },
+        "room": "01a17c1c-feb2-72b5-a73f-bf1f0cd08cc8",
+        "rotationY": -1.5707963267948966
+      },
+      {
+        "id": "01a17c1c-feb2-72d9-9218-9dd0442925a7",
+        "type": "wardrobe",
+        "position": {
+          "x": 20.0815,
+          "y": 1.5,
+          "z": 34.50806457923647
+        },
+        "room": "01a17c1c-feb2-72b1-8473-f0941b1eec91",
+        "rotationY": -1.5707963267948966
+      },
+      {
+        "id": "01a17c1c-feb2-72da-a1bb-2dc08b2529ad",
+        "type": "wardrobe",
+        "position": {
+          "x": 21.672796262361736,
+          "y": 0,
+          "z": 34.53860919522762
+        },
+        "room": "01a17c1c-feb2-72b1-8473-f0941b1eec91",
+        "rotationY": 0
+      }
+    ],
+    "presentationCamera": {
+      "position": {
+        "x": 38.13704747520678,
+        "y": 12.902089204803815,
+        "z": 46.56265099298397
+      },
+      "target": {
+        "x": 25.66782733600212,
+        "y": 1.08,
+        "z": 34.880629094890715
+      }
+    },
+    "roomCameras": {
+      "01a17c1c-feb2-72b0-b2e1-b3bf15901710": {
+        "position": {
+          "x": 21.672796262361736,
+          "y": 1.6,
+          "z": 30.94457690560939
+        },
+        "target": {
+          "x": 23.34559252472347,
+          "y": 1.4,
+          "z": 30
+        }
+      },
+      "01a17c1c-feb2-72b1-8473-f0941b1eec91": {
+        "position": {
+          "x": 21.672796262361736,
+          "y": 1.6,
+          "z": 34.53860919522762
+        },
+        "target": {
+          "x": 23.34559252472347,
+          "y": 1.4,
+          "z": 37.18806457923647
+        }
+      },
+      "01a17c1c-feb2-72b2-bf73-2744f649f0c2": {
+        "position": {
+          "x": 22.61743415169542,
+          "y": 1.6,
+          "z": 37.923622615730956
+        },
+        "target": {
+          "x": 23.34559252472347,
+          "y": 1.4,
+          "z": 38.65918065222546
+        }
+      },
+      "01a17c1c-feb2-72b3-b375-e48996232805": {
+        "position": {
+          "x": 25.30401901647506,
+          "y": 1.6,
+          "z": 34.22990657467364
+        },
+        "target": {
+          "x": 23.34559252472347,
+          "y": 1.4,
+          "z": 30
+        }
+      },
+      "01a17c1c-feb2-72b4-aff5-1dc828d69c5f": {
+        "position": {
+          "x": 24.62478966652951,
+          "y": 1.6,
+          "z": 37.92362261573096
+        },
+        "target": {
+          "x": 23.34559252472347,
+          "y": 1.4,
+          "z": 37.18806457923647
+        }
+      },
+      "01a17c1c-feb2-72b5-a73f-bf1f0cd08cc8": {
+        "position": {
+          "x": 27.399663466447212,
+          "y": 1.6,
+          "z": 33.40069640160127
+        },
+        "target": {
+          "x": 25.90398680833554,
+          "y": 1.4,
+          "z": 35.195508391335274
+        }
+      },
+      "01a17c1c-feb2-72b6-96d4-24429b5a99b3": {
+        "position": {
+          "x": 27.399663466447212,
+          "y": 1.6,
+          "z": 38.47466138450894
+        },
+        "target": {
+          "x": 28.89534012455888,
+          "y": 1.4,
+          "z": 39.76125818978143
+        }
+      },
+      "01a17c1c-feb2-72b7-91ce-93636acec404": {
+        "position": {
+          "x": 30.115497398281562,
+          "y": 1.6,
+          "z": 34.396974495551866
+        },
+        "target": {
+          "x": 28.89534012455888,
+          "y": 1.4,
+          "z": 31.605884411867265
+        }
+      },
+      "01a17c1c-feb2-72b8-97f3-592abb6c0686": {
+        "position": {
+          "x": 25.544342955194942,
+          "y": 1.6,
+          "z": 36.43939910456609
+        },
+        "target": {
+          "x": 23.384952436779045,
+          "y": 1.4,
+          "z": 35.195508391335274
+        }
+      }
+    },
+    "navigation": {
+      "points": [
+        {
+          "x": 21.672796262361736,
+          "y": 0,
+          "z": 30.94457690560939
+        },
+        {
+          "x": 21.672796262361736,
+          "y": 0,
+          "z": 34.53860919522762
+        },
+        {
+          "x": 22.61743415169542,
+          "y": 0,
+          "z": 37.923622615730956
+        },
+        {
+          "x": 25.30401901647506,
+          "y": 0,
+          "z": 34.22990657467364
+        },
+        {
+          "x": 24.62478966652951,
+          "y": 0,
+          "z": 37.92362261573096
+        },
+        {
+          "x": 27.399663466447212,
+          "y": 0,
+          "z": 33.40069640160127
+        },
+        {
+          "x": 27.399663466447212,
+          "y": 0,
+          "z": 38.47466138450894
+        },
+        {
+          "x": 30.115497398281562,
+          "y": 0,
+          "z": 34.396974495551866
+        },
+        {
+          "x": 25.544342955194942,
+          "y": 0,
+          "z": 36.43939910456609
+        }
+      ]
+    },
+    "autotour": {
+      "path": [
+        {
+          "x": 21.672796262361736,
+          "y": 1.6,
+          "z": 30.94457690560939
+        },
+        {
+          "x": 21.672796262361736,
+          "y": 1.6,
+          "z": 34.53860919522762
+        },
+        {
+          "x": 22.61743415169542,
+          "y": 1.6,
+          "z": 37.923622615730956
+        },
+        {
+          "x": 25.30401901647506,
+          "y": 1.6,
+          "z": 34.22990657467364
+        },
+        {
+          "x": 24.62478966652951,
+          "y": 1.6,
+          "z": 37.92362261573096
+        },
+        {
+          "x": 27.399663466447212,
+          "y": 1.6,
+          "z": 33.40069640160127
+        },
+        {
+          "x": 27.399663466447212,
+          "y": 1.6,
+          "z": 38.47466138450894
+        },
+        {
+          "x": 30.115497398281562,
+          "y": 1.6,
+          "z": 34.396974495551866
+        },
+        {
+          "x": 25.544342955194942,
+          "y": 1.6,
+          "z": 36.43939910456609
+        }
+      ],
+      "gaze": [
+        {
+          "at": 0,
+          "target": {
+            "x": 21.672796262361736,
+            "y": 1.4,
+            "z": 34.53860919522762
+          }
+        },
+        {
+          "at": 1,
+          "target": {
+            "x": 22.61743415169542,
+            "y": 1.4,
+            "z": 37.923622615730956
+          }
+        },
+        {
+          "at": 2,
+          "target": {
+            "x": 25.30401901647506,
+            "y": 1.4,
+            "z": 34.22990657467364
+          }
+        },
+        {
+          "at": 3,
+          "target": {
+            "x": 24.62478966652951,
+            "y": 1.4,
+            "z": 37.92362261573096
+          }
+        },
+        {
+          "at": 4,
+          "target": {
+            "x": 27.399663466447212,
+            "y": 1.4,
+            "z": 33.40069640160127
+          }
+        },
+        {
+          "at": 5,
+          "target": {
+            "x": 27.399663466447212,
+            "y": 1.4,
+            "z": 38.47466138450894
+          }
+        },
+        {
+          "at": 6,
+          "target": {
+            "x": 30.115497398281562,
+            "y": 1.4,
+            "z": 34.396974495551866
+          }
+        },
+        {
+          "at": 7,
+          "target": {
+            "x": 25.544342955194942,
+            "y": 1.4,
+            "z": 36.43939910456609
+          }
+        },
+        {
+          "at": 8,
+          "target": {
+            "x": 23.384952436779045,
+            "y": 1.4,
+            "z": 35.195508391335274
+          }
+        }
+      ]
+    },
+    "walkSpawn": {
+      "position": {
+        "x": 21.672796262361736,
+        "y": 1.6,
+        "z": 30.94457690560939
+      },
+      "target": {
+        "x": 23.34559252472347,
+        "y": 1.4,
+        "z": 30
+      }
+    }
+  },
+  "ops": [
+    {
+      "op": "remove_wall",
+      "wallId": "01a17c1c-feb2-72ad-8ede-829bc2c5f499"
+    }
+  ],
+  "facts": {
+    "01a17c1c-feb2-72b9-b48f-51cb29c80f07": {
+      "archetype": "01a12fdd-8b2c-7337-9463-d77352d0fded",
+      "anchor": "floor",
+      "wallSnap": true,
+      "clearance": 0.6,
+      "dims": [2.6, 0.72, 1.6],
+      "yaw": 0,
+      "footprint": {
+        "hx": 1.3,
+        "hz": 0.8
+      },
+      "surfaces": {}
+    },
+    "01a17c1c-feb2-72ba-aada-3438d533f4b0": {
+      "archetype": "01a1302b-cf5c-71ce-84b3-427340d7c52d",
+      "anchor": "floor",
+      "wallSnap": true,
+      "clearance": 0.6,
+      "dims": [1, 0.64, 0.46],
+      "yaw": 0,
+      "footprint": {
+        "hx": 0.5,
+        "hz": 0.23
+      },
+      "surfaces": {
+        "top": {
+          "y": 0.64
+        }
+      }
+    },
+    "01a17c1c-feb2-72bb-aca0-38c81d9bb9b8": {
+      "archetype": "01a1302b-cf5d-73bc-8bbb-b58d52507e57",
+      "anchor": "floor",
+      "wallSnap": true,
+      "clearance": 0.3,
+      "dims": [0.917, 0.582, 0.21],
+      "yaw": 0,
+      "footprint": {
+        "hx": 0.4585,
+        "hz": 0.105
+      },
+      "surfaces": {
+        "onSurface": true
+      }
+    },
+    "01a17c1c-feb2-72bc-be44-1a2ad1ccda53": {
+      "archetype": "01a1302b-cf50-7402-bcf1-f90ca5a3624d",
+      "anchor": "floor",
+      "wallSnap": true,
+      "clearance": 0.6,
+      "dims": [1.668, 1, 2.449],
+      "yaw": 0,
+      "footprint": {
+        "hx": 0.834,
+        "hz": 1.2245
+      },
+      "surfaces": {}
+    },
+    "01a17c1c-feb2-72bd-8e78-4bf081bef255": {
+      "archetype": "01a1302b-cf5e-74db-88d0-6f0a63b0c942",
+      "anchor": "floor",
+      "wallSnap": true,
+      "clearance": 0.6,
+      "dims": [1.5, 2.15, 0.639],
+      "yaw": 0,
+      "footprint": {
+        "hx": 0.75,
+        "hz": 0.3195
+      },
+      "surfaces": {}
+    },
+    "01a17c1c-feb2-72be-b810-37eaff66c781": {
+      "archetype": "01a1302b-cf51-779d-8b6a-988253e54b19",
+      "anchor": "floor",
+      "wallSnap": true,
+      "clearance": 0.6,
+      "dims": [1.544, 0.95, 2.022],
+      "yaw": 0,
+      "footprint": {
+        "hx": 0.772,
+        "hz": 1.011
+      },
+      "surfaces": {}
+    },
+    "01a17c1c-feb2-72bf-9b82-f952b9c54df8": {
+      "archetype": "01a179e4-5d01-71f6-ae8e-198e4b1bc50e",
+      "anchor": "floor",
+      "wallSnap": true,
+      "clearance": 0.6,
+      "dims": [0.8, 1.95, 0.602],
+      "yaw": 0,
+      "footprint": {
+        "hx": 0.4,
+        "hz": 0.301
+      },
+      "surfaces": {}
+    },
+    "01a17c1c-feb2-72c0-8c56-517cc620e621": {
+      "archetype": "01a1302b-cf4f-70c5-bb43-81467be7d740",
+      "anchor": "floor",
+      "wallSnap": true,
+      "clearance": 0.6,
+      "dims": [1.5, 0.565, 1.5],
+      "yaw": 0,
+      "footprint": {
+        "hx": 0.75,
+        "hz": 0.75
+      },
+      "surfaces": {}
+    },
+    "01a17c1c-feb2-72c1-991b-1313e8765577": {
+      "archetype": "01a1302b-cf5e-74db-88d0-6f0c8c301aa8",
+      "anchor": "floor",
+      "wallSnap": true,
+      "clearance": 0.6,
+      "dims": [0.566, 1.023, 0.436],
+      "yaw": 0,
+      "footprint": {
+        "hx": 0.283,
+        "hz": 0.218
+      },
+      "surfaces": {}
+    },
+    "01a17c1c-feb2-72c2-957e-5baee7bb52d4": {
+      "archetype": "01a1302b-cf5c-71ce-84b3-426edf6ca3eb",
+      "anchor": "floor",
+      "wallSnap": true,
+      "clearance": 0.6,
+      "dims": [0.42, 0.49, 0.65],
+      "yaw": 0,
+      "footprint": {
+        "hx": 0.21,
+        "hz": 0.325
+      },
+      "surfaces": {}
+    },
+    "01a17c1c-feb2-72c3-88a9-7da21436d867": {
+      "archetype": "01a1302b-cf57-7063-8fcd-6814f6a32e14",
+      "anchor": "floor",
+      "wallSnap": true,
+      "clearance": 0.6,
+      "dims": [1.155, 1.685, 0.428],
+      "yaw": 0,
+      "footprint": {
+        "hx": 0.5775,
+        "hz": 0.214
+      },
+      "surfaces": {}
+    },
+    "01a17c1c-feb2-72c4-b3e6-808a8c8db707": {
+      "archetype": "01a1302b-cf5c-71ce-84b3-426edf6ca3eb",
+      "anchor": "floor",
+      "wallSnap": true,
+      "clearance": 0.6,
+      "dims": [0.42, 0.49, 0.65],
+      "yaw": 0,
+      "footprint": {
+        "hx": 0.21,
+        "hz": 0.325
+      },
+      "surfaces": {}
+    },
+    "01a17c1c-feb2-72c5-9b19-6c7fd7e674cb": {
+      "archetype": "01a1302b-cf58-75db-b483-7967e3ffeb03",
+      "anchor": "ceiling",
+      "wallSnap": false,
+      "clearance": 0.3,
+      "dims": [0.467, 0.254, 0.467],
+      "yaw": 0,
+      "footprint": null,
+      "surfaces": {}
+    },
+    "01a17c1c-feb2-72c6-9681-607639452783": {
+      "archetype": "01a12fdf-14d4-7a4f-af00-122706e2f3ef",
+      "anchor": "floor",
+      "wallSnap": true,
+      "clearance": 0.35,
+      "dims": [0.55, 0.56, 0.493],
+      "yaw": 0,
+      "footprint": {
+        "hx": 0.275,
+        "hz": 0.2465
+      },
+      "surfaces": {
+        "top": {
+          "y": 0.56
+        }
+      }
+    },
+    "01a17c1c-feb2-72c7-83e6-c1528be21925": {
+      "archetype": "01a1302b-cf5e-74db-88d0-6f12ace6cfa0",
+      "anchor": "floor",
+      "wallSnap": true,
+      "clearance": 0.6,
+      "dims": [0.604, 0.84, 0.58],
+      "yaw": 0,
+      "footprint": {
+        "hx": 0.302,
+        "hz": 0.29
+      },
+      "surfaces": {}
+    },
+    "01a17c1c-feb2-72c8-8c2c-fcdede3d03af": {
+      "archetype": "01a179a3-836e-7581-9baf-b467ed530cd8",
+      "anchor": "floor",
+      "wallSnap": true,
+      "clearance": 0.6,
+      "dims": [1.2, 0.877, 0.532],
+      "yaw": 0,
+      "footprint": {
+        "hx": 0.6,
+        "hz": 0.266
+      },
+      "mirror": {
+        "x": true,
+        "y": false,
+        "z": false
+      },
+      "surfaces": {}
+    },
+    "01a17c1c-feb2-72c9-bc50-8127d85ec6c5": {
+      "archetype": "01a12fdf-14f1-7902-95ef-5408ad6bfc96",
+      "anchor": "wall",
+      "wallSnap": true,
+      "clearance": 0,
+      "dims": [0.76, 0.76, 0.06],
+      "yaw": 0,
+      "layout": {
+        "mount": {
+          "centre": 1.6
+        }
+      },
+      "footprint": null,
+      "surfaces": {}
+    },
+    "01a17c1c-feb2-72ca-bc38-88cb47fbf925": {
+      "archetype": "01a1302b-cf56-709e-b642-8c044d136394",
+      "anchor": "floor",
+      "wallSnap": true,
+      "clearance": 0.6,
+      "dims": [0.46, 0.46, 0.444],
+      "yaw": 0,
+      "footprint": {
+        "hx": 0.23,
+        "hz": 0.222
+      },
+      "surfaces": {
+        "top": {
+          "y": 0.46
+        }
+      }
+    },
+    "01a17c1c-feb2-72cb-9e0c-32f5661a6506": {
+      "archetype": "01a1796c-ee3b-7777-9960-8481cbb78565",
+      "anchor": "wall",
+      "wallSnap": true,
+      "clearance": 0.1,
+      "dims": [0.75, 0.5, 0.033],
+      "yaw": 0,
+      "footprint": null,
+      "mirror": {
+        "x": true,
+        "y": false,
+        "z": false
+      },
+      "surfaces": {}
+    },
+    "01a17c1c-feb2-72cc-b1e0-c51232f304b0": {
+      "archetype": "01a1302b-cf56-709e-b642-8c044d136394",
+      "anchor": "floor",
+      "wallSnap": true,
+      "clearance": 0.6,
+      "dims": [0.46, 0.46, 0.444],
+      "yaw": 0,
+      "footprint": {
+        "hx": 0.23,
+        "hz": 0.222
+      },
+      "surfaces": {
+        "top": {
+          "y": 0.46
+        }
+      }
+    },
+    "01a17c1c-feb2-72cd-abbe-10be058a99bf": {
+      "archetype": "01a17997-8e27-76ea-9b9b-78779bf0200a",
+      "anchor": "wall",
+      "wallSnap": true,
+      "clearance": 0.1,
+      "dims": [0.486, 0.746, 0.028],
+      "yaw": 0,
+      "footprint": null,
+      "mirror": {
+        "x": true,
+        "y": false,
+        "z": false
+      },
+      "surfaces": {}
+    },
+    "01a17c1c-feb2-72ce-9f26-4af16f722f31": {
+      "archetype": "01a12fdf-14ea-7472-ac01-acc2a78f4a24",
+      "anchor": "floor",
+      "wallSnap": false,
+      "clearance": 0.2,
+      "dims": [0.794, 1.795, 0.739],
+      "yaw": 0,
+      "layout": {
+        "footprint": 0.5
+      },
+      "footprint": {
+        "hx": 0.1985,
+        "hz": 0.18475
+      },
+      "surfaces": {}
+    },
+    "01a17c1c-feb2-72cf-a1d9-d58aea580246": {
+      "archetype": "01a1302b-cf58-75db-b483-7967e3ffeb03",
+      "anchor": "ceiling",
+      "wallSnap": false,
+      "clearance": 0.3,
+      "dims": [0.467, 0.254, 0.467],
+      "yaw": 0,
+      "footprint": null,
+      "surfaces": {}
+    },
+    "01a17c1c-feb2-72d0-be2c-617ba247091e": {
+      "archetype": "01a1302b-cf58-75db-b483-7967e3ffeb03",
+      "anchor": "ceiling",
+      "wallSnap": false,
+      "clearance": 0.3,
+      "dims": [0.467, 0.254, 0.467],
+      "yaw": 0,
+      "footprint": null,
+      "surfaces": {}
+    },
+    "01a17c1c-feb2-72d1-bea0-57d668021cb0": {
+      "archetype": "01a1302b-cf5a-7334-9d9f-d4716d3f8fce",
+      "anchor": "floor",
+      "wallSnap": true,
+      "clearance": 0.6,
+      "dims": [2.3, 0.02, 1.6],
+      "yaw": 0,
+      "footprint": null,
+      "surfaces": {}
+    },
+    "01a17c1c-feb2-72d2-b402-70170ec0ae35": {
+      "archetype": "01a1302b-cf59-73b8-b929-4e70d9bfa7aa",
+      "anchor": "floor",
+      "wallSnap": true,
+      "clearance": 0.6,
+      "dims": [2.4, 0.012, 1.7],
+      "yaw": 0,
+      "footprint": null,
+      "surfaces": {}
+    },
+    "01a17c1c-feb2-72d3-8c77-9802f66743f6": {
+      "archetype": "01a1302b-cf58-75db-b483-7967e3ffeb03",
+      "anchor": "ceiling",
+      "wallSnap": false,
+      "clearance": 0.3,
+      "dims": [0.467, 0.254, 0.467],
+      "yaw": 0,
+      "footprint": null,
+      "surfaces": {}
+    },
+    "01a17c1c-feb2-72d4-8582-0930ec5ff40d": {
+      "archetype": "01a12fdf-14e6-738a-8f8c-d94d58d0c6cb",
+      "anchor": "floor",
+      "wallSnap": false,
+      "clearance": 0.3,
+      "dims": [0.457, 1.724, 0.46],
+      "yaw": 0,
+      "footprint": {
+        "hx": 0.2285,
+        "hz": 0.23
+      },
+      "surfaces": {}
+    },
+    "01a17c1c-feb2-72d5-8f96-b1762639475f": {
+      "archetype": "01a1302b-cf58-75db-b483-7967e3ffeb03",
+      "anchor": "ceiling",
+      "wallSnap": false,
+      "clearance": 0.3,
+      "dims": [0.467, 0.254, 0.467],
+      "yaw": 0,
+      "footprint": null,
+      "surfaces": {}
+    },
+    "01a17c1c-feb2-72d6-ac22-3440742ee981": {
+      "archetype": "01a1302b-cf58-75db-b483-7967e3ffeb03",
+      "anchor": "ceiling",
+      "wallSnap": false,
+      "clearance": 0.3,
+      "dims": [0.467, 0.254, 0.467],
+      "yaw": 0,
+      "footprint": null,
+      "surfaces": {}
+    },
+    "01a17c1c-feb2-72d7-a4df-48377389f190": {
+      "archetype": "01a12fdf-14ea-7472-ac01-acc2a78f4a24",
+      "anchor": "floor",
+      "wallSnap": false,
+      "clearance": 0.2,
+      "dims": [0.794, 1.795, 0.739],
+      "yaw": 0,
+      "layout": {
+        "footprint": 0.5
+      },
+      "footprint": {
+        "hx": 0.1985,
+        "hz": 0.18475
+      },
+      "surfaces": {}
+    },
+    "01a17c1c-feb2-72d8-817d-1a6c9a0886ad": {
+      "archetype": "01a12fdf-14e7-7f03-8781-df34142160e3",
+      "anchor": "floor",
+      "wallSnap": false,
+      "clearance": 0.1,
+      "dims": [0.298, 0.524, 0.3],
+      "yaw": 0,
+      "footprint": {
+        "hx": 0.149,
+        "hz": 0.15
+      },
+      "surfaces": {
+        "onSurface": true
+      }
+    },
+    "01a17c1c-feb2-72d9-9218-9dd0442925a7": {
+      "archetype": "01a1796c-ee3b-7777-9960-8481cbb78565",
+      "anchor": "wall",
+      "wallSnap": true,
+      "clearance": 0.1,
+      "dims": [0.75, 0.5, 0.033],
+      "yaw": 0,
+      "footprint": null,
+      "mirror": {
+        "x": true,
+        "y": false,
+        "z": false
+      },
+      "surfaces": {}
+    },
+    "01a17c1c-feb2-72da-a1bb-2dc08b2529ad": {
+      "archetype": "01a1302b-cf58-75db-b483-7967e3ffeb03",
+      "anchor": "ceiling",
+      "wallSnap": false,
+      "clearance": 0.3,
+      "dims": [0.467, 0.254, 0.467],
+      "yaw": 0,
+      "footprint": null,
+      "surfaces": {}
+    }
+  }
+}
