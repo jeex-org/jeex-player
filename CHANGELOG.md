@@ -655,6 +655,14 @@ as described under [Versioning](#versioning).
 
 ### Fixed
 
+- **`strict-new` follows a renamed wall or room.** A batch that removed a
+  partition and joined the walls on either side (`merge_wall`), or split a
+  wall (`split_wall`), gave those walls new ids, so a piece that already stood
+  a few centimetres inside the old wall came back as a new `inside-a-wall`
+  issue and the edit was refused. The base document's hard issues are now
+  carried to the ids that replaced their walls and rooms (room merges
+  included) before they are compared. A piece the same batch pushes into the
+  new wall is still refused.
 - **Try again recovers after a lost graphics context.** When the browser
   lost the WebGL context and never gave it back, Try again failed with
   «Cannot read properties of null (reading 'precision')» and only a page
