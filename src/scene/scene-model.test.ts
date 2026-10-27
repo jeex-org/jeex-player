@@ -602,6 +602,67 @@ describe('layout lint', () => {
     expect(subject.rev).toBe(0);
   });
 
+  describe("'strict-new' follows a wall or room id through the batch to the ids that replaced it", () => {
+    /** Fixed ids the batches below mint: the merged south wall, the split's node and its two halves. */
+    const SOUTH = '01a17b5f-4ab2-73ee-a84f-fb7a6eeba2f1';
+    const CUT = '01a17b5f-4ab2-73ef-b063-93559e980c89';
+    const WEST_HALF = '01a17b5f-4ab2-73f0-bbae-2a790382ad15';
+    const EAST_HALF = '01a17b5f-4ab2-73f1-9d68-ded613dae7f2';
+    /** Removing the partition leaves `wSA` and `wSB` collinear at a node nothing else uses: the host joins them. */
+    const REMOVE_AND_JOIN: readonly SceneOp[] = [
+      { op: 'remove_wall', wallId: L_SHAPE.wall.wPart },
+      { op: 'merge_wall', wallIds: [L_SHAPE.wall.wSA, L_SHAPE.wall.wSB], id: SOUTH },
+    ];
+
+    /** The sofa standing 0.22 m into the south facade of room A, as a recognised plan's symbols do. */
+    function sofaInTheSouthWall(): SceneData {
+      const scene = draftOf(lShapePlan);
+      const sofa = scene.assets.find((asset) => asset.id === L_SHAPE.asset.sofa)!;
+      sofa.position = { x: 4.3, y: 0, z: 0.45 };
+      sofa.rotationY = 0;
+      return scene;
+    }
+
+    function wallIssuesOf(issues: readonly { rule: string; ids: readonly string[] }[] | undefined): string[][] {
+      return (issues ?? []).filter((issue) => issue.rule === 'inside-a-wall').map((issue) => [...issue.ids].sort());
+    }
+
+    test('the base really has the sofa inside the south wall', () => {
+      const issues = lintLayout(sofaInTheSouthWall(), linting(sofaInTheSouthWall()).plan);
+      expect(wallIssuesOf(issues)).toContainEqual([L_SHAPE.asset.sofa, L_SHAPE.wall.wSA].sort());
+    });
+
+    test('removing the partition and joining the south walls is accepted: the sofa was already in a wall the new one replaced', () => {
+      const subject = linting(sofaInTheSouthWall());
+
+      const result = ok(subject.apply({ baseRev: 0, ops: REMOVE_AND_JOIN, lint: 'strict-new' }));
+
+      // Still reported, under the wall's new id, as information.
+      expect(wallIssuesOf(result.issues)).toContainEqual([L_SHAPE.asset.sofa, SOUTH].sort());
+    });
+
+    test('splitting the wall the sofa stands in is accepted the same way, whichever half it is in', () => {
+      const subject = linting(sofaInTheSouthWall());
+      const split: SceneOp = { op: 'split_wall', wallId: L_SHAPE.wall.wSA, at: 2, nodeId: CUT, ids: [WEST_HALF, EAST_HALF] };
+
+      const result = ok(subject.apply({ baseRev: 0, ops: [split], lint: 'strict-new' }));
+
+      expect(wallIssuesOf(result.issues)).toContainEqual([L_SHAPE.asset.sofa, EAST_HALF].sort());
+    });
+
+    test('a piece the same batch pushes into the joined wall is still a new error', () => {
+      const subject = linting(sofaInTheSouthWall());
+      const tableIntoTheWall: SceneOp = { op: 'move_object', assetId: L_SHAPE.asset.table, position: { x: 8, y: 0, z: 0.1 } };
+
+      const result = subject.apply({ baseRev: 0, ops: [...REMOVE_AND_JOIN, tableIntoTheWall], lint: 'strict-new' });
+
+      if (isApplyOk(result)) throw new Error('expected the batch to be refused');
+      expect(result.message).toContain('new error(s)');
+      expect(wallIssuesOf(result.issues)).toContainEqual([L_SHAPE.asset.table, SOUTH].sort());
+      expect(subject.rev).toBe(0);
+    });
+  });
+
   test("'strict-new' on a clean base is 'strict'", () => {
     const subject = linting();
     const sofaIntoTheWall: SceneOp = { op: 'move_object', assetId: L_SHAPE.asset.sofa, position: { x: 0, y: 0, z: 4 } };
