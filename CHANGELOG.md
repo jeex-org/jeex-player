@@ -649,6 +649,14 @@ as described under [Versioning](#versioning).
 
 ### Fixed
 
+- **Try again recovers after a lost graphics context.** When the browser
+  lost the WebGL context and never gave it back, Try again failed with
+  «Cannot read properties of null (reading 'precision')» and only a page
+  reload brought the scene back; the same happened to Try again after any
+  failure once the scene had drawn. A canvas keeps one context for life, so
+  the retried boot now tears the old stage down and draws on a fresh canvas.
+  The door button, which a Try again used to lose for good, comes back with
+  it.
 - **Wall junctions take the walls' colour.** The core where walls meet (a
   corner, a T-junction) wore the unpainted sand plaster whatever the walls
   were painted, so white walls showed beige squares on their tops in 360. A

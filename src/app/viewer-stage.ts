@@ -50,6 +50,7 @@ import { wireWalkLighting } from './walk-lighting-wiring.js';
 import type { WalkDocument } from '../render/walk-lighting/walk-lighting.js';
 import type { PostProcessor } from '../render/post-processor.js';
 import { findSiteGround, setSiteGroundLit } from '../geometry/site-ground.js';
+import { replaceSceneCanvas } from '../ui/scene-canvas.js';
 
 /**
  * What the stage needs from the application, minus the camera it builds itself.
@@ -629,5 +630,7 @@ export class ViewerStage {
     this.walkLighting.dispose();
     this.walkPost.dispose();
     this.runtime.dispose();
+    // The runtime left this canvas's context lost for good: the next boot draws on a fresh one.
+    replaceSceneCanvas(this.deps.roots);
   }
 }
