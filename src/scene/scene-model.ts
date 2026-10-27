@@ -33,6 +33,7 @@ import { solvePlan, type SolvedPlan } from '../plan/plan-solver.js';
 import { validateScene } from './scene-validator.js';
 import { applyOp, OpError, sameTouched, type SceneOp, type TouchedEntity } from './scene-ops.js';
 import { applyRoomMerges, planRoomMerges, type RoomMerge } from './room-merge.js';
+import { heirsOf, inheritedKeys, issueKey } from './issue-heirs.js';
 import { diffScenes, sameData } from './scene-diff.js';
 import { Fanout } from '../shared/fanout.js';
 import { draftOf, type Committed, type Draft } from '../shared/committed.js';
@@ -52,7 +53,10 @@ import type { SceneData } from './types.js';
  *
  * `strict-new` refuses only a hard issue the BASE document did not already
  * have, compared by rule id and entity ids: a sofa moved across the room is not
- * refused because a wardrobe elsewhere already stood in a doorway. Pre-existing
+ * refused because a wardrobe elsewhere already stood in a doorway. A wall or
+ * room the batch split, joined or merged is followed to its new ids first
+ * (`issue-heirs.ts`), so a piece already in a wall stays old in the wall that
+ * replaced it. Pre-existing
  * hard issues still come back in `ApplyOk.issues`, so the host can show them
  * without blocking the edit.
  */
@@ -123,11 +127,6 @@ export type ApplyResult = ApplyOk | ApplyFailure;
 /** Notified after a batch commits, in subscription order. */
 export type RevisionListener = (rev: number, touched: readonly TouchedEntity[], ops: readonly SceneOp[]) => void;
 
-/** An issue by WHAT it says about WHOM: its rule and its sorted entity ids (`free-space.ts` keys the same way). */
-function issueKey(issue: LayoutIssue): string {
-  return `${issue.rule}|${[...issue.ids].sort().join(',')}`;
-}
-
 export function isApplyOk(result: ApplyResult): result is ApplyOk {
   return (result as ApplyFailure).error === undefined;
 }
@@ -193,8 +192,8 @@ export class SceneModel {
   private pendingErrors: Error[] = [];
   /** True while listeners are being notified; blocks re-entrant `apply`. */
   private applying = false;
-  /** The committed revision's hard-issue keys, for `strict-new`; `null` until first asked. */
-  private baseErrors: { rev: number; keys: ReadonlySet<string> } | null = null;
+  /** The committed revision's hard issues, for `strict-new`; `null` until first asked. */
+  private baseErrors: { rev: number; issues: readonly LayoutIssue[] } | null = null;
   /** Optional sink for listener failures, set with `onError`. */
   private onListenerError?: ((error: Error) => void) | undefined;
 
@@ -296,7 +295,7 @@ export class SceneModel {
       return { error: 'validation_failed', message };
     }
 
-    const linted = this.lint(batch.lint ?? 'off', candidate, candidatePlan);
+    const linted = this.lint(batch.lint ?? 'off', candidate, candidatePlan, () => heirsOf(batch.ops, roomMerges));
     if (!Array.isArray(linted)) return linted;
 
     this.committed = deepFreeze(draft);
@@ -367,7 +366,13 @@ export class SceneModel {
    * to lint without one is the CALLER's mistake and is refused rather than
    * answered with an empty list that would read as "no issues found".
    */
-  private lint(mode: LintMode, candidate: SceneData, plan: SolvedPlan): LayoutIssue[] | ApplyFailure {
+  /** `heirs`: where the batch's renamed walls and rooms went (`issue-heirs.ts`), read only by `strict-new`. */
+  private lint(
+    mode: LintMode,
+    candidate: SceneData,
+    plan: SolvedPlan,
+    heirs: () => ReturnType<typeof heirsOf>,
+  ): LayoutIssue[] | ApplyFailure {
     if (mode === 'off') return [];
     if (!this.linter) {
       return {
@@ -379,7 +384,7 @@ export class SceneModel {
     if (mode === 'report') return issues;
     let errors = issues.filter((issue) => issue.severity === 'error');
     if (mode === 'strict-new') {
-      const base = this.baseErrorKeys(this.linter);
+      const base = inheritedKeys(this.baseErrorIssues(this.linter), heirs());
       errors = errors.filter((issue) => !base.has(issueKey(issue)));
     }
     if (errors.length === 0) return issues;
@@ -391,13 +396,12 @@ export class SceneModel {
     };
   }
 
-  /** The committed document's hard issues as keys, linted once per revision. */
-  private baseErrorKeys(linter: LayoutLinter): ReadonlySet<string> {
-    if (this.baseErrors?.rev === this.revision) return this.baseErrors.keys;
-    const keys = new Set<string>();
-    for (const issue of linter(this.committed, this.solved)) if (issue.severity === 'error') keys.add(issueKey(issue));
-    this.baseErrors = { rev: this.revision, keys };
-    return keys;
+  /** The committed document's hard issues, linted once per revision. */
+  private baseErrorIssues(linter: LayoutLinter): readonly LayoutIssue[] {
+    if (this.baseErrors?.rev === this.revision) return this.baseErrors.issues;
+    const issues = linter(this.committed, this.solved).filter((issue) => issue.severity === 'error');
+    this.baseErrors = { rev: this.revision, issues };
+    return issues;
   }
 
   /**
