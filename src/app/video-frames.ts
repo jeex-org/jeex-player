@@ -43,6 +43,12 @@
  * Tour-state invariant: whatever `TourState` the player was in before this
  * call — `ready`, `paused`, `playing` or `ended` — it is in again after, at
  * the same distance along the route (`restoreTour`).
+ *
+ * Context-loss invariant: a WebGL context lost while the clip is produced
+ * ends it with a `ViewerLibError` of code `context-lost`, never with frames
+ * drawn by a context that is gone and never with a promise that does not
+ * settle, so a host's recording can be marked failed. The tour and the live
+ * loop are put back as on any other ending.
  */
 
 import { captureEdge, captureStill } from '../render/still-capture.js';
@@ -188,25 +194,71 @@ export async function captureFrames(deps: FrameCaptureDeps, request: FramesReque
 
   const start = deps.tour.progress();
   const startState = deps.tour.getState();
+  const loss = watchContextLoss(deps.runtime);
   deps.runtime.stop();
   try {
     let provenance: Provenance | undefined;
     await deps.withRoot(async (root) => {
       for (let index = 0; index < count; index += 1) {
+        loss.check(index);
         const timeS = from + (index * speed) / request.fps;
         deps.tour.seekTime(timeS);
         const pose = deps.livePose();
         if (pose === null) throw new ViewerLibError('not-ready', 'capture: the live camera does not exist yet');
-        const shot = await captureStill(deps.runtime.renderer, root, { width, height, pose, post: deps.post });
+        const shot = await loss.race(captureStill(deps.runtime.renderer, root, { width, height, pose, post: deps.post }), index);
+        loss.check(index);
         const blob = text === null ? shot.blob : await stampCaption(shot.blob, text, Math.max(1, shot.width / CAPTION_REFERENCE_PX));
         provenance ??= provenanceFor(deps.model.scene, deps.model.rev, 'frame', state, { camera: pose });
-        await request.onFrame({ index, timeS, blob });
+        await loss.race(Promise.resolve(request.onFrame({ index, timeS, blob })), index);
       }
+      loss.check(count);
     });
     // `count >= 1` always (see `frameCount`), so `provenance` was set on the first iteration.
     return { frames: count, durationS: count > 1 ? (count - 1) / request.fps : 0, provenance: provenance! };
   } finally {
+    loss.stop();
     restoreTour(deps.tour, startState, start.distance);
     deps.runtime.start();
   }
+}
+
+/** The refusal a clip ends with when its context goes; `index` is the frame it was at. */
+function contextLost(index: number): ViewerLibError {
+  return new ViewerLibError('context-lost', `capture frames: the WebGL context was lost at frame ${String(index)}`, { detail: { index } });
+}
+
+/**
+ * Watches the runtime's context for the length of one clip: `check` throws
+ * once it is lost, `race` rejects a pending step the moment it is (a step
+ * waiting on a context that is gone may never settle), `stop` lets go.
+ */
+function watchContextLoss(runtime: RenderRuntime): {
+  check: (index: number) => void;
+  race: <T>(step: Promise<T>, index: number) => Promise<T>;
+  stop: () => void;
+} {
+  const renderer = runtime.renderer;
+  const isLost = (): boolean => renderer.getContext().isContextLost();
+  const canvas = renderer.domElement;
+  const waiting = new Set<() => void>();
+  const onLost = (): void => {
+    for (const reject of waiting) reject();
+  };
+  const listening = new AbortController();
+  canvas.addEventListener('webglcontextlost', onLost, { signal: listening.signal });
+  return {
+    check: (index) => {
+      if (isLost()) throw contextLost(index);
+    },
+    race: <T>(step: Promise<T>, index: number): Promise<T> =>
+      new Promise<T>((resolve, reject) => {
+        const fail = (): void => reject(contextLost(index));
+        waiting.add(fail);
+        step.then(resolve, reject).finally(() => waiting.delete(fail));
+      }),
+    stop: () => {
+      listening.abort();
+      waiting.clear();
+    },
+  };
 }

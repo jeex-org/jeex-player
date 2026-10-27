@@ -228,7 +228,7 @@ Wire protocol (`channel: "jeex-embed"`, `version: 1`), for hosts that do not use
 { channel: 'jeex-embed', version: 1, viewerId, kind: 'event', event, payload }
 ```
 
-Methods: `play`, `pause`, `toggle`, `stop`, `seek {fraction}`, `seekDistance {metres}`, `seekTime {seconds}`, `setTourSpeed {speed}`, `progress`, `loadScene {url} | {document}`, `setMode {mode}`, `getMode`, `getState`, `getScene`, `focusRoom {roomId}`, `setFurnitureVisible {visible}`, `setLocale {locale}`, `setLightTemperature {temperature}`, `resize`, `captureStill {width, height, …}`, `capturePanorama {width, roomId, …}`, `exportGlb {includeFurniture?, state?, embedDocument?}`, `exportUsdz {includeFurniture?}`, `dispose`. `getScene` is answered even before the frame's `ready`, like `dispose`; `exportGlb`/`exportUsdz` need a scene and are not. Both exports' results cross the boundary as an `ArrayBuffer`, not a `Blob` — wrap it yourself (`new Blob([buffer], { type: 'model/gltf-binary' })` or `'model/vnd.usdz+zip'`) for a download link or `URL.createObjectURL`. The spelling `playTour`, `pauseTour` and `destroy` from the original contract is accepted as an alias. Events: `ready`, `error`, `scene`, `mode`, `progress`, `state`, `ended`, `size` (`{ width, height }` of the frame page's content box, from `embed.html` only), `lightTemperature` (`{ temperature, source }`), `disposed`. Error codes are the viewer's ([Errors](#errors)) plus `unknown-method` and `timeout`; a message that fails the envelope or origin check is ignored rather than answered. An inline `loadScene {document}` over the 8 MB cap (`MAX_SCENE_BYTES`, measured in bytes) is answered `bad-params` by the frame itself — the helper checks on the host side too, but the frame does not take a hand-written host's word for it. The helper's `dispose()` emits `disposed` to its own subscribers and then stops listening. Timeouts: a command waits at most 20 s for the frame to become ready (`QUEUE_TIMEOUT_MS`) and 5 s for its reply once posted (`REPLY_TIMEOUT_MS`). The helper's `on` is typed over `EmbedEventMap`, so `viewer.on('progress', (p) => p.fraction)` needs no cast.
+Methods: `play`, `pause`, `toggle`, `stop`, `seek {fraction}`, `seekDistance {metres}`, `seekTime {seconds}`, `setTourSpeed {speed}`, `progress`, `loadScene {url} | {document}` (either with an optional `revision`), `setMode {mode}`, `getMode`, `getState`, `getScene`, `focusRoom {roomId}`, `setFurnitureVisible {visible}`, `setLocale {locale}`, `setLightTemperature {temperature}`, `resize`, `captureStill {width, height, …}`, `capturePanorama {width, roomId, …}`, `exportGlb {includeFurniture?, state?, embedDocument?}`, `exportUsdz {includeFurniture?}`, `dispose`. `getScene` is answered even before the frame's `ready`, like `dispose`; `exportGlb`/`exportUsdz` need a scene and are not. Both exports' results cross the boundary as an `ArrayBuffer`, not a `Blob` — wrap it yourself (`new Blob([buffer], { type: 'model/gltf-binary' })` or `'model/vnd.usdz+zip'`) for a download link or `URL.createObjectURL`. The spelling `playTour`, `pauseTour` and `destroy` from the original contract is accepted as an alias. Events: `ready`, `error`, `scene`, `mode`, `progress`, `state`, `ended`, `size` (`{ width, height }` of the frame page's content box, from `embed.html` only), `lightTemperature` (`{ temperature, source }`), `disposed`. Error codes are the viewer's ([Errors](#errors)) plus `unknown-method` and `timeout`; a message that fails the envelope or origin check is ignored rather than answered. An inline `loadScene {document}` over the 8 MB cap (`MAX_SCENE_BYTES`, measured in bytes) is answered `bad-params` by the frame itself — the helper checks on the host side too, but the frame does not take a hand-written host's word for it. The helper's `dispose()` emits `disposed` to its own subscribers and then stops listening. Timeouts: a command waits at most 20 s for the frame to become ready (`QUEUE_TIMEOUT_MS`) and 5 s for its reply once posted (`REPLY_TIMEOUT_MS`). The helper's `on` is typed over `EmbedEventMap`, so `viewer.on('progress', (p) => p.fraction)` needs no cast.
 
 ## Options
 
@@ -322,7 +322,7 @@ type ViewerHandle = {
   capture: CaptureCommands;           // stills, panoramas and the "as is" pair
   slots: ViewerSlots;                 // the host's own boxes; see Host slots
   ready: Promise<void>;               // first frame of the first scene
-  loadScene(source: { url: string } | { document: unknown } | { repository: SceneRepository }): Promise<void>;
+  loadScene(source: ({ url: string } | { document: unknown } | { repository: SceneRepository }) & { revision?: number }): Promise<void>; // revision: yours, see Capture
   setMode(mode: 'plan2d' | 'plan3d' | 'orbit' | 'walk' | 'tour'): void; // 'orbit' also resets the camera, like Reset camera
   getMode(): ViewerMode;
   focusRoom(roomId: string): boolean;   // room UUID; false for anything else
@@ -475,6 +475,11 @@ type CaptureCommands = {
   panorama(request: { width: number; roomId: string; state?: 'current' | 'default'; caption?: boolean }):
     Promise<{ blob: Blob; provenance: Provenance }>;           // equirectangular, height = width / 2
   pair(request): Promise<{ current: …; default: … }>;          // the staged shot and the unaltered original
+  frames(request: {                                           // the authored tour, frame by frame, at its own clock
+    aspect: '16:9' | '9:16' | '1:1'; height: number; fps: 24 | 25 | 30; speed?: number; from?: number; to?: number;
+    state?: 'current' | 'default'; caption?: boolean;
+    onFrame(frame: { index: number; timeS: number; blob: Blob }): void | Promise<void>;
+  }): Promise<{ frames: number; durationS: number; provenance: Provenance }>;
 };
 
 type Provenance = {
@@ -489,6 +494,10 @@ type Provenance = {
 Every capture renders BESIDE the live view — its own render target, its own camera — so the tour on screen never moves and the canvas is never resized. `state: 'default'` builds the same document offscreen with `finishes` and every asset finish override removed, lit by the same rig, and disposes it again; `pair` is both states of one shot, which is what the AI-disclosure rules (California AB 723, CRMLS 11.5.2) ask for when a listing image has been altered.
 
 Every artefact carries `provenance`, and by default the disclosure sentence is also burnt into the bottom of the picture — «Rendered from a 3D model, not a photograph» (`Визуализация 3D-модели, не фотография` in Russian). Turn it off per request with `caption: false`, or for the whole mount with `capture: { disclosure: { caption: false } }` (`?captureCaption=0`, `data-capture-caption="0"`); `capture.disclosure.text` replaces the sentence. The sidecar's `disclosure` is a constant and no option changes it.
+
+`provenance.rev` is the revision of the document the artefact shows. It counts from the `revision` you pass with `loadScene` (absent is 0): an editor that reloads its document on every commit passes its own revision number there, and every artefact then names the host's revision, plus one per edit applied in the viewer since. The same number is the `scene` event's `rev`.
+
+`frames` ends with a `ViewerLibError` of code `context-lost` when the WebGL context goes while the clip is produced, at whichever frame it was; its `detail.index` names the frame. It never hands on frames drawn by a context that is gone, and it never leaves its promise unsettled, so a recording can be marked failed. The tour and the live view are put back as after any other clip.
 
 A capture before the first frame rejects with a `ViewerLibError` of code `not-ready`. Across an iframe the same two commands are `embed.captureStill(request)` and `embed.capturePanorama(request)`, each answering `{ png: ArrayBuffer; provenance }` in one structured clone; `embed.capturePair(request)` composes the pair host-side.
 

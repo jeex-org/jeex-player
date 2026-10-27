@@ -138,6 +138,14 @@ describe('readCommand', () => {
     expect(readCommand('setMode', { mode: 'walk' }).ok).toBe(true);
   });
 
+  test("`loadScene` carries the host's revision of the document, a whole number of 0 or more", () => {
+    expect(readCommand('loadScene', { document: {}, revision: 12 }).ok).toBe(true);
+    expect(readCommand('loadScene', { url: '/scenes/b.json', revision: 0 }).ok).toBe(true);
+    for (const revision of [-1, 1.5, '3']) {
+      expect(readCommand('loadScene', { document: {}, revision }).ok).toBe(false);
+    }
+  });
+
   test('`loadScene` decides on the PRESENCE of `document`, not on its value', () => {
     expect(readCommand('loadScene', { document: null }).ok).toBe(true);
     expect(readCommand('loadScene', { document: {} }).ok).toBe(true);
