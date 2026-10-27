@@ -655,6 +655,17 @@ as described under [Versioning](#versioning).
 
 ### Fixed
 
+- **A lost context ends a frame capture.** `capture.frames` now rejects
+  with a `ViewerLibError` of code `context-lost` (`detail.index`, the frame)
+  when the WebGL context goes while the clip is produced, instead of
+  resolving with frames drawn by a dead context or never settling; a host's
+  recording can be marked failed. The tour and the live loop are put back.
+- **Provenance names the host's revision.** `loadScene` takes an optional
+  `revision`, the host's revision of the document (across an iframe too), and
+  the viewer's `rev` starts there: the `scene` event and every capture's
+  `provenance.rev` stop saying `0` for an editor that reloads per commit.
+  `SceneModel` takes the same `revision` option; anything but a whole number
+  of 0 or more is `bad-params`.
 - **Each piece of floor belongs to one room.** A room the walls enclose was
   solved as its whole face, so a zone a source outlined inside it (a dining
   corner, a kitchen run, a hall) claimed the same floor twice: in the room's

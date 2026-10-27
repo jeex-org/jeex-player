@@ -60,6 +60,13 @@ export type SceneSource = {
    * own manifest, and the fetched one wins over a stale copy in the host.
    */
   library?: InlineLibrary | undefined;
+  /**
+   * The host's revision of the document, for a host that reloads it on every
+   * commit: the viewer's `rev` starts here (the `scene` event, every
+   * capture's provenance) and counts the viewer's own commits from it. A
+   * whole number of 0 or more; absent is 0.
+   */
+  revision?: number | undefined;
 };
 
 /** How long a scene fetch may take before it is a failure, milliseconds. */

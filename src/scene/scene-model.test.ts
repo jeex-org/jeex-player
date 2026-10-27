@@ -104,6 +104,20 @@ describe('construction', () => {
     expect(subject.scene.rooms[0]!.name).toBe('Room A');
   });
 
+  test('starts at the revision the host gives, and counts its own commits from there', () => {
+    const subject = new SceneModel(draftOf(lShapePlan), CATALOGUE_REGISTRIES, { revision: 41 });
+    expect(subject.rev).toBe(41);
+    expect(ok(subject.apply({ baseRev: 41, ops: [RAISE_CEILING] })).rev).toBe(42);
+  });
+
+  test('refuses a revision that is not a whole number of 0 or more', () => {
+    for (const revision of [-1, 1.5, Number.NaN, Number.POSITIVE_INFINITY]) {
+      expect(() => new SceneModel(draftOf(lShapePlan), CATALOGUE_REGISTRIES, { revision })).toThrow(
+        expect.objectContaining({ name: 'ViewerLibError', code: 'bad-params' }),
+      );
+    }
+  });
+
   test('load validates an unknown document and refuses a broken one', () => {
     expect(SceneModel.load(draftOf(lShapePlan) as unknown, CATALOGUE_REGISTRIES).rev).toBe(0);
     expect(() => SceneModel.load({ schemaVersion: '1.1' }, CATALOGUE_REGISTRIES)).toThrow(/Scene validation failed/);

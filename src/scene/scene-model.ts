@@ -31,6 +31,7 @@
 
 import { solvePlan, type SolvedPlan } from '../plan/plan-solver.js';
 import { validateScene } from './scene-validator.js';
+import { ViewerLibError } from '../shared/errors.js';
 import { applyOp, OpError, sameTouched, type SceneOp, type TouchedEntity } from './scene-ops.js';
 import { applyRoomMerges, planRoomMerges, type RoomMerge } from './room-merge.js';
 import { heirsOf, inheritedKeys, issueKey } from './issue-heirs.js';
@@ -120,6 +121,14 @@ export type SceneModelOptions = {
    * one refuses any batch that asks to lint, rather than silently passing it.
    */
   readonly lint?: LayoutLinter;
+  /**
+   * The revision the model starts at: the HOST's revision of the document it
+   * is handed, so `rev` (and every artefact's provenance) says which of the
+   * host's revisions it is. A host that reloads its document on every commit
+   * passes its own number here; the model counts its own commits from it.
+   * A whole number of 0 or more; absent is 0.
+   */
+  readonly revision?: number;
 };
 
 export type ApplyResult = ApplyOk | ApplyFailure;
@@ -209,6 +218,14 @@ export class SceneModel {
   constructor(input: SceneData, registries: SceneRegistries, options: SceneModelOptions = {}) {
     this.catalogues = registries;
     this.linter = options.lint;
+    if (options.revision !== undefined) {
+      if (!Number.isSafeInteger(options.revision) || options.revision < 0) {
+        throw new ViewerLibError('bad-params', `revision must be a whole number of 0 or more, got ${String(options.revision)}`, {
+          detail: { revision: options.revision },
+        });
+      }
+      this.revision = options.revision;
+    }
     this.committed = deepFreeze(validateScene(draftOf(input), registries));
     this.solved = deepFreeze(solvePlan(this.committed));
   }

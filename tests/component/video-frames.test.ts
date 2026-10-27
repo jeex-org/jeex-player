@@ -157,6 +157,37 @@ describe('captureFrames', () => {
     HEAVY_TEST_TIMEOUT_MS,
   );
 
+  test('a context lost mid-capture rejects with a typed context-lost error, and the tour is put back', async () => {
+    const model = loadModel();
+    const { tour, livePose } = tourFor(model);
+    tour.seek(0.5);
+    const before = tour.progress();
+    const runtime = openRuntime();
+    const deps = depsFor(runtime, model, tour, livePose);
+    const lose = runtime.renderer.getContext().getExtension('WEBGL_lose_context');
+    expect(lose, 'the browser must expose WEBGL_lose_context for this test to mean anything').toBeTruthy();
+    const seen: number[] = [];
+
+    // Guards against a host's recording left at `recording` for good: the
+    // context goes while the clip is being produced, and the promise must say so.
+    const capture = captureFrames(deps, {
+      aspect: '1:1',
+      height: 40,
+      fps: 24,
+      from: 0,
+      to: 0.5,
+      onFrame: ({ index }) => {
+        seen.push(index);
+        if (index === 1) lose!.loseContext();
+      },
+    });
+
+    await expect(capture).rejects.toMatchObject({ name: 'ViewerLibError', code: 'context-lost' });
+    expect(seen).toEqual([0, 1]);
+    expect(tour.getState()).toBe('paused');
+    expect(tour.progress().distance).toBeCloseTo(before.distance, 5);
+  });
+
   test('restores a paused tour to its state and distance', async () => {
     const model = loadModel();
     const { tour, livePose } = tourFor(model);
