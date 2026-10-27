@@ -150,7 +150,7 @@ import {
   type ShadowFit,
   type SunDirection,
   type SunOrientation,
-} from 'jeex-viewer/lighting';
+} from '@jeex-org/jeex-viewer/lighting';
 
 export function light(canvas: HTMLCanvasElement): { context: LightingContext; rigs: LightingRig[]; key: string } {
   const renderer = new THREE.WebGLRenderer({ canvas });

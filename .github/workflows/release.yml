@@ -1,0 +1,63 @@
+# Publishes the package to GitHub Packages (`@jeex-org/jeex-viewer` on
+# https://npm.pkg.github.com) when a version tag `v<version>` is pushed.
+#
+# A release is the commit that sets `package.json#version` and its CHANGELOG
+# entry; the tag names that commit. The job refuses a tag that does not equal
+# the version, so the published version is always the one the tree says.
+#
+# The check is `ci.yml` itself, called as a reusable workflow, not a copy of
+# its steps: the tree is published only after every step of the push gate
+# passed on it. The browser levels stay in the local gate and in `browser.yml`,
+# as for every push.
+#
+# Publishing uses the job's own `GITHUB_TOKEN` with `packages: write`; no
+# stored secret exists for it.
+name: Release
+
+on:
+  push:
+    tags: ['v*']
+
+permissions:
+  contents: read
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  check:
+    uses: ./.github/workflows/ci.yml
+
+  publish:
+    needs: check
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        # The job holds `packages: write`: keep its token out of .git/config while install and build run.
+        with:
+          persist-credentials: false
+
+      - uses: ./.github/actions/setup
+
+      - name: tag equals the package version
+        run: |
+          version=$(bun --print 'require("./package.json").version')
+          if [ "${GITHUB_REF_NAME}" != "v${version}" ]; then
+            echo "tag ${GITHUB_REF_NAME} does not name package.json version ${version}" >&2
+            exit 1
+          fi
+
+      - name: build (library)
+        run: bun run build:lib
+
+      - name: publish
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          printf '//npm.pkg.github.com/:_authToken=${NODE_AUTH_TOKEN}\n' > "${RUNNER_TEMP}/.npmrc"
+          npm publish --userconfig "${RUNNER_TEMP}/.npmrc"

@@ -20,6 +20,8 @@ import {
   LAZY_WASM_LIMITS,
   OPS_BUDGET_FAIL_BYTES,
   LIGHTING_BUDGET_FAIL_BYTES,
+  LIGHTMAP_BUDGET_FAIL_BYTES,
+  SCHEMA_BUDGET_FAIL_BYTES,
   checkBudget,
   formatBytes,
   limitFor,
@@ -84,6 +86,16 @@ describe('constants', () => {
     // `jeex-viewer-lighting-standard-<hash>.js`) are viewer code, not the entry: the viewer's budget.
     expect(limitFor('jeex-viewer-lighting-context-Cgcm6Bjz.js')).toBe(BUDGET_FAIL_BYTES);
     expect(limitFor('jeex-viewer-lighting-standard-Ddnc_dKo.js')).toBe(BUDGET_FAIL_BYTES);
+  });
+
+  test('the two tool entries keep budgets of their own, distinct from chunks named after a module', () => {
+    expect(SCHEMA_BUDGET_FAIL_BYTES).toBe(68_827 + 1024);
+    expect(limitFor('jeex-viewer-schema.js')).toBe(SCHEMA_BUDGET_FAIL_BYTES);
+    expect(LIGHTMAP_BUDGET_FAIL_BYTES).toBe(106_841 + 1024);
+    expect(limitFor('jeex-viewer-lightmap.js')).toBe(LIGHTMAP_BUDGET_FAIL_BYTES);
+    // Shared chunks named after a MODULE (`scene/schema-sets`, `lightmap/lightmap-binding`) are viewer code.
+    expect(limitFor('jeex-viewer-schema-sets-B1x2y3z4.js')).toBe(BUDGET_FAIL_BYTES);
+    expect(limitFor('jeex-viewer-lightmap-binding-C5d6e7f8.js')).toBe(BUDGET_FAIL_BYTES);
   });
 });
 
