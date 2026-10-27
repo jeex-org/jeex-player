@@ -437,6 +437,23 @@ describe('loading another scene', () => {
     MOUNT_PLUS_RELOAD_TIMEOUT_MS,
   );
 
+  test(
+    "a host's revision for the document is the rev the scene event and a capture's provenance report",
+    async () => {
+      const { handle } = mount();
+      await handle.ready;
+      const scenes: ViewerSceneInfo[] = [];
+      handle.on('scene', (info) => scenes.push(info));
+      // Guards against every artefact of an editor that reloads per commit saying `rev: 0`.
+      await handle.loadScene({ document: { ...demoScene(), id: SCENE.second }, revision: 12 });
+      await until(() => scenes.some((info) => info.sceneId === SCENE.second), 'the scene event');
+      expect(scenes.at(-1)!.rev).toBe(12);
+      const { provenance } = await handle.capture.still({ width: 64, height: 36, camera: 'presentation' });
+      expect(provenance.rev).toBe(12);
+    },
+    MOUNT_PLUS_RELOAD_TIMEOUT_MS,
+  );
+
   test('an invalid document reports scene-invalid and leaves the current scene up', async () => {
     const { handle } = mount();
     await handle.ready;

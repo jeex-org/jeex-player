@@ -104,7 +104,8 @@ export async function loadDocument(
     offers = null;
   }
   const project = info !== null || offers !== null ? projectContext(info, log, offers) : null;
-  return { model: SceneModel.load(input, project?.registries ?? CATALOGUE_REGISTRIES, log), project };
+  const options = source?.revision === undefined ? undefined : { revision: source.revision };
+  return { model: SceneModel.load(input, project?.registries ?? CATALOGUE_REGISTRIES, log, options), project };
 }
 /**
  * The raw manifest a mount should read, or `null` for a bare scene.

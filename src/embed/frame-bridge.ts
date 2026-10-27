@@ -249,8 +249,8 @@ export function installFrameBridge(handle: ViewerHandle, options: FrameBridgeOpt
         // CARRIES `document` names a document, whatever it holds, and the
         // other shape names a `url`.
         const { params } = command;
-        if ('document' in params) return handle.loadScene({ document: params.document });
-        return handle.loadScene({ url: params.url });
+        if ('document' in params) return handle.loadScene({ document: params.document, revision: params.revision });
+        return handle.loadScene({ url: params.url, revision: params.revision });
       }
       case 'getState':
         return handle.getState();

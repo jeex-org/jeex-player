@@ -188,12 +188,20 @@ const setSelectionParamsSchema = z.object(
  * required `z.unknown()` is exactly "this key is here, whatever it holds", so
  * the union carries the rule and the branch that matched carries the type.
  */
+/** The host's revision of the document (`SceneSource.revision`): a whole number of 0 or more. */
+const wireRevision = z.optional(
+  finiteNumber.check(
+    z.refine((value: number) => Number.isSafeInteger(value) && value >= 0, { error: 'must be a whole number of 0 or more' }),
+  ),
+);
+
 const inlineSceneParamsSchema = z.object({
   /** Present, whatever it holds — `null` included. A required `z.unknown()` is exactly that rule. */
   document: z.unknown(),
+  revision: wireRevision,
 });
 
-const loadSceneParamsSchema = z.union([inlineSceneParamsSchema, z.object({ url: wireString })], {
+const loadSceneParamsSchema = z.union([inlineSceneParamsSchema, z.object({ url: wireString, revision: wireRevision })], {
   error: 'must name `url` (a string) or `document`',
 });
 
