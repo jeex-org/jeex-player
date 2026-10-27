@@ -299,7 +299,7 @@ export class SceneModel {
     // MULTI_ANCHOR. A batch that removes no wall is never touched.
     let roomMerges: RoomMerge[] = [];
     if (batch.ops.some((op) => op.op === 'remove_wall')) {
-      const merged = applyRoomMerges(draft, planRoomMerges(this.committed, this.solved, draft), this.committed);
+      const merged = applyRoomMerges(draft, planRoomMerges(this.committed, this.solved, draft), this.committed, this.solved);
       roomMerges = merged.merges;
       if (roomMerges.length > 0) {
         for (const entity of merged.touched) if (!touched.some((seen) => sameTouched(seen, entity))) touched.push(entity);

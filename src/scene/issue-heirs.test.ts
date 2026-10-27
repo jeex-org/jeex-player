@@ -35,6 +35,11 @@ describe('heirsOf', () => {
     expect([...heirs.get(W)!]).toEqual([J]);
   });
 
+  test('a room kept as a zone is not gone: its id keeps naming it', () => {
+    const heirs = heirsOf([], [{ from: 'kitchen', to: 'living', summary: '', kept: 'zone' }]);
+    expect(heirs.has('kitchen')).toBe(false);
+  });
+
   test('a room merge, after every op, hands the absorbed room to the survivor', () => {
     const heirs = heirsOf([], [{ from: 'kitchen', to: 'living', summary: '' }]);
     expect([...heirs.get('kitchen')!]).toEqual(['living']);

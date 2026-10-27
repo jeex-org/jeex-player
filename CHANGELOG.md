@@ -662,6 +662,13 @@ as described under [Versioning](#versioning).
 
 ### Fixed
 
+- **An open-plan kitchen stays a kitchen.** Removing the wall between a
+  kitchen and a living room merged the kitchen away: its name and purpose
+  vanished while its furniture stayed. When the two rooms carry different
+  purposes the absorbed room is now kept as a zone of the survivor, with its
+  id, name, purpose, floor, camera and objects, outlined by its old floor;
+  `ApplyOk.roomMerges` reports it with `kept: 'zone'`. Rooms of the same
+  purpose, or without one, merge as before.
 - **`strict-new` keeps a door the merged room had boxed in.** Removing a
   wall can give a door the furniture had boxed in a sliver of floor; the same
   furniture then reports as «no path» to that door in the merged room, and
