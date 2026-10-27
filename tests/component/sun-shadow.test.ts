@@ -322,27 +322,35 @@ describe('a default-state panorama', () => {
     });
     disposers.push(() => runtime.dispose());
     const model = SceneModel.load(structuredClone(lShapePlan), CATALOGUE_REGISTRIES);
-    const capture = captureCommands({
-      runtime: () => runtime,
-      model: () => model,
-      livePose: () => null,
-      options: () => DEFAULT_VIEWER_OPTIONS,
-      messages: () => createMessages('en'),
-      shellState: () => 'dollhouse',
-      ready: () => true,
-    });
-    const { blob } = await capture.panorama({ width: 256, roomId: L_SHAPE.room.a, state: 'default', caption: false });
-    const bitmap = await createImageBitmap(blob);
-    const offscreen = new OffscreenCanvas(bitmap.width, bitmap.height);
-    const context = offscreen.getContext('2d')!;
-    context.drawImage(bitmap, 0, 0);
-    // The top rows of an equirectangular image look straight up: the warm sky
-    // gradient there, or a neutral grey-white where a slab is drawn.
-    const top = context.getImageData(0, 0, bitmap.width, 2).data;
-    let warmth = 0;
-    for (let at = 0; at < top.length; at += 4) warmth += top[at]! - top[at + 2]!;
-    bitmap.close();
-    expect(warmth / (top.length / 4)).toBeGreaterThan(12);
+    /** The mean RGB of the panorama's top rows, which look straight up, with the shell in `shell`. */
+    const zenith = async (shell: 'dollhouse' | 'full'): Promise<number[]> => {
+      const capture = captureCommands({
+        runtime: () => runtime,
+        model: () => model,
+        livePose: () => null,
+        options: () => DEFAULT_VIEWER_OPTIONS,
+        messages: () => createMessages('en'),
+        shellState: () => shell,
+        ready: () => true,
+      });
+      const { blob } = await capture.panorama({ width: 256, roomId: L_SHAPE.room.a, state: 'default', caption: false });
+      const bitmap = await createImageBitmap(blob);
+      const offscreen = new OffscreenCanvas(bitmap.width, bitmap.height);
+      const context = offscreen.getContext('2d')!;
+      context.drawImage(bitmap, 0, 0);
+      const top = context.getImageData(0, 0, bitmap.width, 2).data;
+      bitmap.close();
+      return [0, 1, 2].map((c) => {
+        let sum = 0;
+        for (let at = c; at < top.length; at += 4) sum += top[at]!;
+        return sum / (top.length / 4);
+      });
+    };
+    // The daylight sky is a neutral grey, as a lit slab is: the sky is told
+    // from the slab by the same panorama with the room's ceiling drawn.
+    const sky = await zenith('dollhouse');
+    const slab = await zenith('full');
+    expect(Math.abs(sky[1]! - slab[1]!)).toBeGreaterThan(12);
   });
 });
 
