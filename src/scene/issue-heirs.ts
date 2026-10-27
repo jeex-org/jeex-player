@@ -64,3 +64,32 @@ export function inheritedKeys(
   }
   return keys;
 }
+
+/**
+ * Whether a `circulation` error in a room merge's survivor is a blockage the
+ * merged rooms already had, under another wording.
+ *
+ * The rule's sentences depend on the room's shape: furniture that left a door
+ * with no free floor in the absorbed room can, once the walls are gone, leave
+ * it with floor but no path, or leave the main zone out of reach. So the
+ * error counts as inherited when it names at least one opening (`openingIds`)
+ * and EVERY opening it names already had a `circulation` error, of any
+ * wording, in the survivor or a room merged into it. One opening that was
+ * clear before makes it new.
+ */
+export function inheritedCirculation(
+  issue: Pick<LayoutIssue, 'rule' | 'ids'>,
+  base: readonly Pick<LayoutIssue, 'rule' | 'ids'>[],
+  roomMerges: readonly RoomMerge[],
+  openingIds: ReadonlySet<string>,
+): boolean {
+  if (issue.rule !== 'circulation') return false;
+  const survivor = issue.ids.find((id) => roomMerges.some((merge) => merge.to === id));
+  if (survivor === undefined) return false;
+  const merged = new Set([survivor, ...roomMerges.filter((merge) => merge.to === survivor).map((merge) => merge.from)]);
+  const openings = issue.ids.filter((id) => openingIds.has(id));
+  if (openings.length === 0) return false;
+  return openings.every((opening) =>
+    base.some((old) => old.rule === 'circulation' && old.ids.includes(opening) && old.ids.some((id) => merged.has(id))),
+  );
+}

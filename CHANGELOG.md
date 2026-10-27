@@ -655,6 +655,13 @@ as described under [Versioning](#versioning).
 
 ### Fixed
 
+- **`strict-new` keeps a blockage the merged room already had.** Removing
+  the walls of a furnished room merges it into its neighbour, and the same
+  furniture that left its doors with no free floor then reports as a blocked
+  path, or an unreachable main zone, in the survivor: a new wording, so the
+  edit was refused. Such a `circulation` error is now old when every door or
+  passage it names already had a `circulation` error in one of the merged
+  rooms; one opening that was clear before keeps it new.
 - **The mini-map follows the tour.** In `tour` the map's accented camera dot
   is the camera the run has reached, not the last one the walker stood on.
 - **A camera step walks the new plan.** A step under way when a new document
