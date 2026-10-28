@@ -1,0 +1,76 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Player meter</title>
+    <style>
+      /*
+        A dev-only performance meter: the viewer walks a fixed script and the
+        frame-time numbers land in the bottom strip, sized to stay readable in
+        a phone screenshot. The page itself is not under test.
+      */
+      body {
+        margin: 0;
+        background: #0d1111;
+        color: #dfe7e7;
+        font:
+          13px/1.5 system-ui,
+          sans-serif;
+      }
+      #stage {
+        position: fixed;
+        inset: 0;
+      }
+      #meter {
+        position: fixed;
+        inset: auto 0 0 0;
+        pointer-events: none;
+        background: rgba(5, 9, 9, 0.92);
+        color: #f2fbfb;
+        padding: 6px 8px 7px;
+        font:
+          700 11px/1.5 ui-monospace,
+          'SFMono-Regular',
+          Menlo,
+          Consolas,
+          monospace;
+        font-variant-numeric: tabular-nums;
+        white-space: pre;
+      }
+      #meter-status {
+        font-size: 14px;
+        color: #9fe8b8;
+      }
+      #meter-copy {
+        pointer-events: auto;
+        margin-top: 8px;
+        padding: 10px 14px;
+        font:
+          700 13px/1 ui-monospace,
+          Menlo,
+          Consolas,
+          monospace;
+        color: #05100d;
+        background: #9fe8b8;
+        border: 0;
+        border-radius: 6px;
+      }
+    </style>
+  </head>
+  <body>
+    <div id="stage"></div>
+    <div id="meter">
+      <div id="meter-status">loading scene…</div>
+      <div id="meter-p50">p50 --.- ms p95 --.- ms</div>
+      <div id="meter-slow">>=33ms: - (-.-%) frames: -</div>
+      <div id="meter-demand">draws: - idle: - ticks: -</div>
+      <div id="meter-tier">tier: n/a</div>
+      <div id="meter-gpu">DPR -.-- buffer ---x---</div>
+      <div id="meter-device">GPU: probing…</div>
+      <div id="meter-timing">ready -.-s walk -.-s</div>
+      <button id="meter-copy" type="button">copy result</button>
+    </div>
+    <script type="module" src="/dev/meter.ts"></script>
+  </body>
+</html>

@@ -1,0 +1,124 @@
+{
+  "format": "jeex-project",
+  "formatVersion": 2,
+  "projectId": "01a18304-6a71-7090-9d30-53c048f39ccc",
+  "bakeId": "01a18304-6a71-77b0-9ba0-8ea697274acb",
+  "bakedAt": "2026-10-28T08:00:00.000Z",
+  "title": "Lamp lights cluster fixture",
+  "scene": "scene-cluster.json",
+  "library": {
+    "manifestVersion": "1.0",
+    "id": "01a18304-6a71-7090-9d30-53c048f39ccc",
+    "name": "Lamp lights cluster fixture library",
+    "publisher": "01a18304-6a71-7620-9c30-3ef68edd0c1a",
+    "license": "CC0-1.0",
+    "objects": [
+      {
+        "id": "01a18304-6a71-7d60-92a0-44fc6447852f",
+        "name": "Table lamp, four head",
+        "category": "lighting/table",
+        "dims": [0.3, 0.52, 0.3],
+        "anchor": "floor",
+        "wallSnap": false,
+        "clearance": 0.1,
+        "tags": ["bedroom", "living"],
+        "model": "obj/01a16c09-ee8b-7580-aac8-305889675c7e.glb",
+        "slots": ["metal", "shade"],
+        "defaultFinishes": {
+          "metal": "01a18304-6a71-70a0-9d80-e0bbe591b39f",
+          "shade": "01a18304-6a71-7040-96c0-be72ed6db2d6"
+        },
+        "primarySlot": "shade",
+        "variants": [
+          {
+            "id": "01a18304-6a71-7fb0-9f70-fbaa1daa26cb",
+            "name": "Table lamp, four head",
+            "version": "1.0.0",
+            "dims": [0.3, 0.52, 0.3],
+            "pricing": { "model": "free" },
+            "model": "obj/01a16c09-ee8b-7580-aac8-305889675c7e.glb",
+            "lights": [
+              { "kind": "point", "position": [0.15, 0.443, 0.15], "colour": "#ffd9a4", "lumens": 400, "cutoff": 3 },
+              { "kind": "point", "position": [-0.15, 0.443, 0.15], "colour": "#ffd9a4", "lumens": 400, "cutoff": 3 },
+              { "kind": "point", "position": [0.15, 0.443, -0.15], "colour": "#ffd9a4", "lumens": 400, "cutoff": 3 },
+              { "kind": "point", "position": [-0.15, 0.443, -0.15], "colour": "#ffd9a4", "lumens": 400, "cutoff": 3 }
+            ]
+          }
+        ],
+        "defaultVariant": "01a18304-6a71-7fb0-9f70-fbaa1daa26cb",
+        "mirror": { "x": true, "y": false, "z": true },
+        "onSurface": true
+      },
+      {
+        "id": "01a18304-6a71-7f40-90e0-d812a955756d",
+        "name": "Pendant, two head",
+        "category": "lighting/pendants",
+        "dims": [0.36, 1.052, 0.36],
+        "anchor": "ceiling",
+        "wallSnap": false,
+        "clearance": 0,
+        "tags": ["living", "kitchen"],
+        "model": "obj/01a16c09-ee8e-725c-83c3-401d45e70da5.glb",
+        "slots": ["metal", "shade"],
+        "defaultFinishes": {
+          "metal": "01a18304-6a71-70a0-9d80-e0bbe591b39f",
+          "shade": "01a18304-6a71-7040-96c0-be72ed6db2d6"
+        },
+        "primarySlot": "shade",
+        "variants": [
+          {
+            "id": "01a18304-6a71-7580-9480-c03bb5309c85",
+            "name": "Pendant, two head",
+            "version": "1.0.0",
+            "dims": [0.36, 1.052, 0.36],
+            "pricing": { "model": "free" },
+            "model": "obj/01a16c09-ee8e-725c-83c3-401d45e70da5.glb",
+            "lights": [
+              { "kind": "point", "position": [0, 0.063, 0], "colour": "#ffd9a4", "lumens": 600, "cutoff": 5.2 },
+              { "kind": "point", "position": [0, 0.663, 0], "colour": "#ffd9a4", "lumens": 600, "cutoff": 5.2 }
+            ]
+          }
+        ],
+        "defaultVariant": "01a18304-6a71-7580-9480-c03bb5309c85",
+        "mirror": { "x": true, "y": false, "z": true }
+      }
+    ],
+    "materials": [
+      {
+        "id": "01a18304-6a71-70a0-9d80-e0bbe591b39f",
+        "name": "Cluster fixture lamp metal",
+        "tags": ["metal"],
+        "apply": ["furniture", "metal"],
+        "generator": { "kind": "painted_plaster", "tone": "#3a3631", "seed": 1 },
+        "tile": 1
+      },
+      {
+        "id": "01a18304-6a71-7040-96c0-be72ed6db2d6",
+        "name": "Cluster fixture lamp shade",
+        "tags": ["fabric"],
+        "apply": ["furniture", "fabric"],
+        "generator": { "kind": "painted_plaster", "tone": "#efe6d4", "seed": 2 },
+        "tile": 1
+      }
+    ]
+  },
+  "rights": {
+    "workspaceId": "01a18304-6a71-7620-9c30-3ef68edd0c1a",
+    "perpetual": true,
+    "assets": [
+      {
+        "assetId": "01a18304-6a71-7d60-92a0-44fc6447852f",
+        "variantId": "01a18304-6a71-7fb0-9f70-fbaa1daa26cb",
+        "version": "1.0.0",
+        "access": "free"
+      },
+      {
+        "assetId": "01a18304-6a71-7f40-90e0-d812a955756d",
+        "variantId": "01a18304-6a71-7580-9480-c03bb5309c85",
+        "version": "1.0.0",
+        "access": "free"
+      }
+    ]
+  },
+  "generator": { "name": "lamp-lights cluster fixture", "version": "1" }
+}
