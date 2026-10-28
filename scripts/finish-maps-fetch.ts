@@ -292,7 +292,7 @@ export async function buildIndex(
         pbr: facts.pbr,
       },
       maps,
-      source: facts.source,
+      ...(facts.tileM !== null && { source: facts.source }),
     });
   }
   if (changes.length > 0) {
@@ -409,12 +409,11 @@ export const BUILTIN_RECORDS: BuiltinRecords = ${JSON.stringify(tableRecords(ind
 
 /** `SOURCES.md`: one row per scan. */
 export function renderSources(index: FinishMapsIndex): string {
-  const rows = index.versions
-    .filter((version) => version.kind === 'scan')
-    .map(
-      (version) =>
-        `| ${version.name} | ${version.source.provider} | ${version.source.sourcePage} | ${version.source.licence} | \`${version.version}\` |`,
-    );
+  const rows = index.versions.flatMap(({ kind, name, source, version }) =>
+    kind === 'scan' && source !== undefined
+      ? [`| ${name} | ${source.provider} | ${source.sourcePage} | ${source.licence} | \`${version}\` |`]
+      : [],
+  );
   return [
     '# Sources of the bundled finish maps',
     '',

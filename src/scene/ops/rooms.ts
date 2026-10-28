@@ -31,9 +31,11 @@ import {
   requireFinite,
   requireNewId,
   touchedAsset,
+  touchedCeiling,
   touchedFace,
   touchedFloor,
   touchedRoomWalls,
+  touchedTrim,
   type OpOutcome,
   type TouchedEntity,
 } from './context.js';
@@ -136,7 +138,7 @@ export function applyRemoveRoom(scene: Draft<SceneData>, op: RemoveRoomOp): OpOu
   const hadRoomFinish = rooms !== undefined && Object.prototype.hasOwnProperty.call(rooms, op.roomId);
   if (hadRoomFinish) {
     delete rooms[op.roomId];
-    touched.push(touchedFloor(op.roomId), touchedRoomWalls(op.roomId));
+    touched.push(touchedFloor(op.roomId), touchedRoomWalls(op.roomId), touchedCeiling(op.roomId), touchedTrim(op.roomId));
   }
   const droppedFaces = dropFaceFinishes(scene, (face) => face.room === op.roomId);
   for (const face of droppedFaces) touched.push(touchedFace(face));

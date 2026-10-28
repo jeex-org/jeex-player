@@ -15,6 +15,7 @@ import { opDraft, rejectsOp } from '../../fixtures/op-drafts.js';
 import { FINISH } from '../../materials/finish-ids.js';
 import { SceneModel, isApplyOk } from '../scene-model.js';
 import { OpError, applyOp, TOUCHED_SHELL, touchedAsset, touchedFace, touchedFloor, touchedRoomWalls } from '../scene-ops.js';
+import { touchedCeiling, touchedTrim } from './context.js';
 import { faceKey } from '../types.js';
 import { ROOM_NAME_MAX } from './limits.js';
 import { draftOf, type Draft } from '../../shared/committed.js';
@@ -217,6 +218,20 @@ describe('remove_room', () => {
     expect(scene.interiors![0]!.ops).toEqual([{ op: 'set_material', target: ROOM_B, material: FINISH.ash }]);
   });
 
+  test("a room's dropped finishes touch all four of its surfaces: floor, walls, ceiling and trim", () => {
+    const scene = opDraft();
+    scene.finishes = { rooms: { [ROOM_A]: { ceiling: FINISH.pure_white, trim: FINISH.white } } };
+
+    const outcome = apply(scene, { op: 'remove_room', roomId: ROOM_A });
+
+    expect(outcome.touched.filter((entity) => 'room' in entity && entity.room === ROOM_A)).toEqual([
+      touchedFloor(ROOM_A),
+      touchedRoomWalls(ROOM_A),
+      touchedCeiling(ROOM_A),
+      touchedTrim(ROOM_A),
+    ]);
+  });
+
   test('names the side effects in the summary and lists the unbound furniture in touched', () => {
     const scene = withDependents();
 
@@ -227,6 +242,8 @@ describe('remove_room', () => {
       TOUCHED_SHELL,
       touchedFloor(ROOM_A),
       touchedRoomWalls(ROOM_A),
+      touchedCeiling(ROOM_A),
+      touchedTrim(ROOM_A),
       touchedFace(faceKey(ROOM_A, L_SHAPE.wall.wPart, 'L')),
       touchedAsset(L_SHAPE.asset.sofa),
     ]);

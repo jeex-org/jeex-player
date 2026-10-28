@@ -202,6 +202,20 @@
       "finish": "01a12fdf-1590-7754-92f4-5912a4ff24a2",
       "slug": "ash",
       "alias": "01a12fdf-158e-7748-adfe-d397dde469ba"
+    },
+    {
+      "finish": "01a18184-9805-70ca-adad-9a96164d8363",
+      "slug": "smooth_white",
+      "name": "Smooth white paint",
+      "variant": "01a18187-5224-731a-85cf-72b68ab4b545",
+      "version": "01a18187-5224-731a-85cf-72b76d2de758"
+    },
+    {
+      "finish": "01a18184-9805-70cb-a9e3-4549e80e98f8",
+      "slug": "ceiling_white",
+      "name": "Pure white ceiling",
+      "variant": "01a18187-5620-75ec-9af7-e1887e635059",
+      "version": "01a18187-5620-75ec-9af7-e1894327d780"
     }
   ],
   "defaults": {
@@ -2343,6 +2357,44 @@
         "sourcePage": "https://polyhaven.com/a/long_white_tiles",
         "licence": "CC0-1.0"
       }
+    },
+    {
+      "version": "01a18187-5224-731a-85cf-72b76d2de758",
+      "variant": "01a18187-5224-731a-85cf-72b68ab4b545",
+      "name": "Smooth white paint",
+      "kind": "parameters",
+      "facts": {
+        "tileM": null,
+        "grain": "none",
+        "suitability": "continuous",
+        "colourMode": "natural",
+        "averageColour": "#f5f5f3",
+        "pbr": {
+          "baseColour": "#f5f5f3",
+          "roughness": 0.9,
+          "metalness": 0
+        }
+      },
+      "maps": {}
+    },
+    {
+      "version": "01a18187-5620-75ec-9af7-e1894327d780",
+      "variant": "01a18187-5620-75ec-9af7-e1887e635059",
+      "name": "Pure white ceiling",
+      "kind": "parameters",
+      "facts": {
+        "tileM": null,
+        "grain": "none",
+        "suitability": "continuous",
+        "colourMode": "natural",
+        "averageColour": "#f8f8f8",
+        "pbr": {
+          "baseColour": "#f8f8f8",
+          "roughness": 0.95,
+          "metalness": 0
+        }
+      },
+      "maps": {}
     },
     {
       "version": "01a16ede-b329-70bf-8fe1-72452c06aa9e",

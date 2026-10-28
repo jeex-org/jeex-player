@@ -88,8 +88,9 @@ describe('finish-maps index', () => {
     const sources = readFileSync(join(FINISH_MAPS_DIR, 'SOURCES.md'), 'utf8');
     for (const version of index.versions) {
       if (version.kind !== 'scan') continue;
-      expect(sources).toContain(version.source.sourcePage);
-      expect(sources).toContain(version.source.licence);
+      expect(version.source).toBeDefined();
+      expect(sources).toContain(version.source!.sourcePage);
+      expect(sources).toContain(version.source!.licence);
     }
   });
 
@@ -156,6 +157,19 @@ describe('the contemporary set', () => {
   test('the glazed zellige carries its clear coat', () => {
     const { pbr } = BUILTIN_FINISHES.get(FINISH.zellige)!.material.facts;
     expect({ clearcoat: pbr.clearcoat, clearcoatRoughness: pbr.clearcoatRoughness }).toEqual({ clearcoat: 1, clearcoatRoughness: 0.08 });
+  });
+
+  test('the smooth white walls and the white ceiling are flat library paints: no maps, so no relief', () => {
+    for (const id of [FINISH.smooth_white, FINISH.ceiling_white]) {
+      const { material } = BUILTIN_FINISHES.get(id)!;
+      expect({ id, kind: material.kind, tileM: material.facts.tileM, maps: Object.keys(material.maps) }).toEqual({
+        id,
+        kind: 'parameters',
+        tileM: null,
+        maps: [],
+      });
+      expect(WALL_FINISHES.some((finish) => finish.id === id)).toBe(true);
+    }
   });
 
   test('the default ceiling is the lime plaster tinted warm white', () => {

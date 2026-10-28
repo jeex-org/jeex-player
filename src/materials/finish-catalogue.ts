@@ -201,6 +201,17 @@ export const WALL_FINISHES: BankFinish[] = [
     seed: 28,
   },
   { id: FINISH.zellige, slug: 'zellige', name: 'Teal zellige', kind: 'tiles', base: '#234f59', roughness: 0.3, style: 'ceramic', seed: 29 },
+  // Flat paints: their library materials carry no maps, so they draw without relief.
+  { id: FINISH.smooth_white, slug: 'smooth-white', name: 'Smooth white paint', kind: 'plaster', base: '#f5f5f3', roughness: 0.9, seed: 30 },
+  {
+    id: FINISH.ceiling_white,
+    slug: 'ceiling-white',
+    name: 'Pure white ceiling',
+    kind: 'plaster',
+    base: '#f8f8f8',
+    roughness: 0.95,
+    seed: 31,
+  },
 ];
 
 /** A retired bundled finish: valid in documents, read as `target`, never offered by the picker. */

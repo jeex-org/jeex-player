@@ -2,7 +2,7 @@
  * Module-size gate. Walks `src/` recursively and fails when a non-test `.ts`
  * file exceeds its line limit: the default (`DEFAULT_LIMIT`, the ~400-line
  * smell of the coding standards rounded up to a hard 700), a higher one for
- * the two data files, and a lower one for the composition root
+ * the data files, and a lower one for the composition root
  * (`app/viewer-api.ts` ≤ 300 by contract).
  *
  * The named limits are keyed by PATH, not by basename: the layer directory is part of a
@@ -26,10 +26,12 @@ export const DEFAULT_LIMIT = 700;
  */
 export const WARN_LIMIT = 400;
 /**
- * Line limit for the two data files the contract names explicitly. They are
- * catalogue tables, not modules: the number tracks whatever `oxfmt` makes of
- * the table (one entry per row, wrapped at the configured width), because a
- * longer table of the same rows is not a harder file to hold in your head.
+ * Line limit for the data files: the two the contract names explicitly and
+ * the bundled finishes' generated table, which grows by a row with every
+ * bound finish. They are catalogue tables, not modules: the number tracks
+ * whatever `oxfmt` makes of the table (one entry per row, wrapped at the
+ * configured width), because a longer table of the same rows is not a harder
+ * file to hold in your head.
  */
 export const DATA_FILE_LIMIT = 1500;
 /**
@@ -56,8 +58,8 @@ export const VIEWER_API_LIMIT = 300;
  */
 export const VIEWER_APP_LIMIT = 500;
 
-/** The two data files the contract names, addressed by their path in `src/`. */
-const DATA_FILES = new Set(['assets/asset-library.ts', 'demo/scene-data.ts']);
+/** The data files, addressed by their path in `src/`. */
+const DATA_FILES = new Set(['assets/asset-library.ts', 'demo/scene-data.ts', 'materials/builtin-library-data.ts']);
 
 /** The document schema and its runtime twin, addressed by their path in `src/`. */
 const SCHEMA_FILES = new Set(['scene/types.ts', 'scene/types.schema.ts']);

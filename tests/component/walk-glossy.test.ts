@@ -34,11 +34,12 @@ const LIVING = '01a15f1b-dbbd-7634-b8b8-af9c8008284d';
 const LIVING_FLOOR = /^floor-01a15f1b-dbbd-7634/;
 /**
  * The ceiling of the living room at the walk start, metered without the white balance (scene linear, R/B), in
- * the default state: the default sun and lamps, the lamps feeding the room grids. Re-recorded 2026-10-27 when
- * the default light became 5000 K and the daylight sky neutral grey (2.453 at «Original» under the sand sky,
- * 2.086 before the lamps fed the grids), on an NVIDIA GPU. Its paint alone reads 1.16 (an off-white).
+ * the default state: the default sun and lamps, the lamps feeding the room grids. Re-recorded 2026-10-28 when
+ * the demo's ceiling became «Pure white ceiling» (#f8f8f8, R/B 1.00), on an NVIDIA GPU; earlier readings were
+ * under an off-white paint of R/B 1.16: 1.907 at 5000 K under the grey sky, 2.453 at «Original» under the sand
+ * sky, 2.086 before the lamps fed the grids.
  */
-const CEILING_RB_MEASURED = 1.907;
+const CEILING_RB_MEASURED = 1.566;
 /**
  * Where the 2D footprint placement put the living probe before the
  * clearance: beside the floor lamp's shade. The «before» reading and the ratio check against it use it.
@@ -239,7 +240,8 @@ describe.skipIf(!HARDWARE)(`walk gloss and white balance in the demo living room
    * The black r 0.07 living floor split by geometry: pixels whose mirror ray (the view ray reflected at the floor)
    * meets a living-room pane, the window's mirror image, against the rest; mean linear luminance of each.
    */
-  function windowBand(view: THREE.PerspectiveCamera): { band: number; rest: number; counts: [number, number]; panes: number } {
+  /** The glass panes of the living room's windows. */
+  function livingPanes(): THREE.Mesh[] {
     const living = lighting.volumes.boxes.filter((b) => b.roomId === LIVING);
     const panes: THREE.Mesh[] = [];
     lighting.scene.traverse((object) => {
@@ -257,6 +259,24 @@ describe.skipIf(!HARDWARE)(`walk gloss and white balance in the demo living room
       )
         panes.push(mesh);
     });
+    return panes;
+  }
+
+  /** Covers the panes with opaque black, so neither the view nor the light through them reaches the room; answers the restore. */
+  function coverPanes(panes: THREE.Mesh[]): () => void {
+    const black = new THREE.MeshBasicMaterial({ color: 0x000000 });
+    const kept = panes.map((pane) => [pane, pane.material] as const);
+    for (const pane of panes) pane.material = black;
+    return () => {
+      for (const [pane, material] of kept) pane.material = material;
+      black.dispose();
+    };
+  }
+
+  function windowBand(
+    view: THREE.PerspectiveCamera,
+    panes: THREE.Mesh[],
+  ): { band: number; rest: number; counts: [number, number]; panes: number } {
     const restore = blackFloor(0.07);
     try {
       const classes = mask(view, (mesh) => (LIVING_FLOOR.test(mesh.name) ? 0 : null));
@@ -412,30 +432,46 @@ describe.skipIf(!HARDWARE)(`walk gloss and white balance in the demo living room
     lighting.scene.traverse((object) => {
       if ((object as THREE.Mesh).isMesh && isGlass(object as THREE.Mesh)) panes += 1;
     });
+    const living = livingPanes();
     const measure = () => {
       const restore = probeAt(PROBE_BEFORE);
-      const before = windowBand(view);
+      const before = windowBand(view, living);
       restore();
-      return { before, after: windowBand(view) };
+      return { before, after: windowBand(view, living) };
     };
     // Diagnostic: the default lamps on.
     const lampsOn = measure();
     const restoreLamps = await lampsOff();
     let daylight: ReturnType<typeof measure>;
+    let covered: ReturnType<typeof windowBand>;
     try {
       daylight = measure();
+      // The window's own share: the same columns with the panes black. Against the rest of the floor alone the
+      // band would also weigh the walls' paint, since a white wall mirrors in the floor about as bright as the
+      // window; the ratio to the rest takes out the room getting darker with its window shut.
+      const uncover = coverPanes(living);
+      try {
+        await rebaked();
+        covered = windowBand(view, living);
+      } finally {
+        uncover();
+      }
     } finally {
       await restoreLamps();
     }
+    const share = daylight.after.band / daylight.after.rest / (covered.band / covered.rest);
     record('windowBand', {
       pose: { position: POSE_WINDOW.position.toArray(), target: POSE_WINDOW.target.toArray(), fov: 60, size: SIZE },
       panes,
       before: daylight.before,
       after: daylight.after,
+      covered,
+      share,
       lampsOn,
     });
     expect(daylight.after.counts[0]).toBeGreaterThan(200);
-    expect(daylight.after.band).toBeGreaterThan(daylight.after.rest);
+    // 1.77 on the white demo (2026-10-28).
+    expect(share).toBeGreaterThan(1.3);
   });
 
   test("the living room's camera balance at the walk start: the ceiling reads near white, a saturated finish and the sky keep their hue", () => {

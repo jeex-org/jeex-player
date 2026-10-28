@@ -46,6 +46,8 @@ export const FINISH = {
   marble: '01a16edb-fb93-7729-93ff-3b4b552be9f0',
   porcelain_grey: '01a16edb-fb93-7729-93ff-3b4cf444d9bf',
   zellige: '01a16edb-fb93-7729-93ff-3b4d4290edb5',
+  smooth_white: '01a18184-9805-70ca-adad-9a96164d8363',
+  ceiling_white: '01a18184-9805-70cb-a9e3-4549e80e98f8',
   // Object-bank finishes (`asset-finish-catalogue.ts`).
   oak_natural: '01a12fdf-159f-719f-87ad-8a1ab59bb73b',
   walnut_dark: '01a12fdf-15a0-7bba-ab44-242ca5f929f4',

@@ -9,6 +9,13 @@ as described under [Versioning](#versioning).
 
 ### Added
 
+- **Two flat white paints.** «Smooth white paint» and «Pure white ceiling»
+  join the bundled wall finishes (either may dress a ceiling). They are
+  parameter-only library materials with no maps, so they draw without
+  relief. The demo apartment now ships smooth white walls in every room and
+  a pure white ceiling over every room but the loggia; its first interior
+  preset is renamed «Oak and white» and repaints the same walls. Existing
+  finishes, Pure white and the plasters included, are unchanged.
 - **`jeex-viewer/schema`: the document formats for a service.** A new entry
   for a service that checks scene documents and baked projects without a
   player: `validateScene`, the scene and project-manifest schemas with their
@@ -704,6 +711,9 @@ as described under [Versioning](#versioning).
 
 ### Fixed
 
+- **`remove_room` touches a room's ceiling and trim.** When the removed
+  room had finishes, `touched` named its floor and walls only; it now also
+  names the ceiling and the trim, which schema 2.3 made paintable.
 - **A zone's floor is still floor.** Since a room's solved floor gave up the
   zones lying in it, the circulation rule judged a door that opens onto a
   zone (a living room kept as a zone of an open-plan kitchen, a dining corner

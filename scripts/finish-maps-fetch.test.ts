@@ -284,6 +284,37 @@ describe('alias rows', () => {
   });
 });
 
+describe('parameter-only rows', () => {
+  const PAINT = '01a18184-9805-70ca-adad-9a96164d8363';
+  const PAINT_VARIANT = '01a18187-5224-731a-85cf-72b68ab4b545';
+  const PAINT_VERSION = '01a18187-5224-731a-85cf-72b76d2de758';
+  const paintFacts = {
+    version: PAINT_VERSION,
+    name: 'Smooth white paint',
+    tileM: null,
+    grain: 'none',
+    suitability: 'continuous',
+    colourMode: 'natural',
+    averageColour: '#f5f5f3',
+    pbr: { baseColour: '#f5f5f3', roughness: 0.9, metalness: 0 },
+    maps: [],
+    source: { provider: 'jeex', sourceName: 'Smooth white paint', sourcePage: 'https://store.example/a/paint', licence: 'parameter-only' },
+  };
+  const withPaint = (): unknown => {
+    const base = mapping() as { rows: unknown[] };
+    return { ...base, rows: [...base.rows, { finish: PAINT, slug: 'smooth_white', material: PAINT_VARIANT, facts: paintFacts }] };
+  };
+
+  test('a parameters version fetches nothing and records no maps and no source: there is no file to credit', async () => {
+    const { client, calls } = stubStore();
+    const { index } = await buildIndex(withPaint(), client, null, false);
+    const paint = index.versions.find((version) => version.version === PAINT_VERSION)!;
+    expect(calls.filter((call) => call.url.includes(PAINT_VERSION))).toEqual([]);
+    expect({ kind: paint.kind, maps: paint.maps, source: paint.source }).toEqual({ kind: 'parameters', maps: {}, source: undefined });
+    expect(renderSources(index)).not.toContain('store.example');
+  });
+});
+
 describe('rectangular maps', () => {
   /** The plank row's facts turned into a 3.6 by 1.8 m tile. */
   function rectangular(): unknown {
