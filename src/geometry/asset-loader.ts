@@ -38,6 +38,7 @@ import { GeometryCache, makeBuildKit } from '../assets/asset-kit.js';
 import { prepareGltfBody } from './gltf-body.js';
 import { MIRROR_FACTS_USERDATA_KEY, setBodyMirror } from './asset-mirror.js';
 import { LAMP_LIGHT_KEY, tagArtificialLight, type LampLightTag } from '../assets/artificial-light.js';
+import type { LampLight } from '../assets/asset-types.js';
 import { lampCandela } from '../lighting/lamp-units.js';
 import {
   countTriangles,
@@ -157,28 +158,114 @@ function hangFromCeiling(body: THREE.Object3D, asset: ResolvedAsset, top: number
   if (asset.anchor === 'ceiling' && Number.isFinite(top)) body.position.y = -top;
 }
 
+/** Two authored head positions cluster when they sit within this distance, metres. */
+const LAMP_CLUSTER_RADIUS_M = 0.5;
+
+/** One drawn light's worth of same-colour, same-cutoff heads that sit within the cluster radius. */
+type LampCluster = {
+  readonly colour: string;
+  readonly cutoff: number;
+  /** The `lights` fact index of the FIRST head: the cluster's name and tag index. */
+  readonly firstIndex: number;
+  /** The OR of the heads' shadow hints. */
+  shadow: boolean;
+  /** The summed lumens of the heads so far. */
+  lumens: number;
+  /** Every head's authored position; a new head joins when ANY of them sits within the radius. */
+  positions: Array<LampLight['position']>;
+};
+
+/** Whether two authored positions sit within the cluster radius (squared, no sqrt). */
+function withinClusterRadius(a: LampLight['position'], b: LampLight['position']): boolean {
+  const dx = a[0] - b[0];
+  const dy = a[1] - b[1];
+  const dz = a[2] - b[2];
+  return dx * dx + dy * dy + dz * dz <= LAMP_CLUSTER_RADIUS_M * LAMP_CLUSTER_RADIUS_M;
+}
+
+/**
+ * Groups a variant's `lights` into clusters: single linkage over the cluster
+ * radius, and only heads of one colour (case-insensitive) and one cutoff join.
+ * Facts are read in index order, so a cluster's first head is its lowest index
+ * and the list comes out sorted by it — a lone head becomes a cluster of one,
+ * unchanged. A head joins EVERY cluster it touches, and they merge into the
+ * lowest-index one: a head that bridges two clusters joins them into one,
+ * whatever order the facts were authored in.
+ */
+function lampClusters(facts: readonly LampLight[]): LampCluster[] {
+  const clusters: LampCluster[] = [];
+  for (const [index, fact] of facts.entries()) {
+    const colour = fact.colour.toLowerCase();
+    const matches = clusters.filter(
+      (candidate) =>
+        candidate.colour.toLowerCase() === colour &&
+        candidate.cutoff === fact.cutoff &&
+        candidate.positions.some((position) => withinClusterRadius(position, fact.position)),
+    );
+    const [target, ...rest] = matches;
+    if (target) {
+      for (const other of rest) {
+        target.lumens += other.lumens;
+        target.shadow ||= other.shadow;
+        target.positions.push(...other.positions);
+        clusters.splice(clusters.indexOf(other), 1);
+      }
+      target.lumens += fact.lumens;
+      target.shadow ||= fact.shadow ?? false;
+      target.positions.push(fact.position);
+      continue;
+    }
+    clusters.push({
+      colour: fact.colour,
+      cutoff: fact.cutoff,
+      firstIndex: index,
+      shadow: fact.shadow ?? false,
+      lumens: fact.lumens,
+      positions: [fact.position],
+    });
+  }
+  return clusters;
+}
+
 /**
  * The live lights of a variant's `lights` fact, for the body they sit under.
  *
- * Each is a three.js `PointLight` in the body's own (model) frame, so the
- * placement's scale, turn and mirror reach it through the body and the group;
- * its distance and intensity are the fact's, unscaled. Tagged artificial with
- * the authored colour as «Original», tagged as a fact light for the bake, and
- * never casting a shadow in this release whatever the hint says.
+ * Heads of one fact that sit within `LAMP_CLUSTER_RADIUS_M` of each other draw
+ * as ONE `PointLight` at their centroid, at the candela of their summed lumens:
+ * multi-head lamp models (a chandelier's candles) otherwise cost one live light
+ * per bulb. Only same-colour, same-cutoff heads join, and the chain rule is
+ * single linkage, so a string of near heads merges even when its ends are far
+ * apart. Each drawn light keeps the contract of the old per-fact light —
+ * three.js `PointLight` in the body's own (model) frame, so the placement's
+ * scale, turn and mirror reach it through the body and the group; its distance
+ * and intensity are the cluster's, unscaled. Tagged artificial with the
+ * authored colour as «Original», tagged as a fact light for the bake (the
+ * cluster's first head's index, the summed lumens, the OR of the shadow
+ * hints), and never casting a shadow in this release whatever the hint says.
+ * A fact whose heads cluster alone draws exactly as before.
  */
 function lampLights(asset: ResolvedAsset): THREE.PointLight[] {
-  return (asset.lights ?? []).map((fact, index) => {
-    const light = tagArtificialLight(new THREE.PointLight(fact.colour, lampCandela(fact.lumens), fact.cutoff, 2));
-    light.name = index === 0 ? `${asset.placementId}-light` : `${asset.placementId}-light-${index + 1}`;
-    light.position.set(fact.position[0], fact.position[1], fact.position[2]);
+  return lampClusters(asset.lights ?? []).map((cluster) => {
+    const light = tagArtificialLight(new THREE.PointLight(cluster.colour, lampCandela(cluster.lumens), cluster.cutoff, 2));
+    light.name = cluster.firstIndex === 0 ? `${asset.placementId}-light` : `${asset.placementId}-light-${cluster.firstIndex + 1}`;
+    let x = 0;
+    let y = 0;
+    let z = 0;
+    for (const position of cluster.positions) {
+      x += position[0];
+      y += position[1];
+      z += position[2];
+    }
+    const heads = cluster.positions.length;
+    light.position.set(x / heads, y / heads, z / heads);
     light.castShadow = false;
     const tag: LampLightTag = {
       source: 'fact',
       placementId: asset.placementId,
-      index,
-      lumens: fact.lumens,
-      cutoff: fact.cutoff,
-      shadow: fact.shadow ?? false,
+      index: cluster.firstIndex,
+      lumens: cluster.lumens,
+      cutoff: cluster.cutoff,
+      shadow: cluster.shadow,
     };
     light.userData[LAMP_LIGHT_KEY] = tag;
     return light;

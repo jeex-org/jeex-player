@@ -15,6 +15,7 @@ import { PROJECT_FIXTURE } from '../../tests/fixtures/project/fixture-ids.js';
 import { HANGING, hangingManifest, modelFrameBox } from '../fixtures/hanging-pendant.js';
 import { LAMP_PROJECT_FIXTURE as LAMPS } from '../../tests/fixtures/project/fixture-ids.js';
 import { ARTIFICIAL_LIGHT_KEY, isArtificialLight } from '../assets/artificial-light.js';
+import { lampCandela } from '../lighting/lamp-units.js';
 
 /**
  * Loader checks that need Three.js but no canvas: texture generators return
@@ -396,7 +397,9 @@ describe('lamp lights are built on the first body', () => {
   });
 
   test('three lights are named in array order, the first without a number', () => {
-    const loader = lampLoader(withTableLights([BULB, { ...BULB, position: [0.1, 0.4, 0] }, { ...BULB, position: [-0.1, 0.4, 0] }]));
+    // Positions spread beyond the 0.5 m cluster radius, so the three facts stay
+    // three lights and the naming order is what the test watches.
+    const loader = lampLoader(withTableLights([BULB, { ...BULB, position: [0.6, 0.4, 0] }, { ...BULB, position: [-0.6, 0.4, 0] }]));
     const names = lightsUnder(loader.load(TABLE_LAMP).group).map((light) => light.name);
     const id = LAMPS.placement.tableLamp;
     expect(names).toEqual([`${id}-light`, `${id}-light-2`, `${id}-light-3`]);
@@ -445,6 +448,137 @@ describe('lamp lights are built on the first body', () => {
     const { group } = loader.load(PENDANT);
     group.updateMatrixWorld(true);
     expect(lightsUnder(group)[0]!.getWorldPosition(new THREE.Vector3()).y).toBeCloseTo(2.65 - 0.989, 6);
+    loader.dispose();
+  });
+
+  test('a four-head fact within half a metre merges into one tagged light at the centroid', () => {
+    const loader = lampLoader(
+      withTableLights([
+        { ...BULB, position: [0, 0.44, 0] },
+        { ...BULB, position: [0.1, 0.45, 0] },
+        { ...BULB, position: [-0.1, 0.44, 0.1] },
+        { ...BULB, position: [0.05, 0.43, -0.1] },
+      ]),
+    );
+    const lights = lightsUnder(loader.load(TABLE_LAMP).group);
+    expect(lights).toHaveLength(1);
+    const light = lights[0]!;
+    // The first head's fact index names and tags the cluster.
+    expect(light.name).toBe(`${LAMPS.placement.tableLamp}-light`);
+    const position = light.position;
+    expect(position.x).toBeCloseTo(0.0125, 9);
+    expect(position.y).toBeCloseTo(0.44, 9);
+    expect(position.z).toBeCloseTo(0, 9);
+    expect(light.userData['lampLight']).toEqual({
+      source: 'fact',
+      placementId: LAMPS.placement.tableLamp,
+      index: 0,
+      lumens: 1600,
+      cutoff: 3,
+      shadow: false,
+    });
+    loader.dispose();
+  });
+
+  test('two heads 0.6 m apart stay two lights with their own indices', () => {
+    const loader = lampLoader(withTableLights([BULB, { ...BULB, position: [0.6, 0.443, 0] }]));
+    const lights = lightsUnder(loader.load(TABLE_LAMP).group);
+    const id = LAMPS.placement.tableLamp;
+    expect(lights.map((light) => light.name)).toEqual([`${id}-light`, `${id}-light-2`]);
+    expect(lights.map((light) => light.userData['lampLight'])).toEqual([
+      { source: 'fact', placementId: id, index: 0, lumens: 400, cutoff: 3, shadow: false },
+      { source: 'fact', placementId: id, index: 1, lumens: 400, cutoff: 3, shadow: false },
+    ]);
+    loader.dispose();
+  });
+
+  test('a chain 0 / 0.45 / 0.9 m merges into one light: single linkage over half a metre', () => {
+    const loader = lampLoader(withTableLights([BULB, { ...BULB, position: [0.45, 0.443, 0] }, { ...BULB, position: [0.9, 0.443, 0] }]));
+    const lights = lightsUnder(loader.load(TABLE_LAMP).group);
+    expect(lights).toHaveLength(1);
+    // The ends are 0.9 m apart, yet the chain joins them.
+    expect(lights[0]!.position.x).toBeCloseTo(0.45, 9);
+    expect(lights[0]!.position.y).toBeCloseTo(0.443, 9);
+    expect((lights[0]!.userData['lampLight'] as { lumens: number }).lumens).toBe(1200);
+    loader.dispose();
+  });
+
+  test('two heads exactly 0.5 m apart join: the radius is inclusive', () => {
+    const loader = lampLoader(withTableLights([BULB, { ...BULB, position: [0.5, 0.443, 0] }]));
+    const lights = lightsUnder(loader.load(TABLE_LAMP).group);
+    expect(lights).toHaveLength(1);
+    expect(lights[0]!.position.x).toBeCloseTo(0.25, 9);
+    expect((lights[0]!.userData['lampLight'] as { lumens: number }).lumens).toBe(800);
+    loader.dispose();
+  });
+
+  test('a head that bridges two clusters merges them, whatever order the facts were authored in', () => {
+    // The 0.45 m head comes LAST: it sits within half a metre of both the 0 m
+    // and the 0.9 m cluster, so all three join one light — the same result the
+    // in-order chain above gives.
+    const loader = lampLoader(withTableLights([BULB, { ...BULB, position: [0.9, 0.443, 0] }, { ...BULB, position: [0.45, 0.443, 0] }]));
+    const lights = lightsUnder(loader.load(TABLE_LAMP).group);
+    expect(lights).toHaveLength(1);
+    expect(lights[0]!.position.x).toBeCloseTo(0.45, 9);
+    expect((lights[0]!.userData['lampLight'] as { lumens: number }).lumens).toBe(1200);
+    loader.dispose();
+  });
+
+  test('colour compares without case: #FFD9A4 and #ffd9a4 are one cluster, the authored string kept', () => {
+    const loader = lampLoader(withTableLights([BULB, { ...BULB, colour: '#FFD9A4', position: [0.2, 0.443, 0] }]));
+    const lights = lightsUnder(loader.load(TABLE_LAMP).group);
+    expect(lights).toHaveLength(1);
+    expect((lights[0]!.userData['lampLight'] as { lumens: number }).lumens).toBe(800);
+    expect(lights[0]!.userData[ARTIFICIAL_LIGHT_KEY]).toEqual({ colour: new THREE.Color('#ffd9a4').toArray() });
+    loader.dispose();
+  });
+
+  test('a shadow hint on a LATER head survives the merge', () => {
+    const loader = lampLoader(withTableLights([BULB, { ...BULB, position: [0.2, 0.443, 0], shadow: true }]));
+    const [light] = lightsUnder(loader.load(TABLE_LAMP).group);
+    expect((light!.userData['lampLight'] as { shadow: boolean }).shadow).toBe(true);
+    loader.dispose();
+  });
+
+  test('heads that differ in colour stay separate however close they sit', () => {
+    const loader = lampLoader(withTableLights([BULB, { ...BULB, colour: '#ff0000' }]));
+    const lights = lightsUnder(loader.load(TABLE_LAMP).group);
+    expect(lights).toHaveLength(2);
+    expect(lights.map((light) => light.userData[ARTIFICIAL_LIGHT_KEY])).toEqual([
+      { colour: new THREE.Color('#ffd9a4').toArray() },
+      { colour: new THREE.Color('#ff0000').toArray() },
+    ]);
+    loader.dispose();
+  });
+
+  test('heads that differ in cutoff stay separate however close they sit', () => {
+    const loader = lampLoader(withTableLights([BULB, { ...BULB, cutoff: 4 }]));
+    const lights = lightsUnder(loader.load(TABLE_LAMP).group);
+    expect(lights).toHaveLength(2);
+    expect(lights.map((light) => light.distance)).toEqual([3, 4]);
+    loader.dispose();
+  });
+
+  test('the merged light stays a shadowless artificial light of the authored colour at the summed candela', () => {
+    const loader = lampLoader(
+      withTableLights([
+        { ...BULB, shadow: true },
+        { ...BULB, position: [0.2, 0.443, 0] },
+      ]),
+    );
+    const [light] = lightsUnder(loader.load(TABLE_LAMP).group);
+    expect(light!.castShadow).toBe(false);
+    expect(light!.userData[ARTIFICIAL_LIGHT_KEY]).toEqual({ colour: new THREE.Color('#ffd9a4').toArray() });
+    expect(light!.intensity).toBeCloseTo(lampCandela(800), 9);
+    // The tag keeps its shape; the shadow hint is the OR of the heads' hints.
+    expect(light!.userData['lampLight']).toEqual({
+      source: 'fact',
+      placementId: LAMPS.placement.tableLamp,
+      index: 0,
+      lumens: 800,
+      cutoff: 3,
+      shadow: true,
+    });
     loader.dispose();
   });
 });

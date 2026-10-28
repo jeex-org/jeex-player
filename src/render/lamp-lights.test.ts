@@ -128,17 +128,35 @@ describe('collectLampLights', () => {
     builder.dispose();
   });
 
-  test("indexes follow the variant's lights within a placement", () => {
+  test('co-located heads bake as one merged lamp; a head past the linkage stays its own entry, in index order', () => {
+    // The loader merges clustered heads before any light exists in the scene,
+    // so the bake sees one entry per cluster: the summed lumens under the
+    // first head's index, at the cluster's position, at the candela of the
+    // sum — and the OR of the heads' shadow hints, so a shadowing head does
+    // not lose its shadow to a lower-index neighbour. The third head sits
+    // 0.6 m away, past the linkage, and keeps its own entry.
     const bulb = { kind: 'point', position: [0, 0.443, 0], colour: '#ffd9a4', lumens: 400, cutoff: 3 };
     const { builder, root } = lampScene({
       edit: (manifest) => {
-        manifest.library.objects[0]!.variants[0]!['lights'] = [bulb, { ...bulb, lumens: 200, shadow: true }];
+        manifest.library.objects[0]!.variants[0]!['lights'] = [
+          bulb,
+          { ...bulb, lumens: 200, shadow: true },
+          { ...bulb, position: [0.6, 0.443, 0], lumens: 300 },
+        ];
       },
     });
     const table = collectLampLights(root).filter((entry) => entry.placementId === LAMPS.placement.tableLamp);
-    expect(table.map((entry) => ({ index: entry.index, lumens: entry.lumens, shadow: entry.shadow }))).toEqual([
-      { index: 0, lumens: 400, shadow: false },
-      { index: 1, lumens: 200, shadow: true },
+    expect(
+      table.map((entry) => ({
+        index: entry.index,
+        lumens: entry.lumens,
+        intensity: Number(entry.intensity.toFixed(9)),
+        position: entry.position.map((value) => Number(value.toFixed(6))),
+        shadow: entry.shadow,
+      })),
+    ).toEqual([
+      { index: 0, lumens: 600, intensity: 1.8, position: [1, 0.443, 1], shadow: true },
+      { index: 2, lumens: 300, intensity: 0.9, position: [1.6, 0.443, 1], shadow: false },
     ]);
     expect(root.getObjectByName(FURNITURE_GROUP_NAME)).toBeDefined();
     builder.dispose();
