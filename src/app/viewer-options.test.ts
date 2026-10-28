@@ -10,14 +10,13 @@ import {
   DEFAULT_VIEWER_OPTIONS,
   OPTION_SCHEMA,
   OVERLAY_PRESETS,
-  optionsFromDataset,
-  optionsFromQuery,
   optionsFromRecord,
   resolveViewerOptions,
   type DeepPartial,
   type ViewerOptions,
   type ViewerOptionsInput,
 } from './viewer-options.js';
+import { optionsFromDataset, optionsFromQuery } from './option-adapters.js';
 import type { OptionSpec } from './option-resolvers.js';
 import { SLOT_NAMES } from '../ui/host-slots.js';
 import { collectLog } from '../fixtures/stubs.js';
@@ -118,6 +117,7 @@ describe('resolveViewerOptions', () => {
       analytics: { mode: 'on', endpoint: undefined },
       settings: { show: false, side: 'end' },
       lighting: { temperature: 5000, hdri: {} },
+      quality: 'auto',
       onLog: logged.sink,
     });
     // The tour only engages at start in `view.mode: 'tour'`; `tour.mode` says
@@ -183,6 +183,7 @@ describe('resolveViewerOptions', () => {
       analytics: { mode: 'on', endpoint: undefined },
       settings: { show: false, side: 'end' },
       lighting: { temperature: 5000, hdri: {} },
+      quality: 'auto',
       onLog: logged.sink,
     });
     expect(Object.keys(resolved)).toEqual([
@@ -207,6 +208,7 @@ describe('resolveViewerOptions', () => {
       'analytics',
       'settings',
       'lighting',
+      'quality',
       'onLog',
     ]);
   });
@@ -747,6 +749,7 @@ describe('OPTION_SCHEMA', () => {
         'analytics.endpoint',
         'settings.show',
         'settings.side',
+        'quality',
         'lighting.temperature',
       ].sort(),
     );

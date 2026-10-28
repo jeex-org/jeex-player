@@ -25,9 +25,6 @@ import type { Messages } from '../ui/messages.js';
 import type { SceneModel, ApplyResult } from '../scene/scene-model.js';
 import type { SceneOp } from '../scene/scene-ops.js';
 import { facadeFinishOf, faceFinishOf, floorFinishOf, roomWallFinishOf } from '../scene/scene-ops.js';
-import { polylineMidpoint } from '../plan/plan-geometry.js';
-import { buildPlanDrawing } from '../plan/plan-drawing.js';
-import { planDrawingInputs } from '../assets/plan-fixtures.js';
 import type { AssetFactsSource } from '../assets/asset-facts.js';
 // Type-only: `layout-lint.ts` itself is loaded lazily, only for a page that
 // has the debug capability on, so a production bundle never pays for it.
@@ -55,8 +52,10 @@ import type { HdriDebug, WalkLightingState } from './walk-lighting-controller.js
 import type { WalkLightingStats } from '../render/walk-lighting/walk-lighting.js';
 import type { DemandCounters } from '../render/render-demand.js';
 import type { LightBakeState } from '../lightmap/light-bake-wiring.js';
+import type { QualityDebug } from '../render/quality-tier.js';
 
 import { freeSpaceModule, layoutLintModule, loadLayoutModules } from './debug-layout-modules.js';
+import { planDebugDto, planDrawingCounts } from './viewer-debug-plan.js';
 
 /** The room lighting as the debug surface reads it. */
 type WalkLightingDebug = { state: WalkLightingState; stats: WalkLightingStats | null };
@@ -121,6 +120,8 @@ type ViewerDebugApi = {
    * `live`, `sky-only` (over a light bake) or `failed`, with the preset, cube size and sun intensity (`walk-lighting-controller.ts`).
    */
   hdri: () => HdriDebug;
+  /** The render quality tier in force: the mode (`auto` runs the frame-time machine, `fixed` pins) and the tier it answers with (`quality-control.ts`). */
+  quality: () => QualityDebug;
   /**
    * Cumulative frame-loop ticks and display draws (`render/render-demand.ts`):
    * a resting view keeps ticking while its draws stay flat; `insetDraws`
@@ -379,6 +380,8 @@ type SceneDebug = {
   walkPost: () => WalkPostState | undefined;
   walkLighting: () => WalkLightingDebug | undefined;
   hdri: () => HdriDebug | undefined;
+  /** The render quality tier in force (`quality-control.ts`). */
+  quality: () => QualityDebug | undefined;
   renderDemand: () => DemandCounters | undefined;
   lightBake: () => LightBakeState;
   furnitureVisible: () => boolean;
@@ -511,6 +514,7 @@ export function installViewerDebug(host: ViewerDebugHost): ViewerDebugApi {
     walkPost: () => host.walkPost() ?? 'off',
     walkLighting: () => host.walkLighting() ?? { state: 'off', stats: null },
     hdri: () => host.hdri() ?? { state: 'off', preset: null, cubeSize: null, sunIntensity: null },
+    quality: () => host.quality() ?? { mode: 'auto', tier: 'high' },
     renderDemand: () => host.renderDemand() ?? { ticks: 0, draws: 0, insetDraws: 0 },
     lightBake: () => host.lightBake(),
     assetModels: () => {
@@ -575,34 +579,8 @@ export function installViewerDebug(host: ViewerDebugHost): ViewerDebugApi {
       // is the band a wall pick actually lands in.
       return projectToViewport(camera, new THREE.Vector3(x, 1.2, z), { width, height });
     },
-    /**
-     * Solved plan geometry: click coordinates for browser-check come from here.
-     * Cloned, because the committed plan is frozen and shared.
-     */
-    plan: () => ({
-      rooms: model().plan.rooms.map((room) => ({
-        id: room.roomId,
-        bbox: { ...room.bbox },
-        polygon: room.polygon.map((point) => ({ x: point.x, z: point.z })),
-      })),
-      // A face without a midpoint (a degenerate polyline) is dropped rather
-      // than reported at a fabricated origin — a caller that trusted `{0,0}`
-      // as a real point would click on whatever facade wall happens to be
-      // there instead of getting nothing.
-      facadeWalls: model().plan.facade.flatMap((face) => {
-        const centre = polylineMidpoint(face.polyline);
-        if (!centre) return [];
-        return [
-          {
-            face: { ...face.key },
-            wallId: face.wallId,
-            centre: { x: centre.x, z: centre.z },
-            outward: { x: face.normal.x, z: face.normal.z },
-            length: face.length,
-          },
-        ];
-      }),
-    }),
+    /** Solved plan geometry: click coordinates for browser-check come from here; cloned, because the committed plan is frozen and shared (`viewer-debug-plan.ts`). */
+    plan: () => planDebugDto(model()),
     projectPoint: (x, y, z) => project(x, y, z),
     focusRoom: (roomId) => host.director()?.focusRoom(roomId) ?? false,
     floorPoint: (x, y) => controller()?.debugFloorPoint(x, y) ?? null,
@@ -616,14 +594,7 @@ export function installViewerDebug(host: ViewerDebugHost): ViewerDebugApi {
       }
       return null;
     },
-    planDrawing: () => {
-      const counts: Record<string, number> = {};
-      for (const primitive of buildPlanDrawing(model().plan, model().scene, planDrawingInputs(model().scene, host.assetFacts()))
-        .primitives) {
-        counts[primitive.kind] = (counts[primitive.kind] ?? 0) + 1;
-      }
-      return counts;
-    },
+    planDrawing: () => planDrawingCounts(model(), host.assetFacts()),
     renderCamera: () => {
       const camera = host.renderCamera();
       if (!camera) return null;

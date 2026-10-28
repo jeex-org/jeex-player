@@ -30,21 +30,26 @@ import type * as THREE from 'three';
 import { isPostProcessed, type PostProcessor } from '../render/post-processor.js';
 import { FirstDrawGate } from '../render/first-draw.js';
 import type { ViewerMode } from '../scene/types.js';
-import type { BalanceSource } from '../render/walk-post.js';
+// Type-only, all of it: the chain's module is the lazy walk chunk, and a
+// value import here would pull it into the boot bundle.
+import type { BalanceSource, WalkPost, WalkPostTierInputs } from '../render/walk-post.js';
 
 /**
  * The production `build`: imports the chain's module on demand and builds it
  * on the runtime's renderer. The dynamic import is what keeps the chain out of
- * the boot bundle of the ES and demo builds (a `lazy-` chunk of its own).
+ * the boot bundle of the ES and demo builds (a `lazy-` chunk of its own). The
+ * STARTING tier's post inputs are built in; a later switch retunes the live
+ * chain (`applyTierInputs`).
  */
 export async function loadWalkPost(
   renderer: THREE.WebGLRenderer,
   scene: THREE.Scene,
   camera: THREE.Camera,
   balance?: BalanceSource,
+  tier?: WalkPostTierInputs,
 ): Promise<PostProcessor> {
   const { createWalkPost } = await import('../render/walk-post.js');
-  return createWalkPost(renderer, scene, camera, { balance });
+  return createWalkPost(renderer, scene, camera, { balance, ...(tier !== undefined && { tier }) });
 }
 
 export type WalkPostDeps = {
@@ -72,6 +77,8 @@ export class WalkPostController {
   private failed = false;
   private eligible = false;
   private disposed = false;
+  /** The latest tier inputs handed over; a chain adopted after them takes them too. */
+  private latestTier: WalkPostTierInputs | null = null;
   /** Closed while the current chain's scene programs compile. */
   private readonly compiled = new FirstDrawGate({
     setTimeout: (run, ms) => setTimeout(run, ms) as unknown as number,
@@ -111,6 +118,25 @@ export class WalkPostController {
     if (this.attached) return 'on';
     if (this.pending || (this.chain && !this.compiled.open)) return 'loading';
     return this.failed ? 'failed' : 'off';
+  }
+
+  /**
+   * Hands one tier's post inputs to the built chain when it is the walk chain
+   * (a quality tier switch, `app/quality-control.ts`); answers `false` while
+   * there is no chain, or a foreign `PostProcessor` that takes none. The
+   * switch is remembered either way: a chain adopted afterwards — the build
+   * was still loading when the switch landed — takes the latest inputs in
+   * `adopt`, so a tier switch is never lost to a build in flight.
+   */
+  applyTierInputs(inputs: WalkPostTierInputs): boolean {
+    if (this.disposed) return false;
+    this.latestTier = inputs;
+    const chain = this.chain;
+    if (chain === null) return false;
+    const post = chain as Partial<WalkPost>;
+    if (typeof post.applyTier !== 'function') return false;
+    post.applyTier(inputs);
+    return true;
   }
 
   /** The GPU context is gone: every resource of the chain went with it. */
@@ -158,6 +184,11 @@ export class WalkPostController {
       return null;
     }
     this.chain = chain;
+    // A tier switch that landed while this build was loading (applyTierInputs
+    // found no chain) reaches the chain here: it adopts the latest inputs, not
+    // the ones the build started with. `applyTier` with unchanged inputs is cheap.
+    const post = chain as Partial<WalkPost>;
+    if (this.latestTier && typeof post.applyTier === 'function') post.applyTier(this.latestTier);
     const prepare = this.deps.prepare;
     this.compiled.arm(prepare ? () => prepare(chain) : null);
     if (this.eligible && this.compiled.open) this.setAttached(chain);

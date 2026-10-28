@@ -27,10 +27,12 @@ import { parseRatio } from './ratio.js';
 import { isLightTemperature } from '../lighting/colour-temperature.js';
 import { TEMPERATURE_RANGE } from '../lighting/temperature-range.js';
 import { convertRaw } from '../app/option-raw.js';
+import { isQualityMode } from '../app/quality-check.js';
 import { PendingViewer } from './pending-viewer.js';
 import type { ElementRuntime } from './element-runtime.js';
 import {
   DEFAULT_TAG,
+  QUALITY_ATTRIBUTE,
   READONLY_ATTRIBUTE,
   RATIO_ATTRIBUTE,
   SHADOW_ATTRIBUTE,
@@ -365,6 +367,10 @@ export class ViewerElementController {
       this.applyTemperature(handle);
       return;
     }
+    if (effect === 'quality') {
+      this.applyQuality(handle);
+      return;
+    }
     const options = resolveViewerOptions(this.readOptions());
     switch (effect) {
       case 'scene': {
@@ -415,6 +421,24 @@ export class ViewerElementController {
     }
     this.log().warn('option-invalid', `<${DEFAULT_TAG}>: ${TEMPERATURE_ATTRIBUTE}="${raw}" is not a temperature; keeping the current one`, {
       attribute: TEMPERATURE_ATTRIBUTE,
+      value: raw,
+    });
+  }
+
+  /**
+   * `quality` on a running viewer: `auto`, `low` or `high`, no attribute for
+   * the default the shared option table names (`auto`). Anything else warns
+   * once and keeps the current tier. Before the start the mount reads it.
+   */
+  private applyQuality(handle: ViewerHandle): void {
+    const raw = this.host.attribute(QUALITY_ATTRIBUTE);
+    const value = raw === null ? OPTION_SCHEMA['quality'].default : convertRaw('enum', raw);
+    if (isQualityMode(value)) {
+      handle.setQuality(value);
+      return;
+    }
+    this.log().warn('option-invalid', `<${DEFAULT_TAG}>: ${QUALITY_ATTRIBUTE}="${raw}" is not a quality mode; keeping the current one`, {
+      attribute: QUALITY_ATTRIBUTE,
       value: raw,
     });
   }

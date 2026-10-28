@@ -113,6 +113,10 @@ const COPY_SHADER = {
  * walk lighting: three keeps a transmission target per camera that draws
  * glass and frees it only with the renderer, so a camera per capture (as
  * `PMREMGenerator.fromScene` makes) would strand one target per capture.
+ *
+ * The cube's edge is the tuning's `probeSize` and nothing else: the layout
+ * invariant above pins the atlas tile to what a 128 px capture's PMREM
+ * produces, so no caller may hand a different edge.
  */
 export class ProbeCamera {
   readonly camera: THREE.CubeCamera;

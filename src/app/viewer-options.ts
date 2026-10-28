@@ -258,6 +258,12 @@ export type ViewerOptions = {
     /** A sky per sun preset for walk and tour (`HdriEntry`, README «Sky in walk and tour»); an object at mount only. */
     hdri: HdriOption;
   };
+  /**
+   * Render quality tier. `'auto'` (default) watches the drawn-frame times in
+   * walk and tour and drops to the cheaper tier for the rest of the scene when
+   * motion runs slow, recovering once; `'low'`/`'high'` pin a tier.
+   */
+  quality: 'auto' | 'low' | 'high';
 };
 
 /**
@@ -320,6 +326,7 @@ export const DEFAULT_VIEWER_OPTIONS: ViewerOptions = {
   analytics: { mode: 'on' },
   settings: { show: false, side: 'end' },
   lighting: { temperature: TEMPERATURE_RANGE.default, hdri: {} },
+  quality: 'auto',
 };
 
 /**
@@ -338,6 +345,7 @@ const INTERACTION_MODES = closedSet<ViewerOptions['interaction']>()(['full', 'no
 const EDITS_MODES = closedSet<ViewerOptions['edits']>()(['local', 'emit', 'off']);
 const SETTINGS_SIDES = closedSet<ViewerOptions['settings']['side']>()(['start', 'end']);
 const ANALYTICS_MODES = closedSet<ViewerOptions['analytics']['mode']>()(['on', 'off']);
+const QUALITY_MODES = closedSet<ViewerOptions['quality']>()(['auto', 'low', 'high']);
 
 /** Every dotted (or top-level) path `OPTION_SCHEMA` declares a row for. */
 export type OptionPath =
@@ -378,6 +386,7 @@ export type OptionPath =
   | 'analytics.endpoint'
   | 'settings.show'
   | 'settings.side'
+  | 'quality'
   | 'lighting.temperature';
 
 /**
@@ -470,6 +479,7 @@ export const OPTION_SCHEMA = {
     attr: 'settings-side',
   },
   'lighting.temperature': { kind: 'temperature', default: TEMPERATURE_RANGE.default, query: 'lightTemperature', attr: 'light-temperature' },
+  quality: { kind: 'enum', values: QUALITY_MODES, default: DEFAULT_VIEWER_OPTIONS.quality, query: 'quality', attr: 'quality' },
 } as const satisfies Record<OptionPath, OptionSpec>;
 
 /** `overlay="kiosk"`/`"embed"`/`"unbranded"`: sugar over other options, not itself a `ViewerOptions` field. */
@@ -686,15 +696,4 @@ export function optionsFromRecord(
     else containerFor(result, section, () => ({}))[field] = value;
   }
   return result;
-}
-
-/** Every `OPTION_SCHEMA` row's `?<query>=` spelling (demo, dev, iframe embed), e.g. `?view=walk&tourStart=0.25&chrome=0`. */
-export function optionsFromQuery(search: string, log?: LogSink): DeepPartial<ViewerOptions> {
-  const params = new URLSearchParams(search.startsWith('?') ? search.slice(1) : search);
-  return optionsFromRecord((key) => params.get(key) ?? undefined, 'query', log);
-}
-
-/** Every `OPTION_SCHEMA` row's `data-<attr>` spelling (embedding), e.g. `data-view`, `data-tour-start`, `data-chrome`. */
-export function optionsFromDataset(dataset: DOMStringMap, log?: LogSink): DeepPartial<ViewerOptions> {
-  return optionsFromRecord((key) => dataset[key], 'attr', log);
 }

@@ -46,6 +46,7 @@ import type { ViewerMode } from '../scene/types.js';
 import { mergeScopes, type LightingScope } from './walk-lighting-scope.js';
 import type { WalkDocument, WalkLightingStats } from '../render/walk-lighting/walk-lighting.js';
 import { WALK_LIGHTING_TUNING } from '../render/walk-lighting/walk-lighting-tuning.js';
+import { walkLightingOverridesFor, type QualityTierName } from '../render/quality-tier.js';
 import type { HdriContent, HdriSkyState, HdriView } from '../render/hdri/hdri-sky.js';
 import type { HdriEntry } from '../lighting/hdri-entry.js';
 import type { HdriTarget } from './hdri-wiring.js';
@@ -116,10 +117,14 @@ export type HdriDebug = {
 /** One file of the current entry: in flight, or loaded. */
 type HdriFile<T> = { controller: AbortController; value: T | null };
 
-/** The production `build`: imports the walk chunk and builds the lighting on the runtime's renderer and scene. */
-export async function loadWalkLighting(renderer: THREE.WebGLRenderer, scene: THREE.Scene): Promise<WalkLightingHandle> {
+/** The production `build`: imports the walk chunk and builds the lighting on the runtime's renderer and scene. The STARTING quality tier sets the bake pace (`walkLightingOverridesFor`); the probes' capture edge is the probe atlas's invariant and never varies. Read once per lighting build; a later tier switch retunes the screen, never the bake. */
+export async function loadWalkLighting(
+  renderer: THREE.WebGLRenderer,
+  scene: THREE.Scene,
+  tier: QualityTierName = 'high',
+): Promise<WalkLightingHandle> {
   const { WalkLighting } = await import('../render/walk-post.js');
-  return new WalkLighting(renderer, scene);
+  return new WalkLighting(renderer, scene, walkLightingOverridesFor(tier));
 }
 
 export type WalkLightingDeps<Doc> = {

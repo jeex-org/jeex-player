@@ -46,6 +46,7 @@ import type { Picker } from '../geometry/picker.js';
 import type { AssetMoveControl } from '../edit/asset-move-session.js';
 import { loadWalkPost, WalkPostController } from './walk-post-controller.js';
 import { hdriLoads, loadWalkLighting, WalkLightingController, type HdriDeps } from './walk-lighting-controller.js';
+import type { QualityControl } from './quality-control.js';
 import { wireWalkLighting } from './walk-lighting-wiring.js';
 import type { WalkDocument } from '../render/walk-lighting/walk-lighting.js';
 import type { PostProcessor } from '../render/post-processor.js';
@@ -79,6 +80,8 @@ export type ViewerStageDeps = {
    * anyway (found from an embedding editor host).
    */
   planOptions: () => PlanModeOptions;
+  /** The render quality tier (`quality-control.ts`): the runtime and the walk builds start on it, and it feeds on drawn frames. */
+  quality: QualityControl;
   /** The mounted document's bank, for the plan's fixtures (`SceneMount.assetFacts`). */
   assetFacts: () => AssetFactsSource;
   /** A click on a room of the map: the application decides how to get there. */
@@ -216,6 +219,8 @@ export class ViewerStage {
   readonly walkPost: WalkPostController;
   /** The walk and tour room lighting: built after the chain, baked on entry (`walk-lighting-controller.ts`). */
   readonly walkLighting: WalkLightingController;
+  /** The render quality tier: built the runtime and the chains on it, fed by the frames it draws (`quality-control.ts`). */
+  readonly quality: QualityControl;
   /** The document the room lighting is built for, and the end of its edit subscription. */
   private lightingDocument: { document: () => WalkDocument | null; off: () => void } | null = null;
   private disposed = false;
@@ -238,9 +243,13 @@ export class ViewerStage {
     // attached either (`setDocument` -> `mountCameraDirector`, below) — the
     // style alone would still let the canvas SEE the events, just not react.
     if (deps.director.interaction === 'none') deps.roots.canvas.style.setProperty('pointer-events', 'none');
+    // The runtime and the two walk builds below start on the tier the control
+    // answers; only a live switch applies one.
+    this.quality = deps.quality;
     this.runtime = createRenderRuntime({
       canvas: deps.roots.canvas,
       viewport: deps.viewport,
+      pixelRatioCap: this.quality.pixelRatioCap,
       onContextLost: () => {
         this.walkPost.contextLost();
         this.walkLighting.contextLost();
@@ -268,10 +277,16 @@ export class ViewerStage {
     this.runtime.setCamera(this.camera);
     this.walkPost = new WalkPostController({
       build: () =>
-        loadWalkPost(this.runtime.renderer, this.runtime.scene, this.camera, {
-          live: () => this.walkLighting.balance(),
-          at: (position) => this.walkLighting.balanceAt(position),
-        }),
+        loadWalkPost(
+          this.runtime.renderer,
+          this.runtime.scene,
+          this.camera,
+          {
+            live: () => this.walkLighting.balance(),
+            at: (position) => this.walkLighting.balanceAt(position),
+          },
+          this.quality.chainInputs,
+        ),
       attach: (chain) => this.runtime.setPostProcessor(chain),
       report: (error) => deps.onFrameError?.(error),
       // The scene's programs for the chain's own target, linked before the first frame through it.
@@ -279,7 +294,11 @@ export class ViewerStage {
     });
     this.walkLighting = new WalkLightingController({
       build: async () => {
-        const lighting = await loadWalkLighting(this.runtime.renderer, this.runtime.scene);
+        // The tier in force at build time sets the bake pace, read once per
+        // lighting build; the probes' capture edge is the probe atlas's
+        // invariant and never varies, and a later tier switch retunes the
+        // screen, never the bake.
+        const lighting = await loadWalkLighting(this.runtime.renderer, this.runtime.scene, this.quality.tier);
         // The walk's ambient floor is artificial light: it takes the current temperature.
         deps.artificialLights?.(this.runtime.scene);
         return lighting;
@@ -529,6 +548,15 @@ export class ViewerStage {
       this.preview.sync();
     };
     for (const hook of [...orderFrameHooks(cameraHook, hooks), frameEnd]) this.runtime.addFrameHook(hook);
+    // The quality machine feeds on drawn frames: a POST-render hook knows the
+    // tick drew (`lastDrawnAt` is this tick's own reading) and runs after the
+    // draw, outside the frame's GL state. A skipped tick breaks the interval
+    // instead of stretching it: demand said "no draw", never that the device
+    // was slow, so sporadic draws read as no motion, not as slow motion.
+    this.runtime.addPostRenderHook((_delta, now) => {
+      if (this.runtime.lastDrawnAt === now) this.quality.drawn(now);
+      else this.quality.skipped();
+    });
     this.runtime.start();
   }
 

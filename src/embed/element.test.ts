@@ -14,6 +14,7 @@ import {
   DEFAULT_TAG,
   MOUNT_BOX_STYLE,
   OBSERVED_ATTRIBUTES,
+  QUALITY_ATTRIBUTE,
   RATIO_ATTRIBUTE,
   SHADOW_ATTRIBUTE,
   SHADOW_NONE,
@@ -278,12 +279,13 @@ describe('optionsFromAttributes', () => {
 });
 
 describe('effectOf', () => {
-  test('only `src`, `view`, `light-temperature` and the box `ratio` do anything to a running viewer', () => {
+  test('only `src`, `view`, `light-temperature`, `quality` and the box `ratio` do anything to a running viewer', () => {
     expect(effectOf('src')).toBe('scene');
     expect(effectOf('view')).toBe('mode');
     expect(effectOf('light-temperature')).toBe('temperature');
+    expect(effectOf(QUALITY_ATTRIBUTE)).toBe('quality');
     expect(effectOf(RATIO_ATTRIBUTE)).toBe('box');
-    const live = new Set(['src', 'view', 'light-temperature', RATIO_ATTRIBUTE, LOADING_ATTRIBUTE]);
+    const live = new Set(['src', 'view', 'light-temperature', QUALITY_ATTRIBUTE, RATIO_ATTRIBUTE, LOADING_ATTRIBUTE]);
     for (const attribute of OBSERVED_ATTRIBUTES.filter((name) => !live.has(name))) {
       expect([attribute, effectOf(attribute)]).toEqual([attribute, 'frozen']);
     }

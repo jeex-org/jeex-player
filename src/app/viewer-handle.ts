@@ -230,6 +230,16 @@ export type ViewerHandle = {
    */
   setLightTemperature(temperature: number | null): void;
   /**
+   * Sets the render quality tier: `'auto'` (default) lets the viewer watch
+   * the drawn-frame times in walk and tour and drop to the cheaper tier for
+   * the rest of the scene when motion runs slow, recovering once per scene;
+   * `'low'` and `'high'` pin a tier. Only the drawing buffer's ratio and the
+   * walk chain's occlusion change; the scene on screen is not rebuilt. Throws
+   * a `ViewerLibError` with code `bad-params` (path `quality`) for any other
+   * value and keeps the current tier.
+   */
+  setQuality(quality: 'auto' | 'low' | 'high'): void;
+  /**
    * Re-reads the theme from the viewer root's CSS and applies what CSS alone
    * cannot reach: the 3D backdrop (`--jeex-backdrop`, `--jeex-backdrop-top`).
    * The mount reads it once before the first frame; call this after changing

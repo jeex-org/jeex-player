@@ -248,3 +248,49 @@ describe('WalkPostController compiles the scene for the chain before attaching i
     expect(rejected.attached).toEqual([other]);
   });
 });
+
+describe('applyTierInputs', () => {
+  /** The low tier's inputs, as the quality control would hand them over. */
+  const LOW = { aoResolutionScale: 0.75, denoise: { depthPhi: 0.05, normalPhi: 8, lumaPhi: 10, radius: 4, samples: 8 }, gtaoSamples: 8 };
+  const HIGH = { aoResolutionScale: 1, denoise: { depthPhi: 0.05, normalPhi: 8, lumaPhi: 10, radius: 6, samples: 16 }, gtaoSamples: 16 };
+
+  test('hands the per-tier inputs to the built walk chain; false while there is none', async () => {
+    const h = harness();
+    expect(h.controller.applyTierInputs(LOW)).toBe(false);
+    h.controller.update('walk');
+    const chain = await h.finish(0);
+    // A chain that is not the walk post (a foreign PostProcessor) takes none.
+    expect(h.controller.applyTierInputs(LOW)).toBe(false);
+    const tiered: Array<unknown> = [];
+    (chain as { applyTier?: (inputs: unknown) => void }).applyTier = (received) => tiered.push(received);
+    expect(h.controller.applyTierInputs(LOW)).toBe(true);
+    expect(tiered).toEqual([LOW]);
+  });
+
+  test('a switch that landed while the chain was loading is re-applied when the chain adopts', async () => {
+    const h = harness();
+    h.controller.update('walk'); // the build starts on the build-time inputs
+    // The tier switch lands while the walk chunk is still loading: no chain
+    // to take it, but the controller remembers it.
+    expect(h.controller.applyTierInputs(LOW)).toBe(false);
+    const tiered: Array<unknown> = [];
+    (h.builds[0]!.chain as { applyTier?: (inputs: unknown) => void }).applyTier = (received) => tiered.push(received);
+    await h.finish(0);
+    // The chain adopts the LATEST inputs, not the ones the build started with.
+    expect(tiered).toEqual([LOW]);
+    // And a later switch reaches the adopted chain the ordinary way.
+    expect(h.controller.applyTierInputs(HIGH)).toBe(true);
+    expect(tiered).toEqual([LOW, HIGH]);
+  });
+
+  test('a disposed controller applies nothing', async () => {
+    const h = harness();
+    h.controller.update('walk');
+    const chain = await h.finish(0);
+    const tiered: Array<unknown> = [];
+    (chain as { applyTier?: (inputs: unknown) => void }).applyTier = (received) => tiered.push(received);
+    h.controller.dispose();
+    expect(h.controller.applyTierInputs(LOW)).toBe(false);
+    expect(tiered).toEqual([]);
+  });
+});

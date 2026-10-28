@@ -5,7 +5,8 @@
 
 import { describe, expect, test } from 'bun:test';
 import * as THREE from 'three';
-import { quadMaterials, WALK_POST_TUNING, WalkPost } from './walk-post.js';
+import { quadMaterials, WALK_POST_TUNING, WalkPost, type WalkPostTierInputs } from './walk-post.js';
+import { QUALITY_TIERS } from './quality-tier.js';
 
 describe('WALK_POST_TUNING', () => {
   test('GTAO at 0.3 m world radius on a full-resolution buffer with depth-aware denoise, half-float targets without multisampling', () => {
@@ -82,6 +83,109 @@ describe('WalkPost sizes around captures', () => {
     post.setSize(500, 300, 2);
     post.render(new THREE.Scene(), new THREE.PerspectiveCamera(), 0);
     expect(sizes.at(-1)).toEqual([1000, 600]);
+  });
+});
+
+describe('WalkPost per-tier inputs', () => {
+  /**
+   * The low tier's inputs, as the quality module would hand them over, but at
+   * a three-quarter occlusion buffer: the tier itself keeps the full buffer,
+   * and this pins that the chain still honours a reduced scale.
+   */
+  const LOW: WalkPostTierInputs = {
+    aoResolutionScale: 0.75,
+    denoise: { ...QUALITY_TIERS.low.denoise },
+    gtaoSamples: QUALITY_TIERS.low.gtaoSamples,
+  };
+
+  /** The chain over a renderer with no GPU: nothing is drawn, only the sizes are watched. */
+  function tierChain(options: { tier?: WalkPostTierInputs } = {}): WalkPost {
+    const globals = globalThis as { Image?: unknown };
+    globals.Image ??= class {
+      src = '';
+      onload: (() => void) | null = null;
+      decode(): Promise<void> {
+        return Promise.resolve();
+      }
+    };
+    const renderer = {
+      getPixelRatio: () => 1,
+      getSize: (target: THREE.Vector2) => target.set(800, 450),
+      getDrawingBufferSize: (target: THREE.Vector2) => target.set(800, 450),
+      getRenderTarget: () => null,
+      setRenderTarget: () => undefined,
+    } as unknown as THREE.WebGLRenderer;
+    return new WalkPost(renderer, new THREE.Scene(), new THREE.PerspectiveCamera(), options.tier ? { tier: options.tier } : {});
+  }
+
+  test('default construction is today`s behaviour: full resolution, the tuned denoise, three`s default rays', () => {
+    const post = tierChain();
+    expect(post.occlusion.gtaoMaterial.defines['SAMPLES']!).toBe(16);
+    expect(post.occlusion.pdMaterial.uniforms['depthPhi']!.value).toBe(WALK_POST_TUNING.denoise.depthPhi);
+    expect(post.occlusion.pdMaterial.uniforms['radius']!.value).toBe(WALK_POST_TUNING.denoise.radius);
+    // A real size change propagates at the default scale of 1.
+    post.setSize(640, 360, 1);
+    expect(post.occlusion.gtaoRenderTarget.width).toBe(640);
+    post.dispose();
+  });
+
+  test('a chain built on the low sampling halves the rays and sizes the occlusion buffer at a reduced scale', () => {
+    const post = tierChain({ tier: LOW });
+    expect(post.occlusion.gtaoMaterial.defines['SAMPLES']!).toBe(8);
+    expect(post.occlusion.pdMaterial.uniforms['radius']!.value).toBe(4);
+    post.setSize(640, 360, 1);
+    expect(post.occlusion.gtaoRenderTarget.width).toBe(480);
+    expect(post.occlusion.gtaoRenderTarget.height).toBe(270);
+    post.dispose();
+  });
+
+  test('applyTier retunes the denoise, the ray define and the buffer scale on the same pass', () => {
+    const post = tierChain();
+    const original = post.occlusion;
+    let disposed = 0;
+    const realDispose = original.dispose.bind(original);
+    original.dispose = () => {
+      disposed += 1;
+      realDispose();
+    };
+    post.applyTier(LOW);
+    // A different ray count is a shader define on the SAME pass: three sets
+    // needsUpdate and relinks only the GTAO program; nothing is rebuilt,
+    // disposed or re-allocated (the switch lands on a device that is already
+    // slow — a rebuilt pass would relink every program of the pass).
+    expect(disposed).toBe(0);
+    expect(post.occlusion).toBe(original);
+    expect(post.composer.passes[1]).toBe(post.occlusion);
+    expect(post.composer.passes.length).toBe(4);
+    expect(post.occlusion.gtaoMaterial.defines['SAMPLES']!).toBe(8);
+    expect(post.occlusion.pdMaterial.uniforms['radius']!.value).toBe(4);
+    // The scale applies at once, without waiting for a resize...
+    expect(post.occlusion.gtaoRenderTarget.width).toBe(600);
+    // ...and a real resize keeps scaling with it.
+    post.setSize(640, 360, 1);
+    expect(post.occlusion.gtaoRenderTarget.width).toBe(480);
+    post.dispose();
+  });
+
+  test('applyTier with the same ray count keeps the pass; applying the same tier twice changes nothing twice over', () => {
+    const post = tierChain();
+    const original = post.occlusion;
+    const sameSamples: WalkPostTierInputs = { aoResolutionScale: 1, denoise: { ...WALK_POST_TUNING.denoise, radius: 4 }, gtaoSamples: 16 };
+    post.applyTier(sameSamples);
+    expect(post.occlusion).toBe(original);
+    expect(original.pdMaterial.uniforms['radius']!.value).toBe(4);
+    post.applyTier({ ...sameSamples });
+    expect(post.occlusion).toBe(original);
+    post.dispose();
+  });
+
+  test('applyTier on a disposed chain retunes nothing: nothing is allocated that disposal would miss', () => {
+    const post = tierChain();
+    post.dispose();
+    const tuned: number[] = [];
+    post.occlusion.updateGtaoMaterial = (parameters) => tuned.push(parameters['samples'] as number);
+    post.applyTier(LOW);
+    expect(tuned).toEqual([]);
   });
 });
 

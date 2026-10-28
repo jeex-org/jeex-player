@@ -1400,4 +1400,30 @@ describe('a pixel-ratio change at a fixed CSS box', () => {
       restore();
     }
   });
+
+  test('setPixelRatioCap retunes the cap and refits: a quality tier moves the drawing buffer without a resize event', () => {
+    const { runtime, calls, setRatio, restore } = dpr();
+    try {
+      // A phone display at 3: the cap decides, not the display.
+      setRatio(3);
+      expect(calls.pixelRatio).toBe(1.7);
+      runtime.demand.commit(runtime.getCamera()!);
+      runtime.setPixelRatioCap(1.25);
+      expect(calls.pixelRatio).toBe(1.25);
+      // The refit asks for a frame: the next tick draws the new buffer.
+      expect(runtime.demand.shouldDraw(runtime.getCamera()!, 'orbit')).toBe(true);
+      runtime.demand.commit(runtime.getCamera()!);
+      // The cap is mutable in both directions, and a viewer built under a
+      // lower cap can go back up.
+      runtime.setPixelRatioCap(2);
+      expect(calls.pixelRatio).toBe(2);
+      // Setting the cap the buffer already runs at is a no-op, not a realloc.
+      const before = calls.sizes.length;
+      runtime.setPixelRatioCap(2);
+      expect(calls.sizes.length).toBe(before);
+    } finally {
+      runtime.dispose();
+      restore();
+    }
+  });
 });

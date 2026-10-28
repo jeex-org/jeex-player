@@ -95,6 +95,13 @@ describe('embedPageOptions', () => {
     expect(embedPageOptions('?readonly=false').readonly).toBe(false);
     expect(embedPageOptions('?readonly=1').readonly).toBe(true);
   });
+
+  test('the embed page inherits every OPTION_SCHEMA row the query names, quality included', () => {
+    // The iframe reads the whole query through the one adapter, so a new row
+    // travels without the page learning about it; this pins the inheritance.
+    expect(embedPageOptions('?quality=low').quality).toBe('low');
+    expect(embedPageOptions('').quality).toBeUndefined();
+  });
 });
 
 describe('framePageRatio', () => {
