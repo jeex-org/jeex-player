@@ -50,6 +50,7 @@ const statusOut = document.querySelector<HTMLElement>('#meter-status');
 const p50Out = document.querySelector<HTMLElement>('#meter-p50');
 const slowOut = document.querySelector<HTMLElement>('#meter-slow');
 const demandOut = document.querySelector<HTMLElement>('#meter-demand');
+const tierOut = document.querySelector<HTMLElement>('#meter-tier');
 const gpuOut = document.querySelector<HTMLElement>('#meter-gpu');
 const deviceOut = document.querySelector<HTMLElement>('#meter-device');
 const timingOut = document.querySelector<HTMLElement>('#meter-timing');
@@ -60,6 +61,12 @@ function say(text: string): void {
 
 function line(out: HTMLElement | null, text: string): void {
   if (out) out.textContent = text;
+}
+
+/** The strip's tier line, from the debug readout; silent while the surface is absent. */
+function printTier(): void {
+  const state = window.__viewerDebug?.quality();
+  if (state && tierOut) tierOut.textContent = `tier: ${state.mode} → ${state.tier}`;
 }
 
 function sleep(ms: number): Promise<void> {
@@ -102,7 +109,7 @@ async function dragTurn(canvas: HTMLCanvasElement): Promise<void> {
   canvas.dispatchEvent(new PointerEvent('pointerup', { ...options, clientX: fromX + TURN_PX }));
 }
 
-/** The strip lines that make up the copied result, in on-screen order. `meter-tier` is reserved for the quality tiers (a later change prints the chosen tier there). */
+/** The strip lines that make up the copied result, in on-screen order. */
 const RESULT_LINE_IDS = [
   'meter-status',
   'meter-p50',
@@ -170,13 +177,19 @@ async function main(): Promise<void> {
   if (!stage) throw new Error('meter: no #stage container');
   wireCopyButton();
 
-  const project = new URL(window.location.href).searchParams.get('project');
+  const params = new URL(window.location.href).searchParams;
+  const project = params.get('project');
+  // ?quality=low|high|auto forces the tier for a measurement; the default auto
+  // is what a published embed gets.
+  const qualityParam = params.get('quality');
+  const quality = qualityParam === 'low' || qualityParam === 'high' ? qualityParam : 'auto';
   const handle = mountViewer(stage, {
     // Development pages never send telemetry.
     analytics: 'off',
     scene: project === null ? { repository: new LocalFixtureRepository() } : { url: project },
     view: { mode: 'walk' },
     tour: { mode: 'off' },
+    quality,
   });
 
   say('loading scene…');
@@ -227,6 +240,7 @@ async function main(): Promise<void> {
         const recent = samples.slice(-30);
         const fps = recent.length > 0 ? 1000 / (recent.reduce((sum, ms) => sum + ms, 0) / recent.length) : 0;
         say(`measuring… ${((now - walkStartedAt) / 1000).toFixed(1)}s · ${frames}f · ${fps.toFixed(0)}fps`);
+        printTier();
       }
       requestAnimationFrame(sample);
     }
@@ -272,6 +286,7 @@ async function main(): Promise<void> {
   line(gpuOut, `DPR ${window.devicePixelRatio.toFixed(2)}  buffer ${canvas.width}x${canvas.height}`);
   line(deviceOut, `GPU: ${gpuRenderer()}`);
   line(timingOut, `ready ${readySeconds.toFixed(1)}s  walk ${walkSeconds.toFixed(1)}s`);
+  printTier();
   say(bakeMissed === null ? 'DONE' : `DONE · bake not live (state=${bakeMissed})`);
 }
 

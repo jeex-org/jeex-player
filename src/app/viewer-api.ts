@@ -119,6 +119,7 @@ export function mountViewerAs(embedding: Embedding, container: HTMLElement, opti
     stepCamera: (to) => app.handle.stepCamera(to),
     setFurnitureVisible: (visible) => app.handle.setFurnitureVisible(visible),
     setLightTemperature: (temperature) => app.handle.lightTemperature.set(temperature, 'host'),
+    setQuality: (quality) => app.handle.quality.set(quality),
     refreshTheme: () => app.handle.refreshTheme(),
     setLocale: (locale) => app.handle.setLocale(locale),
     setSelection: (target) => app.handle.setSelection(target),
@@ -156,5 +157,6 @@ export function mountViewerAs(embedding: Embedding, container: HTMLElement, opti
   return handle;
 }
 
-export { DEFAULT_VIEWER_OPTIONS, optionsFromDataset, optionsFromQuery, resolveViewerOptions } from './viewer-options.js';
+export { DEFAULT_VIEWER_OPTIONS, resolveViewerOptions } from './viewer-options.js';
+export { optionsFromDataset, optionsFromQuery } from './option-adapters.js';
 export { FetchSceneRepository, InlineSceneRepository } from '../scene/scene-repository.js';

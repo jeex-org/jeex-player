@@ -1,6 +1,9 @@
 import { describe, expect, test } from 'bun:test';
 import { WalkLightingController, type WalkLightingHandle } from './walk-lighting-controller.js';
 import type { LightingScope } from './walk-lighting-scope.js';
+import { ProbeCamera } from '../render/walk-lighting/room-probes.js';
+import { WALK_LIGHTING_TUNING } from '../render/walk-lighting/walk-lighting-tuning.js';
+import { QUALITY_TIERS, walkLightingOverridesFor } from '../render/quality-tier.js';
 
 type Doc = { id: number };
 
@@ -376,5 +379,18 @@ describe('WalkLightingController camera balance', () => {
     controller.update('orbit');
     expect(controller.balance()).toBeNull();
     expect(controller.balanceAt({ x: 1, y: 1, z: 1 })).toBeNull();
+  });
+});
+
+describe('the starting tier`s lighting overrides', () => {
+  test('the probe camera builds at the atlas-invariant edge, and the tier maps the bake pace only', () => {
+    // The atlas tile invariant (`render/walk-lighting/room-probes.ts`) pins
+    // the capture edge on every tier; `walkLightingOverridesFor` maps the
+    // bake pace, and nothing else, from the STARTING tier.
+    const camera = new ProbeCamera();
+    expect(camera.target.width).toBe(WALK_LIGHTING_TUNING.probeSize);
+    camera.dispose();
+    expect(walkLightingOverridesFor('low')).toEqual({ probesPerFrame: QUALITY_TIERS.low.probesPerFrame });
+    expect(walkLightingOverridesFor('high')).toEqual({ probesPerFrame: QUALITY_TIERS.high.probesPerFrame });
   });
 });

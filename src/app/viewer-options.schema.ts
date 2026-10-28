@@ -194,6 +194,7 @@ const SETTINGS_SIDE_VALUES = ['start', 'end'] as const;
 const TOUR_MODE_VALUES = ['play', 'paused', 'off'] as const;
 const MOTION_VALUES = ['auto', 'full', 'reduced'] as const;
 const INTERACTION_VALUES = ['full', 'none', 'passive'] as const;
+const QUALITY_VALUES = ['auto', 'low', 'high'] as const;
 
 /**
  * `ViewerOptions` minus the fields no schema can usefully describe:
@@ -244,4 +245,5 @@ export const viewerOptionsSchema = z.object({
   analytics: z.object({ mode: z.enum(['on', 'off']), endpoint: z.optional(z.string()) }),
   settings: z.object({ show: z.boolean(), side: z.enum(SETTINGS_SIDE_VALUES) }),
   lighting: z.object({ temperature: lightTemperatureSchema, hdri: z.partialRecord(z.enum(SITE_SUNS), hdriEntrySchema) }),
+  quality: z.enum(QUALITY_VALUES),
 });

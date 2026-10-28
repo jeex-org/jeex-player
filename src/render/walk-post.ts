@@ -122,7 +122,32 @@ export type BalanceSource = {
 };
 
 /** Options of a chain; the white balance defaults to the tuned one, and a balance source, when given, overrides it. */
-export type WalkPostOptions = { whiteBalance?: Mat3 | undefined; balance?: BalanceSource | undefined };
+export type WalkPostOptions = {
+  whiteBalance?: Mat3 | undefined;
+  balance?: BalanceSource | undefined;
+  tier?: WalkPostTierInputs | undefined;
+};
+
+/**
+ * The per-tier inputs the chain takes (quality tiers, `quality-tier.ts`): the
+ * occlusion buffer's resolution scale, the GTAO denoise and the GTAO ray
+ * count. The ray count is a shader define: three sets needsUpdate and relinks
+ * that one program on a live switch (`applyTier`); the denoise is uniforms
+ * and defines the material applies itself; the scale is effective at the next
+ * `setSize`.
+ */
+export type WalkPostTierInputs = {
+  aoResolutionScale: number;
+  denoise: { depthPhi: number; normalPhi: number; lumaPhi: number; radius: number; samples: number };
+  gtaoSamples: number;
+};
+
+/** The inputs the chain ran with before the tiers existed: the tuning and three's default ray count. */
+export const WALK_POST_DEFAULT_TIER: WalkPostTierInputs = Object.freeze({
+  aoResolutionScale: WALK_POST_TUNING.aoResolutionScale,
+  denoise: WALK_POST_TUNING.denoise,
+  gtaoSamples: 16,
+});
 
 /** The scene pass, drawing inside the beauty-pass scope a mirror captures in. */
 class BeautyPass extends RenderPass {
@@ -140,11 +165,18 @@ class BeautyPass extends RenderPass {
   }
 }
 
-/** GTAO at the tuned resolution, fed by opaque surfaces only, releasing everything it made. */
+/** GTAO at the occlusion buffer's scale, fed by opaque surfaces only, releasing everything it made. */
 class OcclusionPass extends GTAOPass {
+  /** The occlusion buffer's size as a fraction of the drawing buffer, per side; a tier may lower it. */
+  aoScale: number;
+
+  constructor(scene: THREE.Scene, camera: THREE.Camera, width: number, height: number, aoScale: number) {
+    super(scene, camera, width, height);
+    this.aoScale = aoScale;
+  }
+
   override setSize(width: number, height: number): void {
-    const scale = WALK_POST_TUNING.aoResolutionScale;
-    super.setSize(Math.max(1, Math.floor(width * scale)), Math.max(1, Math.floor(height * scale)));
+    super.setSize(Math.max(1, Math.floor(width * this.aoScale)), Math.max(1, Math.floor(height * this.aoScale)));
   }
 
   override render(
@@ -180,6 +212,8 @@ export class WalkPost implements PostProcessor {
   readonly whiteBalance: Mat3;
   private readonly balance: BalanceSource | null;
   private readonly renderer: THREE.WebGLRenderer;
+  /** The tier inputs the chain runs on now; `applyTier` retunes them. */
+  private tier: WalkPostTierInputs;
   /** The composer's size in device pixels now: the live size, or the last capture's until the next live frame. */
   private width: number;
   private height: number;
@@ -190,6 +224,7 @@ export class WalkPost implements PostProcessor {
 
   constructor(renderer: THREE.WebGLRenderer, scene: THREE.Scene, camera: THREE.Camera, options: WalkPostOptions = {}) {
     this.renderer = renderer;
+    this.tier = options.tier ?? WALK_POST_DEFAULT_TIER;
     const size = renderer.getDrawingBufferSize(new THREE.Vector2());
     this.width = Math.max(1, size.x);
     this.height = Math.max(1, size.y);
@@ -204,9 +239,8 @@ export class WalkPost implements PostProcessor {
     // Sizes are handed over in device pixels; the composer must not multiply again.
     this.composer.setPixelRatio(1);
     this.beauty = new BeautyPass(scene, camera);
-    this.occlusion = new OcclusionPass(scene, camera, this.width, this.height);
-    this.occlusion.updateGtaoMaterial({ radius: WALK_POST_TUNING.aoRadiusM, screenSpaceRadius: false });
-    this.occlusion.updatePdMaterial(WALK_POST_TUNING.denoise);
+    this.occlusion = new OcclusionPass(scene, camera, this.width, this.height, this.tier.aoResolutionScale);
+    this.applyOcclusionTier(this.tier);
     this.smaa = new SMAAPass();
     this.output = new OutputPass();
     this.whiteBalance = options.whiteBalance ?? WALK_WHITE_BALANCE;
@@ -296,6 +330,34 @@ export class WalkPost implements PostProcessor {
     this.liveWidth = Math.max(1, Math.floor(width * pixelRatio));
     this.liveHeight = Math.max(1, Math.floor(height * pixelRatio));
     this.resize(this.liveWidth, this.liveHeight);
+  }
+
+  /**
+   * Applies one tier's post inputs (`quality-tier.ts`): the denoise through
+   * the material, the occlusion buffer's scale — effective at the next
+   * `setSize`, and reapplied here so a switch whose drawing buffer does not
+   * move (a display under both caps) still takes — and the ray count as the
+   * GTAO material's SAMPLES define: three sets needsUpdate and relinks only
+   * that one program. A rebuilt pass would relink every program of the pass
+   * and allocate its targets again — a hitch on a device that is already
+   * slow, and a spike the machine would read as another slow frame. The tone
+   * curve, the exposure, SMAA and the targets are a tier's business never.
+   */
+  applyTier(inputs: WalkPostTierInputs): void {
+    if (this.disposed) return;
+    this.applyOcclusionTier(inputs);
+    this.tier = inputs;
+    this.occlusion.setSize(this.width, this.height);
+  }
+
+  /** The one occlusion setup both a fresh chain and a live tier switch run, so the two can never drift. */
+  private applyOcclusionTier(inputs: WalkPostTierInputs): void {
+    // The radius is world space (metres), not the pass's screen-space default;
+    // the ray count is the material's SAMPLES define (three's default of 16 is
+    // what an unspecified build runs).
+    this.occlusion.updateGtaoMaterial({ radius: WALK_POST_TUNING.aoRadiusM, screenSpaceRadius: false, samples: inputs.gtaoSamples });
+    this.occlusion.updatePdMaterial(inputs.denoise);
+    this.occlusion.aoScale = inputs.aoResolutionScale;
   }
 
   dispose(): void {

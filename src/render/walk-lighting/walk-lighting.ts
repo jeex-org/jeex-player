@@ -182,6 +182,15 @@ function mirrorsOf(scene: THREE.Object3D): THREE.Object3D[] {
 /** The bytes a grid's atlas and its bounce snapshot take on the GPU (RGBA float). */
 const gridBytes = (grid: RoomGrid): number => grid.resolution.x * grid.resolution.y * 7 * (grid.resolution.z + 2) * 16 * 2;
 
+/**
+ * The per-build overrides the STARTING quality tier asks of the tuning's
+ * bake pace (`app/walk-lighting-controller.ts`); absent, the pace stays the
+ * tuning's own. The probes' capture edge is deliberately NOT overridable —
+ * the probe atlas's tile invariant pins it (`room-probes.ts`). Read once, at
+ * the build; a later tier switch never re-opens this bag.
+ */
+export type WalkLightingOverrides = { probesPerFrame?: number };
+
 export class WalkLighting {
   /** The scene's shared uniforms (`walkUniformsFor`): they outlive this lighting, as the patched materials do. */
   readonly uniforms: WalkUniforms;
@@ -201,8 +210,10 @@ export class WalkLighting {
   private grids: RoomGrid[] = [];
   private exterior: LightProbeGridWebGL | null = null;
   private atlas: ProbeAtlas | null = null;
-  /** The probes' cube camera, shared by every document's atlas. */
-  private readonly probeCamera = new ProbeCamera();
+  /** The probes' cube camera, shared by every document's atlas, at the atlas-invariant edge (`room-probes.ts`). */
+  private readonly probeCamera: ProbeCamera;
+  /** The bake pace the starting tier asked of the grids. */
+  private readonly probesPerFrame: number;
   private bake: GridBake | null = null;
   private probes: RoomProbes | null = null;
   private current: WalkLightingPhase = 'baking';
@@ -220,9 +231,11 @@ export class WalkLighting {
   /** The live sun's direction authority, for the sky's elevation (`render/sun-shadow.ts`). */
   private sun: () => { override(elevationDeg: number | null): void } | null | undefined = () => null;
 
-  constructor(renderer: THREE.WebGLRenderer, scene: THREE.Scene) {
+  constructor(renderer: THREE.WebGLRenderer, scene: THREE.Scene, overrides: WalkLightingOverrides = {}) {
     this.renderer = renderer;
     this.scene = scene;
+    this.probesPerFrame = overrides.probesPerFrame ?? T.probesPerFrame;
+    this.probeCamera = new ProbeCamera();
     this.uniforms = walkUniformsFor(scene);
     this.sampler = new RoomSampler(this.uniforms);
     this.placeholder = this.uniforms.jeexAtlas.value;
@@ -483,7 +496,7 @@ export class WalkLighting {
     this.show(false);
     this.assignLamps();
     this.current = 'baking';
-    this.bake = this.gridBake(this.grids, T.probesPerFrame);
+    this.bake = this.gridBake(this.grids, this.probesPerFrame);
     const scene = this.scene;
     this.probes = new RoomProbes({
       probes: this.volumes!.probes,

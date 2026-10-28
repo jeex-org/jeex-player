@@ -59,6 +59,8 @@ export const VIEW_ATTRIBUTE = OPTION_SCHEMA['view.mode'].attr;
 export const READONLY_ATTRIBUTE = OPTION_SCHEMA['readonly'].attr;
 /** The live attribute of the light's colour temperature: kelvin, `original`, or absent for «Original». */
 export const TEMPERATURE_ATTRIBUTE = OPTION_SCHEMA['lighting.temperature'].attr;
+/** The live attribute of the render quality tier: `auto`, `low` or `high`. */
+export const QUALITY_ATTRIBUTE = OPTION_SCHEMA['quality'].attr;
 
 /**
  * The element's default box, as the `:host` rule of its shadow root.
@@ -163,13 +165,14 @@ export const ELEMENT_STATES = ['loading', 'ready', 'error'] as const;
 export type ElementState = (typeof ELEMENT_STATES)[number];
 
 /** What one attribute change does to a viewer that is already running. */
-type AttributeEffect = 'scene' | 'mode' | 'temperature' | 'box' | 'start' | 'frozen';
+type AttributeEffect = 'scene' | 'mode' | 'temperature' | 'quality' | 'box' | 'start' | 'frozen';
 
 /** Which effect an attribute has; `frozen` is "read once, at mount", `start` matters only until the start. */
 export function effectOf(attribute: string): AttributeEffect {
   if (attribute === SRC_ATTRIBUTE) return 'scene';
   if (attribute === VIEW_ATTRIBUTE) return 'mode';
   if (attribute === TEMPERATURE_ATTRIBUTE) return 'temperature';
+  if (attribute === QUALITY_ATTRIBUTE) return 'quality';
   if (attribute === RATIO_ATTRIBUTE) return 'box';
   if (attribute === LOADING_ATTRIBUTE) return 'start';
   return 'frozen';

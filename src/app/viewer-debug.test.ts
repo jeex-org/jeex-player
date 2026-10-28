@@ -85,6 +85,7 @@ const READ_ONLY_KEYS = [
   'walkPost',
   'walkLighting',
   'hdri',
+  'quality',
   'renderDemand',
   'lightBake',
 ];
@@ -125,6 +126,7 @@ function host(overrides: Partial<ViewerDebugHost> = {}): ViewerDebugHost {
     walkPost: () => undefined,
     walkLighting: () => undefined,
     hdri: () => undefined,
+    quality: () => undefined,
     renderDemand: () => undefined,
     lightBake: () => ({ state: 'applied', bakeId: 'bake', bound: 3 }),
     director: () => stubDirector(),
@@ -176,6 +178,11 @@ describe('the installed surface', () => {
     for (const key of Object.keys(api)) {
       expect({ key, type: typeof (api as unknown as Record<string, unknown>)[key] }).toEqual({ key, type: 'function' });
     }
+  });
+
+  test('quality answers the machine rest state where the host provides none', () => {
+    const api = installViewerDebug(host());
+    expect(api.quality()).toEqual({ mode: 'auto', tier: 'high' });
   });
 
   test('without the capability the mutating and exporting methods are absent', () => {

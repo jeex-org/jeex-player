@@ -107,9 +107,8 @@ export class ViewerApp {
   });
   private readonly ui: ViewerUI;
   /**
-   * `handle.capture` (`capture-commands.ts`). Built here rather than in the
-   * command bag because it reads the RENDERER, which is the stage's and not
-   * something any other command needs.
+   * `handle.capture` (`capture-commands.ts`). Built here rather than in the command bag because it reads
+   * the RENDERER, which is the stage's and not something any other command needs.
    */
   readonly capture: CaptureCommands = captureCommands({
     ...stageCaptureDeps(() => this.stage),
@@ -415,6 +414,7 @@ export class ViewerApp {
         globals: this.globals,
         messages: () => this.messages,
         furnitureVisible: () => this.furnitureVisible,
+        quality: () => this.handle.quality,
         projectLibrary: () => this.project()?.manifest.library,
         reapplyFurniture: () => this.handle.setFurnitureVisible(this.furnitureVisible, true),
         emitScene: (info) => this.events.emit('scene', info),

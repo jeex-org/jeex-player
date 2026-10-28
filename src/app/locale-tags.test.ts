@@ -11,7 +11,8 @@
  */
 
 import { beforeEach, describe, expect, test } from 'bun:test';
-import { optionsFromQuery, resolveViewerOptions, type DeepPartial, type ViewerOptions } from './viewer-options.js';
+import { optionsFromQuery } from './option-adapters.js';
+import { resolveViewerOptions, type DeepPartial, type ViewerOptions } from './viewer-options.js';
 import { collectLog } from '../fixtures/stubs.js';
 import { SHIPPED_LOCALES } from '../ui/messages.js';
 

@@ -46,6 +46,7 @@ import type { SceneSource } from '../scene/scene-repository.js';
 import type { ProjectInfo } from '../app/project-wiring.js';
 import { ViewerLibError } from '../shared/errors.js';
 import { requireLightTemperature } from '../app/light-temperature-check.js';
+import { requireQuality } from '../app/quality-check.js';
 
 /** What the stand-in needs from the element that owns it. */
 export type PendingViewerHost = {
@@ -289,6 +290,11 @@ export class PendingViewer implements ViewerHandle {
     const value = requireLightTemperature(temperature);
     if (!this.booted) this.temperature = value;
     this.command((handle) => handle.setLightTemperature(value));
+  }
+  /** Refused at the call, before the start too; queued like every setter. */
+  setQuality(quality: 'auto' | 'low' | 'high'): void {
+    const value = requireQuality(quality);
+    this.command((handle) => handle.setQuality(value));
   }
   /** Not queued: the mount reads the theme itself, so a refresh before the start has nothing to do. */
   refreshTheme(): void {

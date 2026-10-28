@@ -31,6 +31,7 @@ import type { ViewerSelection, ViewerSelectionTarget } from './selection.js';
 import type { SelectionDescription } from '../ui/selection-options.js';
 import { assetMoveWiring } from './asset-move-wiring.js';
 import { LightTemperatureControl } from './light-temperature-control.js';
+import { QualityControl } from './quality-control.js';
 import type { AssetMoveControl } from '../edit/asset-move-session.js';
 
 type HandleCommandsDeps = {
@@ -57,6 +58,8 @@ export type HandleCommands = {
   readonly slots: ViewerSlots;
   /** The colour temperature of the artificial light: the host's `setLightTemperature`, the panel, new roots (`light-temperature-control.ts`). */
   readonly lightTemperature: LightTemperatureControl;
+  /** The render quality tier: the host's `setQuality`, the element's live attribute, the auto machine (`quality-control.ts`). */
+  readonly quality: QualityControl;
   setMode(mode: ViewerMode): void;
   getMode(): ViewerMode;
   getFurnitureVisible(): boolean;
@@ -189,16 +192,46 @@ export function handleCommands(deps: HandleCommandsDeps): HandleCommands {
   // The panel opens on the mount option; every later change reaches it through `reflect`.
   deps.ui.setLightTemperature(lightTemperature.value);
 
+  /** The mode on screen: the director's once a document built it, the mount option's before that. */
+  const currentMode = (): ViewerMode => deps.stage()?.director?.controller.getMode() ?? deps.options.view.mode;
+
+  const quality = new QualityControl({
+    initial: deps.options.quality,
+    runtime: () => deps.stage()?.runtime,
+    applyChainTier: (inputs) => deps.stage()?.walkPost.applyTierInputs(inputs) ?? false,
+    // The machine's sampling arms only while the room lighting is live AND the
+    // mode is one it shows: `state()` stays 'live' in orbit and plan after one
+    // walk visit, and those modes' frames are a different cost with different
+    // motion — they feed nothing.
+    lightingLive: () => {
+      const mode = currentMode();
+      return deps.stage()?.walkLighting.state() === 'live' && (mode === 'walk' || mode === 'tour');
+    },
+    invalidate: () => deps.stage()?.runtime.demand.invalidate(),
+  });
+  // A new scene load restarts the auto machine and puts the screen back on the
+  // tier it restarts on; a pinned tier is unaffected. The `scene` event also
+  // fires after every plan-level revision of the SAME scene: only a changed
+  // scene id is a new load, or an editing session would reset the machine —
+  // and give back the recovery budget — on every ceiling and opening edit.
+  let lastSceneId: string | null = null;
+  deps.events.on('scene', ({ sceneId }) => {
+    if (sceneId === lastSceneId) return;
+    lastSceneId = sceneId;
+    quality.newScene();
+  });
+
   const commands: HandleCommands = {
     slots: deps.context.slots,
     lightTemperature,
+    quality,
 
     setMode(mode) {
       switchMode(mode, true);
     },
 
     getMode() {
-      return deps.stage()?.director?.controller.getMode() ?? deps.options.view.mode;
+      return currentMode();
     },
 
     getFurnitureVisible() {

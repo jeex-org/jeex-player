@@ -29,6 +29,7 @@ import type { ViewerStage } from './viewer-stage.js';
 import type { ViewerUI } from '../ui/viewer-ui.js';
 import type { FullscreenController } from '../ui/fullscreen-controller.js';
 import type { ProjectLibraryManifest } from '../assets/project-manifest.js';
+import type { QualityControl } from './quality-control.js';
 
 /** What re-seeding needs of the running viewer. */
 type DocumentWiringDeps = {
@@ -44,6 +45,8 @@ type DocumentWiringDeps = {
   globals: ViewerPageGlobals;
   messages: () => Messages;
   furnitureVisible: () => boolean;
+  /** The application-level quality control (`handle-commands.ts` built it), for the debug surface. */
+  quality: () => QualityControl;
   /** The loaded bake's object bank for the debug layout linter; absent for a bare scene. */
   projectLibrary: () => ProjectLibraryManifest | undefined;
   /** Pushes the authoritative furniture state onto a freshly built group. */
@@ -91,6 +94,7 @@ function installDebugApi(deps: DocumentWiringDeps, model: SceneModel): void {
       messages: deps.messages,
       stage: deps.stage,
       furnitureVisible: deps.furnitureVisible,
+      quality: deps.quality,
       projectLibrary: deps.projectLibrary,
     }),
   );

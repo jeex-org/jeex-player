@@ -66,6 +66,11 @@ export function stageWiring(deps: StageWiringDeps): ViewerStageDeps {
     viewport: deps.viewport,
     messages: deps.messages,
     dollhouse: deps.dollhouse,
+    // The render quality tier: one control per application (`handle-commands.ts`
+    // built it); the stage builds the runtime and the walk chains on the tier it
+    // answers and feeds it the frames it draws. The capture is safe: the control
+    // lives as long as the application the stage boots for.
+    quality: deps.handle().quality,
     minimapEnabled: () => deps.options.view.minimap,
     // Fullscreen shows the control bar whatever `chrome.controls` says, and the
     // walk's camera buttons with it.

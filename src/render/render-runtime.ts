@@ -62,9 +62,9 @@ import { FirstDrawGate, FirstDrawSignal } from './first-draw.js';
 import { SettleWindow, gpuResources } from './settle-window.js';
 import { compileScene } from './scene-compile.js';
 import { devicePixelRatioOf, measureEntry, observeBox, watchPixelRatio, type ObservedBox, type ViewportBox } from './viewport-box.js';
+import type { RenderRuntimeOptions } from './render-runtime-options.js';
+import { QUALITY_TIERS } from './quality-tier.js';
 
-/** Device pixel ratio cap: above this the fill cost outgrows the visible gain. */
-const PIXEL_RATIO_CAP = 1.7;
 /** Shadow map resolution of the sun, in texels per side: the standard's default. */
 const SHADOW_MAP_SIZE = LIGHTING_STANDARD.apartment.sun.shadow.defaultMapSize;
 /**
@@ -86,41 +86,6 @@ const FOG_FAR = 72; // metres
 
 /** Per-frame callback: `delta` in seconds, `now` in milliseconds. */
 export type FrameHook = (delta: number, now: number) => void;
-
-type RenderRuntimeOptions = {
-  canvas: HTMLCanvasElement;
-  viewport: ViewportBox;
-  pixelRatioCap?: number;
-  shadowMapSize?: number;
-  /**
-   * Injection seams. Bun has no WebGL context and no `requestAnimationFrame`,
-   * so the unit test drives the loop with stubs; production uses the defaults.
-   */
-  createRenderer?: (canvas: HTMLCanvasElement) => THREE.WebGLRenderer;
-  /** The lighting standard bound to the renderer; production builds it with the player's three.js. */
-  createLighting?: (renderer: THREE.WebGLRenderer) => LightingContext;
-  scheduleFrame?: (callback: () => void) => number;
-  cancelFrame?: (handle: number) => void;
-  now?: () => number;
-  /**
-   * The context is gone: the loop has already been stopped and nothing will be
-   * drawn until it comes back. The composition root shows the user what
-   * happened and emits the public `error` event.
-   */
-  onContextLost?: (() => void) | undefined;
-  /**
-   * The browser gave the context back. Every GPU resource was dropped with it,
-   * so the composition root re-mounts the committed document; this runtime
-   * resumes the loop itself.
-   */
-  onContextRestored?: (() => void) | undefined;
-  /** The mounted viewer's lifetime; aborting it unwinds every listener here. */
-  signal?: AbortSignal | undefined;
-  /** A frame hook threw. The frame goes on; the composition root reports it. */
-  onError?: ((error: unknown) => void) | undefined;
-  /** The camera mode now: every mode but `plan2d` draws on demand (`render-demand.ts`). */
-  mode?: (() => string | undefined) | undefined;
-};
 
 function defaultRenderer(canvas: HTMLCanvasElement): THREE.WebGLRenderer {
   return new THREE.WebGLRenderer({ canvas, antialias: true, powerPreference: 'high-performance' });
@@ -181,7 +146,7 @@ export class RenderRuntime {
   /** Frees what the first-picture compilation built, once a picture drew. */
   private releaseCompile: (() => void) | null = null;
   private readonly canvas: HTMLCanvasElement;
-  private readonly pixelRatioCap: number;
+  private pixelRatioCap: number;
   /** Watches the viewport box; `null` where there is no `ResizeObserver`. */
   private readonly observer: ResizeObserver | null;
   /** The last box the observer reported; `null` before the first observation. */
@@ -213,7 +178,9 @@ export class RenderRuntime {
     this.hooks = new Fanout<[number, number]>((error) => this.report(error));
     this.postRenderHooks = new Fanout<[number, number]>((error) => this.report(error));
     this.canvas = options.canvas;
-    this.pixelRatioCap = options.pixelRatioCap ?? PIXEL_RATIO_CAP;
+    // The cap's one home is the `high` tier (`quality-tier.ts`): an unspecified
+    // runtime draws at today's look.
+    this.pixelRatioCap = options.pixelRatioCap ?? QUALITY_TIERS.high.pixelRatioCap;
 
     this.sky = new SkyBackdrop(DAYLIGHT_SKY.top, DAYLIGHT_SKY.horizon);
     if (this.sky.texture) this.scene.background = this.sky.texture;
@@ -355,6 +322,16 @@ export class RenderRuntime {
     const box = this.box;
     const measured = box?.measured && box.cssWidth > 0 ? box.deviceWidth / box.cssWidth : devicePixelRatioOf();
     return Math.min(measured, this.pixelRatioCap);
+  }
+
+  /**
+   * Retunes the cap (a quality tier switch) and refits the drawing buffer now:
+   * the same resize a display change takes. A cap the buffer runs at is a no-op.
+   */
+  setPixelRatioCap(value: number): void {
+    if (value === this.pixelRatioCap) return;
+    this.pixelRatioCap = value;
+    this.resize();
   }
 
   /**

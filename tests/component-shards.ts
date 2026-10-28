@@ -89,6 +89,10 @@ export const COMPONENT_FILE_COST_S: Readonly<Record<string, number>> = {
   'project-mark.test.ts': 37,
   'project-mount.test.ts': 28,
   'provenance.test.ts': 1,
+  // Measured on this machine's SwiftShader with one worker (2026-10-28), not on the hosted runner.
+  'quality-tier.test.ts': 17,
+  // Not run on the hosted runners (skipped whole on a software rasteriser, as room-white-balance): the floor.
+  'quality-low-look.test.ts': 1,
   'render-on-demand.test.ts': 582,
   'render-runtime-lighting.test.ts': 2,
   'replace-popup.test.ts': 5,

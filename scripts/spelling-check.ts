@@ -104,6 +104,8 @@ export const FORCED_NAMES: readonly ForcedName[] = [
   // The BARE word `center` needs no entry — it is not a hit at all, see
   // `SPELLING_RULES`. `dcenter` does, because it carries a letter.
   { name: 'dcenter', reason: 'scene operation wire format: SetOpeningOp.dcenter (documented wart)' },
+  // ---- dev tooling the viewer does not ship
+  { name: 'dev/meter.ts', reason: 'the dev performance meter page: its file name is the API' },
 ];
 
 /** A whole file the spelling gate does not read, and why. */

@@ -1,8 +1,10 @@
 import { describe, expect, test } from 'bun:test';
 import { z } from 'zod/mini';
 import { judgeOption, viewerOptionsSchema, type OptionSpec } from './viewer-options.schema.js';
-import { optionsFromQuery, resolveViewerOptions, type ViewerOptions } from './viewer-options.js';
+import { optionsFromQuery } from './option-adapters.js';
+import { resolveViewerOptions, type ViewerOptions } from './viewer-options.js';
 import { MESSAGE_KEYS, registerLocale, type MessageKey } from '../ui/messages.js';
+import { collectLog } from '../fixtures/stubs.js';
 
 const enumSpec: OptionSpec = { kind: 'enum', values: ['a', 'b', 'c'], default: 'a', query: 'q', attr: 'q' };
 const flagSpec: OptionSpec = { kind: 'flag', default: true, query: 'q', attr: 'q' };
@@ -143,6 +145,22 @@ describe('viewerOptionsSchema', () => {
       hint: true,
       autoHide: true,
     });
+  });
+
+  test('quality resolves through the closed set, the default is auto, and every value parses', () => {
+    expect(resolveViewerOptions().quality).toBe('auto');
+    for (const value of ['auto', 'low', 'high'] as const) {
+      const resolved = resolveViewerOptions({ quality: value });
+      expect(resolved.quality).toBe(value);
+      expect({ value, ok: z.safeParse(viewerOptionsSchema, resolved).success }).toEqual({ value, ok: true });
+    }
+    // A stranger falls back to the default, telling the host's sink exactly
+    // once (the resolver's contract, judged by the enum schema here).
+    const logged = collectLog();
+    expect(resolveViewerOptions({ quality: 'crisp', onLog: logged.sink } as never).quality).toBe('auto');
+    const warnings = logged.entries.filter((entry) => entry.code === 'option-invalid');
+    expect(warnings.length).toBe(1);
+    expect(warnings[0]!.message).toContain('quality');
   });
 
   test('the fullscreenButton shorthand resolves to the full section the schema demands', () => {
