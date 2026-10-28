@@ -1,6 +1,6 @@
 /**
  * Self-test for the module-size gate: line counting, the per-file limit
- * (700 lines, higher for the two data files and lower for the composition
+ * (700 lines, higher for the data files and lower for the composition
  * root), and the `KNOWN_OVERSIZE` allowlist, against a temporary directory
  * rather than the real `src/`. Every limit and every allowlist entry is
  * addressed by PATH under `src/`, so the fixtures are nested the way the real
@@ -38,9 +38,10 @@ function fixtureDir(files: Record<string, string>): string {
 }
 
 describe('limitFor', () => {
-  test('data files get the 1000-line allowance', () => {
+  test('data files get the data-table allowance', () => {
     expect(limitFor('assets/asset-library.ts')).toBe(DATA_FILE_LIMIT);
     expect(limitFor('demo/scene-data.ts')).toBe(DATA_FILE_LIMIT);
+    expect(limitFor('materials/builtin-library-data.ts')).toBe(DATA_FILE_LIMIT);
   });
 
   test('the composition root and its public surface are held to their contracts', () => {

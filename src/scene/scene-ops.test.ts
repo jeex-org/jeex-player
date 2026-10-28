@@ -392,8 +392,17 @@ const VOCABULARY_SNAPSHOT: readonly VocabularyCase[] = [
     op: { op: 'remove_room', roomId: R.wc },
     // The demo binds the WC's three pieces to it (`DemoAsset.room`), so the
     // removal unbinds them and names each one.
-    summary: `Room ${R.wc}: removed WC, 3 objects unbound, room camera dropped`,
-    touched: [TOUCHED_SHELL, touchedAsset(DEMO.asset.wcToilet), touchedAsset(DEMO.asset.wcVanity), touchedAsset(DEMO.asset.wcMirror)],
+    summary: `Room ${R.wc}: removed WC, 3 objects unbound, room camera dropped, finishes dropped`,
+    touched: [
+      TOUCHED_SHELL,
+      touchedFloor(R.wc),
+      touchedRoomWalls(R.wc),
+      touchedCeiling(R.wc),
+      touchedTrim(R.wc),
+      touchedAsset(DEMO.asset.wcToilet),
+      touchedAsset(DEMO.asset.wcVanity),
+      touchedAsset(DEMO.asset.wcMirror),
+    ],
   },
   {
     name: 'place_object',

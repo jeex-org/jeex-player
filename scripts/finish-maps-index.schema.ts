@@ -76,20 +76,29 @@ const source = z.strictObject({
   licence: z.string().check(z.minLength(1)),
 });
 
-const version = z.strictObject({
-  version: uuid,
-  variant: uuid,
-  name: z.string().check(z.minLength(1)),
-  kind: z.enum(['scan', 'parameters']),
-  facts,
-  maps: z.strictObject({
-    albedo: z.optional(map),
-    albedoTint: z.optional(map),
-    normal: z.optional(map),
-    arm: z.optional(map),
-  }),
-  source,
-});
+const version = z
+  .strictObject({
+    version: uuid,
+    variant: uuid,
+    name: z.string().check(z.minLength(1)),
+    kind: z.enum(['scan', 'parameters']),
+    facts,
+    maps: z.strictObject({
+      albedo: z.optional(map),
+      albedoTint: z.optional(map),
+      normal: z.optional(map),
+      arm: z.optional(map),
+    }),
+    // A scan credits the files it was made from; a parameters material has no
+    // file to credit, so it records no source (its library page is not public).
+    source: z.optional(source),
+  })
+  .check(
+    z.refine(
+      (entry) => (entry.source !== undefined) === (entry.kind === 'scan'),
+      'a scan records its source and a parameters material none',
+    ),
+  );
 
 const bound = z.strictObject({
   finish: uuid,

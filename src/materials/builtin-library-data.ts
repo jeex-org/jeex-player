@@ -510,6 +510,42 @@ export const BUILTIN_RECORDS: BuiltinRecords = {
       sizes: ['256', '512', '768'],
     },
     {
+      versionId: '01a18187-5224-731a-85cf-72b76d2de758',
+      kind: 'parameters',
+      facts: {
+        tileM: null,
+        grain: 'none',
+        suitability: 'continuous',
+        colourMode: 'natural',
+        averageColour: '#f5f5f3',
+        pbr: {
+          baseColour: '#f5f5f3',
+          roughness: 0.9,
+          metalness: 0,
+        },
+      },
+      roles: [],
+      sizes: ['256', '512', '768'],
+    },
+    {
+      versionId: '01a18187-5620-75ec-9af7-e1894327d780',
+      kind: 'parameters',
+      facts: {
+        tileM: null,
+        grain: 'none',
+        suitability: 'continuous',
+        colourMode: 'natural',
+        averageColour: '#f8f8f8',
+        pbr: {
+          baseColour: '#f8f8f8',
+          roughness: 0.95,
+          metalness: 0,
+        },
+      },
+      roles: [],
+      sizes: ['256', '512', '768'],
+    },
+    {
       versionId: '01a16ede-b329-70bf-8fe1-72452c06aa9e',
       kind: 'scan',
       facts: {
@@ -672,10 +708,20 @@ export const BUILTIN_RECORDS: BuiltinRecords = {
       version: 22,
       rotation: 0,
     },
+    {
+      finish: '01a18184-9805-70ca-adad-9a96164d8363',
+      version: 23,
+      rotation: 0,
+    },
+    {
+      finish: '01a18184-9805-70cb-a9e3-4549e80e98f8',
+      version: 24,
+      rotation: 0,
+    },
   ],
   ceiling: {
     finish: '01a12fdf-15aa-7d0e-97e3-bb2102d2e0bb',
-    version: 23,
+    version: 25,
     colour: '#f1ece2',
     rotation: 0,
   },

@@ -454,9 +454,29 @@ describe('apartmentScene layout', () => {
 });
 
 describe('apartmentScene interiors', () => {
-  test('the four presets are the ones the panel offers, in order, the first named Oak and sand', () => {
+  test('the four presets are the ones the panel offers, in order, the first named Oak and white', () => {
     expect(apartmentScene.interiors?.map((preset) => preset.id)).toEqual(Object.values(DEMO.preset));
-    expect(apartmentScene.interiors?.[0]?.name).toBe('Oak and sand');
+    expect(apartmentScene.interiors?.[0]?.name).toBe('Oak and white');
+  });
+
+  test('the flat ships smooth white walls in every room and a white ceiling in every room but the loggia', () => {
+    const rooms = apartmentScene.finishes?.rooms ?? {};
+    expect(Object.keys(rooms).sort()).toEqual(apartmentScene.rooms.map((room) => room.id).sort());
+    for (const room of apartmentScene.rooms) {
+      const ceiling = room.kind === 'loggia' ? {} : { ceiling: FINISH.ceiling_white };
+      expect({ room: room.name, finishes: rooms[room.id] }).toEqual({
+        room: room.name,
+        finishes: { walls: FINISH.smooth_white, ...ceiling },
+      });
+    }
+  });
+
+  test('the first preset is the shipped look: applying it repaints no wall and no ceiling', () => {
+    const model = new SceneModel(apartmentScene, CATALOGUE_REGISTRIES);
+    expect(isApplyOk(applyPresetBatch(model, DEMO.preset.oakSand))).toBe(true);
+    const paint = (scene: typeof apartmentScene): unknown =>
+      Object.entries(scene.finishes?.rooms ?? {}).map(([id, { walls, ceiling }]) => ({ id, walls, ceiling }));
+    expect(paint(model.scene)).toEqual(paint(apartmentScene));
   });
 
   test('a preset dresses the flat and never re-lays it: every pose, footprint and height stays', () => {

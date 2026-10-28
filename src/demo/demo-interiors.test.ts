@@ -17,7 +17,7 @@ describe('demo interior presets', () => {
 
   test('are named after their palettes', () => {
     expect(demoInteriors.map((preset) => preset.name)).toEqual([
-      'Oak and sand',
+      'Oak and white',
       'Chalk and herringbone',
       'Walnut and terracotta',
       'Sage and mocha',

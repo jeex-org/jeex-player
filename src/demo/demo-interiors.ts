@@ -31,14 +31,14 @@ const { room: ROOM, asset: ASSET, opening: OPENING, preset: PRESET } = DEMO;
  */
 const PRESET_IDS = [PRESET.oakSand, PRESET.chalkAsh, PRESET.walnutTerracotta, PRESET.sageGraphite] as const;
 
-const PRESET_NAMES: Quad = ['Oak and sand', 'Chalk and herringbone', 'Walnut and terracotta', 'Sage and mocha'];
+const PRESET_NAMES: Quad = ['Oak and white', 'Chalk and herringbone', 'Walnut and terracotta', 'Sage and mocha'];
 
 /**
  * `[floor, wall]` the panel draws each preview swatch from. By convention it is
  * the pair the living room gets, so the swatch never lies about the palette.
  */
 const PRESET_SWATCHES: Array<[string, string]> = [
-  [FINISH.oak, FINISH.sand],
+  [FINISH.oak, FINISH.smooth_white],
   [FINISH.herringbone, FINISH.white],
   [FINISH.walnut, FINISH.white],
   [FINISH.chevron, FINISH.sage],
@@ -61,15 +61,15 @@ const PRESET_FLOORS: Record<string, Quad> = {
 
 /** Walls, every room. The sleeping rooms take the warmer/greener half of each palette. */
 const PRESET_WALLS: Record<string, Quad> = {
-  [ROOM.kitchen]: [FINISH.sand, FINISH.white, FINISH.white, FINISH.sage],
-  [ROOM.living]: [FINISH.sand, FINISH.white, FINISH.white, FINISH.sage],
-  [ROOM.loggia]: [FINISH.sand, FINISH.white, FINISH.white, FINISH.sage],
-  [ROOM.hall]: [FINISH.sand, FINISH.white, FINISH.white, FINISH.sage],
-  [ROOM.guestRoom]: [FINISH.sand, FINISH.white, FINISH.terra, FINISH.venetian],
-  [ROOM.study]: [FINISH.sand, FINISH.white, FINISH.terra, FINISH.venetian],
-  [ROOM.bedroom]: [FINISH.sand, FINISH.white, FINISH.terra, FINISH.venetian],
-  [ROOM.bathroom]: [FINISH.sand, FINISH.tiles_white, FINISH.tiles_white, FINISH.graphite],
-  [ROOM.wc]: [FINISH.sand, FINISH.tiles_white, FINISH.tiles_white, FINISH.graphite],
+  [ROOM.kitchen]: [FINISH.smooth_white, FINISH.white, FINISH.white, FINISH.sage],
+  [ROOM.living]: [FINISH.smooth_white, FINISH.white, FINISH.white, FINISH.sage],
+  [ROOM.loggia]: [FINISH.smooth_white, FINISH.white, FINISH.white, FINISH.sage],
+  [ROOM.hall]: [FINISH.smooth_white, FINISH.white, FINISH.white, FINISH.sage],
+  [ROOM.guestRoom]: [FINISH.smooth_white, FINISH.white, FINISH.terra, FINISH.venetian],
+  [ROOM.study]: [FINISH.smooth_white, FINISH.white, FINISH.terra, FINISH.venetian],
+  [ROOM.bedroom]: [FINISH.smooth_white, FINISH.white, FINISH.terra, FINISH.venetian],
+  [ROOM.bathroom]: [FINISH.smooth_white, FINISH.tiles_white, FINISH.tiles_white, FINISH.graphite],
+  [ROOM.wc]: [FINISH.smooth_white, FINISH.tiles_white, FINISH.tiles_white, FINISH.graphite],
 };
 
 /** Furniture, one row per placement. Column 0 is the variant the plan (`scene-data.ts`) ships. */

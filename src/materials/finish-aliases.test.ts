@@ -62,7 +62,7 @@ describe('the contemporary set', () => {
     ]);
   });
 
-  test('the walls are the existing ones, then the nine new wall finishes', () => {
+  test('the walls are the existing ones, then the nine new wall finishes, then the two flat paints', () => {
     expect(WALL_FINISHES.map((finish) => finish.id)).toEqual([
       FINISH.sand,
       FINISH.white,
@@ -79,6 +79,8 @@ describe('the contemporary set', () => {
       FINISH.marble,
       FINISH.porcelain_grey,
       FINISH.zellige,
+      FINISH.smooth_white,
+      FINISH.ceiling_white,
     ]);
   });
 

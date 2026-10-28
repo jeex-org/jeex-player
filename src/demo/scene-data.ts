@@ -345,6 +345,17 @@ const baseApartment: SceneData = {
     },
   ],
 
+  // Smooth white paint on every wall and a pure white ceiling over every room
+  // (a loggia has none); the first interior preset repaints the same walls.
+  finishes: {
+    rooms: Object.fromEntries(
+      [ROOM.kitchen, ROOM.bathroom, ROOM.wc, ROOM.guestRoom, ROOM.hall, ROOM.living, ROOM.bedroom, ROOM.study, ROOM.loggia].map((id) => [
+        id,
+        id === ROOM.loggia ? { walls: FINISH.smooth_white } : { walls: FINISH.smooth_white, ceiling: FINISH.ceiling_white },
+      ]),
+    ),
+  },
+
   // No `materials[]`: every finish this scene uses (oak, stone, light ceramic
   // for floors; walnut, linen, brass, ... for furniture) is a bundled catalogue
   // entry and resolves through `material-catalogue.resolveFinish`. The field is
