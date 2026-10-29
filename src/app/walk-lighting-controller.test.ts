@@ -4,6 +4,7 @@ import type { LightingScope } from './walk-lighting-scope.js';
 import { ProbeCamera } from '../render/walk-lighting/room-probes.js';
 import { WALK_LIGHTING_TUNING } from '../render/walk-lighting/walk-lighting-tuning.js';
 import { QUALITY_TIERS, walkLightingOverridesFor } from '../render/quality-tier.js';
+import type { Mat3 } from '../render/white-balance.js';
 
 type Doc = { id: number };
 
@@ -366,19 +367,27 @@ describe('WalkLightingController camera balance', () => {
     expect(lighting.eyes.at(-1)).toBe(eye);
   });
 
-  test('answers the balance only while the room lighting is shown', async () => {
+  test('answers the room balance while the room lighting is shown, and no balance at all before', async () => {
+    const NEUTRAL: Mat3 = [1, 0, 0, 0, 1, 0, 0, 0, 1];
     const { controller, built, finishBuild } = setup({ bakeFrames: 1, eye: () => ({ x: 1, y: 1, z: 1 }) });
-    expect(controller.balance()).toBeNull();
+    // During the bake the frame is lit by the scene's neutral lights: the
+    // chain's tuned balance, made for the room lighting, would turn it blue.
+    expect(controller.balance()).toEqual(NEUTRAL);
+    expect(controller.roomBalance()).toBe('neutral');
+    expect(controller.balanceAt({ x: 1, y: 1, z: 1 })).toEqual(NEUTRAL);
     controller.update('walk');
     await finishBuild();
     balanced(built[0]!);
     controller.update('walk');
     expect(controller.balance()).toBe(WARM);
+    expect(controller.roomBalance()).toBe('live');
     expect(controller.balanceAt({ x: 1, y: 1, z: 1 })).toBe(WARM);
     expect(controller.balanceAt({ x: -1, y: 1, z: 1 })).toBeNull();
     controller.update('orbit');
-    expect(controller.balance()).toBeNull();
-    expect(controller.balanceAt({ x: 1, y: 1, z: 1 })).toBeNull();
+    expect(controller.balance()).toEqual(NEUTRAL);
+    expect(controller.roomBalance()).toBe('neutral');
+    // A capture matches the screen: no balance either.
+    expect(controller.balanceAt({ x: 1, y: 1, z: 1 })).toEqual(NEUTRAL);
   });
 });
 

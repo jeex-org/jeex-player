@@ -1,10 +1,9 @@
 /**
  * The low quality tier must hold the walk look: the per-room white balance and
  * exposure criteria of `room-white-balance.test.ts`, measured at
- * `quality: 'low'` (pixel-ratio cap 1.25, full occlusion buffer, denoise
- * radius 4 / samples 8, GTAO 8 rays, 4 probes baked per frame —
- * `src/render/quality-tier.ts`). A slower phone look may soften occlusion and
- * slow the probe bake, but the frames a visitor sees stay balanced
+ * `quality: 'low'` (pixel-ratio cap 1.25, high's occlusion, 4 probes baked
+ * per frame — `src/render/quality-tier.ts`). A slower phone look may draw a
+ * coarser buffer and slow the probe bake, but the frames a visitor sees stay balanced
  * photographs: whites R/B in `NEUTRAL_RB`, median lightness at least
  * `MIN_MEDIAN`, clipped share at most `MAX_CLIPPED`.
  *

@@ -38,10 +38,10 @@ describe('debugHostFor', () => {
     expect(host.quality()).toEqual({ mode: 'fixed', tier: 'low' });
   });
 
-  test('walkLighting says whether the rooms are balanced live or by the fixed matrix', () => {
+  test('walkLighting says how the rooms are balanced: live, by the fixed matrix, or not at all before the room lighting shows', () => {
     // A device that cannot read the room measurement back keeps the fixed
     // matrix; this one field on a phone tells which picture it draws.
-    const hostWith = (balance: number[] | null) =>
+    const hostWith = (roomBalance: 'live' | 'fixed' | 'neutral') =>
       debugHostFor({} as SceneModel, {
         options: {} as ViewerOptions,
         mount: {} as SceneMount,
@@ -51,12 +51,14 @@ describe('debugHostFor', () => {
         messages: () => {
           throw new Error('debugHostFor: the messages are not part of this test');
         },
-        stage: () => ({ walkLighting: { state: () => 'live', stats: () => null, balance: () => balance } }) as unknown as ViewerStage,
+        stage: () =>
+          ({ walkLighting: { state: () => 'live', stats: () => null, roomBalance: () => roomBalance } }) as unknown as ViewerStage,
         furnitureVisible: () => true,
         quality: () => ({ debug: () => ({ mode: 'fixed', tier: 'high' }) }) as QualityControl,
         projectLibrary: () => undefined,
       });
-    expect(hostWith([1, 0, 0, 0, 1, 0, 0, 0, 1]).walkLighting()).toEqual({ state: 'live', stats: null, roomBalance: 'live' });
-    expect(hostWith(null).walkLighting()).toEqual({ state: 'live', stats: null, roomBalance: 'fixed' });
+    for (const kind of ['live', 'fixed', 'neutral'] as const) {
+      expect(hostWith(kind).walkLighting()).toEqual({ state: 'live', stats: null, roomBalance: kind });
+    }
   });
 });

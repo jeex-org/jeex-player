@@ -32,12 +32,12 @@ describe('QUALITY_TIERS', () => {
     expect(QUALITY_TIERS.high.probesPerFrame).toBe(T.probesPerFrame);
   });
 
-  test('low keeps the denoise phis and the full occlusion buffer, and halves the sampling', () => {
+  test('low keeps the occlusion of high and saves on the drawing buffer and the bake pace', () => {
     expect(QUALITY_TIERS.low).toEqual({
       pixelRatioCap: 1.25,
       aoResolutionScale: 1,
-      denoise: { depthPhi: 0.05, normalPhi: 8, lumaPhi: 10, radius: 4, samples: 8 },
-      gtaoSamples: 8,
+      denoise: { depthPhi: 0.05, normalPhi: 8, lumaPhi: 10, radius: 6, samples: 16 },
+      gtaoSamples: 16,
       // The probe atlas's tile invariant pins the capture edge on every tier
       // (`walk-lighting/room-probes.ts`); only the bake pace below is the tier's.
       probeSize: 128,
@@ -48,6 +48,11 @@ describe('QUALITY_TIERS', () => {
     // 0.5 showed it in the walk, 0.75 in a 2x crop of a door edge. Low keeps
     // the full buffer until the upsample is depth-aware.
     expect(QUALITY_TIERS.low.aoResolutionScale).toBe(QUALITY_TIERS.high.aoResolutionScale);
+    // Half the GTAO rays and a denoise of radius 4 / 8 samples left dark, grainy
+    // blotches round furniture and along floor edges on a Mali-G57 phone (the
+    // tier `auto` drops a phone to); the occlusion stays high's.
+    expect(QUALITY_TIERS.low.gtaoSamples).toBe(QUALITY_TIERS.high.gtaoSamples);
+    expect(QUALITY_TIERS.low.denoise).toEqual(QUALITY_TIERS.high.denoise);
     // The capture edge is NOT a tier knob: any other edge gives a PMREM output
     // a different size than the atlas tile, and the probe step throws.
     expect(QUALITY_TIERS.low.probeSize).toBe(QUALITY_TIERS.high.probeSize);

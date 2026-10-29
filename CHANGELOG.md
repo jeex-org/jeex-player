@@ -11,23 +11,20 @@ as described under [Versioning](#versioning).
 
 - **Quality tiers.** Walk and tour render on one of two tiers: `high` is the
   look every earlier release shipped, and `low` trades the drawing-buffer
-  resolution, the GTAO ray count and the denoise's samples and radius for
-  frame rate on a slow device (the occlusion buffer stays at full
-  resolution), and bakes the room
+  resolution for frame rate on a slow device (the ambient occlusion stays
+  `high`'s), and bakes the room
   light at 4 reflection probes per frame instead of 6. The tone curve, the
   exposure, the sun, the sky, SMAA and the dynamic-range targets are
   unchanged, and so is the reflection probes' capture edge: only the bake
   pace follows the tier in force when the room lighting is built. The
-  drawing-buffer cap applies in every mode; the occlusion knobs only in walk
-  and tour. A host pins a tier with `quality: 'low' | 'high'` (mount option,
+  drawing-buffer cap applies in every mode. A host pins a tier with `quality: 'low' | 'high'` (mount option,
   the live `quality` attribute, `?quality=`, `handle.setQuality(...)`); the
   default `'auto'` watches the drawn-frame times once the room lighting is
   live and drops to `low` after two consecutive 2-second windows whose
   75th-percentile frame interval is above 18 ms. It climbs back to `high`
   once per scene when a 5-second window of motion holds its 75th-percentile
   interval at or under the display's refresh period, and after a second
-  slowdown stays on `low`. A switch retunes the running viewer in place (the
-  ray-count change relinks one shader program) and never reloads the scene
+  slowdown stays on `low`. A switch retunes the running viewer in place and never reloads the scene
   or re-bakes the room lighting; `__viewerDebug.quality()` reports the mode
   and the tier in force.
 - **Two flat white paints.** «Smooth white paint» and «Pure white ceiling»
@@ -144,6 +141,18 @@ as described under [Versioning](#versioning).
 
 ### Fixed
 
+- **No blue walls while a phone bakes the room light.** Until the room
+  lighting is live (about fifteen seconds on a phone, under two on a
+  desktop), walk and tour applied the tuned fixed balance, made to pull the
+  room lighting's warm ceiling down; on the scene's neutral lights it turned
+  every wall blue. The frame is now drawn with no balance until the room
+  lighting shows. `__viewerDebug.walkLighting().roomBalance` reads `neutral`
+  in that phase.
+- **No grainy occlusion on the low tier.** The `low` quality tier, which
+  `auto` drops a phone to, traced half the ambient-occlusion rays with a
+  lighter denoise, and left dark, grainy blotches round furniture and along
+  floor edges on a phone GPU. It now keeps `high`'s occlusion; it still caps
+  the drawing buffer at 1.25× and bakes the room light at 4 probes per frame.
 - **Room balance on Android.** The walk measured each room's light by reading
   a half-float cube back as half floats, a read many Android drivers refuse;
   every room then lost its live camera balance and drew under the fixed one,
