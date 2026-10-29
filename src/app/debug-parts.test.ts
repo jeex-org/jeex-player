@@ -14,6 +14,7 @@ import type { SceneMount } from './scene-mount.js';
 import type { ViewerOptions } from './viewer-options.js';
 import type { FullscreenController } from '../ui/fullscreen-controller.js';
 import type { TourControls } from '../camera/tour-controls.js';
+import type { ViewerStage } from './viewer-stage.js';
 
 describe('debugHostFor', () => {
   test('quality reads the application-level control where no stage exists', () => {
@@ -35,5 +36,27 @@ describe('debugHostFor', () => {
       projectLibrary: () => undefined,
     });
     expect(host.quality()).toEqual({ mode: 'fixed', tier: 'low' });
+  });
+
+  test('walkLighting says whether the rooms are balanced live or by the fixed matrix', () => {
+    // A device that cannot read the room measurement back keeps the fixed
+    // matrix; this one field on a phone tells which picture it draws.
+    const hostWith = (balance: number[] | null) =>
+      debugHostFor({} as SceneModel, {
+        options: {} as ViewerOptions,
+        mount: {} as SceneMount,
+        doors: {} as DoorController,
+        shell: {} as FullscreenController,
+        tour: {} as TourControls,
+        messages: () => {
+          throw new Error('debugHostFor: the messages are not part of this test');
+        },
+        stage: () => ({ walkLighting: { state: () => 'live', stats: () => null, balance: () => balance } }) as unknown as ViewerStage,
+        furnitureVisible: () => true,
+        quality: () => ({ debug: () => ({ mode: 'fixed', tier: 'high' }) }) as QualityControl,
+        projectLibrary: () => undefined,
+      });
+    expect(hostWith([1, 0, 0, 0, 1, 0, 0, 0, 1]).walkLighting()).toEqual({ state: 'live', stats: null, roomBalance: 'live' });
+    expect(hostWith(null).walkLighting()).toEqual({ state: 'live', stats: null, roomBalance: 'fixed' });
   });
 });

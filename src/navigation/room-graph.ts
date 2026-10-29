@@ -19,7 +19,7 @@
  * - a leg no straight line can make is retried through the centre of the room
  *   it crosses, then around the furniture on a coarse grid of standing points
  *   inside that room; if nothing gets through, the answer is `null` and the
- *   caller falls back to a fly-in (`hint.noClearPath`).
+ *   caller jumps the walker into the room instead (`roomStandingPoint`).
  *
  * Pure module: no `three`, no DOM.
  */
@@ -171,6 +171,21 @@ export function roomAt(plan: SolvedPlan, point: Vec2): string | null {
  */
 export function roomCentre(plan: SolvedPlan, scene: SceneData, roomId: string, obstacles: readonly Obstacle[]): Vec2 {
   return centreWith(plan, scene, roomId, obstacles);
+}
+
+/**
+ * Where a walker jumped into `roomId` stands: its centre (`roomCentre`) when
+ * that lies inside the room, walkable and clear of furniture, else the clear
+ * standing point of the room nearest to it. The centre alone can sit in a
+ * table that fills the middle of the room, or outside a concave room, and a
+ * room whose centre is unreachable is exactly the one no route gets to.
+ * The centre is the answer only when the room has no clear point at all.
+ */
+export function roomStandingPoint(plan: SolvedPlan, scene: SceneData, roomId: string, obstacles: readonly Obstacle[]): Vec2 {
+  const centre = centreWith(plan, scene, roomId, obstacles);
+  if (roomAt(plan, centre) === roomId && isNavigable(plan, v3(centre)) && standable(obstacles, centre, 0)) return centre;
+  const candidates = detourCandidates(plan, roomId, obstacles);
+  return candidates.reduce((best, point) => (dist(point, centre) < dist(best, centre) ? point : best), candidates[0] ?? centre);
 }
 
 /**

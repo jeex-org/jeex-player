@@ -28,6 +28,7 @@ import * as THREE from 'three';
 import { CameraController } from './camera-controller.js';
 import { buildRoomGraph, routeToRoom as planRouteToRoom, type RoomGraph, type RouteWaypoint } from '../navigation/room-graph.js';
 import { obstaclesFor } from '../assets/asset-footprint.js';
+import { roomJumpPose } from './room-jump.js';
 import type { AssetFactsSource } from '../assets/asset-facts.js';
 import { pointInPolygon } from '../plan/plan-geometry.js';
 import { TourPlayer } from './tour-player.js';
@@ -568,8 +569,9 @@ export class CameraDirector {
    * In `walk` the camera WALKS there through the doors; a tour is paused and
    * handed over to walk first, because a click on the mini-map is the user
    * taking the wheel. Every other mode has no walker to send, so the room is
-   * flown to as a room focus. When no clear path exists the walk falls back to
-   * the same fly-in and says why (`hint.noClearPath`).
+   * flown to as a room focus. When no clear path exists the walker jumps into
+   * the room (`roomStandingPoint`, facing the room camera's aim)
+   * and stays in walk (`hint.arrivedInstantly`).
    *
    * A second call naming the SAME room while it is still the one being
    * travelled to is an "instant transfer": the walk ends on the spot
@@ -591,7 +593,9 @@ export class CameraDirector {
       this.walkHintPending = false;
     }
 
-    const name = this.deps.scene().rooms.find((room) => room.id === roomId)?.name ?? roomId;
+    const room = this.deps.scene().rooms.find((candidate) => candidate.id === roomId);
+    if (!room) return false;
+    const name = room.name;
 
     if (controller.isTravelling() && this.travellingTo === roomId) {
       controller.finishTravel();
@@ -625,9 +629,14 @@ export class CameraDirector {
       ui.wakeControls();
       return true;
     }
-    if (!controller.flyToRoom(roomId)) return false;
-    ui.setModeButtons('orbit');
-    this.hint('hint.noClearPath');
+    // No clear way through the doors: the walker JUMPS into the room and stays
+    // on foot. Flying to the room camera would drop the visitor into 360.
+    controller.cancelTravel();
+    const obstacles = controller.hasFurnitureCollision() ? obstaclesFor(this.deps.scene(), controller.assetFacts()) : [];
+    const jump = roomJumpPose(this.deps.plan(), this.deps.scene(), roomId, obstacles, controller.getPose());
+    controller.setPose(jump.position, jump.target);
+    controller.syncWalkLook();
+    this.hint('hint.arrivedInstantly', { name });
     ui.wakeControls();
     return true;
   }
