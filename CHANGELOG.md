@@ -142,6 +142,20 @@ as described under [Versioning](#versioning).
   form of `set_material`), so a preset that dressed them no longer refuses the
   batch.
 
+### Fixed
+
+- **Room balance on Android.** The walk measured each room's light by reading
+  a half-float cube back as half floats, a read many Android drivers refuse;
+  every room then lost its live camera balance and drew under the fixed one,
+  cold whites and off hues. The read now asks for floats, the pair WebGL2
+  grants for every float colour buffer, and an empty or refused read counts
+  as no measurement. `__viewerDebug.walkLighting().roomBalance` says `live`
+  or `fixed`.
+- **A mini-map click in walk stays in walk.** Where furniture leaves no clear
+  way through the doors, the walker jumps into the room, clear of the
+  furniture and facing the room camera's aim, instead of flying there in
+  360.
+
 ### Changed (breaking)
 
 - **The package is `@jeex-org/jeex-viewer`.** GitHub Packages takes scoped

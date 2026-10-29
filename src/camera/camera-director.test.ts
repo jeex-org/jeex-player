@@ -20,7 +20,7 @@ import { planViewPose } from './plan-view-pose.js';
 import { fieldOfViewFor } from './camera-tuning.js';
 import { Picker } from '../geometry/picker.js';
 import { solvePlan } from '../plan/plan-solver.js';
-import { roomCentre } from '../navigation/room-graph.js';
+import { roomAt, roomCentre } from '../navigation/room-graph.js';
 import { lShapePlan } from '../fixtures/plan-l-shape.js';
 import { L_SHAPE } from '../fixtures/plan-l-shape-ids.js';
 import { FINISH } from '../materials/finish-ids.js';
@@ -29,7 +29,7 @@ import { DoorAnimator } from '../doors/door-animator.js';
 import { pointAt } from '../plan/door-swing.js';
 import type { Dollhouse } from '../geometry/dollhouse.js';
 import type { SceneData } from '../scene/types.js';
-import { isInDoorway, isNavigable } from '../navigation/navigation.js';
+import { EYE_HEIGHT_M, isInDoorway, isNavigable } from '../navigation/navigation.js';
 import { tourNavigation } from '../navigation/tour-legs.js';
 import { createMessages } from '../ui/messages.js';
 import { fakeCanvas, fakeWindowHooks } from '../fixtures/stubs.js';
@@ -701,7 +701,7 @@ describe('travelToRoom: what a mini-map click does in each mode', () => {
     expect(controller.isTravelling()).toBe(false);
   });
 
-  test('no clear path falls back to the fly-in and says so', () => {
+  test('no clear path jumps the walker into the room and stays in walk', () => {
     // A slab of furniture over the doorway: no leg of any route gets through.
     const blocked = draftOf(lShapePlan);
     blocked.assets.push({
@@ -711,16 +711,18 @@ describe('travelToRoom: what a mini-map click does in each mode', () => {
       collision: { hx: 2.4, hz: 1.6 },
       material: FINISH.plaster_white,
     });
-    const { director, controller, camera, hints } = harness({ scene: blocked });
+    const { director, controller, camera, hints, plan } = harness({ scene: blocked });
     director.setMode('walk');
     camera.position.set(3, 1.65, 6);
     expect(director.routeToRoom(L_SHAPE.room.b)).toBeNull();
 
     expect(director.travelToRoom(L_SHAPE.room.b)).toBe(true);
     expect(controller.isTravelling()).toBe(false);
-    expect(hints.at(-1)).toBe(t('hint.noClearPath'));
-    // `flyToRoom` is an orbit move: the fallback says which room, in 360.
-    expect(controller.getMode()).toBe('orbit');
+    // A mini-map click in walk never drops the visitor into 360: they land in the room, on foot.
+    expect(controller.getMode()).toBe('walk');
+    expect(roomAt(plan, { x: camera.position.x, z: camera.position.z })).toBe(L_SHAPE.room.b);
+    expect(camera.position.y).toBeCloseTo(EYE_HEIGHT_M, 6);
+    expect(hints.at(-1)).toBe(t('hint.arrivedInstantly', { name: 'Room B' }));
   });
 
   test('a baked project’s own furniture blocks the route, read from the document’s bank', () => {

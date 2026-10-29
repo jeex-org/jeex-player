@@ -57,7 +57,11 @@ export function debugHostFor(model: SceneModel, deps: DebugPartsDeps): ViewerDeb
     walkPost: () => stage()?.walkPost.state(),
     walkLighting: () => {
       const lighting = stage()?.walkLighting;
-      return lighting ? { state: lighting.state(), stats: lighting.stats() } : undefined;
+      // `fixed`: no live room balance, the chain's tuned matrix draws (outside
+      // walk, or a device that could not read the room measurement back).
+      return lighting
+        ? { state: lighting.state(), stats: lighting.stats(), roomBalance: lighting.balance() ? 'live' : 'fixed' }
+        : undefined;
     },
     hdri: () => stage()?.walkLighting.hdri(),
     // The application-level control, read directly: routing it through

@@ -33,7 +33,7 @@ function drawsNothing(mesh: THREE.Mesh): boolean {
 export class RoomSampler {
   private readonly target: THREE.WebGLCubeRenderTarget;
   private readonly camera: THREE.CubeCamera;
-  private readonly texels: Uint16Array;
+  private readonly texels: Float32Array;
   /** The grey card every surface is drawn with: white, matte, patched for the walk once. */
   private readonly card = new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 1, metalness: 0 });
 
@@ -43,7 +43,7 @@ export class RoomSampler {
     this.target = new THREE.WebGLCubeRenderTarget(T.balance.sampleSize, { type: THREE.HalfFloatType });
     this.target.texture.name = 'WalkLighting.roomSampler';
     this.camera = new THREE.CubeCamera(0.05, 100, this.target);
-    this.texels = new Uint16Array(T.balance.sampleSize * T.balance.sampleSize * 4);
+    this.texels = new Float32Array(T.balance.sampleSize * T.balance.sampleSize * 4);
   }
 
   /** Measures the room around `position` as `scene` draws now; `null` when nothing reads as a lit neutral surface. */
@@ -66,13 +66,43 @@ export class RoomSampler {
       renderer.autoClear = autoClear;
       for (const object of hidden) object.visible = true;
     }
+    // A refused or empty read measures nothing: the room keeps the fixed
+    // balance, which `__viewerDebug.walkLighting().roomBalance` reports.
+    const faces = this.read(renderer);
+    return faces ? measureProbe(faces) : null;
+  }
+
+  /**
+   * The six faces as floats, or `null` when the read failed. WebGL2 grants
+   * reading a float colour buffer (RGBA16F included) back as RGBA/FLOAT on
+   * every device; three reads with the texture's own type, RGBA/HALF_FLOAT,
+   * which desktop grants and many Android drivers refuse with
+   * INVALID_OPERATION, leaving the texels empty. So the read is made here.
+   */
+  private read(renderer: THREE.WebGLRenderer): Float32Array[] | null {
+    const gl = renderer.getContext();
     const size = T.balance.sampleSize;
-    const faces = [0, 1, 2, 3, 4, 5].map((face) => {
-      this.texels.fill(0);
-      renderer.readRenderTargetPixels(this.target, 0, 0, size, size, this.texels, face);
-      return Float32Array.from(this.texels, (value) => THREE.DataUtils.fromHalfFloat(value));
-    });
-    return measureProbe(faces);
+    const previous = renderer.getRenderTarget();
+    const previousFace = renderer.getActiveCubeFace();
+    const previousLevel = renderer.getActiveMipmapLevel();
+    const faces: Float32Array[] = [];
+    let failed = false;
+    let lit = false;
+    // An error flag a draw before left set is not this read's answer.
+    for (let stale = 0; stale < 8 && gl.getError() !== gl.NO_ERROR; stale += 1);
+    try {
+      for (let face = 0; face < 6 && !failed; face += 1) {
+        renderer.setRenderTarget(this.target, face);
+        this.texels.fill(0);
+        gl.readPixels(0, 0, size, size, gl.RGBA, gl.FLOAT, this.texels);
+        failed = gl.getError() !== gl.NO_ERROR;
+        lit ||= this.texels.some((value) => value !== 0);
+        faces.push(Float32Array.from(this.texels));
+      }
+    } finally {
+      renderer.setRenderTarget(previous, previousFace, previousLevel);
+    }
+    return failed || !lit ? null : faces;
   }
 
   dispose(): void {

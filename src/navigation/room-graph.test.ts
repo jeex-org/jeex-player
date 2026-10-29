@@ -9,7 +9,16 @@
  */
 
 import { describe, expect, test } from 'bun:test';
-import { buildRoomGraph, roomAt, roomCentre, routeBetween, routeToRoom, walkSpawn, DOOR_STANDOFF_M } from './room-graph.js';
+import {
+  buildRoomGraph,
+  roomAt,
+  roomCentre,
+  roomStandingPoint,
+  routeBetween,
+  routeToRoom,
+  walkSpawn,
+  DOOR_STANDOFF_M,
+} from './room-graph.js';
 import { solvePlan } from '../plan/plan-solver.js';
 import { EYE_HEIGHT_M, canTraverse, isInDoorway, isNavigable, pathBlockedByFurniture } from './navigation.js';
 import { obstaclesFor } from '../assets/asset-footprint.js';
@@ -314,5 +323,28 @@ describe('routeBetween', () => {
       { x: 3.95, z: 5.0 },
       { x: 3.95, z: 7.6 },
     ]);
+  });
+});
+
+describe('roomStandingPoint: where a walker jumped into a room stands', () => {
+  test('a centre pushed off one table into the next: a clear point inside the room, in no furniture', () => {
+    const lPlan = solvePlan(lShapePlan);
+    // A side table on the room's centre, a sideboard wall to wall just beside it:
+    // the centre is pushed off the table straight into the sideboard.
+    const sideTable = { x: 7.95, z: 2.5, hx: 0.5, hz: 0.5, cos: 1, sin: 0 };
+    const sideboard = { x: 8.9, z: 2.5, hx: 0.4, hz: 3, cos: 1, sin: 0 };
+    const inside = (point: Vec2, box: typeof sideTable) => Math.abs(point.x - box.x) <= box.hx && Math.abs(point.z - box.z) <= box.hz;
+    expect(inside(roomCentre(lPlan, lShapePlan, L_SHAPE.room.b, [sideboard, sideTable]), sideboard)).toBe(true);
+
+    const point = roomStandingPoint(lPlan, lShapePlan, L_SHAPE.room.b, [sideboard, sideTable]);
+
+    expect(roomAt(lPlan, point)).toBe(L_SHAPE.room.b);
+    expect(isNavigable(lPlan, { x: point.x, y: EYE_HEIGHT_M, z: point.z })).toBe(true);
+    expect(inside(point, sideTable) || inside(point, sideboard)).toBe(false);
+  });
+
+  test('a clear room: its centre', () => {
+    const lPlan = solvePlan(lShapePlan);
+    expect(roomStandingPoint(lPlan, lShapePlan, L_SHAPE.room.b, [])).toEqual(roomCentre(lPlan, lShapePlan, L_SHAPE.room.b, []));
   });
 });
