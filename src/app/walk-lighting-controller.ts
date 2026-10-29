@@ -52,6 +52,9 @@ import type { HdriEntry } from '../lighting/hdri-entry.js';
 import type { HdriTarget } from './hdri-wiring.js';
 import type { Mat3 } from '../render/white-balance.js';
 
+/** No balance at all: the matrix that leaves a colour as it is. */
+const NEUTRAL_BALANCE: Mat3 = [1, 0, 0, 0, 1, 0, 0, 0, 1];
+
 type Vec3 = { x: number; y: number; z: number };
 
 /** What the controller drives: `render/walk-lighting/walk-lighting.ts`'s `WalkLighting`. */
@@ -373,14 +376,27 @@ export class WalkLightingController<Doc = WalkDocument> {
     return this.pending ? 'loading' : 'off';
   }
 
-  /** The live camera balance while the room lighting is shown; `null` keeps the chain's tuned balance. */
+  /**
+   * The live camera balance while the room lighting is shown; `null` keeps the
+   * chain's tuned balance. Before the room lighting shows (the bake, a phone's
+   * fifteen seconds), the frame is lit by the scene's own neutral lights, and
+   * the tuned balance, made to pull the room lighting's warm ceiling down,
+   * would turn it blue: it is drawn unbalanced.
+   */
   balance(): Mat3 | null {
-    return this.shown ? (this.lighting?.balance ?? null) : null;
+    return this.shown ? (this.lighting?.balance ?? null) : NEUTRAL_BALANCE;
   }
 
-  /** The camera balance of the room at `position` while the room lighting is shown, for a capture from that point. */
+  /** Which balance `balance()` answers: the rooms' measured one, the chain's tuned one (nothing measured), or none before the room lighting shows. */
+  roomBalance(): 'live' | 'fixed' | 'neutral' {
+    if (!this.shown) return 'neutral';
+    return this.lighting?.balance ? 'live' : 'fixed';
+  }
+
+  /** The camera balance of the room at `position` while the room lighting is shown, for a capture from that point; none before. */
   balanceAt(position: Vec3): Mat3 | null {
-    return this.shown ? (this.lighting?.balanceAt?.(position) ?? null) : null;
+    // A capture matches the screen: no balance before the room lighting shows (`balance`).
+    return this.shown ? (this.lighting?.balanceAt?.(position) ?? null) : NEUTRAL_BALANCE;
   }
 
   stats(): WalkLightingStats | null {

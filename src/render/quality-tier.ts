@@ -4,10 +4,11 @@
  * to the viewer (`quality: 'auto'`).
  *
  * `high` is the behaviour every delivery before quality tiers shipped; `low`
- * trades sampling resolution for frame rate on a slow device. What differs
- * between the tiers is below: the drawing buffer's pixel-ratio cap, the
- * occlusion buffer's resolution, the GTAO ray count, the denoise's samples
- * and radius, and the probes' bake pace. The tone curve, the exposure, the
+ * trades drawing-buffer resolution for frame rate on a slow device. The
+ * settings below are the drawing buffer's pixel-ratio cap, the occlusion
+ * buffer's resolution, the GTAO ray count, the denoise's samples and radius,
+ * and the probes' bake pace; today the tiers differ in the cap and the bake
+ * pace only, the occlusion being the same on both. The tone curve, the exposure, the
  * sun and its 2048-texel shadow, the lamp occlusion, the sky, SMAA and the
  * half-float targets are identical on every tier — and so is the probes'
  * capture edge, which the probe atlas pins (see `probeSize` below).
@@ -58,9 +59,13 @@ export const QUALITY_TIERS = Object.freeze({
     pixelRatioCap: 1.25,
     /** The full occlusion buffer: any smaller one leaves stair-stepped halos on door and table edges, because the blend's bilinear upsampling crosses depth (`walk-post.ts`; 0.75 showed it in a 2x crop). A depth-aware upsample comes first. */
     aoResolutionScale: 1,
-    denoise: Object.freeze({ depthPhi: 0.05, normalPhi: 8, lumaPhi: 10, radius: 4, samples: 8 }),
-    /** Half the GTAO rays at the same radius: softer occlusion, far cheaper. */
-    gtaoSamples: 8,
+    /**
+     * The occlusion is high's: half the GTAO rays with a denoise of radius 4 /
+     * 8 samples left dark, grainy blotches round furniture and along floor
+     * edges on a Mali-G57 phone. The fill saving above is the tier's cost cut.
+     */
+    denoise: Object.freeze({ depthPhi: 0.05, normalPhi: 8, lumaPhi: 10, radius: 6, samples: 16 }),
+    gtaoSamples: 16,
     /**
      * NOT a tier knob, whatever the tier: the probe atlas's tile invariant
      * pins the capture edge — a 128 px probe's PMREM output is exactly one

@@ -71,9 +71,12 @@ export const WALK_POST_TUNING = Object.freeze({
    */
   denoise: Object.freeze({ depthPhi: 0.05, normalPhi: 8, lumaPhi: 10, radius: 6, samples: 16 }),
   /**
-   * The fixed camera white balance, applied while no room balance answers
-   * (before the room lighting is live; `walk-lighting/room-balance.ts` sets
-   * each room's once it is): a partial adaptation from `source`, the
+   * The fixed camera white balance, applied while the room lighting is live
+   * but no room balance answers (a device that cannot read the room
+   * measurement back, or a capture point outside every room); before the
+   * room lighting is live the frame takes no balance
+   * (`WalkLightingController.balance`), and `walk-lighting/room-balance.ts`
+   * sets each room's once it is: a partial adaptation from `source`, the
    * measured linear colour of the neutral surfaces, towards the display
    * white, by `degree` (`white-balance.ts`). Measured 2026-10-25 on the demo
    * apartment's living-room ceiling at the walk start (the default sun preset

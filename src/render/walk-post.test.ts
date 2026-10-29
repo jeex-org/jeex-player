@@ -88,14 +88,14 @@ describe('WalkPost sizes around captures', () => {
 
 describe('WalkPost per-tier inputs', () => {
   /**
-   * The low tier's inputs, as the quality module would hand them over, but at
-   * a three-quarter occlusion buffer: the tier itself keeps the full buffer,
-   * and this pins that the chain still honours a reduced scale.
+   * Reduced sampling, spelled out: no tier ships it (the low tier keeps
+   * high's occlusion and the full buffer), and this pins that the chain still
+   * honours a smaller buffer, fewer rays and a lighter denoise when handed them.
    */
-  const LOW: WalkPostTierInputs = {
+  const REDUCED: WalkPostTierInputs = {
     aoResolutionScale: 0.75,
-    denoise: { ...QUALITY_TIERS.low.denoise },
-    gtaoSamples: QUALITY_TIERS.low.gtaoSamples,
+    denoise: { ...QUALITY_TIERS.low.denoise, radius: 4, samples: 8 },
+    gtaoSamples: 8,
   };
 
   /** The chain over a renderer with no GPU: nothing is drawn, only the sizes are watched. */
@@ -129,8 +129,8 @@ describe('WalkPost per-tier inputs', () => {
     post.dispose();
   });
 
-  test('a chain built on the low sampling halves the rays and sizes the occlusion buffer at a reduced scale', () => {
-    const post = tierChain({ tier: LOW });
+  test('a chain handed reduced sampling halves the rays and sizes the occlusion buffer at a reduced scale', () => {
+    const post = tierChain({ tier: REDUCED });
     expect(post.occlusion.gtaoMaterial.defines['SAMPLES']!).toBe(8);
     expect(post.occlusion.pdMaterial.uniforms['radius']!.value).toBe(4);
     post.setSize(640, 360, 1);
@@ -148,7 +148,7 @@ describe('WalkPost per-tier inputs', () => {
       disposed += 1;
       realDispose();
     };
-    post.applyTier(LOW);
+    post.applyTier(REDUCED);
     // A different ray count is a shader define on the SAME pass: three sets
     // needsUpdate and relinks only the GTAO program; nothing is rebuilt,
     // disposed or re-allocated (the switch lands on a device that is already
@@ -184,7 +184,7 @@ describe('WalkPost per-tier inputs', () => {
     post.dispose();
     const tuned: number[] = [];
     post.occlusion.updateGtaoMaterial = (parameters) => tuned.push(parameters['samples'] as number);
-    post.applyTier(LOW);
+    post.applyTier(REDUCED);
     expect(tuned).toEqual([]);
   });
 });

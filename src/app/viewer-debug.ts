@@ -58,7 +58,7 @@ import { freeSpaceModule, layoutLintModule, loadLayoutModules } from './debug-la
 import { planDebugDto, planDrawingCounts } from './viewer-debug-plan.js';
 
 /** The room lighting as the debug surface reads it. */
-type WalkLightingDebug = { state: WalkLightingState; stats: WalkLightingStats | null; roomBalance?: 'live' | 'fixed' };
+type WalkLightingDebug = { state: WalkLightingState; stats: WalkLightingStats | null; roomBalance?: 'live' | 'fixed' | 'neutral' };
 
 /** What `__viewerDebug.minimap()` answers (`minimap.ts`). */
 type MinimapState = {
