@@ -2,7 +2,7 @@ import { describe, expect, test } from 'bun:test';
 import { readFileSync, readdirSync } from 'node:fs';
 import { join } from 'node:path';
 import { SITE_ORIGIN, pageUrl, twinPath } from './site-build.ts';
-import { htmlToMarkdown, visibleMarkdown } from './site-markdown.ts';
+import { htmlToMarkdown } from './site-markdown.ts';
 
 const SITE = join(import.meta.dirname, '..', 'site');
 const PAGE = 'https://player.jeex.org/guide.html';
@@ -144,13 +144,13 @@ describe('the real site pages', () => {
     for (const [, target] of md.matchAll(/\]\(([^)\s]+)\)/g)) expect(target).toMatch(/^https:\/\//);
   });
 
-  test('the JSON-LD of the home page says only what the page shows', () => {
+  test('the JSON-LD of the home page says only what the page and its twin show', () => {
     const html = readFileSync(join(SITE, 'index.html'), 'utf8');
     const blocks = [...html.matchAll(/<script type="application\/ld\+json">([\s\S]*?)<\/script>/g)];
     expect(blocks.length).toBe(1);
     const data = JSON.parse(blocks[0]?.[1] ?? '') as { '@graph': Record<string, string>[] };
     expect(data['@graph'].map((node) => node['@type'])).toEqual(['WebSite', 'SoftwareSourceCode']);
-    const visible = visibleMarkdown(html, pageUrl('index.html'));
+    const visible = htmlToMarkdown(html, pageUrl('index.html'));
     for (const node of data['@graph']) {
       for (const [key, value] of Object.entries(node)) {
         if (key.startsWith('@')) continue;

@@ -336,10 +336,3 @@ export function htmlToMarkdown(html: string, base: string): string {
   if (mains.length !== 1) throw new Error(`site-markdown: the page has ${mains.length === 0 ? 'no <main>' : 'more than one <main>'}`);
   return render(mains[0] as Element, base);
 }
-
-/** Everything a visitor can read on the page (its whole `<body>`), as Markdown: what structured data may claim. */
-export function visibleMarkdown(html: string, base: string): string {
-  const body = find(parse(html), 'body')[0];
-  if (body === undefined) throw new Error('site-markdown: the page has no <body>');
-  return render(body, base);
-}
