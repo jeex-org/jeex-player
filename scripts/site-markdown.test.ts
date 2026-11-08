@@ -65,7 +65,10 @@ describe('htmlToMarkdown', () => {
   });
 
   test('a word and an element laid out apart stay apart; punctuation keeps its place', () => {
-    const md = htmlToMarkdown(page('<ul><li><a href="r.md#o">Options<span>every option</span></a></li><li>Each (<code>group</code>) and <b>x</b>.</li></ul>'), PAGE);
+    const md = htmlToMarkdown(
+      page('<ul><li><a href="r.md#o">Options<span>every option</span></a></li><li>Each (<code>group</code>) and <b>x</b>.</li></ul>'),
+      PAGE,
+    );
     expect(md).toBe('- [Options every option](https://player.jeex.org/r.md#o)\n- Each (`group`) and **x**.\n');
   });
 
