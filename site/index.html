@@ -22,6 +22,25 @@
 <meta name="twitter:title" content="JEEX Player - an open-source 3D tour player for your website">
 <meta name="twitter:description" content="Five views of one apartment on your own page, as a custom element, an ES module or an iframe. Apache-2.0.">
 <meta name="twitter:image" content="https://player.jeex.org/assets/og.png">
+<script type="application/ld+json">{
+  "@context": "https://schema.org",
+  "@graph": [
+    {
+      "@type": "WebSite",
+      "@id": "https://player.jeex.org/#website",
+      "name": "JEEX Player",
+      "url": "https://player.jeex.org/"
+    },
+    {
+      "@type": "SoftwareSourceCode",
+      "@id": "https://player.jeex.org/#source",
+      "name": "JEEX Player",
+      "description": "Five views of one apartment — a 2D plan, a 3D top view, a 360 orbit, a walk and a guided tour — on your own page, embedded as a custom element, an ES module or an iframe.",
+      "codeRepository": "https://github.com/jeex-org/jeex-player",
+      "license": "https://github.com/jeex-org/jeex-player/blob/main/LICENSE"
+    }
+  ]
+}</script>
 <link rel="stylesheet" href="assets/site.css">
 <script src="assets/site.js" defer></script>
 </head>
@@ -137,27 +156,27 @@
       </div>
       <ul class="benefits five">
         <li class="benefit">
-          <span class="tag">2D</span>
+          <span class="tag" aria-hidden="true">2D</span>
           <h3>2D plan</h3>
           <p>The floor plan as a drawing, with room names, areas and facade dimension lines, and a marker where the camera stands.</p>
         </li>
         <li class="benefit">
-          <span class="tag">3D</span>
+          <span class="tag" aria-hidden="true">3D</span>
           <h3>3D top view</h3>
           <p>The same plan in three dimensions, seen from above.</p>
         </li>
         <li class="benefit">
-          <span class="tag">360</span>
+          <span class="tag" aria-hidden="true">360</span>
           <h3>360 orbit</h3>
           <p>The dollhouse: rotate, pan and zoom around the whole apartment.</p>
         </li>
         <li class="benefit">
-          <span class="tag">Walk</span>
+          <span class="tag" aria-hidden="true">Walk</span>
           <h3>Walk</h3>
           <p>A person at eye height. Click a floor point to walk there or use W A S D; walls and closed doors stop you.</p>
         </li>
         <li class="benefit">
-          <span class="tag">Tour</span>
+          <span class="tag" aria-hidden="true">Tour</span>
           <h3>Guided tour</h3>
           <p>A route through the rooms with play, pause and a scrub bar, and fully drivable from your own script.</p>
         </li>

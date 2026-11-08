@@ -78,6 +78,9 @@ describe('buildSite', () => {
     root = '';
   });
 
+  const HOME =
+    '<html><head><title>Home</title></head><body><main><h1>Home</h1><p data-viewer-sha>viewer {{VIEWER_SHA}}</p></main></body></html>';
+
   function write(path: string, body: string): void {
     mkdirSync(dirname(path), { recursive: true });
     writeFileSync(path, body);
@@ -86,7 +89,7 @@ describe('buildSite', () => {
   function tree(withEmbed: boolean): { repo: string; out: string } {
     root = mkdtempSync(join(tmpdir(), 'site-build-'));
     const repo = join(root, 'checkout');
-    write(join(repo, 'site', 'index.html'), '<p data-viewer-sha>viewer {{VIEWER_SHA}}</p>');
+    write(join(repo, 'site', 'index.html'), HOME);
     write(join(repo, 'site', 'assets', 'site.css'), 'body{}');
     write(join(repo, 'site', 'README.md'), '# notes');
     write(join(repo, 'site', 'assets', 'poster.md'), '# poster notes');
@@ -102,7 +105,10 @@ describe('buildSite', () => {
     const { repo, out } = tree(true);
     write(join(out, 'stale.txt'), 'left over');
     buildSite(repo, out, fakeSchemas(['scene', 'viewer-options']), '642e6f8');
-    expect(readFileSync(join(out, 'index.html'), 'utf8')).toBe('<p data-viewer-sha>viewer 642e6f8</p>');
+    expect(readFileSync(join(out, 'index.html'), 'utf8')).toBe(
+      '<html><head><title>Home</title><link rel="alternate" type="text/markdown" href="/index.md"></head><body><main><h1>Home</h1><p data-viewer-sha>viewer 642e6f8</p></main></body></html>',
+    );
+    expect(readFileSync(join(out, 'index.md'), 'utf8')).toBe('# Home\n\nviewer 642e6f8\n');
     expect(readFileSync(join(out, 'assets', 'site.css'), 'utf8')).toBe('body{}');
     expect(readFileSync(join(out, 'demo', 'index.html'), 'utf8')).toBe('demo index');
     expect(readFileSync(join(out, 'demo', 'embed.html'), 'utf8')).toBe(
@@ -138,6 +144,26 @@ describe('buildSite', () => {
     expect(css).toMatch(/--jeex-backdrop:\s*#c6b8a3/);
     expect(css).toMatch(/--jeex-backdrop-top:\s*#dcd3c2/);
     expect(css).toMatch(/--jeex-accent:/);
+  });
+
+  test('every page of the site gets its Markdown twin and announces it; the demo build gets none', () => {
+    const { repo, out } = tree(true);
+    write(
+      join(repo, 'site', 'about', 'index.html'),
+      '<html><head></head><body><main><h1>About</h1><p><a href="../install.md">Install</a></p></main></body></html>',
+    );
+    buildSite(repo, out, fakeSchemas(['scene']), null);
+    expect(readFileSync(join(out, 'about', 'index.md'), 'utf8')).toBe('# About\n\n[Install](https://player.jeex.org/install.md)\n');
+    expect(readFileSync(join(out, 'about', 'index.html'), 'utf8')).toContain(
+      '<link rel="alternate" type="text/markdown" href="/about/index.md"></head>',
+    );
+    expect(existsSync(join(out, 'demo', 'index.md'))).toBe(false);
+  });
+
+  test('refuses a twin that would overwrite a published Markdown file', () => {
+    const { repo, out } = tree(true);
+    write(join(repo, 'site', 'install.html'), '<html><head></head><body><main><h1>Install</h1></main></body></html>');
+    expect(() => buildSite(repo, out, fakeSchemas(['scene']), null)).toThrow(/install\.md already exists/);
   });
 
   test('fails with a clear message when the demo build is missing', () => {
