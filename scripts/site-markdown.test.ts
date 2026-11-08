@@ -64,6 +64,11 @@ describe('htmlToMarkdown', () => {
     expect(md).toBe('- [**Source** example.org](https://example.org/)\n');
   });
 
+  test('a word and an element laid out apart stay apart; punctuation keeps its place', () => {
+    const md = htmlToMarkdown(page('<ul><li><a href="r.md#o">Options<span>every option</span></a></li><li>Each (<code>group</code>) and <b>x</b>.</li></ul>'), PAGE);
+    expect(md).toBe('- [Options every option](https://player.jeex.org/r.md#o)\n- Each (`group`) and **x**.\n');
+  });
+
   test('inline runs inside a container become one paragraph, blocks stay blocks', () => {
     const md = htmlToMarkdown(page('<div class="cta-row"><a href="a.html">A</a> <a href="b.html">B</a></div><p>After</p>'), PAGE);
     expect(md).toBe('[A](https://player.jeex.org/a.html) [B](https://player.jeex.org/b.html)\n\nAfter\n');

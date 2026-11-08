@@ -172,8 +172,11 @@ class Writer {
 
   /**
    * Inline Markdown for `nodes`; blocks met inside (a list item's heading and
-   * text) are joined with spaces, and so are two elements with no text between
-   * them (`<b>Source</b><span>…</span>`, which the page lays out apart).
+   * text) are joined with spaces. Pieces the page lays out apart with no
+   * whitespace between them (`<b>Source</b><span>…</span>`,
+   * `Options<span>every option</span>`) get a space too: after an element, or
+   * where a letter or digit would otherwise run into the next word. Punctuation
+   * keeps its place (`(<code>group</code>)` stays `` (`group`) ``).
    */
   inline(nodes: readonly Node[]): string {
     const parts: string[] = [];
@@ -187,7 +190,8 @@ class Writer {
       if (skipped(node)) continue;
       const written = this.element(node);
       if (written === '') continue;
-      parts.push(afterElement ? ` ${written}` : written);
+      const runsOn = /[\p{L}\p{N}]$/u.test(parts.at(-1) ?? '') && /^[\p{L}\p{N}]/u.test(written);
+      parts.push(afterElement || runsOn ? ` ${written}` : written);
       afterElement = true;
     }
     return parts.join('');
