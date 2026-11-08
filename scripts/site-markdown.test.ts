@@ -1,8 +1,8 @@
 import { describe, expect, test } from 'bun:test';
 import { readFileSync, readdirSync } from 'node:fs';
 import { join } from 'node:path';
-import { SITE_ORIGIN } from './site-build.ts';
-import { htmlToMarkdown, pageUrl, twinPath, visibleMarkdown } from './site-markdown.ts';
+import { SITE_ORIGIN, pageUrl, twinPath } from './site-build.ts';
+import { htmlToMarkdown, visibleMarkdown } from './site-markdown.ts';
 
 const SITE = join(import.meta.dirname, '..', 'site');
 const PAGE = 'https://player.jeex.org/guide.html';

@@ -1,9 +1,9 @@
 /**
  * The Markdown twin of a player-site page: the page's `<main>` rendered as
- * Markdown at build time (`scripts/site-build.ts`), so an AI agent can read
- * the same content without the markup. The twin of `name.html` is `name.md`
- * beside it (`about/index.html` → `about/index.md`), and the page announces
- * it with `<link rel="alternate" type="text/markdown">`.
+ * Markdown at build time, so an AI agent can read the same content without
+ * the markup. Where the twin lives and how the page announces it is
+ * `scripts/site-build.ts` (`twinPath`, `writeTwin`); this module only
+ * converts.
  *
  * The pages are hand-written and well-formed, so this is a small strict
  * converter for exactly the elements they use, not a general HTML parser: an
@@ -12,8 +12,6 @@
  * twin. What is not content is dropped: `svg`, buttons, scripts, and every
  * element that is `hidden` or `aria-hidden="true"`.
  */
-
-import { SITE_ORIGIN } from './site-build.ts';
 
 type Element = { tag: string; attrs: Map<string, string>; children: Node[] };
 type Node = Element | string;
@@ -344,15 +342,4 @@ export function visibleMarkdown(html: string, base: string): string {
   const body = find(parse(html), 'body')[0];
   if (body === undefined) throw new Error('site-markdown: the page has no <body>');
   return render(body, base);
-}
-
-/** The twin of the page at `path` (relative to the site root): `.html` → `.md`, beside it. */
-export function twinPath(path: string): string {
-  if (!path.endsWith('.html')) throw new Error(`site-markdown: ${path} is not a page`);
-  return `${path.slice(0, -'.html'.length)}.md`;
-}
-
-/** The URL the page at `path` is served at; a directory's `index.html` is the directory itself. */
-export function pageUrl(path: string): string {
-  return `${SITE_ORIGIN}/${path.replace(/(^|\/)index\.html$/, '$1')}`;
 }

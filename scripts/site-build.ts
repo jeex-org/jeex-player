@@ -38,7 +38,7 @@ import { cpSync, existsSync, mkdirSync, readFileSync, readdirSync, rmSync, write
 import { dirname, join, relative, sep } from 'node:path';
 import { z } from 'zod';
 import { apartmentScene } from '../src/demo/scene-data.js';
-import { htmlToMarkdown, pageUrl, twinPath } from './site-markdown.ts';
+import { htmlToMarkdown } from './site-markdown.ts';
 
 /** Where the demo apartment's scene document lands, relative to the output root. */
 export const DEMO_SCENE_PATH = 'demo/demo-apartment.json';
@@ -171,6 +171,17 @@ function linkDemoTheme(page: string): void {
   const html = readFileSync(page, 'utf8');
   if (!html.includes('</head>')) throw new Error(`site-build: ${page} has no </head> to link the demo theme into`);
   writeFileSync(page, html.replace('</head>', `<link rel="stylesheet" href="../${DEMO_THEME_PATH}" /></head>`));
+}
+
+/** The twin of the page at `path` (relative to the site root): `.html` → `.md`, beside it. */
+export function twinPath(path: string): string {
+  if (!path.endsWith('.html')) throw new Error(`site-build: ${path} is not a page`);
+  return `${path.slice(0, -'.html'.length)}.md`;
+}
+
+/** The URL the page at `path` is served at; a directory's `index.html` is the directory itself. */
+export function pageUrl(path: string): string {
+  return `${SITE_ORIGIN}/${path.replace(/(^|\/)index\.html$/, '$1')}`;
 }
 
 /**
