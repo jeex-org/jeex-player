@@ -76,3 +76,21 @@ install: no vulnerabilities (367 packages).
 | Package            | Version  | Was | Command                                            |
 | ------------------ | -------- | --- | -------------------------------------------------- |
 | `polygon-clipping` | `0.15.7` | new | `npm view polygon-clipping version dist-tags`      |
+
+## 2026-11-08: glob for two advisories
+
+`bun audit` reported GHSA-3g3m-2fjr-6pw4 (moderate: glob before 14.0.2 lets a timed-out
+search keep walking the file system) against `glob@13.0.6` and GHSA-g3hv-75wg-m249 (moderate:
+minimatch before 11.0.1 can be made to expand a pattern without bound) against
+`minimatch@10.2.6`, both reached only through the dev dependency
+`ts-json-schema-generator > glob > minimatch`. `ts-json-schema-generator` 2.9.0 is its
+`latest` and asks for `glob ^13.0.6`, and 13.0.7, the newest of that line, is still inside the
+glob advisory's range, so `package.json` overrides `glob` to the `latest` tag, 14.0.4, which
+brings `minimatch ^11.0.5`. `ts-json-schema-generator` is the only package that uses `glob`,
+and it calls only `globSync`, which 14 keeps; the schema generation tests and the site build
+pass on it.
+
+| Package     | Version  | Was      | Command                                                  |
+| ----------- | -------- | -------- | -------------------------------------------------------- |
+| `glob`      | `14.0.4` | `13.0.6` | `npm view glob dist-tags`, `npm view ts-json-schema-generator version dependencies.glob` |
+| `minimatch` | `11.0.5` | `10.2.6` | `npm view minimatch dist-tags`, `npm view glob@14.0.4 dependencies` |

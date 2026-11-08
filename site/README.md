@@ -15,7 +15,9 @@ runs `bun run build` (the demo, `dist/`) and then `scripts/site-build.ts`, which
 ```
 site-out/
   index.html, integration.html, assets/   these pages
+  index.md, integration.md, ...           the Markdown twin of every page, generated
   llms.txt, install.md                    the llmstxt.org index and the instruction it links to
+  robots.txt                              crawler rules and the content signal
   demo/                                   the demo build (dist/)
   demo/demo-apartment.json                the demo apartment (src/demo/scene-data.ts) as a scene document
   schema/*.schema.json                    the JSON Schemas (scripts/schema-gen.ts), as in dist-lib/schema/
@@ -24,7 +26,9 @@ site-out/
 
 Every snippet on the site loads `demo/demo-apartment.json`. Markdown in this folder documents the site and is not published, except `install.md`, the step-by-step instruction for an AI agent that `llms.txt` links to. Both are hand-written from the README.
 
-A server that hosts the site should send `demo/demo-apartment.json` with `Access-Control-Allow-Origin: *` (and `schema/` too, for editors that fetch a document's `$schema`), so that pages on other origins can load it, and serve `llms.txt` and `install.md` as `text/plain` or `text/markdown`.
+For AI agents and AI search, each page also has a Markdown twin beside it (`integration.html` → `integration.md`, `index.html` → `index.md`), which `scripts/site-markdown.ts` renders from the page's `<main>` at build time, and the page announces it with `<link rel="alternate" type="text/markdown">`. The twins are never edited by hand: change the page. The converter knows only the elements the pages use and fails the build on anything else, so a new kind of element is added to it with a test. `llms.txt` links the pages through their twins. `robots.txt` admits the OpenAI crawlers by name and carries `Content-Signal: search=yes, ai-input=yes, ai-train=yes` for everyone. The home page's JSON-LD (`WebSite`, `SoftwareSourceCode`) says only what the page shows, and a test holds every value of it to the visible text.
+
+A server that hosts the site should send `demo/demo-apartment.json` with `Access-Control-Allow-Origin: *` (and `schema/` too, for editors that fetch a document's `$schema`), so that pages on other origins can load it, and serve `llms.txt` as `text/plain` or `text/markdown` and every `.md` file as `text/markdown; charset=utf-8`.
 
 Elements carrying `data-viewer-sha` show the player commit a deployed build was made from; `{{VIEWER_SHA}}` is their placeholder. The commit comes from `SITE_COMMIT` (`SITE_COMMIT=<sha> bun run build:site`); a build without it leaves those elements out.
 

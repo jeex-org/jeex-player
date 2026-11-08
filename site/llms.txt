@@ -11,12 +11,12 @@ Facts an agent needs before it starts:
 - The person who owns the website makes their own apartment's scene. `https://player.jeex.org/demo/demo-apartment.json` is the player's own demo apartment, served with CORS for trying the player out; it is not the person's property.
 - A scene URL is fetched without credentials (a scene on another origin needs CORS) and must answer with a `Content-Type` that includes `application/json`, no redirect, within 15 seconds and at most 8 MB.
 - The custom element and the iframe page are read-only for visitors by default.
-- The player sends anonymous telemetry to `https://telemetry.jeex.org/v1/player` by default; `analytics="off"` turns it off, and a page with a Content Security Policy needs that endpoint in `connect-src` ([Telemetry](https://player.jeex.org/telemetry.html)).
+- The player sends anonymous telemetry to `https://telemetry.jeex.org/v1/player` by default; `analytics="off"` turns it off, and a page with a Content Security Policy needs that endpoint in `connect-src` ([Telemetry](https://player.jeex.org/telemetry.md)).
 
 ## Instructions
 
 - [install.md](https://player.jeex.org/install.md): build, copy, embed, supply a scene, size, CSP and the checks in the browser, step by step
-- [Integration guide](https://player.jeex.org/integration.html): the same route for a person, as a web page
+- [Integration guide](https://player.jeex.org/integration.md): the same route as the guide page for a person, in Markdown
 - [README: Paste into any site](https://github.com/jeex-org/jeex-player/blob/main/README.md#paste-into-any-site): the three plain-HTML forms and what each does on its own
 - [README: Install and build](https://github.com/jeex-org/jeex-player/blob/main/README.md#install-and-build): requirements and the files `dist-lib/` holds
 
@@ -28,12 +28,13 @@ Facts an agent needs before it starts:
 - [README: Events](https://github.com/jeex-org/jeex-player/blob/main/README.md#events): handle and element events
 - [README: Errors](https://github.com/jeex-org/jeex-player/blob/main/README.md#errors): the error codes to branch on
 - [README: Sizing and styling](https://github.com/jeex-org/jeex-player/blob/main/README.md#sizing-and-styling): container height, fullscreen
-- [Telemetry](https://player.jeex.org/telemetry.html): exactly what the player sends, what it never sends, how to turn it off
+- [Telemetry](https://player.jeex.org/telemetry.md): exactly what the player sends, what it never sends, how to turn it off
 - [README: Content Security Policy](https://github.com/jeex-org/jeex-player/blob/main/README.md#content-security-policy): what a strict page needs
 - [README: iframe permissions and origin](https://github.com/jeex-org/jeex-player/blob/main/README.md#iframe-permissions-and-origin): sandbox, title, who may frame `embed.html`
 
 ## Optional
 
+- [Home page](https://player.jeex.org/index.md): what the player is, its five views, the three ways to embed it and the questions people ask first
 - [README: Scene document](https://github.com/jeex-org/jeex-player/blob/main/README.md#scene-document): the schema 2.3 document and its rules
 - [README: Project format](https://github.com/jeex-org/jeex-player/blob/main/README.md#project-format): the baked project folder and its limits
 - [README: Viewer handle API](https://github.com/jeex-org/jeex-player/blob/main/README.md#viewer-handle-api): playback, modes, selection, captures

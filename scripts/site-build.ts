@@ -6,7 +6,10 @@
  * the complete demo build `dist/` under `demo/`, never flattened over the
  * site's own `index.html`. Markdown under `site/` documents the folder and is
  * not published, except the agent instruction `install.md`
- * (`PUBLISHED_MARKDOWN`); `llms.txt` is copied like any other file.
+ * (`PUBLISHED_MARKDOWN`); `llms.txt` and `robots.txt` are copied like any
+ * other file. Every page of the site gets a Markdown twin beside it
+ * (`index.html` → `index.md`, `scripts/site-markdown.ts`), generated from the
+ * stamped page and announced in its `<head>`; the demo build gets none.
  *
  * Beside the demo build it writes `demo/demo-apartment.json`: the viewer's own
  * demo apartment (`src/demo/scene-data.ts`) as a scene document, the URL every
@@ -35,6 +38,7 @@ import { cpSync, existsSync, mkdirSync, readFileSync, readdirSync, rmSync, write
 import { dirname, join, relative, sep } from 'node:path';
 import { z } from 'zod';
 import { apartmentScene } from '../src/demo/scene-data.js';
+import { htmlToMarkdown } from './site-markdown.ts';
 
 /** Where the demo apartment's scene document lands, relative to the output root. */
 export const DEMO_SCENE_PATH = 'demo/demo-apartment.json';
@@ -169,6 +173,33 @@ function linkDemoTheme(page: string): void {
   writeFileSync(page, html.replace('</head>', `<link rel="stylesheet" href="../${DEMO_THEME_PATH}" /></head>`));
 }
 
+/** The twin of the page at `path` (relative to the site root): `.html` → `.md`, beside it. */
+export function twinPath(path: string): string {
+  if (!path.endsWith('.html')) throw new Error(`site-build: ${path} is not a page`);
+  return `${path.slice(0, -'.html'.length)}.md`;
+}
+
+/** The URL the page at `path` is served at; a directory's `index.html` is the directory itself. */
+export function pageUrl(path: string): string {
+  return `${SITE_ORIGIN}/${path.replace(/(^|\/)index\.html$/, '$1')}`;
+}
+
+/**
+ * Writes the Markdown twin of the page at `path` (relative to `out`) beside it
+ * and announces it in the page's `<head>` with
+ * `<link rel="alternate" type="text/markdown">`. A twin that would replace a
+ * file already in the output (a published `.md`) is an error.
+ */
+function writeTwin(out: string, path: string): void {
+  const page = join(out, path);
+  const twin = twinPath(path);
+  if (existsSync(join(out, twin))) throw new Error(`site-build: the Markdown twin of ${path} cannot be written: ${twin} already exists`);
+  const html = readFileSync(page, 'utf8');
+  if (!html.includes('</head>')) throw new Error(`site-build: ${path} has no </head> to announce its Markdown twin in`);
+  writeFileSync(join(out, twin), htmlToMarkdown(html, pageUrl(path)));
+  writeFileSync(page, html.replace('</head>', `<link rel="alternate" type="text/markdown" href="/${twin}"></head>`));
+}
+
 /** Every `.html` file under `dir`, recursively, as absolute paths. */
 function htmlFiles(dir: string): string[] {
   return readdirSync(dir, { recursive: true, encoding: 'utf8' })
@@ -180,8 +211,8 @@ function htmlFiles(dir: string): string[] {
  * Writes the site of the checkout `root` into `out`: `root/site/**` (minus the
  * folder notes, `isPublished`) at the top, `root/dist/**` under `out/demo/`
  * with the demo scene beside it, every page of the site stamped with `sha`
- * (`siteCommit()` by default), and the schemas under `out/schema/`
- * (`publishSchemas`).
+ * (`siteCommit()` by default) and given its Markdown twin (`writeTwin`), and
+ * the schemas under `out/schema/` (`publishSchemas`).
  * `out` is emptied first.
  */
 export function buildSite(
@@ -199,7 +230,10 @@ export function buildSite(
 
   rmSync(out, { recursive: true, force: true });
   cpSync(site, out, { recursive: true, filter: (source) => isPublished(site, source) });
-  for (const page of htmlFiles(out)) writeFileSync(page, stamp(readFileSync(page, 'utf8'), sha));
+  for (const page of htmlFiles(out)) {
+    writeFileSync(page, stamp(readFileSync(page, 'utf8'), sha));
+    writeTwin(out, relative(out, page).split(sep).join('/'));
+  }
   cpSync(dist, join(out, 'demo'), { recursive: true });
   linkDemoTheme(join(out, 'demo', 'embed.html'));
   writeFileSync(join(out, DEMO_SCENE_PATH), demoSceneJson());
