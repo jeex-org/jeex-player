@@ -7,6 +7,8 @@
 
 import { describe, expect, test } from 'bun:test';
 import { planToSvg } from './plan-export.js';
+import { EN } from '../shared/messages.js';
+import { DE } from '../ui/locales/de.js';
 import { buildPlanDrawing } from './plan-drawing.js';
 import { solvePlan } from './plan-solver.js';
 import { planDrawingInputs } from '../assets/plan-fixtures.js';
@@ -90,6 +92,13 @@ describe('planToSvg', () => {
     const a = planToSvg(drawing, plan, { width: 1024, height: 768, title: 'Demo apartment' });
     const b = planToSvg(drawing, plan, { width: 1024, height: 768, title: 'Demo apartment' });
     expect(a).toBe(b);
+  });
+
+  test("the area caveat is the caller's sentence in the viewer's language, English by default", () => {
+    const plan = solvePlan(lShapePlan);
+    const drawing = buildPlanDrawing(plan, lShapePlan, planDrawingInputs(lShapePlan));
+    expect(planToSvg(drawing, plan, { width: 400, height: 300 })).toContain(`<desc>${EN['plan.areaCaveat']}</desc>`);
+    expect(planToSvg(drawing, plan, { width: 400, height: 300, caveat: DE['plan.areaCaveat'] })).toContain(`<desc>${DE['plan.areaCaveat']}</desc>`);
   });
 
   test('an optional title becomes the first child; the area caveat is always present as <desc>', () => {

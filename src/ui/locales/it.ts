@@ -138,4 +138,5 @@ export const IT: Record<MessageKey, string> = {
   'settings.warm': 'calda',
   'settings.neutral': 'neutra',
   'settings.cool': 'fredda',
+  'plan.areaCaveat': 'Le superfici delle stanze sono calcolate dal contorno del pavimento, non sono misure rilevate.',
 };

@@ -149,4 +149,5 @@ export const ES: Record<MessageKey, string> = {
   'settings.warm': 'cálida',
   'settings.neutral': 'neutra',
   'settings.cool': 'fría',
+  'plan.areaCaveat': 'Las superficies de las habitaciones se calculan a partir del contorno del suelo, no son medidas tomadas in situ.',
 };

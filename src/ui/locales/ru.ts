@@ -160,4 +160,5 @@ export const RU: Record<MessageKey, string> = {
   'settings.warm': 'тёплая',
   'settings.neutral': 'нейтральная',
   'settings.cool': 'холодная',
+  'plan.areaCaveat': 'Площади комнат — это площадь решённого контура пола, а не результат обмера.',
 };

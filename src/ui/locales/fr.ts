@@ -139,4 +139,5 @@ export const FR: Record<MessageKey, string> = {
   'settings.warm': 'chaude',
   'settings.neutral': 'neutre',
   'settings.cool': 'froide',
+  'plan.areaCaveat': 'Les surfaces des pièces sont calculées à partir du contour du sol, ce ne sont pas des mesures relevées.',
 };

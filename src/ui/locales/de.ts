@@ -138,4 +138,5 @@ export const DE: Record<MessageKey, string> = {
   'settings.warm': 'warm',
   'settings.neutral': 'neutral',
   'settings.cool': 'kühl',
+  'plan.areaCaveat': 'Raumflächen sind aus dem Bodenumriss berechnet, kein Aufmaß.',
 };

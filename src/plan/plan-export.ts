@@ -20,6 +20,7 @@
  * Pure module: no `three`, no DOM.
  */
 
+import { EN } from '../shared/messages.js';
 import { facadeDimensions, type PlanDimension } from './plan-dimensions.js';
 import { fitTransform, planPoint, type PlanDrawing, type PlanPrimitive } from './plan-drawing.js';
 import type { SolvedPlan } from './plan-solver.js';
@@ -37,7 +38,12 @@ export type PlanSvgOptions = {
   /** A bottom-left scale bar at a "nice" round metre length. Default `true`. */
   scaleBar?: boolean;
   title?: string;
-  locale?: 'en' | 'ru';
+  /**
+   * The `<desc>` sentence that says how room areas were found, in the viewer's
+   * language: the caller passes its `messages['plan.areaCaveat']`. Default:
+   * the English catalogue's.
+   */
+  caveat?: string;
 };
 
 /** Fraction of the shorter side left empty all round, when `options.padding` is omitted. */
@@ -50,11 +56,6 @@ const NICE_METRES: readonly number[] = [0.5, 1, 2, 5, 10, 20, 50, 100, 200];
 const SCALE_BAR_MARGIN_PX = 16;
 /** Half-height of a scale-bar end tick, pixels. */
 const SCALE_BAR_TICK_PX = 4;
-
-const CAVEAT: Readonly<Record<'en' | 'ru', string>> = {
-  en: 'Room areas are the shoelace area of the solved floor polygon, not a surveyed figure.',
-  ru: 'Площади комнат — это площадь решённого контура пола, а не результат обмера.',
-};
 
 const PAPER = '#ffffff';
 const WALL_FILL = '#101010';
@@ -239,11 +240,10 @@ function scaleBarEls(transform: Transform, width: number, height: number): strin
 export function planToSvg(drawing: PlanDrawing, plan: SolvedPlan, options: PlanSvgOptions): string {
   const padding = options.padding ?? DEFAULT_PADDING;
   const transform = fitTransform(drawing.bounds, { w: options.width, h: options.height }, padding);
-  const locale = options.locale ?? 'en';
 
   const body: string[] = [
     ...(options.title === undefined ? [] : [`<title>${escapeXml(options.title)}</title>`]),
-    `<desc>${escapeXml(CAVEAT[locale])}</desc>`,
+    `<desc>${escapeXml(options.caveat ?? EN['plan.areaCaveat'])}</desc>`,
     `<rect x="0" y="0" width="${fmt(options.width)}" height="${fmt(options.height)}" fill="${PAPER}"/>`,
     ...wallsAndOpenings(transform, drawing.primitives),
     ...doorsAndFixtures(transform, drawing.primitives),
