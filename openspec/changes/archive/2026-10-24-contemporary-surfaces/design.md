@@ -44,5 +44,5 @@ Non-goals: a herringbone generator, coat normal maps, changes to lighting or pos
 3. [Clear coat sits on the unperturbed normal in three.js] → accepted; no coat normal map in this change.
 4. [Older bakes of scenes on changed finishes still match their hash] → named in the release notes; re-bake.
 5. [A project override of a target does not reach its aliases] → documented precedence; a project that wants it ships a material under the alias id too. Its option may still be marked current on an alias wall that draws the bundled target: vanishingly unlikely, not built for.
-6. [Pixel-reading browser tests on the demo flat] → `walk-lighting`, `export-gltf`, `swatch-preview`, `plan-modes`, `render-on-demand` and `library-material` component tests run one by one through the heavy queue after the re-fetch; expected numbers may be re-measured, nothing in the lighting code changes.
+6. [Pixel-reading browser tests on the demo flat] → `walk-lighting`, `export-gltf`, `swatch-preview`, `plan-modes`, `render-on-demand` and `library-material` component tests run one by one after the re-fetch; expected numbers may be re-measured, nothing in the lighting code changes.
 7. [Bakes of scenes with those frames carry the old finish id] → they are refused by the shell check and made again.

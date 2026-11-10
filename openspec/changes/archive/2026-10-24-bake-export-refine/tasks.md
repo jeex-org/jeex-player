@@ -19,8 +19,8 @@
 ## 4. Loader and adoption
 
 - [x] 4.1 Red tests: UV1 on an unseen node refused before pages; a binding naming an unseen part refused; an unsplit file refused; round trip with the stand-in unwrap skipping unseen parts keeps behaviour, partitioned triangles, picks, dollhouse cut/restore with children, children live and unbound; undo removes children. Verify: fail first.
-- [x] 4.2 Stand-in unwrap skips unseen parts; `verifiedShellFile`, `adoptShippedShell` with children and raycast forwarding; docs. Verify: 4.1 green, `tests/component/baked-shell.test.ts` green through the heavy queue.
+- [x] 4.2 Stand-in unwrap skips unseen parts; `verifiedShellFile`, `adoptShippedShell` with children and raycast forwarding; docs. Verify: 4.1 green, `tests/component/baked-shell.test.ts` green.
 
 ## 5. Integration
 
-- [x] 5.1 `bash scripts/check.sh fast`, then the standard tier once through the heavy queue; no screenshot baseline changes. Verify: both green.
+- [x] 5.1 `bash scripts/check.sh fast`, then the standard tier once; no screenshot baseline changes. Verify: both green.

@@ -42,7 +42,7 @@ Each behaviour lands as a pair of commits: a red test commit whose body quotes t
 
 - [x] 7.1 Red test, then demo presets off the retired ids with their new names.
 - [x] 7.2 Update bun tests that pinned old colours, names, kept stripes or tiled repeats to the approved mapping; name each in the report. Remove the tests of kept bundled finishes (none is kept); the kept code path stays for an index that keeps one.
-- [x] 7.3 Browser tests that read pixels on bundled finishes (`walk-lighting`, `export-gltf`, `swatch-preview`, `plan-modes`, `render-on-demand`, `library-material`, `builtin-textures` component tests) run one by one through the heavy queue after 2.2; expected numbers re-measured where the new looks move them, nothing in the lighting code changes.
+- [x] 7.3 Browser tests that read pixels on bundled finishes (`walk-lighting`, `export-gltf`, `swatch-preview`, `plan-modes`, `render-on-demand`, `library-material`, `builtin-textures` component tests) run one by one after 2.2; expected numbers re-measured where the new looks move them, nothing in the lighting code changes.
 - [x] 7.4 README paragraph on the bundled finishes and the ops export, CHANGELOG entry (new public export, host `current` for an alias).
 
 ## 8. Integration

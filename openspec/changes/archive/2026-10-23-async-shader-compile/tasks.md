@@ -1,6 +1,6 @@
 # Tasks
 
-## 1. Measure the baseline (heavy queue)
+## 1. Measure the baseline
 
 - [x] 1.1 On the GPU and on SwiftShader, bare embed page, median of 5: the first-draw task length, the self time of `getProgramParameter`/`getProgramInfoLog` inside it (CPU profile), the synchronous time of `compile()` itself, total blocking time; also with `KHR_parallel_shader_compile` stubbed to null. Record.
   - Method: bare `embed.html` of an unminified build, Chromium, 900x600, median of 5; the program-status wait is timed by wrapping `getProgramParameter`/`getProgramInfoLog` inside the rAF callback that makes the first default-framebuffer draw (the V8 profile attributes these native calls to three's callers, so its self time read 0). Before: GPU first-draw task 568 ms, link wait 430 ms, TBT 1170 ms (KHR stubbed: 529 / 405 / 1100); SwiftShader 2332 / 2211 / 5350 (stubbed 2320 / 2197 / 5327); `compile()` not called. Start in tour (GPU): chain-attach task link 44 ms, next five tasks up to 205 ms (room lighting).
@@ -15,7 +15,7 @@
 
 ## 3. Acceptance
 
-- [x] 3.1 Browser test (heavy queue): the first display draw happens after compile resolves and at 1 s when it does not; `ready` comes after it; the first picture matches a pre-change screenshot within the repo's usual canvas tolerance.
-- [x] 3.2 Repeat 1.1 after the change through the heavy queue; acceptance: link self time in the first-draw task ≤ ¼ of baseline on the GPU with parallel compilation; first picture no later than baseline + one frame without it; start in tour shows no synchronous scene re-link when the chain attaches. Report all numbers.
+- [x] 3.1 Browser test: the first display draw happens after compile resolves and at 1 s when it does not; `ready` comes after it; the first picture matches a pre-change screenshot within the repo's usual canvas tolerance.
+- [x] 3.2 Repeat 1.1 after the change; acceptance: link self time in the first-draw task ≤ ¼ of baseline on the GPU with parallel compilation; first picture no later than baseline + one frame without it; start in tour shows no synchronous scene re-link when the chain attaches. Report all numbers.
   - After (same method): GPU first-draw task 128 ms, link wait 23 ms (5 % of 430: passes the quarter), TBT 723 ms; KHR stubbed: link 21 ms, first picture at 1278 ms vs 1343 ms before; SwiftShader: task 141-167 ms, link 10-11 ms, first picture 1508-1537 ms vs 3221-3227 ms. Start in tour: 3 programs link in the chain-attach task (two shadow depth programs `compileAsync` never reaches, the output pass), 103 ms, no scene program re-linked; the room lighting grids still re-link later (198 ms, accepted). Two further levers were needed: the linear program set (mirrors, transmission) and the background plane, and putting compiled programs to their first use a few per task.
 - [x] 3.3 README (performance note; `ready` now follows the first picture) and CHANGELOG.

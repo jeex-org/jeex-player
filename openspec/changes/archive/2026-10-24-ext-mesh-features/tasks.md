@@ -22,4 +22,4 @@
 - [x] 4.1 CHANGELOG Unreleased (**Breaking**), README `exportGlb` paragraph, `host-handle.ts` comment
 - [x] 4.2 Conformance test green; re-export byte-identical; no screenshot baseline changes
 - [x] 4.3 Budget and purity: `gltf-validator` in no library or IIFE bundle
-- [x] 4.4 Fast tier, the changed component files, one standard tier through the heavy queue
+- [x] 4.4 Fast tier, the changed component files, one standard tier
