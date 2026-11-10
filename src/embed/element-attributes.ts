@@ -129,11 +129,23 @@ const ATTRIBUTE_OF_KEY: ReadonlyMap<string, string> = new Map(
 );
 
 /**
+ * The attributes HTML's bare-boolean spelling applies to: the on/off ones
+ * (`flag`, and the `switch` `analytics`, whose bare form keeps failing closed).
+ */
+const BARE_BOOLEAN_ATTRIBUTES: ReadonlySet<string> = new Set(
+  [...Object.values(OPTION_SCHEMA), ...Object.values(COMPOUND_SCHEMA)]
+    .filter((spec) => spec.kind === 'flag' || spec.kind === 'switch')
+    .map((spec) => spec.attr),
+);
+
+/**
  * Reads the options off an element's attributes.
  *
  * The one thing it adds to `optionsFromRecord` is HTML's own convention for a
  * boolean attribute: `<jeex-viewer minimap>` has the value `''`, which means
- * "present", and `asFlag` only knows `0`/`1`/`false`/`true`. Everything else
+ * "present", and `asFlag` only knows `0`/`1`/`false`/`true`. On any other
+ * attribute an empty value is absent: `src=""` is no scene, `lang=""` the
+ * default locale (`BARE_BOOLEAN_ATTRIBUTES`). Everything else
  * — the spellings, the conversions, the complaint about a bad value — is the
  * schema's job and stays there. `log` is the element's own sink, so an
  * unrecognised compound value (`chrome="maybe"`) is reported through the
@@ -146,7 +158,8 @@ export function optionsFromAttributes(read: (attribute: string) => string | null
       if (attribute === undefined) return undefined;
       const raw = read(attribute);
       if (raw === null) return undefined;
-      return raw === '' ? 'true' : raw;
+      if (raw !== '') return raw;
+      return BARE_BOOLEAN_ATTRIBUTES.has(attribute) ? 'true' : undefined;
     },
     'attr',
     log,

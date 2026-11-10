@@ -25,7 +25,7 @@ import {
   hostBoxCss,
   optionsFromAttributes,
 } from './element.js';
-import { COMPOUND_SCHEMA, OPTION_SCHEMA } from '../app/viewer-options.js';
+import { COMPOUND_SCHEMA, OPTION_SCHEMA, resolveViewerOptions } from '../app/viewer-options.js';
 import type { SceneSource } from '../scene/scene-repository.js';
 import type { TourControls } from '../camera/tour-controls.js';
 import type { ViewerHandle } from '../app/viewer-handle.js';
@@ -248,6 +248,17 @@ describe('optionsFromAttributes', () => {
     expect(optionsFromAttributes((name) => (name === 'minimap' ? '0' : null))).toEqual({ view: { minimap: false } });
   });
 
+  test('an empty value is a bare boolean only for an on/off option; anywhere else it is absent', () => {
+    // `<jeex-viewer src="">` is what a CMS template writes for a listing with
+    // no tour: no scene, not a scene at the URL `true`. `lang=""` is the
+    // default locale, not the word `true`.
+    expect(optionsFromAttributes((name) => (name === 'src' ? '' : null))).toEqual({});
+    expect(optionsFromAttributes((name) => (name === 'lang' ? '' : null))).toEqual({});
+    // `analytics` is an on/off switch that fails closed: its bare spelling
+    // keeps turning telemetry off.
+    expect(resolveViewerOptions(optionsFromAttributes((name) => (name === 'analytics' ? '' : null))).analytics.mode).toBe('off');
+  });
+
   test('an absent attribute contributes nothing, so the default stands', () => {
     expect(optionsFromAttributes(() => null)).toEqual({});
   });
@@ -324,6 +335,14 @@ describe('connect', () => {
     expect(() => controller.connect()).not.toThrow();
     const scene = (record.mounted[0]!.options as { scene?: { repository?: { load: () => Promise<unknown> } } }).scene;
     expect(typeof scene?.repository?.load).toBe('function');
+    expect(scene?.repository?.load()).rejects.toMatchObject({ code: 'no-scene-source' });
+  });
+
+  test('an element with an empty `src` mounts like one with none', () => {
+    const { controller, record } = harness({ src: '' });
+    controller.connect();
+    const scene = (record.mounted[0]!.options as { scene?: { url?: string; repository?: { load: () => Promise<unknown> } } }).scene;
+    expect(scene?.url).toBeUndefined();
     expect(scene?.repository?.load()).rejects.toMatchObject({ code: 'no-scene-source' });
   });
 

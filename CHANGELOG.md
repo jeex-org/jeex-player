@@ -141,6 +141,11 @@ as described under [Versioning](#versioning).
 
 ### Fixed
 
+- **`<jeex-viewer src="">` shows the no-scene card.** An empty value means
+  `true` only on an on/off attribute (`minimap`, `analytics`); on every other
+  attribute it is the same as no attribute. An empty `src` no longer fetches
+  the URL `true` and fails with `scene-load`; it fires `jeex-error` with
+  `no-scene-source`, and `lang=""` is the default language.
 - **No blue walls while a phone bakes the room light.** Until the room
   lighting is live (about fifteen seconds on a phone, under two on a
   desktop), walk and tour applied the tuned fixed balance, made to pull the
