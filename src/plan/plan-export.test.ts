@@ -98,7 +98,9 @@ describe('planToSvg', () => {
     const plan = solvePlan(lShapePlan);
     const drawing = buildPlanDrawing(plan, lShapePlan, planDrawingInputs(lShapePlan));
     expect(planToSvg(drawing, plan, { width: 400, height: 300 })).toContain(`<desc>${EN['plan.areaCaveat']}</desc>`);
-    expect(planToSvg(drawing, plan, { width: 400, height: 300, caveat: DE['plan.areaCaveat'] })).toContain(`<desc>${DE['plan.areaCaveat']}</desc>`);
+    expect(planToSvg(drawing, plan, { width: 400, height: 300, caveat: DE['plan.areaCaveat'] })).toContain(
+      `<desc>${DE['plan.areaCaveat']}</desc>`,
+    );
   });
 
   test('an optional title becomes the first child; the area caveat is always present as <desc>', () => {
