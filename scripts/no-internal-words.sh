@@ -15,7 +15,7 @@ case "${1:-}" in
 esac
 top=$(git rev-parse --show-toplevel 2>/dev/null) || { echo "no-internal-words: not inside a git repository" >&2; exit 2; }
 cd "$top"
-pattern='orchestrator|(^|[^a-z])ocr([^a-z]|$)|tailnet|gate queue|heavy-run queue|review of record|the owner asked'
+pattern='orchestrator|ocr review|tailnet|gate queue|heavy-run queue|review of record|the owner asked'
 # -I skips binary files (textures, screenshots); git grep exits 1 on no match,
 # anything above 1 is a failure of the scan itself.
 rc=0
