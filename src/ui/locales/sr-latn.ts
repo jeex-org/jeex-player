@@ -159,5 +159,4 @@ export const SR_LATN: Record<MessageKey, string> = {
   'settings.warm': 'toplo',
   'settings.neutral': 'neutralno',
   'settings.cool': 'hladno',
-  'plan.areaCaveat': 'Površine prostorija su izračunate iz obrisa poda, a ne izmerene.',
 };

@@ -182,7 +182,6 @@ export const EN = {
   'settings.warm': 'warm',
   'settings.neutral': 'neutral',
   'settings.cool': 'cool',
-  'plan.areaCaveat': 'Room areas are the shoelace area of the solved floor polygon, not a surveyed figure.',
 } as const;
 
 export type MessageKey = keyof typeof EN;

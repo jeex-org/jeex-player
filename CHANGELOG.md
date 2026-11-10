@@ -184,10 +184,6 @@ as described under [Versioning](#versioning).
 
 ### Changed
 
-- **The plan's area caveat is a catalogue message.** The `<desc>` sentence of
-  the exported plan SVG is the new key `plan.areaCaveat` in every shipped
-  locale; a catalogue given to `registerLocale` carries it too.
-
 - **Cooler default light.** The interior's artificial light now defaults to a
   neutral 5000 K instead of «Original», and the daylight sky walk and tour
   are lit by is a neutral grey (`#d4d4d4` to `#b9b9b9`) instead of a warm
