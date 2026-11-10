@@ -47,6 +47,6 @@ Each behaviour lands as a pair of commits: a red test commit whose body quotes t
 
 ## 8. Integration
 
-- [x] 8.1 Fast tier while working; failed files re-run alone through the heavy-run queue.
+- [x] 8.1 Fast tier while working; failed files re-run alone.
 - [x] 8.2 Archive, then code review and security review over the branch diff, one answer commit as a red/code pair.
-- [x] 8.3 Rebase on the main branch, then one full gate through the gate queue; a red gate is answered per failed file.
+- [x] 8.3 Rebase on the main branch, then one full gate; a red gate is answered per failed file.

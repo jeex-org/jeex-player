@@ -2,7 +2,7 @@
 
 ## Why
 
-A selected object can only be swapped for a variant of its own design, and a long list of variants runs off the viewer. The owner asked for every variation to be reachable, and for a way to replace the object with a different asset, chosen from a popup grouped by category. The player has no catalogue beyond what the scene places and no operation that changes an object's asset while keeping its id.
+A selected object can only be swapped for a variant of its own design, and a long list of variants runs off the viewer. Every variation must be reachable, and the viewer needs a way to replace the object with a different asset, chosen from a popup grouped by category. The player has no catalogue beyond what the scene places and no operation that changes an object's asset while keeping its id.
 
 ## What Changes
 

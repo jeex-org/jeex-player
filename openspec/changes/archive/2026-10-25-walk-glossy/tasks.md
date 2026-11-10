@@ -44,7 +44,7 @@ Every behaviour change lands as a failing test first, then the code. Browser tes
 
 - Independent review of these artifacts before implementation.
 - Rebase onto the orbit-on-demand landing before the gate.
-- Review of record, security review, one full gate through the machine's gate queue, approval of the change, then archive it.
+- Code review, security review, one full gate, approval of the change, then archive it.
 
 ## 5b. Zero bump normal in captures
 

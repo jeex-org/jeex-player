@@ -37,7 +37,7 @@ export type QualityDebug = { mode: QualityMode; tier: QualityTierName };
 
 /**
  * The per-tier settings. Every `low` value here is a starting point, not a
- * measurement: the owner-phone measurement of this delivery may fix the final
+ * measurement: a measurement on a real phone may fix the final
  * numbers, and each one is commented with what it buys.
  */
 export const QUALITY_TIERS = Object.freeze({

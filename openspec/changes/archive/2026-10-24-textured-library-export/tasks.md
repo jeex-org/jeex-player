@@ -26,9 +26,9 @@ Every behaviour change lands as two commits: first the failing test alone, then 
 ## 4. Integration
 
 - [x] 4.1 Update the README export section (textured library surfaces, KTX2 flat, USDZ normals note) and verify `no-docs-refs.sh` and the fast tier pass.
-- [ ] 4.2 One full gate through the gate queue on the final tree; on red, only the failed files are re-run.
+- [ ] 4.2 One full gate on the final tree; on red, only the failed files are re-run.
 
 ## Workflow follow-up
 
 - Archive the change, clean the published-repo artifacts, validate all specs strictly.
-- Review of record and security review over the branch diff; one answer commit.
+- Code review and security review over the branch diff; one answer commit.

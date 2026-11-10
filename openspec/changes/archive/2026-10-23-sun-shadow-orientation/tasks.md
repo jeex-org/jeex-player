@@ -53,7 +53,7 @@
 
 ## 7. Integration
 
-- [x] 7.1 Fast tier green, then the full gate once through the machine's gate queue on the final tree; on red re-run only the failed files.
+- [x] 7.1 Fast tier green, then the full gate once on the final tree; on red re-run only the failed files.
 
 ## Workflow follow-up
 

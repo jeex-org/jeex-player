@@ -6,3 +6,5 @@ pre-commit:
   commands:
     no-docs-refs:
       run: bash scripts/no-docs-refs.sh --staged
+    no-internal-words:
+      run: bash scripts/no-internal-words.sh --staged

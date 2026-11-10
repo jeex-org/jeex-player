@@ -1,8 +1,8 @@
 /**
  * Dev-only performance meter: mounts the viewer in walk mode, plays one fixed
  * scripted walk and prints the frame-time numbers in the bottom strip, sized
- * to stay readable in a phone screenshot. Nothing leaves the page — the owner
- * opens it, waits for DONE and sends the picture.
+ * to stay readable in a phone screenshot. Nothing leaves the page: the person
+ * measuring opens it, waits for DONE and keeps the picture.
  *
  * The script is the same input sequence on every page: short forward holds
  * alternating with 90-degree drag turns. A single "forward, turn, forward"
@@ -127,7 +127,7 @@ function wireCopyButton(): void {
   button?.addEventListener('click', () => {
     const lines = RESULT_LINE_IDS.map((id) => document.querySelector<HTMLElement>(`#${id}`)?.textContent ?? '').filter(Boolean);
     const text = `${lines.join('\n')}\nurl: ${window.location.href}\nua: ${navigator.userAgent}`;
-    // The page runs on HTTPS (tailnet) or localhost, where the async clipboard
+    // The page runs on HTTPS or localhost, where the async clipboard
     // API exists; anywhere else the click still says so instead of throwing.
     if (!navigator.clipboard) {
       button.textContent = 'copy failed — send a screenshot';

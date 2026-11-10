@@ -45,4 +45,4 @@ Every task is red-green: its focused test is written first and seen failing, the
 
 ## Workflow follow-up
 
-- Full gate through the gate queue, OCR and security review, archive: done by the orchestrator.
+- Full gate, code review and security review, then archive.

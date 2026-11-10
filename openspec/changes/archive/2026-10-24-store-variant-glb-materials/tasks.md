@@ -15,6 +15,6 @@
 
 ## Workflow follow-up
 
-- One full gate through the gate queue after the review answer commit and the rebase; on red, re-run only the failed files.
+- One full gate after the review answer commit and the rebase; on red, re-run only the failed files.
 - Archive the change, move the internal process notes out of the repository, set the archived change to the stock schema and run `openspec validate --all --strict`.
 - Code review and security review over the branch diff; fixes land as one red/code pair.

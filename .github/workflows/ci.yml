@@ -90,6 +90,9 @@ jobs:
       - name: no-docs-refs
         run: bash scripts/no-docs-refs.sh
 
+      - name: no-internal-words
+        run: bash scripts/no-internal-words.sh
+
       - name: build (demo)
         run: bun run build
 

@@ -64,4 +64,4 @@ Every behaviour change lands as a failing test first, then the code, as two comm
 
 ## Workflow follow-up
 
-- After implementation: the review of record, the security review and one full gate through the gate queue, then archive the change and move the internal artifacts out of the repository before the delivery commit.
+- After implementation: the code review, the security review and one full gate, then archive the change and move the internal artifacts out of the repository before the delivery commit.

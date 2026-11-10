@@ -19,4 +19,4 @@
 ## 4. Documentation and checks
 
 - [x] 4.1 README format section: dims policy and the walk rule.
-- [x] 4.2 Integration: `bash scripts/check.sh fast` green; component tier for the touched files through the heavy-run queue; the one full gate is run later by the orchestrator, not in this change's tasks.
+- [x] 4.2 Integration: `bash scripts/check.sh fast` green; component tier for the touched files; the one full gate runs once at the end of the branch, not in this change's tasks.

@@ -21,4 +21,4 @@ Non-goals: toggling wall and floor finish panels (no aura, already closed by any
 - A second tap faster than the double-click interval is a double tap: it flies in rather than deselecting, as a fast double tap always has.
 
 - iOS Safari may report `detail` 1 for the second tap of a double tap on a `touch-action: none` canvas. Then a double tap on an unselected object selects, deselects and flies in. Checked on a device after landing; if so, a follow-up adds a time and distance recognizer.
-- A user who meant to reopen a closed Replace panel by tapping the same object now deselects it instead and needs a third tap. This is what the owner asked for.
+- A user who meant to reopen a closed Replace panel by tapping the same object now deselects it instead and needs a third tap. This is the intended trade.

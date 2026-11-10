@@ -37,5 +37,5 @@
 ## 3. Checks
 
 - [ ] 3.1 Fast tier green
-- [ ] 3.2 OCR review of record and security review; one answer commit
+- [ ] 3.2 Code review and security review; one answer commit
 - [ ] 3.3 One full gate

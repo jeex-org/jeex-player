@@ -290,7 +290,7 @@ export class RenderRuntime {
     return this.observer !== null && !this.canvas.isConnected;
   }
 
-  /** Stops drawing without forgetting that the owner asked for a running loop. */
+  /** Stops drawing without forgetting that a running loop was asked for. */
   private pause(): void {
     if (this.handle === null) return;
     this.cancel(this.handle);

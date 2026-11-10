@@ -11,7 +11,7 @@
 ## 2. Integration
 
 - [x] 2.1 `bash scripts/check.sh fast` green
-- [ ] 2.2 The full quality gate through the machine's gate queue (run by the maintainer); on red, only the failed files are re-run
+- [ ] 2.2 The full quality gate (run by the maintainer); on red, only the failed files are re-run
 
 ## Workflow follow-up
 
