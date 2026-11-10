@@ -249,10 +249,8 @@ describe('optionsFromAttributes', () => {
   });
 
   test('an empty value is a bare boolean only for an on/off option; anywhere else it is absent', () => {
-    // `<jeex-viewer src="">` is what a CMS template writes for a listing with
-    // no tour: no scene, not a scene at the URL `true`. `lang=""` is the
-    // default locale, not the word `true`.
-    expect(optionsFromAttributes((name) => (name === 'src' ? '' : null))).toEqual({});
+    // `lang=""` is the default locale, not the word `true` (an empty `src` is
+    // proved where it matters, at the mount: see «an element with an empty `src`»).
     expect(optionsFromAttributes((name) => (name === 'lang' ? '' : null))).toEqual({});
     // `analytics` is an on/off switch that fails closed: its bare spelling
     // keeps turning telemetry off.
@@ -339,6 +337,8 @@ describe('connect', () => {
   });
 
   test('an element with an empty `src` mounts like one with none', () => {
+    // What a CMS template writes for a listing with no tour: no scene, not a
+    // scene at the URL `true`.
     const { controller, record } = harness({ src: '' });
     controller.connect();
     const scene = (record.mounted[0]!.options as { scene?: { url?: string; repository?: { load: () => Promise<unknown> } } }).scene;
