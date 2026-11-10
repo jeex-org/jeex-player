@@ -413,7 +413,7 @@ export class ViewerElementController {
    * mount reads it.
    */
   private applyTemperature(handle: ViewerHandle): void {
-    const raw = this.host.attribute(TEMPERATURE_ATTRIBUTE);
+    const raw = this.valueOf(TEMPERATURE_ATTRIBUTE);
     const value = raw === null ? TEMPERATURE_RANGE.default : convertRaw('temperature', raw);
     if (value === null || isLightTemperature(value)) {
       handle.setLightTemperature(value);
@@ -431,7 +431,7 @@ export class ViewerElementController {
    * once and keeps the current tier. Before the start the mount reads it.
    */
   private applyQuality(handle: ViewerHandle): void {
-    const raw = this.host.attribute(QUALITY_ATTRIBUTE);
+    const raw = this.valueOf(QUALITY_ATTRIBUTE);
     const value = raw === null ? OPTION_SCHEMA['quality'].default : convertRaw('enum', raw);
     if (isQualityMode(value)) {
       handle.setQuality(value);
@@ -441,6 +441,16 @@ export class ViewerElementController {
       attribute: QUALITY_ATTRIBUTE,
       value: raw,
     });
+  }
+
+  /**
+   * A value attribute as the element reads it: an empty value is the same as
+   * no attribute (`quality=""` is the default), as `optionsFromAttributes`
+   * reads every attribute that is not an on/off one.
+   */
+  private valueOf(attribute: string): string | null {
+    const raw = this.host.attribute(attribute);
+    return raw === '' ? null : raw;
   }
 
   /** This element's sink: the host's `onLog` when it set one, else the console. */
@@ -453,7 +463,7 @@ export class ViewerElementController {
    * value is not a ratio: the box then stays at `DEFAULT_RATIO`.
    */
   private applyBox(): void {
-    const ratio = this.host.attribute(RATIO_ATTRIBUTE);
+    const ratio = this.valueOf(RATIO_ATTRIBUTE);
     if (ratio !== null && parseRatio(ratio) === null) {
       this.log().warn('ratio-invalid', `<${DEFAULT_TAG}>: ratio="${ratio}" is not a ratio like 16:9, 4:3 or 1; using 16:9`, { ratio });
     }
@@ -488,7 +498,7 @@ export class ViewerElementController {
   private readOptions(sink: LogSink | undefined = this.onLog ?? undefined): DeepPartial<ViewerOptions> {
     const options: DeepPartial<ViewerOptions> = optionsFromAttributes((name) => this.host.attribute(name), sink);
     if (this.onLog !== null) options.onLog = this.onLog;
-    const lang = this.host.attribute(OPTION_SCHEMA['locale'].attr);
+    const lang = this.valueOf(OPTION_SCHEMA['locale'].attr);
     if (lang !== null) {
       const resolved = resolveLocaleTag(lang);
       if (resolved === undefined) {
