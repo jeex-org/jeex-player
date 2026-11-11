@@ -62,11 +62,17 @@ export const HOST_BUDGET_FAIL_BYTES = 4 * 1024;
  * scene schemas — a good deal of the scene model, but still no `three` and no
  * DOM.
  *
- * The gate is set from a measured size of `jeex-viewer-ops.js` (97,115 gzip
- * bytes, 94.8 KB, from `measureBundle('dist-lib')` right after
+ * The gate is set from a measured size of `jeex-viewer-ops.js` (100,242 gzip
+ * bytes, 97.9 KB, from `measureBundle('dist-lib')` right after
  * `bun run build:lib`) plus 1 KB. Most of the entry is the scene model and its
  * `zod/mini` schemas; the bundled bank's fixed UUID v7 literals (random hex
- * that gzip cannot fold) are a large share. The last raise, from 85,580
+ * that gzip cannot fold) are a large share. The last raise, from 98,100 bytes
+ * measured on the main branch (2026-11-11, +2,142 bytes), is the commit-time
+ * step after a shell edit (`scene/shell-settle.ts`: painted faces and door
+ * swings re-read on the new plan, a zone attached again, a moved placement
+ * rebound), the one `referencesOf` behind every preset clean-up with the
+ * split rewrite, the walkable floor of the plan, and the validator's drawn
+ * opening heights, all applied by a host server-side. The raise before it, from 85,580
  * bytes, is polygon-clipping for solvePlan floor ownership (2026-10-27,
  * +11.1 KB gzip with its two dependencies): a face's room gives up the zones
  * lying in it (`plan/floor-ownership.ts`). The raise before it, from 82,556
@@ -87,7 +93,7 @@ export const HOST_BUDGET_FAIL_BYTES = 4 * 1024;
  * `npm pack` time; the fix is to re-measure and update this comment, never to
  * raise the number from memory.
  */
-export const OPS_BUDGET_FAIL_BYTES = 97_115 + 1024;
+export const OPS_BUDGET_FAIL_BYTES = 100_242 + 1024;
 
 /**
  * Hard limit for the `jeex-viewer/lighting` entry, gzip bytes. It carries the
@@ -115,14 +121,17 @@ export const LIGHTING_BUDGET_FAIL_BYTES = 12_085 + 1024;
  * `scripts/package-entry-check.ts` names it.
  *
  * The gates are the measured sizes from `measureBundle('dist-lib')` right after
- * `bun run build:lib`, when the entries were added (2026-10-27), plus 1 KB:
- * `jeex-viewer-schema.js` 68,827 gzip bytes (the validator, the manifest and
- * scene schemas, the shipped catalogues), `jeex-viewer-lightmap.js` 106,841
+ * `bun run build:lib`, plus 1 KB: `jeex-viewer-schema.js` 70,208 gzip bytes
+ * (the validator, the manifest and scene schemas, the shipped catalogues;
+ * raised 2026-11-11 from 68,936 measured on the main branch, +1,272 bytes, for
+ * the validator's drawn opening heights and the walkable floor its plan solve
+ * now carries, and the library map vocabulary the entry publishes; first set
+ * at 68,827 when the entries were added on 2026-10-27), `jeex-viewer-lightmap.js` 106,841
  * (the scene builder and the bank the bake lights and the shell are built
  * from). The fix for a crossing is to re-measure and update this comment,
  * never to raise the number from memory.
  */
-export const SCHEMA_BUDGET_FAIL_BYTES = 68_827 + 1024;
+export const SCHEMA_BUDGET_FAIL_BYTES = 70_208 + 1024;
 export const LIGHTMAP_BUDGET_FAIL_BYTES = 106_841 + 1024;
 
 /**
