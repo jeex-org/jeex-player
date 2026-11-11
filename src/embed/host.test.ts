@@ -545,6 +545,26 @@ describe('commands and replies', () => {
     });
   });
 
+  test('`stepCamera` posts its target and resolves with whether a step started', async () => {
+    const embed = await readyEmbed();
+    const stepped = embed.stepCamera('previous');
+    await settled();
+    const command = iframe.contentWindow.commands.at(-1)!;
+    expect([command.method, command.params]).toEqual(['stepCamera', { to: 'previous' }]);
+    fromFrame(frameReply(command.id, { ok: true, result: true }));
+    expect(await stepped).toBe(true);
+  });
+
+  test('`setQuality` posts the tier and resolves on the reply', async () => {
+    const embed = await readyEmbed();
+    const set = embed.setQuality('low');
+    await settled();
+    const command = iframe.contentWindow.commands.at(-1)!;
+    expect([command.method, command.params]).toEqual(['setQuality', { quality: 'low' }]);
+    fromFrame(frameReply(command.id, { ok: true }));
+    expect(await set).toBeUndefined();
+  });
+
   test('`exportGlb` resolves with the ArrayBuffer the frame replies with', async () => {
     const embed = await readyEmbed();
     const bytes = new Uint8Array([0x67, 0x6c, 0x54, 0x46]).buffer;

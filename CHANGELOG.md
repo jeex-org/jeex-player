@@ -9,6 +9,12 @@ as described under [Versioning](#versioning).
 
 ### Added
 
+- **The iframe form steps cameras and sets the quality tier.** The wire
+  carries `stepCamera {to}` (answered with whether a step started) and
+  `setQuality {quality}`, both validated like every other command, and the
+  host helper has `embed.stepCamera(to)` and `embed.setQuality(quality)`, so
+  a host's own Previous/Next buttons and a phone tier switch work through a
+  frame as they do on the module and the element.
 - **The plan tool.** `handle.setPlanTool(true)` arms handles on the wall or
   opening `setSelection` highlighted in `plan2d`: drag an end node, move the
   wall sideways, slide an opening or change its width with a jamb. The drag

@@ -95,6 +95,15 @@ export type JeexEmbed = {
   setLocale(locale: Locale): Promise<void>;
   /** The colour temperature of the artificial light, kelvin from 2700 to 6500 in steps of 100, or `null` for «Original»; `lightTemperature` events carry changes back. */
   setLightTemperature(temperature: number | null): Promise<void>;
+  /**
+   * Steps the frame's walk to a tour camera (a host's own Previous/Next
+   * buttons): `'next'`/`'previous'`, `'first'`/`'last'`, or a 0-based camera.
+   * Resolves `false` when nothing started (another mode, no such camera, an
+   * end of the list).
+   */
+  stepCamera(to: 'next' | 'previous' | 'first' | 'last' | number): Promise<boolean>;
+  /** The frame's render quality tier: `'auto'` (default), or `'low'`/`'high'` pinned. */
+  setQuality(quality: 'auto' | 'low' | 'high'): Promise<void>;
   /** Highlights one wall, opening, room or asset in the frame, or clears it with `null`. */
   setSelection(target: ViewerSelectionTarget | null): Promise<void>;
   /** Re-measures the frame's container, for a host whose own layout just changed. */

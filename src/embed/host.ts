@@ -558,6 +558,8 @@ export function embedViewer(container: HTMLElement, options: EmbedOptions): Jeex
     setLocale: (locale) => nothing('setLocale', { locale }),
     setLightTemperature: (temperature) => nothing('setLightTemperature', { temperature }),
     setSelection: (target) => nothing('setSelection', { target }),
+    stepCamera: (to) => send('stepCamera', { to }) as Promise<boolean>,
+    setQuality: (quality) => nothing('setQuality', { quality }),
     resize: () => nothing('resize'),
     captureStill,
     capturePanorama: (request) => send('capturePanorama', { ...request }) as Promise<EmbedCapture>,
