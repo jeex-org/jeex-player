@@ -11,7 +11,9 @@
  *   `parseSceneDocument` judge, the supported `SCHEMA_VERSIONS` and the closed
  *   vocabularies (`ROOM_PURPOSES`, `ROOM_KINDS`, `OPENING_TYPES`, `WALL_ROLES`);
  * - the baked project: the manifest schema, its parser and issue list, the
- *   library parser and the lamp-light schema with its three ceilings, and the
+ *   library parser, the lamp-light schema with its three ceilings, the map
+ *   file vocabulary of a library material (`libraryMapPath`,
+ *   `LIBRARY_MAP_EXTENSIONS`, `LIBRARY_MAP_SIZES`), and the
  *   helpers that read a manifest's library (`projectLibraryOf`, `libraryOf`,
  *   `isProjectDocument`, `PROJECT_FORMAT`);
  * - the catalogues: the shipped `CATALOGUE_REGISTRIES`, `registriesFromLibrary`
@@ -41,7 +43,10 @@ export {
   LAMP_MAX_CUTOFF,
   LAMP_MAX_LIGHTS,
   LAMP_MAX_LUMENS,
+  LIBRARY_MAP_EXTENSIONS,
+  LIBRARY_MAP_SIZES,
   lampLightSchema,
+  libraryMapPath,
   parseProjectLibrary,
   parseProjectManifest,
   projectManifestIssues,
@@ -49,6 +54,8 @@ export {
 } from '../assets/project-manifest.schema.js';
 export { PROJECT_FORMAT, isProjectDocument, libraryOf, projectLibraryOf } from '../assets/project-manifest.js';
 export type { BakedProjectManifest, ProjectLibraryManifest } from '../assets/project-manifest.js';
+export type { LibraryMapExtension } from '../assets/project-manifest.schema.js';
+export type { LibraryMapRole, LibraryMapSize } from '../materials/finish-types.js';
 
 export { CATALOGUE_REGISTRIES } from '../assets/catalogue-registries.js';
 export { CATALOGUE_ID_BY_SLUG } from '../assets/catalogue-slugs.js';

@@ -108,7 +108,8 @@ export type LibraryMapSize = '128' | '256' | '384' | '512' | '768';
 /**
  * One map of a library material: its colour space (`srgb` for the two colour
  * roles, `linear` for every other), the OpenGL convention on `normal` only, and
- * one file per listed size, each exactly `tex/<versionId>/<role>.<px>.webp`.
+ * one file per listed size, each exactly `tex/<versionId>/<role>.<px>.<ext>`
+ * with `<ext>` `webp` or `ktx2` (`assets/project-manifest.schema.libraryMapPath`).
  */
 export type LibraryMap = {
   readonly colourSpace: 'srgb' | 'linear';
