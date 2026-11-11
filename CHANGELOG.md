@@ -9,6 +9,40 @@ as described under [Versioning](#versioning).
 
 ### Added
 
+- **One table says what each delivery form carries.** Every `ViewerHandle`
+  member and every handle event has a row saying whether the iframe wire and
+  the custom element carry it (`src/embed/delivery-contract.ts`); the wire
+  method list, the frame bridge, the host helper's handle, the forwarded
+  events and the element's DOM events are checked against it at compile
+  time, so a member or an event added for hosts without a row no longer
+  lands in one form and silently misses another. The README's
+  [Integration paths](README.md#integration-paths) lists, per form, the
+  methods and events the table gives it, and a test keeps the two equal.
+- **The element re-emits every handle event.** New DOM events:
+  `jeex-walk-camera`, `jeex-tour-speed` and the authoring tools'
+  `jeex-checkpoint-select`, `jeex-checkpoint-edit`,
+  `jeex-checkpoint-look-through`, `jeex-checkpoint-placing`,
+  `jeex-asset-edit`, `jeex-asset-edit-refused`, `jeex-asset-move-state`,
+  `jeex-plan-edit`, `jeex-plan-edit-refused` and `jeex-plan-tool-state`, all
+  typed on `HTMLElementEventMap`.
+- **The iframe form carries `walkCamera` and `tourSpeed`,** so a host that
+  draws its own tour bar follows the camera stepper and the speed button.
+- **The frame announces itself.** The `ready` payload carries `player` (the
+  package version) and `methods` (every method the frame answers), and the
+  host helper exposes them read-only as `embed.player` and `embed.methods`.
+- **A protocol version mismatch is named, not timed out.** The frame answers
+  the first command of another protocol version once with `unknown-method`
+  and `protocol 1`; the host helper, seeing its frame speak another version,
+  rejects `ready` and every command with `unknown-method` and
+  `protocol <N>` and logs `protocol-mismatch` once. Neither side acts on the
+  foreign message.
+- **`edit-without-revision`.** Arming the plan tool or the asset move tool
+  on a document loaded without its `revision` logs one warning per
+  document: every `planEdit.baseRev` and `assetEdit.baseRev` counts from the
+  revision the host loaded the document with, and from 0 without one, so a
+  host that keeps its own revisions refused each batch as a conflict. The
+  README and the `baseRev` documentation now say to pass the stored revision
+  to `loadScene` or the scene source.
 - **The iframe form steps cameras and sets the quality tier.** The wire
   carries `stepCamera {to}` (answered with whether a step started) and
   `setQuality {quality}`, both validated like every other command, and the
