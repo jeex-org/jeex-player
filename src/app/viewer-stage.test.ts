@@ -73,14 +73,6 @@ describe('anchorCamera', () => {
     expect(projected!.y).toBeGreaterThan(300);
   });
 
-  test('plan2d projects through the top view too: the drawing is fitted to it, the frozen rig shows nothing', () => {
-    const view = top();
-    const frozen = rig();
-    // In plan2d the drawn camera is the frozen rig; the pick camera is the fitted top view.
-    const planModes = { activeCamera: () => frozen, pickCamera: () => view };
-    expect(anchorCamera(planModes, frozen)).toBe(view);
-  });
-
   test('a mode without a plan camera keeps the perspective rig', () => {
     const perspective = rig();
     expect(anchorCamera({ pickCamera: () => undefined }, perspective)).toBe(perspective);

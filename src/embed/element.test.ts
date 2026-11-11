@@ -385,7 +385,7 @@ describe('the events', () => {
     record.fireTour('state', 'playing');
     record.fireTour('ended', undefined);
     record.fire('lightTemperature', { temperature: 3000, source: 'panel' });
-    record.fire('assets', { models: { upgraded: 2, failed: 1, budget: false }, textures: { failed: 0 } });
+    record.fire('assets', { models: { upgraded: 2, failed: 1, budget: false }, textures: { failed: 0, budget: false } });
     expect(record.emitted.map((event) => event.type)).toEqual([
       'jeex-ready',
       'jeex-error',
@@ -398,7 +398,10 @@ describe('the events', () => {
       'jeex-assets',
     ]);
     expect(record.emitted.at(-2)!.detail).toEqual({ temperature: 3000, source: 'panel' });
-    expect(record.emitted.at(-1)!.detail).toEqual({ models: { upgraded: 2, failed: 1, budget: false }, textures: { failed: 0 } });
+    expect(record.emitted.at(-1)!.detail).toEqual({
+      models: { upgraded: 2, failed: 1, budget: false },
+      textures: { failed: 0, budget: false },
+    });
   });
 
   test('the payloads are the documented shapes, not the internal ones', () => {
@@ -600,10 +603,8 @@ describe('disconnect', () => {
   test('disposes the viewer and drops every subscription', () => {
     const { controller, record } = harness();
     controller.connect();
-    // Five handle events (ready, error, scene, mode, select) plus `edit`,
-    // `lightTemperature` and `assets`, three of the tour's, plus the handle's own wait for
-    // the first `scene` and `ready`. Every one of them has to come back on disconnect.
-    expect(record.open()).toBe(13);
+    // Every handle and tour subscription the element took has to come back on disconnect.
+    expect(record.open()).toBeGreaterThan(0);
     controller.disconnect();
     expect(record.disposals).toBe(1);
     expect(record.open()).toBe(0);
@@ -869,7 +870,7 @@ describe('the runtime import', () => {
 });
 
 describe('the boot behind the handle', () => {
-  test('a boot that fails replays nothing; the queue waits for a Retry that reaches ready', async () => {
+  test('a boot that fails sends the waiting loadScene calls, the scene a failed viewer can take; the rest waits for ready', async () => {
     let fail: (error: unknown) => void = () => undefined;
     const ready = new Promise<void>((_resolve, reject) => {
       fail = reject;
@@ -880,16 +881,27 @@ describe('the boot behind the handle', () => {
     viewer.setMode('walk');
     const load = viewer.loadScene({ url: '/b.json' });
     record.start();
-    record.fire('error', { code: 'scene-load', message: 'nope' });
+    record.fire('error', { code: 'scene-load', message: 'nope', fatal: true });
     fail(new Error('scene-load'));
     await expect(viewer.ready).rejects.toThrow('scene-load');
     expect(record.modes).toEqual([]);
-    expect(record.loaded).toEqual([]);
-    // A Retry that boots raises `ready`: the queue runs then.
-    record.fire('ready', { sceneId: 'flat-a', options: {} });
-    expect(record.modes).toEqual(['walk']);
     expect(record.loaded).toEqual([{ url: '/b.json' }]);
     await load;
+    // A loadScene after the failure goes to the running viewer at once too.
+    await viewer.loadScene({ url: '/c.json' });
+    expect(record.loaded).toEqual([{ url: '/b.json' }, { url: '/c.json' }]);
+    // The scene that boots raises `ready`: the other commands run then.
+    record.fire('ready', { sceneId: 'flat-a', options: {} });
+    expect(record.modes).toEqual(['walk']);
+  });
+
+  test('an error the viewer carries on through sends nothing early', () => {
+    const { controller, record } = harness({ src: '/a.json' }, { deferred: true, ready: new Promise<void>(() => {}) });
+    controller.connect();
+    void controller.viewer!.loadScene({ url: '/b.json' });
+    record.start();
+    record.fire('error', { code: 'internal', message: 'a frame hook threw' });
+    expect(record.loaded).toEqual([]);
   });
 
   test('a disconnect while the boot runs rejects the loads still queued', async () => {

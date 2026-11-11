@@ -16,7 +16,7 @@ import { ZONED, zonedLivingPlan } from '../fixtures/plan-zoned-living.js';
 import { FINISH } from '../materials/finish-ids.js';
 import { resolveDoorSwing } from '../plan/door-swing.js';
 import { solvePlan } from '../plan/plan-solver.js';
-import { SceneModel } from './scene-model.js';
+import { SceneModel, isApplyOk } from './scene-model.js';
 import { faceFinishOf } from './scene-ops.js';
 import type { SceneData, SceneOp } from './types.js';
 
@@ -102,6 +102,42 @@ describe('a painted face keeps its paint when another room comes to own it', () 
   });
 });
 
+describe('a preset painting a facade face follows it when a room is built against the wall', () => {
+  /** The north wall's outside (side R of A -> B) gets a loggia: the facade face becomes the loggia's wall. */
+  const LOGGIA: readonly SceneOp[] = [
+    { op: 'add_node', id: NEW.p, p: { x: 0, z: -1.5 } },
+    { op: 'add_node', id: NEW.q, p: { x: 10, z: -1.5 } },
+    { op: 'add_wall', id: NEW.wAP, a: N.a, b: NEW.p, thickness: 0.2, role: 'facade' },
+    { op: 'add_wall', id: NEW.wPQ, a: NEW.p, b: NEW.q, thickness: 0.2, role: 'facade' },
+    { op: 'add_wall', id: NEW.wQB, a: NEW.q, b: N.b, thickness: 0.2, role: 'facade' },
+    { op: 'add_room', id: NEW.loggia, name: 'Loggia', anchor: { x: 5, z: -0.75 } },
+  ];
+  const preset = (op: SceneOp): SceneData => ({
+    ...livingRoom(),
+    interiors: [{ id: '01a1f6d0-3c20-7b00-8f00-0000000000a2', name: 'Facade', swatch: [FINISH.oak, FINISH.graphite], ops: [op] }],
+  });
+
+  test('the explicit form turns from a facade paint into a wall paint of the new room, and the room commits', () => {
+    const model = commit(
+      preset({ op: 'set_material', surface: 'facade', face: { wallId: ZONED.wall.north, side: 'R' }, material: FINISH.graphite }),
+      LOGGIA,
+    );
+    expect(model.scene.interiors?.[0]?.ops).toEqual([
+      { op: 'set_material', surface: 'wall', face: { room: NEW.loggia, wallId: ZONED.wall.north, side: 'R' }, material: FINISH.graphite },
+    ]);
+  });
+
+  test('the face-target form takes the new owner, and the room commits', () => {
+    const model = commit(
+      preset({ op: 'set_material', target: { wallId: ZONED.wall.north, side: 'R' }, material: FINISH.graphite }),
+      LOGGIA,
+    );
+    expect(model.scene.interiors?.[0]?.ops).toEqual([
+      { op: 'set_material', target: { room: NEW.loggia, wallId: ZONED.wall.north, side: 'R' }, material: FINISH.graphite },
+    ]);
+  });
+});
+
 describe('a door with an authored swing keeps the side its leaf opens to', () => {
   test('a room built outside a balcony door that opens in leaves the leaf in the living room', () => {
     const base = livingRoom();
@@ -134,6 +170,32 @@ describe('a door with an authored swing keeps the side its leaf opens to', () =>
   });
 });
 
+describe('a door carried onto a split wall keeps its side too', () => {
+  test('split the balcony wall and build a balcony against the half with the door, in one batch: the leaf stays in the living room', () => {
+    const base = livingRoom();
+    const scene: SceneData = {
+      ...base,
+      walls: base.walls.map((wall) =>
+        wall.id === ZONED.wall.north
+          ? { ...wall, a: N.b, b: N.a, openings: [{ id: NEW.door, type: 'door', center: 2.5, width: 0.9, swing: 'in' }] }
+          : wall,
+      ),
+    };
+    const model = commit(scene, [
+      { op: 'split_wall', wallId: ZONED.wall.north, at: 5, nodeId: NEW.east, ids: [NEW.eastN, NEW.eastS] },
+      { op: 'add_node', id: NEW.p, p: { x: 10, z: -1.5 } },
+      { op: 'add_node', id: NEW.q, p: { x: 5, z: -1.5 } },
+      { op: 'add_wall', id: NEW.wAP, a: N.b, b: NEW.p, thickness: 0.2, role: 'facade' },
+      { op: 'add_wall', id: NEW.wPQ, a: NEW.p, b: NEW.q, thickness: 0.2, role: 'facade' },
+      { op: 'add_wall', id: NEW.wQB, a: NEW.q, b: NEW.east, thickness: 0.2, role: 'facade' },
+      { op: 'add_room', id: NEW.loggia, name: 'Balcony', anchor: { x: 7.5, z: -0.75 } },
+    ]);
+    const half = model.scene.walls.find((wall) => wall.id === NEW.eastN)!;
+    const door = half.openings![0]!;
+    expect(resolveDoorSwing(model.scene, model.plan, half, door, () => 0).roomId).toBe(LIVING);
+  });
+});
+
 describe('a zone kept by a merge is a room again once a wall closes round it', () => {
   /** The L-shape at schema 2.4, room A the living room and room B the kitchen: removing the partition keeps B as a zone. */
   function openPlan(): SceneModel {
@@ -158,12 +220,16 @@ describe('a zone kept by a merge is a room again once a wall closes round it', (
     expect(model.plan.rooms.find((room) => room.roomId === L_SHAPE.room.b)?.loop.length).toBeGreaterThan(0);
   });
 
-  test('set_room with polygon: null re-attaches a zone explicitly', () => {
+  test('set_room with polygon: null re-attaches a zone explicitly, and refuses a room that has no outline', () => {
     const model = openPlan();
-    expect(model.apply({ baseRev: 1, ops: [REBUILD, { op: 'set_room', roomId: L_SHAPE.room.b, polygon: null }] })).toMatchObject({
-      rev: 2,
-    });
+    const result = model.apply({ baseRev: 1, ops: [{ op: 'set_room', roomId: L_SHAPE.room.b, polygon: null }, REBUILD] });
+    expect(result).toMatchObject({ rev: 2 });
+    expect(isApplyOk(result) && result.applied[0]!.summary).toBe(`Room ${L_SHAPE.room.b}: attached to its walls`);
     expect(model.scene.rooms.find((room) => room.id === L_SHAPE.room.b)!.polygon).toBeUndefined();
+    expect(model.apply({ baseRev: 2, ops: [{ op: 'set_room', roomId: L_SHAPE.room.a, polygon: null }] })).toMatchObject({
+      error: 'validation_failed',
+      message: expect.stringContaining('already attached to its walls'),
+    });
   });
 });
 

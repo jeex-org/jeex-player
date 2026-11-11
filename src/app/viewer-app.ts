@@ -32,6 +32,7 @@ import { Picker } from '../geometry/picker.js';
 import { hasWebGL } from '../render/webgl-probe.js';
 import { ViewerUI, type ViewerCommands } from '../ui/viewer-ui.js';
 import { createViewerContext, ViewerDisposedError, type ViewerContext } from './viewer-context.js';
+import { ViewerLibError } from '../shared/errors.js';
 import { ViewerPageGlobals } from './viewer-page-globals.js';
 import { sceneErrorCode, ViewerEvents, toViewerError, type ViewerEventMap, type ViewerEventName } from './viewer-events.js';
 import type { Messages } from '../ui/messages.js';
@@ -216,13 +217,13 @@ export class ViewerApp {
       renderPreview: (group) => this.stage?.runtime.preview.render(group) ?? null,
       edits: editsWiring(this.options, (edit) => this.events.emit('edit', edit)),
       onDocument: (model) => this.onDocument(model),
-      onAssetsChanged: (model) => this.stage?.director?.controller.refreshObstacles(model.scene),
+      onAssetsChanged: (model) => this.stage?.placementsChanged(model.scene),
       // A variant swap hands out a new opening group with its leaf open again.
       onOpeningsChanged: () => this.doors.reapply(),
       onError: (error) => this.events.emit('error', error),
-      onModelsSettled: (model, result) => {
+      onModelsSettled: (model, result, maps) => {
         this.telemetry.modelsSettled(model, result);
-        this.assets.settled(result);
+        void this.assets.settled(result, maps);
       },
       usage: this.usage,
       textureEnv: () => textureEnvOf(this.stage?.runtime.renderer, this.options.resolveTexture, this.log, this.ktx2),
@@ -281,12 +282,10 @@ export class ViewerApp {
       this.globals.claim();
       showBootStep(this.ui, this.messages, 'support');
       if (!hasWebGL(this.roots.canvas)) {
-        this.fail(
-          { code: 'webgl-unavailable', message: this.messages.t('error.noWebglBody') },
-          this.messages.t('error.noWebglTitle'),
-          false,
-        );
-        return;
+        const failure = { code: 'webgl-unavailable', message: this.messages.t('error.noWebglBody') } as const;
+        this.fail(failure, this.messages.t('error.noWebglTitle'), false);
+        // Reported, and the card is up: the boot still FAILED, so `ready` and a `loadScene` reject.
+        throw new ViewerLibError(failure.code, failure.message);
       }
       showBootStep(this.ui, this.messages, 'scene');
       const loaded = await loadWithNoiseTiles(preloaded ? Promise.resolve(preloaded) : this.documents.boot(), this.context.signal);
@@ -331,6 +330,8 @@ export class ViewerApp {
       // A boot the host cut short is not a failure to report: the shell it
       // would put the card in has already been removed from the container.
       if (error instanceof ViewerDisposedError) throw error;
+      // Already reported where it happened (no WebGL): the instance is torn down.
+      if (this.disposed) throw error;
       const failure = toViewerError(sceneErrorCode(error), error, this.messages.t('error.unknown'));
       this.fail(failure, this.messages.t('error.title'), true);
       throw error;

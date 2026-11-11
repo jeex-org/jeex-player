@@ -413,11 +413,13 @@ export function embedViewer(container: HTMLElement, options: EmbedOptions): Jeex
         for (const queued of held) queued.post();
       }
     }
-    if (data.event === 'error' && !ready) {
-      // The first scene failed: `ready` says so with the frame's own code, and
-      // `loadScene` (the one command that can bring a scene up) goes through.
+    const failure = data.event === 'error' ? (data.payload as { code?: ErrorCode; message?: string; fatal?: unknown } | null) : null;
+    if (failure?.fatal === true && !ready) {
+      // The first scene failed and took the viewer down: `ready` says so with
+      // the frame's own code, and `loadScene` (the one command that can bring
+      // a scene up) goes through. An error the viewer carries on through
+      // leaves `ready` to the frame.
       failed = true;
-      const failure = data.payload as { code?: ErrorCode; message?: string } | null;
       failReady(new EmbedError(failure?.code ?? 'internal', failure?.message ?? 'the frame gave no reason'));
       const scenes = queue.filter((queued) => queued.method === 'loadScene');
       queue = queue.filter((queued) => queued.method !== 'loadScene');

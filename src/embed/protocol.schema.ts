@@ -360,7 +360,10 @@ export const readyPayloadSchema = z.object(
 /** What the frame pushes unasked (`EmbedEventMap`); the contract the host's hand check must agree with. */
 export const eventSchema = z.discriminatedUnion('event', [
   z.object({ event: z.literal('ready'), payload: readyPayloadSchema }),
-  z.object({ event: z.literal('error'), payload: z.object({ code: errorCodeSchema, message: wireString }) }),
+  z.object({
+    event: z.literal('error'),
+    payload: z.object({ code: errorCodeSchema, message: wireString, fatal: z.optional(z.literal(true)) }),
+  }),
   z.object({ event: z.literal('scene'), payload: z.object({ sceneId: wireString, rev: finiteNumber }) }),
   z.object({ event: z.literal('mode'), payload: viewerModeSchema }),
   z.object({
@@ -398,7 +401,7 @@ export const eventSchema = z.discriminatedUnion('event', [
     event: z.literal('assets'),
     payload: z.object({
       models: z.object({ upgraded: finiteNumber, failed: finiteNumber, budget: z.boolean() }),
-      textures: z.object({ failed: finiteNumber }),
+      textures: z.object({ failed: finiteNumber, budget: z.boolean() }),
     }),
   }),
   z.object({ event: z.literal('disposed'), payload: z.undefined() }),

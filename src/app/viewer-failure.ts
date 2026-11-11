@@ -43,7 +43,7 @@ type FailureDeps = {
 /** The user-facing card AND the machine-readable event, from one place: `fail(failure, title, retry)`. */
 export function failureRaiser(deps: FailureDeps): (failure: ViewerError, title: string, retry: boolean) => void {
   return (failure, title, retry) => {
-    deps.emitError(failure);
+    deps.emitError({ ...failure, fatal: true });
     deps.teardown();
     deps.showError(title, failure.message, retry);
   };

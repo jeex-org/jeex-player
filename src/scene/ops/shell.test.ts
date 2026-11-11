@@ -237,7 +237,7 @@ describe('move_node', () => {
     expect(doors).toEqual([0.6, 1.6]);
   });
 
-  test('openings that no longer fit slide toward the end that did not move before they are refused', () => {
+  test('openings that no longer fit slide toward the end that did not move instead of being refused', () => {
     const scene = opDraft();
     const wall = scene.walls.find((candidate) => candidate.id === W.wSB)!;
     wall.openings = [

@@ -648,7 +648,7 @@ describe('the failures', () => {
     expect(built.calls.tour).toEqual([]);
   });
 
-  test('`loadScene` after a failed first scene is answered: it is how a host gives the frame another one', async () => {
+  test('`loadScene` is answered before the first `ready`: after a failed first scene it is how a host gives the frame another one', async () => {
     const built = fakeHandle();
     installFrameBridge(built.handle, { hostOrigin: HOST_ORIGIN, target: hostWindow as unknown as Window, viewerId: VIEWER_ID });
     built.fire.error({ code: 'scene-load', message: 'the tour answered 404', cause: undefined });
@@ -724,7 +724,7 @@ describe('the events', () => {
     fire.state('playing');
     fire.ended();
     fire.lightTemperature({ temperature: 6500, source: 'host' });
-    fire.assets({ models: { upgraded: 2, failed: 1, budget: false }, textures: { failed: 0 } });
+    fire.assets({ models: { upgraded: 2, failed: 1, budget: false }, textures: { failed: 0, budget: false } });
     expect(events().map((entry) => entry.event)).toEqual([
       'ready',
       'error',
@@ -737,7 +737,17 @@ describe('the events', () => {
       'assets',
     ]);
     expect(events().at(-2)!.payload).toEqual({ temperature: 6500, source: 'host' });
-    expect(events().at(-1)!.payload).toEqual({ models: { upgraded: 2, failed: 1, budget: false }, textures: { failed: 0 } });
+    expect(events().at(-1)!.payload).toEqual({ models: { upgraded: 2, failed: 1, budget: false }, textures: { failed: 0, budget: false } });
+  });
+
+  test('a boot failure is marked fatal on the wire; any other error is not', () => {
+    const { fire } = bridge();
+    fire.error({ code: 'scene-load', message: '404', cause: undefined, fatal: true });
+    fire.error({ code: 'internal', message: 'a frame hook threw', cause: undefined });
+    expect(events().map((entry) => entry.payload)).toEqual([
+      { code: 'scene-load', message: '404', fatal: true },
+      { code: 'internal', message: 'a frame hook threw' },
+    ]);
   });
 
   test('an error event carries the code and the message, never the cause', () => {

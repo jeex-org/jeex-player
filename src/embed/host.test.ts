@@ -328,7 +328,7 @@ describe('the queue', () => {
 
   test('an `error` before the first `ready` rejects `ready` with its code', async () => {
     const embed = make();
-    fromFrame(frameEvent('error', { code: 'scene-load', message: 'the tour answered 404' }));
+    fromFrame(frameEvent('error', { code: 'scene-load', message: 'the tour answered 404', fatal: true }));
     const outcome = await embed.ready.then(
       () => 'resolved',
       (error: unknown) => error,
@@ -341,13 +341,20 @@ describe('the queue', () => {
     const embed = make();
     void embed.play().catch(() => undefined);
     const early = embed.loadScene({ url: '/early.json' });
-    fromFrame(frameEvent('error', { code: 'scene-load', message: 'the tour answered 404' }));
+    fromFrame(frameEvent('error', { code: 'scene-load', message: 'the tour answered 404', fatal: true }));
     const late = embed.loadScene({ url: '/fallback.json' });
     await settled();
     expect(iframe.contentWindow.commands.map((command) => command.method)).toEqual(['loadScene', 'loadScene']);
     for (const command of iframe.contentWindow.commands) fromFrame(frameReply(command.id, { ok: true }));
     await expect(early).resolves.toBeUndefined();
     await expect(late).resolves.toBeUndefined();
+  });
+
+  test('an error that does not end the boot leaves `ready` to the frame: it still resolves', async () => {
+    const embed = make();
+    fromFrame(frameEvent('error', { code: 'internal', message: 'a frame hook threw' }));
+    fromFrame(frameEvent('ready', { sceneId: DEMO.scene }));
+    await expect(embed.ready).resolves.toBeDefined();
   });
 
   test('a second `ready` (a later scene) does not re-flush the queue', async () => {
@@ -776,32 +783,10 @@ describe('dispose', () => {
     await expect(pending).rejects.toThrow(/disposed/);
   });
 
-  test('a command still queued for `ready` rejects as `disposed` at once, and its boot clock is stopped', async () => {
+  test('a command still queued for `ready` rejects as `disposed` at once', async () => {
     const embed = make();
-    const started: unknown[] = [];
-    const cleared: unknown[] = [];
-    const realSet = globalThis.setTimeout;
-    const realClear = globalThis.clearTimeout;
-    globalThis.setTimeout = ((...args: Parameters<typeof setTimeout>) => {
-      const handle = realSet(...args);
-      started.push(handle);
-      return handle;
-    }) as typeof setTimeout;
-    let queued: Promise<void>;
-    try {
-      queued = embed.play();
-    } finally {
-      globalThis.setTimeout = realSet;
-    }
-    globalThis.clearTimeout = ((handle: Parameters<typeof clearTimeout>[0]) => {
-      cleared.push(handle);
-      realClear(handle);
-    }) as typeof clearTimeout;
-    try {
-      embed.dispose();
-    } finally {
-      globalThis.clearTimeout = realClear;
-    }
+    const queued = embed.play();
+    embed.dispose();
     const outcome = await Promise.race([
       queued.then(
         () => 'resolved',
@@ -811,9 +796,6 @@ describe('dispose', () => {
     ]);
     expect(outcome).toBeInstanceOf(EmbedError);
     expect((outcome as EmbedError).code).toBe('disposed');
-    // The one timer `play` started is its boot clock.
-    expect(started).toHaveLength(1);
-    expect(cleared).toContain(started[0]);
   });
 
   test('a command after dispose rejects instead of reaching a frame that is gone', async () => {

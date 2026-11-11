@@ -132,7 +132,7 @@ describe('a project whose library lost a model', () => {
       handle.on('assets', (info) => reports.push(info));
       await handle.ready;
       await until(() => reports.length > 0, 'the first model pass to settle');
-      expect(reports).toEqual([{ models: { upgraded: 0, failed: 1, budget: false }, textures: { failed: 0 } }]);
+      expect(reports).toEqual([{ models: { upgraded: 0, failed: 1, budget: false }, textures: { failed: 0, budget: false } }]);
     },
     PROJECT_TIMEOUT_MS,
   );

@@ -189,6 +189,18 @@ export class PlanModes {
   }
 
   /**
+   * A revision that moved, added or removed placements without rebuilding the
+   * plan: the selection mark is read again from the new document.
+   */
+  placementsChanged(scene: SceneData): void {
+    if (this.source === null) return;
+    this.source = { plan: this.source.plan, scene };
+    if (this.selection === null) return;
+    this.mark = selectionMark(this.source.plan, scene, this.selection);
+    if (this.mode === 'plan2d') this.paint();
+  }
+
+  /**
    * What the 2D drawing is fitted to: the plan bounds in metres and the
    * metres-to-pixels transform over the viewport box (CSS pixels, the same fit
    * `plan2d` paints with), or `null` before a document. A host overlay or an

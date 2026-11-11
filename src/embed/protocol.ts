@@ -161,7 +161,8 @@ export type ErrorCode =
  */
 export type EmbedEventMap = {
   ready: { options: unknown; sceneId: string };
-  error: { code: ErrorCode; message: string };
+  /** `fatal`: the boot failed and the viewer is down; only `loadScene` brings a scene back. */
+  error: { code: ErrorCode; message: string; fatal?: true };
   scene: { sceneId: string; rev: number };
   mode: ViewerMode;
   /** A click named something in the frame's scene; only with `select` on. */
@@ -180,7 +181,7 @@ export type EmbedEventMap = {
   /** The colour temperature of the artificial light changed: kelvin or `null` («Original»), and who changed it. */
   lightTemperature: { temperature: number | null; source: 'host' | 'panel' };
   /** Once per document, when its first model pass settled: what loaded and what fell back (`ViewerAssetsInfo`). */
-  assets: { models: { upgraded: number; failed: number; budget: boolean }; textures: { failed: number } };
+  assets: { models: { upgraded: number; failed: number; budget: boolean }; textures: { failed: number; budget: boolean } };
   disposed: undefined;
 };
 

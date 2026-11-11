@@ -118,4 +118,12 @@ describe('split_wall rewrites the preset instructions on the wall onto both halv
     expect(moved).toMatchObject({ op: 'set_opening', openingId: WINDOW, wallId: NEW.secondE });
     expect((moved as { center: number }).center).toBeCloseTo(0.5, 9);
   });
+
+  test('a set_opening without a centre on an opening of the wall follows the opening to its half', () => {
+    // The east window sits at 2.5 m; cut at 1 m it lands on the second half.
+    const model = commit(withPreset([{ op: 'set_opening', openingId: WINDOW, wallId: L_SHAPE.wall.wE, width: 1.2 }]), [
+      { op: 'split_wall', wallId: L_SHAPE.wall.wE, at: 1, nodeId: NEW.nodeE, ids: [NEW.firstE, NEW.secondE] },
+    ]);
+    expect(presetOps(model)[0]).toEqual({ op: 'set_opening', openingId: WINDOW, wallId: NEW.secondE, width: 1.2 });
+  });
 });

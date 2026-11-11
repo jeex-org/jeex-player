@@ -124,6 +124,7 @@ export const COMPONENT_FILE_COST_S: Readonly<Record<string, number>> = {
   'walk-lighting.test.ts': 320,
   'walk-post.test.ts': 60,
   'webgl-probe.test.ts': 2,
+  'webgl-unavailable.test.ts': 2,
   'wheel-ownership.test.ts': 1,
 };
 

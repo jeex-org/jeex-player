@@ -4,8 +4,8 @@
  * procedural stand-in, a surface left flat, the byte budget reached), which
  * `ready` alone cannot say.
  *
- * Invariant: one event per document, raised when its first model pass settles
- * (`SceneMount.onModelsSettled`). Texture failures are counted from the
+ * Invariant: one event per document, raised when its first model pass and its
+ * library maps have settled (`SceneMount.onModelsSettled`). Texture failures are counted from the
  * instance's log, by the codes a texture leaves when its surface stays flat
  * (`materials/texture-source.ts`), from the moment the document was mounted;
  * a revision of the same document keeps the count.
@@ -32,6 +32,7 @@ export class AssetsReport {
   /** The document the count belongs to; a different model is a new mount. */
   private model: SceneModel | null = null;
   private texturesFailed = 0;
+  private textureBudget = false;
 
   constructor(emit: (info: ViewerAssetsInfo) => void) {
     this.emit = emit;
@@ -40,6 +41,7 @@ export class AssetsReport {
   /** Every entry of the instance's log passes here first. */
   observe(entry: LogEntry): void {
     if (TEXTURE_FAILURES.has(entry.code)) this.texturesFailed += 1;
+    if (entry.code === 'texture-budget') this.textureBudget = true;
   }
 
   /** A document is on screen: a new one starts its count from zero, a revision keeps it. */
@@ -47,11 +49,20 @@ export class AssetsReport {
     if (model === this.model) return;
     this.model = model;
     this.texturesFailed = 0;
+    this.textureBudget = false;
   }
 
-  /** The first model pass of the document on screen settled. */
-  settled(result: UpgradeResult): void {
+  /**
+   * The first model pass of the document on screen settled; the event goes
+   * once its library maps (`maps`, `SceneBuilder.mapsSettled`) have attached
+   * or given up too, so a texture that fails after the models is counted. A
+   * document replaced in the meantime gets no event for the old one.
+   */
+  async settled(result: UpgradeResult, maps: Promise<void> = Promise.resolve()): Promise<void> {
+    const model = this.model;
+    await maps;
+    if (this.model !== model) return;
     const { upgraded, failed, budget } = result;
-    this.emit({ models: { upgraded, failed, budget }, textures: { failed: this.texturesFailed } });
+    this.emit({ models: { upgraded, failed, budget }, textures: { failed: this.texturesFailed, budget: this.textureBudget } });
   }
 }

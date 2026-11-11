@@ -9,6 +9,10 @@ as described under [Versioning](#versioning).
 
 ### Added
 
+- **`error.fatal`.** The failure that took the viewer down (its error card is
+  on screen) carries `fatal: true`, on the module, the element and the wire;
+  only a fatal `error` before the first `ready` rejects the iframe helper's
+  `ready`.
 - **`plan2d` shows a host's selection.** `setSelection` draws its wall,
   opening, room or placement on the 2D plan in the accent, and the
   `selection-anchor` slot is projected through the plan's top view in
@@ -24,10 +28,11 @@ as described under [Versioning](#versioning).
   checked against, for a service that writes or explains a bake.
 
 - **The `assets` event.** Once per document, when its first model pass
-  settles, the viewer says what its libraries delivered:
-  `{ models: { upgraded, failed, budget }, textures: { failed } }`, the
-  models swapped in, the ones left as procedural stand-ins, whether the byte
-  budget stopped the pass, and the textures whose surface stayed flat. A tour
+  and its library maps have settled, the viewer says what its libraries delivered:
+  `{ models: { upgraded, failed, budget }, textures: { failed, budget } }`,
+  the models swapped in, the ones left as procedural stand-ins, whether the
+  byte budget stopped the pass, the textures whose surface stayed flat, and
+  whether the texture byte budget left the remaining surfaces flat. A tour
   that loads only in part still fires `ready`; this event is how a host
   learns it. The element raises it as `jeex-assets`, and it crosses the
   iframe boundary as the `assets` event.
@@ -164,6 +169,9 @@ as described under [Versioning](#versioning).
 
 ### Fixed
 
+- **No WebGL is a failed boot.** Without a WebGL 2 context `ready` rejects
+  with `webgl-unavailable`, as the handle documents, and so does a later
+  `loadScene`; before, both resolved over the fallback card.
 - **A door pushed to the start of its wall commits.** The edge-margin check
   of an opening compares with the plan tolerance, so a door the clamp puts
   exactly on the margin (0.8, 1.0, 1.2 or 1.6 m wide against the start of a

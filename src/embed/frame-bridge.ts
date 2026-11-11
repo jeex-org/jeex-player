@@ -169,7 +169,7 @@ export function installFrameBridge(handle: ViewerHandle, options: FrameBridgeOpt
     }),
     handle.on('error', (error) => {
       lastError = error;
-      emit('error', { code: error.code, message: error.message });
+      emit('error', { code: error.code, message: error.message, ...(error.fatal === true ? { fatal: true as const } : {}) });
     }),
     handle.on('scene', (info) => emit('scene', info)),
     handle.on('mode', (mode) => emit('mode', mode)),

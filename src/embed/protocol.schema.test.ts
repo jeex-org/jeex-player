@@ -314,7 +314,7 @@ describe('the event union', () => {
     scene: { sceneId: DEMO.scene, rev: 3 },
     mode: 'walk',
     lightTemperature: { temperature: 3000, source: 'panel' },
-    assets: { models: { upgraded: 4, failed: 1, budget: false }, textures: { failed: 2 } },
+    assets: { models: { upgraded: 4, failed: 1, budget: false }, textures: { failed: 2, budget: false } },
     select: {
       kind: 'wall',
       id: DEMO.wall.spineKitchen,

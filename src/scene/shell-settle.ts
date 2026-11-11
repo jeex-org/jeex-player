@@ -90,30 +90,42 @@ function rekeyFaceFinishes(
   return touched;
 }
 
-/** A preset `set_material` on a face, re-keyed like the document's own paint. */
-function rekeyPresetOp(op: Draft<SceneOp>, plan: SolvedPlan, owners: Map<string, string | null>): Draft<SceneOp> {
+/**
+ * A preset `set_material` on a face, re-keyed like the document's own paint:
+ * the explicit form also names its surface, which follows the owner (a room's
+ * face is a `wall`, an unowned one the `facade`), and an instruction whose
+ * finish cannot dress the new surface is dropped (`null`).
+ */
+function rekeyPresetOp(
+  op: Draft<SceneOp>,
+  plan: SolvedPlan,
+  owners: Map<string, string | null>,
+  registries: SceneRegistries,
+): Draft<SceneOp> | null {
   if (op.op !== 'set_material') return op;
-  if (op.surface !== undefined) {
-    const next = op.face === undefined ? undefined : rekeyed(op.face, plan, owners);
-    return next === undefined ? op : { ...op, face: next };
-  }
-  if (typeof op.target !== 'object') return op;
-  const next = rekeyed(op.target, plan, owners);
-  return next === undefined ? op : { ...op, target: next };
+  const face = op.surface === undefined ? (typeof op.target === 'object' ? op.target : undefined) : op.face;
+  const next = face === undefined ? undefined : rekeyed(face, plan, owners);
+  if (next === undefined) return op;
+  if (!dresses(registries, op.material, next)) return null;
+  if (op.surface !== undefined) return { ...op, surface: next.room === undefined ? 'facade' : 'wall', face: next };
+  return { ...op, target: next };
 }
 
 /** Rewrites every explicit door swing whose wall's interior side turned round between the two plans. */
 function keepSwingSides(draft: Draft<SceneData>, committed: SceneData, before: SolvedPlan, after: SolvedPlan): TouchedEntity[] {
   const touched: TouchedEntity[] = [];
+  // Found by OPENING id: a split in the same batch carries a door onto a new wall id.
+  const doorsBefore = new Map(
+    committed.walls.flatMap((wall) => (wall.openings ?? []).map((opening) => [opening.id, { wall, opening }] as const)),
+  );
   for (const wall of draft.walls) {
-    const old = committed.walls.find((candidate) => candidate.id === wall.id);
-    if (old === undefined) continue;
     for (const opening of wall.openings ?? []) {
       if (opening.swing === undefined) continue;
-      const was = (old.openings ?? []).find((candidate) => candidate.id === opening.id);
-      if (was?.swing === undefined) continue;
+      const found = doorsBefore.get(opening.id);
+      if (found?.opening.swing === undefined) continue;
+      const { wall: old, opening: was } = found;
       const oldInterior = interiorSideOf(before, old.id, pointAt(committed, old, was.center).tangent).normal;
-      const newInterior = interiorSideOf(after, wall.id, pointAt(draft as SceneData, wall, opening.center).tangent).normal;
+      const newInterior = interiorSideOf(after, wall.id, pointAt(draft, wall, opening.center).tangent).normal;
       const physical = was.swing === 'in' ? oldInterior : { x: -oldInterior.x, z: -oldInterior.z };
       const word = dot(physical, newInterior) > 0 ? 'in' : 'out';
       if (word === opening.swing) continue;
@@ -164,16 +176,18 @@ export function settleShellEdit(
   const reattached = reattachZones(draft);
   let plan: SolvedPlan;
   try {
-    plan = solvePlan(draft as SceneData);
+    plan = solvePlan(draft);
   } catch {
     return reattached;
   }
   const owners = ownersOf(plan);
   const touched = [...reattached, ...rekeyFaceFinishes(draft, plan, owners, registries)];
   if (draft.interiors) {
-    draft.interiors = draft.interiors.map((preset) => {
-      const ops = preset.ops.map((op) => rekeyPresetOp(op, plan, owners));
-      return ops.every((op, index) => op === preset.ops[index]) ? preset : { ...preset, ops };
+    draft.interiors = draft.interiors.flatMap((preset) => {
+      const ops = preset.ops.map((op) => rekeyPresetOp(op, plan, owners, registries));
+      if (ops.every((op, index) => op === preset.ops[index])) return [preset];
+      const kept = ops.filter((op): op is Draft<SceneOp> => op !== null);
+      return kept.length === 0 ? [] : [{ ...preset, ops: kept }];
     });
   }
   touched.push(...keepSwingSides(draft, committed, committedPlan, plan));

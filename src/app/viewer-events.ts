@@ -36,6 +36,12 @@ export type ViewerError = {
   detail?: ErrorDetail | undefined;
   /** The original throw, when there was one. */
   cause?: unknown;
+  /**
+   * `true` on the failure that took the viewer down: its error card is on
+   * screen and only a `loadScene` or the card's Retry brings a scene back.
+   * Absent on an error the viewer carries on through.
+   */
+  fatal?: true | undefined;
 };
 
 /** A scene is on screen: the first one, and every one after it. */
@@ -52,7 +58,8 @@ export type ViewerSceneInfo = { sceneId: string; rev: number };
  */
 export type ViewerAssetsInfo = {
   models: { upgraded: number; failed: number; budget: boolean };
-  textures: { failed: number };
+  /** `budget`: the texture byte budget was reached, and the surfaces still waiting stayed flat. */
+  textures: { failed: number; budget: boolean };
 };
 
 /**

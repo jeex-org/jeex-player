@@ -20,6 +20,10 @@ import { referencesOf } from './context.js';
 export function splitWallInPresets(scene: Draft<SceneData>, op: SplitWallOp): void {
   if (!scene.interiors) return;
   const [first, second] = op.ids;
+  const halfHolding = (openingId: string): string | undefined =>
+    scene.walls.find(
+      (wall) => (wall.id === first || wall.id === second) && (wall.openings ?? []).some((opening) => opening.id === openingId),
+    )?.id;
   const rewrite = (candidate: Draft<SceneOp>): Draft<SceneOp>[] => {
     if (!referencesOf(candidate).walls.includes(op.wallId)) return [candidate];
     const onBoth = (wallId: string): Draft<SceneOp> | undefined => {
@@ -34,7 +38,10 @@ export function splitWallInPresets(scene: Draft<SceneData>, op: SplitWallOp): vo
     if (firstCopy !== undefined && secondCopy !== undefined) return [firstCopy, secondCopy];
     if (candidate.op === 'set_opening') {
       const center = candidate.center;
-      if (center === undefined || center < op.at) return [{ ...candidate, wallId: first }];
+      // Without a centre the instruction edits the opening where it stands:
+      // on whichever half now carries it.
+      if (center === undefined) return [{ ...candidate, wallId: halfHolding(candidate.openingId) ?? first }];
+      if (center < op.at) return [{ ...candidate, wallId: first }];
       return [{ ...candidate, wallId: second, center: center - op.at }];
     }
     return [];

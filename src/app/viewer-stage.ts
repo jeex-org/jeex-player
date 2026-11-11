@@ -512,6 +512,12 @@ export class ViewerStage {
    * and once per frame after that, so a mode reached by any route at all — a
    * button, a room focus, a manual grab mid-tour — lands on the card.
    */
+  /** Placements changed without a rebuild: the walk's obstacles and the plan's selection mark follow. */
+  placementsChanged(scene: SceneData): void {
+    this.cameraDirector?.controller.refreshObstacles(scene);
+    this.planModes.placementsChanged(scene);
+  }
+
   syncMinimap(): void {
     const mode = this.mode;
     if (mode) this.minimap.setMode(mode);
