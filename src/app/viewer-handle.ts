@@ -4,9 +4,12 @@
  *
  * It lives apart from `viewer-api.ts` on purpose. This file is the CONTRACT —
  * no imports but types, nothing to run — and the composition root is what
- * satisfies it. The three embed forms (the ES module, the custom
- * element and the postMessage bridge) all speak exactly this, so a change here
- * is a change to every one of them.
+ * satisfies it. The three embed forms are built from it: the ES module is
+ * this handle, the custom element hands it out as `viewer` and re-emits its
+ * events, and the postMessage bridge carries the part of it a published tour
+ * needs. Which members and events reach the element and the wire is one table
+ * (`embed/delivery-contract.ts`) with a row per member and per event, so a
+ * member added here does not compile until it has its row.
  *
  * Everything is safe to call the moment `mountViewer` returns, before the first
  * scene exists: the tour remembers the last command and replays it

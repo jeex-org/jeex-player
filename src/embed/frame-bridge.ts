@@ -115,6 +115,11 @@ function exportUsdzOptions(params: ParamsOf<'exportUsdz'>): ExportUsdzOptions {
   return includeFurniture === undefined ? {} : { includeFurniture };
 }
 
+/** The `never` arm of `perform`: reached only by a method the switch has no case for, which `tsc` refuses. */
+function unperformed(command: never): never {
+  throw new ViewerLibError('internal', `frame bridge: no case for ${(command as { method: string }).method}`);
+}
+
 function messageOf(error: unknown): string {
   return error instanceof Error ? error.message : String(error);
 }
@@ -299,6 +304,10 @@ export function installFrameBridge(handle: ViewerHandle, options: FrameBridgeOpt
         emit('disposed', {});
         uninstall();
         return undefined;
+      default:
+        // Every wire method of the table (`delivery-contract.ts`) has a case
+        // above: a `Command` this switch forgot does not compile here.
+        return unperformed(command);
     }
   };
 

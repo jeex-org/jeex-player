@@ -251,7 +251,9 @@ export const METHOD_ALIASES: Readonly<Record<string, CommandMethod>> = {
  *
  * Exported because `protocol.schema.test.ts` walks it to prove that every
  * method has a branch of its own in `commandSchema` — the list drives the
- * test, never the other way round.
+ * test, never the other way round. The delivery table
+ * (`delivery-contract.ts`) proves at compile time that it is exactly the wire
+ * methods its rows name.
  */
 export const METHOD_LIST = [
   'play',
