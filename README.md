@@ -503,7 +503,7 @@ Armed, in `plan2d` only, the wall or opening `setSelection` highlighted carries 
 
 ### The authoring tools load on demand
 
-The tour-camera overlay (with its preview card and look-through), the asset move tool and the plan tool are one lazily loaded chunk (`lazy-jeex-viewer-authoring-*`). The first `setCheckpointOverlay(true)`, `setAssetMoveTool(true)` or `setPlanTool(true)` loads it; a page that never turns one on downloads none of it. A switch turned on before the first scene is in force at that scene's first `scene` event. Turned on later, until the chunk is in, the commands that answer a boolean (`addCheckpoint`, `focusCheckpoint`, `turnAsset` and the rest) answer `false` and the void ones do nothing. The IIFE build cannot split code and carries the tools inline.
+The tour-camera overlay (with its preview card and look-through), the asset move tool and the plan tool are one lazily loaded chunk (`lazy-jeex-viewer-authoring-*`). The first `setCheckpointOverlay(true)`, `setAssetMoveTool(true)` or `setPlanTool(true)` loads it; a page that never turns one on downloads none of it. A switch turned on before the first scene is in force at that scene's first `scene` event. Turned on later, until the chunk is in, the commands that answer a boolean (`addCheckpoint`, `focusCheckpoint`, `turnAsset` and the rest) answer `false` and the void ones do nothing; `focusCheckpoint(null)` has nothing to clear and answers `true`, as before. The IIFE build cannot split code and carries the tools inline.
 
 ## Capture: stills, panoramas and provenance
 

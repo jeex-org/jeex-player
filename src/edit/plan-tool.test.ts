@@ -200,6 +200,118 @@ describe('the plan tool', () => {
     expect(h.states).toEqual(['dragging', 'idle']);
   });
 
+  /** Press on n2, drag past the threshold with one judged frame: the draft shows the moved node. */
+  const midDrag = (h: ReturnType<typeof harness>): void => {
+    expect(h.tool.press(px(6, 0), 1)).toBe(true);
+    h.tool.move(px(6.5, 0));
+    for (const run of h.frames.splice(0)) run();
+    expect(h.drafts.at(-1)).not.toBeNull();
+  };
+  /** No edit, no refusal, the drag's two edges, and the committed drawing back. */
+  const endedWithNoEdit = (h: ReturnType<typeof harness>): void => {
+    expect(h.edits).toEqual([]);
+    expect(h.refusals).toEqual([]);
+    expect(h.states).toEqual(['dragging', 'idle']);
+    expect(h.drafts.at(-1)).toBeNull();
+    expect(h.tool.dragging()).toBe(false);
+    expect(h.tool.pressedBy()).toBeNull();
+  };
+
+  test('leaving plan2d mid-drag ends it with no edit, and the release after it emits nothing', () => {
+    const h = harness();
+    midDrag(h);
+    h.world.mode = 'plan3d';
+    // The wiring cancels on the `mode` event; a move or release before it ends the drag too.
+    h.tool.move(px(7, 0));
+    h.tool.release(px(7, 0));
+    endedWithNoEdit(h);
+  });
+
+  test('`setPlanTool(false)` mid-drag ends it with no edit, and the release after it emits nothing', () => {
+    const h = harness();
+    midDrag(h);
+    h.tool.setEnabled(false);
+    expect(h.tool.release(px(6.5, 0))).toBe(false);
+    endedWithNoEdit(h);
+  });
+
+  test('another selection mid-drag ends it on the next event with no edit', () => {
+    const h = harness();
+    midDrag(h);
+    h.world.target = { kind: 'wall', id: L_SHAPE.wall.wE };
+    h.tool.move(px(7, 0));
+    h.tool.release(px(7, 0));
+    endedWithNoEdit(h);
+  });
+
+  test('a new document mid-drag ends it with no edit, and a frame queued before it judges nothing', () => {
+    const h = harness();
+    midDrag(h);
+    h.tool.move(px(7, 0));
+    expect(h.frames).toHaveLength(1);
+    h.world.model = new SceneModel({ ...lShapePlan, id: OTHER_SCENE }, CATALOGUE_REGISTRIES);
+    h.tool.documentChanged();
+    const trials = h.trials.length;
+    for (const run of h.frames.splice(0)) run();
+    expect(h.trials).toHaveLength(trials);
+    h.tool.release(px(7, 0));
+    endedWithNoEdit(h);
+  });
+
+  test('a cancelled pointer past the travel threshold ends the drag with no edit; the release after it passes through', () => {
+    const h = harness();
+    const fire = bound(h);
+    fire('pointerdown', px(6, 0));
+    fire('pointermove', px(6.5, 0));
+    for (const run of h.frames.splice(0)) run();
+    expect(h.tool.dragging()).toBe(true);
+    fire('pointercancel', px(6.5, 0));
+    fire('pointerup', px(6.5, 0));
+    endedWithNoEdit(h);
+  });
+
+  test('a tool never armed claims nothing, paints nothing and emits nothing', () => {
+    const h = harness();
+    const tool = new PlanTool({
+      mode: () => 'plan2d',
+      target: () => ({ kind: 'wall', id: L_SHAPE.wall.wSA }),
+      model: () => h.model,
+      transform: () => TRANSFORM,
+      showDraft: (draft) => h.drafts.push(draft),
+      redraw: () => undefined,
+      emitEdit: (edit) => h.edits.push(edit),
+      emitRefused: (refusal) => h.refusals.push(refusal),
+      emitState: (state) => h.states.push(state.phase),
+      hint: (key) => h.hints.push(key),
+      frame: (run) => h.frames.push(run),
+    });
+    expect(tool.press(px(6, 0), 1)).toBe(false);
+    expect(tool.move(px(6.5, 0))).toBe(false);
+    expect(tool.release(px(6.5, 0))).toBe(false);
+    expect(tool.view()).toBeNull();
+    expect(h.frames).toEqual([]);
+    expect(h.edits).toEqual([]);
+    expect(h.refusals).toEqual([]);
+    expect(h.states).toEqual([]);
+    expect(h.drafts).toEqual([]);
+  });
+
+  test('a wall dragged along itself moves nothing: no `planEdit`, no refusal, and the tool goes back to idle', () => {
+    const h = harness();
+    expect(h.tool.press(px(3, 0), 1)).toBe(true);
+    h.tool.move(px(5, 0));
+    for (const run of h.frames.splice(0)) run();
+    h.tool.release(px(5, 0));
+    endedWithNoEdit(h);
+  });
+
+  test('a node dragged away and back to where it started moves nothing: no `planEdit`, no refusal, idle', () => {
+    const h = harness();
+    midDrag(h);
+    h.tool.release(px(6, 0));
+    endedWithNoEdit(h);
+  });
+
   /** Press on the node handle at `from`, drag to `to` with one judged frame, release there. */
   const dragNode = (h: ReturnType<typeof harness>, from: { x: number; z: number }, to: { x: number; z: number }): void => {
     expect(h.tool.press(px(from.x, from.z), 1)).toBe(true);

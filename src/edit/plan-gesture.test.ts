@@ -4,13 +4,14 @@
  */
 
 import { describe, expect, test } from 'bun:test';
-import { gestureOps } from './plan-gesture.js';
+import { changesNothing, gestureOps } from './plan-gesture.js';
 import { planHandles, type PlanHandle } from '../plan/plan-handles.js';
 import { solvePlan } from '../plan/plan-solver.js';
 import { lShapePlan } from '../fixtures/plan-l-shape.js';
 import { L_SHAPE } from '../fixtures/plan-l-shape-ids.js';
 import { SceneModel } from '../scene/scene-model.js';
 import { CATALOGUE_REGISTRIES } from '../assets/catalogue-registries.js';
+import type { PlanEditOp } from './plan-edit.js';
 
 const start = { scene: lShapePlan, plan: solvePlan(lShapePlan) };
 const wallHandles = planHandles(start.plan, lShapePlan, { kind: 'wall', id: L_SHAPE.wall.wSA });
@@ -71,5 +72,17 @@ describe('gestureOps', () => {
     if ('error' in judged) throw new Error(judged.message);
     const door = judged.scene.walls.flatMap((wall) => wall.openings ?? []).find((item) => item.id === L_SHAPE.opening.doorEntry)!;
     expect(door.center - door.width / 2).toBeCloseTo(0.75, 9);
+  });
+
+  test('`changesNothing`: a handle released where it was pressed changes nothing; any travel that moves it does', () => {
+    const ops = (handle: PlanHandle, travel: number): readonly PlanEditOp[] =>
+      gestureOps(handle, handle.at, { x: handle.at.x + travel, z: handle.at.z }, start)!.ops;
+    const body = pick(doorHandles, (handle) => handle.kind === 'opening');
+    const jambB = pick(doorHandles, (handle) => handle.kind === 'opening-end' && handle.end === 'b');
+    const n2 = pick(wallHandles, (handle) => handle.kind === 'node' && handle.nodeId === L_SHAPE.node.n2);
+    const middle = pick(wallHandles, (handle) => handle.kind === 'wall');
+    for (const handle of [body, jambB, n2, middle]) expect(changesNothing(ops(handle, 0), lShapePlan)).toBe(true);
+    for (const handle of [body, jambB, n2]) expect(changesNothing(ops(handle, 0.2), lShapePlan)).toBe(false);
+    expect(changesNothing([{ op: 'move_node', nodeId: L_SHAPE.node.n2, dp: { x: 0, z: 0.1 } }], lShapePlan)).toBe(false);
   });
 });

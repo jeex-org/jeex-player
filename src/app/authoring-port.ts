@@ -9,8 +9,10 @@
  * bound to the current stage as soon as both are there (`ready()`, which the
  * boot awaits before the first document is mounted, so the first `scene`
  * event finds the tools bound). Every command is forwarded to the bound
- * tools; until then a command that answers a boolean answers `false`, a void
- * one does nothing, `lookThroughId()` is `null` and `placing()` is `false`.
+ * tools; until then a command that answers a boolean answers `false` (except
+ * `focusCheckpoint(null)`, a clear with nothing to clear, which answers `true`
+ * once there is a stage), a void one does nothing, `lookThroughId()` is `null`
+ * and `placing()` is `false`.
  *
  * A «Move» armed before the tools are bound is remembered like a switch and
  * armed once they are; switching the asset tool off forgets it.
@@ -179,7 +181,8 @@ export function authoringPort<S, M>(deps: AuthoringPortDeps<S, M>): AuthoringPor
     frameCheckpoint: (id) => call(false, (tools) => tools.frameCheckpoint(id)),
     lookThroughCheckpoint: (id) => call(false, (tools) => tools.lookThroughCheckpoint(id)),
     endLookThrough: (commit) => call(false, (tools) => tools.endLookThrough(commit)),
-    focusCheckpoint: (id) => call(false, (tools) => tools.focusCheckpoint(id)),
+    // Clearing the focus with no tools bound has nothing to clear: it succeeds once there is a stage, as with the overlay off.
+    focusCheckpoint: (id) => call(id === null && deps.stage() !== undefined, (tools) => tools.focusCheckpoint(id)),
     revertCheckpointEdit: () => call(undefined, (tools) => tools.revertCheckpointEdit()),
     armAssetMove() {
       if (bound) bound.tools.armAssetMove();

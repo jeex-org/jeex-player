@@ -298,7 +298,9 @@ as described under [Versioning](#versioning).
   `setAssetMoveTool(true)` or `setPlanTool(true)`; a page that never turns one
   on downloads none of them, and the boot bundle is smaller. A switch turned
   on before the first scene is in force at its first `scene` event; turned on
-  later, the tools' boolean commands answer `false` until the chunk is in.
+  later, the tools' boolean commands answer `false` until the chunk is in
+  (`focusCheckpoint(null)`, a clear with nothing to clear, still answers
+  `true`).
 - **Openings keep their place when a wall end moves.** On `move_node` an
   opening keeps its distance in metres from the wall end that did not move,
   instead of its share of the wall, and openings that no longer fit slide

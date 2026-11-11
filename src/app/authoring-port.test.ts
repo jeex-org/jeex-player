@@ -121,6 +121,19 @@ describe('the authoring port', () => {
     expect(h.port.debug()).toEqual({ loaded: false, checkpointOverlay: undefined, assetMove: null });
   });
 
+  test('`focusCheckpoint(null)` before the tools are bound clears nothing and answers `true`, as with the overlay off; before a stage `false`', async () => {
+    const h = harness();
+    expect(h.port.focusCheckpoint(null)).toBe(false);
+    h.setStage({ name: 'stage' });
+    await h.port.ready();
+    expect(h.port.focusCheckpoint(null)).toBe(true);
+    h.port.setCheckpointOverlay(true);
+    // The chunk is on the way: the clear still has nothing to clear.
+    expect(h.port.focusCheckpoint(null)).toBe(true);
+    expect(h.port.focusCheckpoint(CAM)).toBe(false);
+    expect(h.loads).toHaveLength(1);
+  });
+
   test('each switch turned on starts exactly one load, and a second switch during that load starts none', () => {
     const h = harness();
     h.port.setCheckpointOverlay(true);

@@ -142,14 +142,19 @@ export const LIGHTMAP_BUDGET_FAIL_BYTES = 106_841 + 1024;
  * dynamic import), and this is the number that catches it being pulled back
  * into the element's static graph.
  *
- * The gate is the measured size (43,830 gzip bytes: the entry, the element's
- * own chunk and the option reader it shares with the other entries, from
- * `measureBundle('dist-lib')` right after `bun run build:lib`, once the plan
- * tool's two hints joined every locale catalogue the reader carries and the
- * element's pending handle queued its two commands; 42,452 before, once the
- * host sky's option joined the reader: the entry schema that judges
- * `lighting.hdri` and its fold; 41,552 before that, 39,297 before the light
- * temperature) plus 1 KB.
+ * The gate is the measured size (43,830 gzip bytes: the entry 147, the
+ * element's own chunk 5,770 and the option reader it shares with the other
+ * entries 37,913, from `measureBundle('dist-lib')` right after
+ * `bun run build:lib`) plus 1 KB. Measured on 2026-11-11 against the main
+ * branch's build of the same day, 43,454 (147 + 5,747 + 37,560): the plan
+ * tool's two hints in the English and six locale catalogues the reader
+ * carries (+314 gzip bytes over the seven modules), the compound attributes
+ * moved out of `viewer-options.ts` into `option-overlays.ts` (+39 for the
+ * extra module scope) and the pending handle's two queued commands (+23).
+ * No authoring module is in this graph. The main branch had already grown
+ * past its own recorded 42,452 (once the host sky's option joined the
+ * reader: the entry schema that judges `lighting.hdri` and its fold; 41,552
+ * before that, 39,297 before the light temperature).
  */
 export const ELEMENT_ENTRY = 'jeex-viewer-element.js';
 export const ELEMENT_BOOT_FAIL_BYTES = 43_830 + 1024;

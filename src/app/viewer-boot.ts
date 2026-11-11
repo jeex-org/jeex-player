@@ -37,7 +37,7 @@ type BootUI = {
 
 /**
  * Mounts the first document of a boot once the authoring tools are bound: a
- * host that switched a tool on before the boot (a studio reload that reopens
+ * host that switched a tool on before the boot (an editor host that reopens
  * the camera it was editing) gets them in force at the first `scene` event.
  * Waits only for a load that was started; a page that turned nothing on
  * mounts at once. A rejection, and no mount, when the viewer is disposed

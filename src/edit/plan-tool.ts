@@ -12,7 +12,8 @@
  * last legal draft and paints the dragged handle in the `bad` tint. The
  * release is judged once more: legal emits `planEdit` and the draft stays as
  * the pending edit, illegal puts back the drawing of before the press and
- * emits `planEditRefused` with the model's message. Esc, a cancelled pointer,
+ * emits `planEditRefused` with the model's message; a release that changes
+ * nothing (the handle back at its start) emits neither. Esc, a cancelled pointer,
  * leaving `plan2d`, disarming, or another selection ends a drag with no edit.
  *
  * The tool mints no id and emits nothing but `move_node` and `set_opening`.
@@ -24,7 +25,7 @@ import { handleAt, planHandles, type PlanHandle, type PlanHandleTarget } from '.
 import { planPointAt, type PlanTransform } from '../plan/plan-drawing.js';
 import type { SceneModel } from '../scene/scene-model.js';
 import type { Vec2, ViewerMode } from '../scene/types.js';
-import { gestureOps } from './plan-gesture.js';
+import { changesNothing, gestureOps } from './plan-gesture.js';
 import { PendingPlanEdit, type PlanDraft } from './pending-plan-edit.js';
 import type { PlanEdit, PlanEditOp, PlanEditRefused, PlanEditTarget, PlanToolStateEvent } from './plan-edit.js';
 
@@ -186,7 +187,10 @@ export class PlanTool {
       return true;
     }
     this.judge(drag, point);
-    if (drag.failure === null && drag.legal) {
+    if (changesNothing(drag.ops, drag.start.scene)) {
+      // Back where it started: nothing to commit, nothing refused.
+      this.host.showDraft(this.pending.draft());
+    } else if (drag.failure === null && drag.legal) {
       this.pending.record(drag.sceneId, drag.rev, drag.ops, drag.legal);
       this.host.emitEdit({ target: drag.target, ops: drag.ops, baseRev: drag.rev, gesture: drag.gesture });
     } else {

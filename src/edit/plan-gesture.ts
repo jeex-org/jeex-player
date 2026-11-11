@@ -18,6 +18,9 @@
  *
  * Every value is rounded to the millimetre so a batch carries no float noise;
  * there is no other snapping, and every other limit is the validator's.
+ * `changesNothing` tells a batch that leaves the start document as it was
+ * (a wall dragged along itself, a handle brought back to its start), which
+ * the tool does not emit.
  *
  * Pure module: no `three`, no DOM.
  */
@@ -66,4 +69,22 @@ export function gestureOps(
       };
     }
   }
+}
+
+/** Whether `ops` leave `scene` as it was: every node already where it is sent, every opening already at its `center` and `width`. */
+export function changesNothing(ops: readonly PlanEditOp[], scene: SceneData): boolean {
+  return ops.every((op) => {
+    if (op.op === 'move_node') {
+      if (op.dp) return op.dp.x === 0 && op.dp.z === 0;
+      const node = scene.nodes.find((candidate) => candidate.id === op.nodeId);
+      return node !== undefined && op.p !== undefined && node.p.x === op.p.x && node.p.z === op.p.z;
+    }
+    const opening = scene.walls.flatMap((wall) => wall.openings ?? []).find((candidate) => candidate.id === op.openingId);
+    // The tool's `set_opening` carries only `center` and, for a jamb, `width`.
+    return (
+      opening !== undefined &&
+      (op.center === undefined || op.center === opening.center) &&
+      (op.width === undefined || op.width === opening.width)
+    );
+  });
 }
