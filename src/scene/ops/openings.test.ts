@@ -292,12 +292,22 @@ describe('an opening clamped to the end of its wall is one the validator accepts
       ...scene,
       nodes: scene.nodes.map((node) => (node.p.x === 10 ? { ...node, p: { x: length, z: node.p.z } } : node)),
       walls: scene.walls.map((wall) =>
-        wall.id === ZONED.wall.north ? { ...wall, openings: [{ id: NEW.door, type: 'door', center: door.center, width: door.width }] } : wall,
+        wall.id === ZONED.wall.north
+          ? { ...wall, openings: [{ id: NEW.door, type: 'door', center: door.center, width: door.width }] }
+          : wall,
       ),
       rooms: scene.rooms.map((room) => ({ ...room, anchor: corner })),
       presentationCamera: { position: { x: corner.x, y: 12, z: 12 }, target: { x: corner.x, y: 0, z: 4 } },
       navigation: { points: [{ x: corner.x, y: 0, z: 4 }] },
-      autotour: { speed: 1.2, path: [{ x: corner.x, y: 1.6, z: 4 }, { x: corner.x, y: 1.6, z: 6 }], gaze: [], zones: [] },
+      autotour: {
+        speed: 1.2,
+        path: [
+          { x: corner.x, y: 1.6, z: 4 },
+          { x: corner.x, y: 1.6, z: 6 },
+        ],
+        gaze: [],
+        zones: [],
+      },
     };
   }
 

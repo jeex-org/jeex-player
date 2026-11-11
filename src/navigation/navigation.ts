@@ -12,7 +12,20 @@
  * Pure module: no `three`, no DOM.
  */
 
-import { EPS, add, boundsOf, closestOnSegment, cross, dist, distanceToPolygon, len, mul, norm, pointInPolygon, sub } from '../plan/plan-geometry.js';
+import {
+  EPS,
+  add,
+  boundsOf,
+  closestOnSegment,
+  cross,
+  dist,
+  distanceToPolygon,
+  len,
+  mul,
+  norm,
+  pointInPolygon,
+  sub,
+} from '../plan/plan-geometry.js';
 import type { SolvedPlan, WallCentreline } from '../plan/plan-solver.js';
 import type { SceneData, Vec2, Vec3 } from '../scene/types.js';
 

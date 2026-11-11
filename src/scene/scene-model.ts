@@ -34,6 +34,7 @@ import { validateScene } from './scene-validator.js';
 import { ViewerLibError } from '../shared/errors.js';
 import { applyOp, OpError, sameTouched, type SceneOp, type TouchedEntity } from './scene-ops.js';
 import { applyRoomMerges, planRoomMerges, type RoomMerge } from './room-merge.js';
+import { SHELL_EDITS, settleShellEdit } from './shell-settle.js';
 import { heirsOf, inheritedCirculation, inheritedKeys, inheritedPath, issueKey } from './issue-heirs.js';
 import { diffScenes, sameData } from './scene-diff.js';
 import { Fanout } from '../shared/fanout.js';
@@ -309,6 +310,15 @@ export class SceneModel {
       roomMerges = merged.merges;
       if (roomMerges.length > 0) {
         for (const entity of merged.touched) if (!touched.some((seen) => sameTouched(seen, entity))) touched.push(entity);
+      }
+    }
+
+    // Which room owns a wall side, and which side is a wall's interior, are the
+    // solver's answers: a shell edit re-reads the paint and the door swings
+    // stored against them (`shell-settle.ts`).
+    if (batch.ops.some((op) => SHELL_EDITS.has(op.op))) {
+      for (const entity of settleShellEdit(draft, this.committed, this.solved, this.catalogues)) {
+        if (!touched.some((seen) => sameTouched(seen, entity))) touched.push(entity);
       }
     }
 

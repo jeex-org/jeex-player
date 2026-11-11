@@ -616,7 +616,6 @@ function forgetWallInPresets(scene: Draft<SceneData>, wallId: string): void {
   forgetReferencesInPresets(scene, 'walls', wallId);
 }
 
-
 /* ------------------------------------------------------------ helpers --- */
 
 /** A plan point whose two coordinates are both real numbers. */

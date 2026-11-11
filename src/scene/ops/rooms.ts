@@ -186,4 +186,3 @@ export function applySetRoomPurpose(scene: Draft<SceneData>, op: SetRoomPurposeO
   else room.purpose = purpose;
   return { summary: `Room ${op.roomId}: purpose ${previous} → ${purpose ?? 'none'}`, touched: [] };
 }
-

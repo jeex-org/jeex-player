@@ -37,7 +37,16 @@ import type {
   SetObjectOp,
   Vec3,
 } from '../types.js';
-import { OpError, forgetInPresets, forgetReferencesInPresets, requireFinite, requireNewId, round, touchedAsset, type OpOutcome } from './context.js';
+import {
+  OpError,
+  forgetInPresets,
+  forgetReferencesInPresets,
+  requireFinite,
+  requireNewId,
+  round,
+  touchedAsset,
+  type OpOutcome,
+} from './context.js';
 import { OBJECT_SCALE } from './limits.js';
 
 /** `(x, y, z)` for a summary line: two decimals, so two placements read as one column. */

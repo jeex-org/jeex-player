@@ -335,9 +335,9 @@ describe('a wall edit proves the centreline before it writes', () => {
   test('set_wall refuses an arc the chord cannot take before it writes the thickness or the role', () => {
     const scene = opDraft();
     const wall = scene.walls.find((candidate) => candidate.id === L_SHAPE.wall.wSB)!;
-    expect(rejectsOp(scene, { op: 'set_wall', wallId: L_SHAPE.wall.wSB, thickness: 0.2, role: 'partition', arc: { radius: 1, ccw: true } })).toContain(
-      'cannot span',
-    );
+    expect(
+      rejectsOp(scene, { op: 'set_wall', wallId: L_SHAPE.wall.wSB, thickness: 0.2, role: 'partition', arc: { radius: 1, ccw: true } }),
+    ).toContain('cannot span');
     expect(wall.thickness).toBe(0.3);
     expect(wall.role).toBe('facade');
   });

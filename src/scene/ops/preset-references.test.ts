@@ -36,7 +36,12 @@ function withPreset(ops: readonly SceneOp[]): SceneData {
   return {
     ...lShapePlan,
     interiors: [
-      { id: NEW.preset, name: 'Warm', swatch: [FINISH.oak, FINISH.sand], ops: [...ops, { op: 'set_object', assetId: TABLE, material: FINISH.oak }] },
+      {
+        id: NEW.preset,
+        name: 'Warm',
+        swatch: [FINISH.oak, FINISH.sand],
+        ops: [...ops, { op: 'set_object', assetId: TABLE, material: FINISH.oak }],
+      },
     ],
   };
 }

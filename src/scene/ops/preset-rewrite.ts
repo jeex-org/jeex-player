@@ -25,7 +25,8 @@ export function splitWallInPresets(scene: Draft<SceneData>, op: SplitWallOp): vo
     const onBoth = (wallId: string): Draft<SceneOp> | undefined => {
       if (candidate.op === 'set_wall' || candidate.op === 'remove_wall') return { ...candidate, wallId };
       if (candidate.op !== 'set_material') return undefined;
-      if (candidate.surface !== undefined) return candidate.face === undefined ? undefined : { ...candidate, face: { ...candidate.face, wallId } };
+      if (candidate.surface !== undefined)
+        return candidate.face === undefined ? undefined : { ...candidate, face: { ...candidate.face, wallId } };
       return typeof candidate.target === 'object' ? { ...candidate, target: { ...candidate.target, wallId } } : undefined;
     };
     const firstCopy = onBoth(first);
