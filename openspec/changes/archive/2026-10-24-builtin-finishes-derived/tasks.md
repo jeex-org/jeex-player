@@ -14,5 +14,5 @@
 
 ## 3. Verification
 
-- [x] 3.1 While working: the bun tests of `scripts/`, `src/materials`, `src/ui`, `src/app/builtin-textures.test.ts`, `src/geometry/builtin-shell.test.ts` and `src/demo`; the browser tests that paint these finishes (`tests/component/sun-shadow.test.ts`, `capture-commands.test.ts`, `tests/built/finish-maps.spec.ts`) through the heavy-run queue when needed.
-- [x] 3.2 Integration: one full gate through the gate queue at the end; a red gate is answered per failed file.
+- [x] 3.1 While working: the bun tests of `scripts/`, `src/materials`, `src/ui`, `src/app/builtin-textures.test.ts`, `src/geometry/builtin-shell.test.ts` and `src/demo`; the browser tests that paint these finishes (`tests/component/sun-shadow.test.ts`, `capture-commands.test.ts`, `tests/built/finish-maps.spec.ts`) when needed.
+- [x] 3.2 Integration: one full gate at the end; a red gate is answered per failed file.

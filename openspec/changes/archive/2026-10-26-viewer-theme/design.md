@@ -83,5 +83,5 @@ The mini-map paints on a canvas, so its view cone and current-camera dot were fi
 ## Risks / Trade-offs
 
 - A visible default change for existing embedders. It is mitigated by a minor release and the migration snippet in the CHANGELOG.
-- About 18 screenshot baselines change. They are regenerated in this PR through the heavy queue.
+- About 18 screenshot baselines change. They are regenerated in this PR.
 - `color-mix()` shades are tuned by eye. The contrast tests pin the on-accent and focus legibility.

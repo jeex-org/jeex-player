@@ -36,5 +36,5 @@
 
 ## 8. Integration
 
-- [x] 8.1 Run the standard tier through the heavy queue; verify it is green
-- [x] 8.2 Run the end-to-end screenshot specs through the heavy queue; verify every existing baseline matches (the full gate is run once by the integrator before the merge)
+- [x] 8.1 Run the standard tier; verify it is green
+- [x] 8.2 Run the end-to-end screenshot specs; verify every existing baseline matches (the full gate is run once by the integrator before the merge)

@@ -32,6 +32,6 @@
 ## 5. Integration
 
 - [x] 5.1 Fast-tier checks green (its static steps run directly after one lint fix; the bun tests run in 5.2)
-- [x] 5.2 Run the standard tier once through the heavy-run queue (it includes the component test that uses the stand-in sidecar) and verify it is green; on red, re-run only the failed files
+- [x] 5.2 Run the standard tier once (it includes the component test that uses the stand-in sidecar) and verify it is green; on red, re-run only the failed files
 - [x] 5.3 Run `openspec validate --all --strict` and verify it passes
 - [x] 5.4 Verify the module is not public: no `package.json` export, lib build entry or `src/embed` / `src/lighting/index.ts` import reaches `src/lightmap/bake-lights*` (`grep -rn bake-lights package.json vite.lib.config.ts src/embed src/lighting/index.ts` finds nothing)

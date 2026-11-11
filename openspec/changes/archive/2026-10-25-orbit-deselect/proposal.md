@@ -2,7 +2,7 @@
 
 ## Why
 
-In 360 a tapped sofa, window or door keeps its selection aura until something else is selected; there is no way to drop a selection by tapping the object again. The owner asked for a second tap on the selected object to deselect it.
+In 360 a tapped sofa, window or door keeps its selection aura until something else is selected; there is no way to drop a selection by tapping the object again. A second tap on the selected object should deselect it.
 
 ## What Changes
 

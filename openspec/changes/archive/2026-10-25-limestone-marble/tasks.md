@@ -15,6 +15,6 @@ Each behaviour lands as a pair of commits: a red test commit whose body quotes t
 
 ## 3. Integration
 
-- [x] 3.1 Fast tier while working; failed files re-run alone through the heavy-run queue.
+- [x] 3.1 Fast tier while working; failed files re-run alone.
 - [x] 3.2 Archive, then code review and security review over the branch diff, one answer commit.
-- [x] 3.3 Rebase on the main branch, then one full gate through the gate queue.
+- [x] 3.3 Rebase on the main branch, then one full gate.

@@ -41,6 +41,7 @@ const FAST_LABELS = [
   'console policy (src/)',
   'listener policy (signal)',
   'no-docs-refs',
+  'no-internal-words',
   'bun test ($DIR, tier=$TIER)',
 ];
 
@@ -170,6 +171,7 @@ describe('check.sh step order', () => {
     'console policy',
     'listener policy',
     'no-docs-refs',
+    'no-internal-words',
   ];
   const EXPENSIVE_SUBSTRINGS = [
     'bun test',

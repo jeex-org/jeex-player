@@ -14,5 +14,5 @@
 
 ## 3. Integration
 
-- [ ] 3.1 Review of record over the branch diff and a security review; fixes in one answer commit.
-- [ ] 3.2 Rebase on the main branch, then one full gate through the gate queue; a red file is re-run alone, never the whole gate.
+- [ ] 3.1 Code review over the branch diff and a security review; fixes in one answer commit.
+- [ ] 3.2 Rebase on the main branch, then one full gate; a red file is re-run alone, never the whole gate.

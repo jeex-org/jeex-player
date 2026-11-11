@@ -126,6 +126,10 @@ echo "== no-docs-refs"
 # repository explains itself in its own files. The same script runs staged in
 # the pre-commit hook (`lefthook.yml`) and in CI (`scripts/ci-parity.test.ts`).
 bash scripts/no-docs-refs.sh
+echo "== no-internal-words"
+# Nor may it carry the words of a private working process (who reviewed or
+# ran what, on which network): staged in the pre-commit hook, and in CI.
+bash scripts/no-internal-words.sh
 echo "== bun test ($DIR, tier=$TIER)"
 if [ "$TIER" = fast ]; then
   # Selected by the change: `scripts/select-tests.ts` walks the import graph

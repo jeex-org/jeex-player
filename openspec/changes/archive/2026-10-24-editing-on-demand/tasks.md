@@ -53,5 +53,5 @@ Mapped to coverage below the browser, through the same gate (the gate's request 
 
 ## Workflow follow-up
 
-- The full gate runs once at the end of the branch, through the machine's gate queue, after the review of record.
+- The full gate runs once at the end of the branch, after the code review.
 - Archive the change after the review requirements are satisfied, so the landing carries the updated main specs.

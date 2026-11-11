@@ -25,7 +25,7 @@ import {
   hostBoxCss,
   optionsFromAttributes,
 } from './element.js';
-import { COMPOUND_SCHEMA, OPTION_SCHEMA } from '../app/viewer-options.js';
+import { COMPOUND_SCHEMA, OPTION_SCHEMA, resolveViewerOptions } from '../app/viewer-options.js';
 import type { SceneSource } from '../scene/scene-repository.js';
 import type { TourControls } from '../camera/tour-controls.js';
 import type { ViewerHandle } from '../app/viewer-handle.js';
@@ -64,6 +64,8 @@ type Recorder = {
   states: string[];
   /** Every `ratio` value the default box was given, oldest first. */
   boxes: Array<string | null>;
+  /** Every quality mode the running viewer was given, oldest first. */
+  qualities: string[];
   /** Subscriptions still open on the handle; teardown must empty this. */
   open: () => number;
   /** Fires one handle event at whoever subscribed to it. */
@@ -96,6 +98,7 @@ function harness(
   let themeRefreshes = 0;
   const states: string[] = [];
   const boxes: Array<string | null> = [];
+  const qualities: string[] = [];
   let disposals = 0;
   const listeners = new Map<string, Set<(payload: never) => void>>();
   const subscribe = (event: string, callback: (payload: never) => void): (() => void) => {
@@ -125,6 +128,9 @@ function harness(
     },
     setLightTemperature: (temperature: number | null) => {
       temperatures.push(temperature);
+    },
+    setQuality: (quality: string) => {
+      qualities.push(quality);
     },
     refreshTheme: () => {
       themeRefreshes += 1;
@@ -189,6 +195,7 @@ function harness(
       themeRefreshes: () => themeRefreshes,
       states,
       boxes,
+      qualities,
       get disposals() {
         return disposals;
       },
@@ -246,6 +253,15 @@ describe('optionsFromAttributes', () => {
     // hand on as garbage for the resolver to complain about.
     expect(optionsFromAttributes((name) => (name === 'minimap' ? '' : null))).toEqual({ view: { minimap: true } });
     expect(optionsFromAttributes((name) => (name === 'minimap' ? '0' : null))).toEqual({ view: { minimap: false } });
+  });
+
+  test('an empty value is a bare boolean only for an on/off option; anywhere else it is absent', () => {
+    // `lang=""` is the default locale, not the word `true` (an empty `src` is
+    // proved where it matters, at the mount: see «an element with an empty `src`»).
+    expect(optionsFromAttributes((name) => (name === 'lang' ? '' : null))).toEqual({});
+    // `analytics` is an on/off switch that fails closed: its bare spelling
+    // keeps turning telemetry off.
+    expect(resolveViewerOptions(optionsFromAttributes((name) => (name === 'analytics' ? '' : null))).analytics.mode).toBe('off');
   });
 
   test('an absent attribute contributes nothing, so the default stands', () => {
@@ -324,6 +340,16 @@ describe('connect', () => {
     expect(() => controller.connect()).not.toThrow();
     const scene = (record.mounted[0]!.options as { scene?: { repository?: { load: () => Promise<unknown> } } }).scene;
     expect(typeof scene?.repository?.load).toBe('function');
+    expect(scene?.repository?.load()).rejects.toMatchObject({ code: 'no-scene-source' });
+  });
+
+  test('an element with an empty `src` mounts like one with none', () => {
+    // What a CMS template writes for a listing with no tour: no scene, not a
+    // scene at the URL `true`.
+    const { controller, record } = harness({ src: '' });
+    controller.connect();
+    const scene = (record.mounted[0]!.options as { scene?: { url?: string; repository?: { load: () => Promise<unknown> } } }).scene;
+    expect(scene?.url).toBeUndefined();
     expect(scene?.repository?.load()).rejects.toMatchObject({ code: 'no-scene-source' });
   });
 
@@ -534,6 +560,15 @@ describe('the `lang` attribute', () => {
     expect((record.mounted[0]!.options as { locale?: string }).locale).toBeUndefined();
     expect(logged.codes()).toEqual(['locale-unknown']);
     expect(logged.entries[0]?.detail).toEqual({ lang: 'zz-ZZ' });
+  });
+
+  test('`lang=""` is the default language, with no warning', () => {
+    const { controller, record } = harness({ lang: '', src: '/a.json' });
+    const logged = collectLog();
+    controller.onLog = logged.sink;
+    controller.connect();
+    expect((record.mounted[0]!.options as { locale?: string }).locale).toBeUndefined();
+    expect(logged.entries).toEqual([]);
   });
 
   test('a plain language tag is used as it is', () => {
@@ -1035,14 +1070,31 @@ describe('the light temperature', () => {
     const logged = collectLog();
     controller.onLog = logged.sink;
     controller.connect();
-    for (const bad of ['2000', '3050', 'warm', '']) {
+    for (const bad of ['2000', '3050', 'warm']) {
       attributes['light-temperature'] = bad;
       controller.attributeChanged('light-temperature');
       await flushed();
     }
     expect(record.temperatures).toEqual([]);
-    expect(logged.codes()).toEqual(['option-invalid', 'option-invalid', 'option-invalid', 'option-invalid']);
+    expect(logged.codes()).toEqual(['option-invalid', 'option-invalid', 'option-invalid']);
     expect(logged.messages()[0]).toContain('light-temperature');
+  });
+
+  test('an empty live `light-temperature`, `quality` or `ratio` is the attribute removed: the default, no warning', async () => {
+    const attributes: Record<string, string> = { src: '/a.json', 'light-temperature': '3000', [QUALITY_ATTRIBUTE]: 'low', ratio: '4:3' };
+    const { controller, record } = harness(attributes);
+    const logged = collectLog();
+    controller.onLog = logged.sink;
+    controller.connect();
+    for (const name of ['light-temperature', QUALITY_ATTRIBUTE, 'ratio']) {
+      attributes[name] = '';
+      controller.attributeChanged(name);
+    }
+    await flushed();
+    expect(record.temperatures).toEqual([5000]);
+    expect(record.qualities).toEqual(['auto']);
+    expect(record.boxes.at(-1)).toBeNull();
+    expect(logged.entries).toEqual([]);
   });
 
   test('setLightTemperature before the start is queued, read back, and refused at the call when invalid', async () => {

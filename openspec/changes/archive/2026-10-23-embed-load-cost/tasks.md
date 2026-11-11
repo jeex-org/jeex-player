@@ -25,10 +25,10 @@
 ## 4. Integration
 
 - [x] 4.1 `bash scripts/check.sh fast`, `bun run check:budget` and `bun run check:budget:lib` are green; eager and lazy sizes recorded before and after.
-- [x] 4.2 The component tier passes (`bun run test:component` through the heavy-run queue).
+- [x] 4.2 The component tier passes (`bun run test:component`).
 - [x] 4.3 Lighthouse mobile, median of 3, on the bare-embed page and a below-the-fold page, before and after.
 
 ## Workflow follow-up
 
-- The repository's full gate, the review of record and the security review run before the delivery commit.
+- The repository's full gate, the code review and the security review run before the delivery commit.
 - Archive the change after those checks, then validate all specs.

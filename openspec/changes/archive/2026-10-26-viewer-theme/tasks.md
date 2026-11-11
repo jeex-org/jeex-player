@@ -32,10 +32,10 @@
 - [ ] 2.3 CSS tokens and neutral defaults; the state surface
 - [ ] 2.4 Hint toggle; reveal button delay
 - [ ] 2.5 Site demo-frame theme; README theming section; CHANGELOG with a migration snippet
-- [ ] 2.6 Screenshot baselines regenerated through the heavy queue
+- [ ] 2.6 Screenshot baselines regenerated
 
 ## 3. Checks
 
 - [ ] 3.1 Fast tier green
-- [ ] 3.2 OCR review of record and security review; one answer commit
+- [ ] 3.2 Code review and security review; one answer commit
 - [ ] 3.3 One full gate

@@ -4,7 +4,7 @@
 
 - [x] 1.1 `metadata-table.test.ts`: a face row has no `guid`/`ifcGuid`/`id` and exactly one row per face, matching its wall, side and room; every remaining `guid` is a UUID v7 from the document; face rows strictly ordered by `(wallId, side)`; the painted-face lookup by address. Run: red for the right reason.
 - [x] 1.2 `structuralMetadataExtension` test: `guid`, `ifcGuid`, `id` declared `required: false`; the three columns are `null` exactly at face rows. Run: red.
-- [x] 1.3 `tests/component/export-gltf.test.ts`: in the exported GLB, every face row's id cells are `null`, entity rows keep their UUIDs, there is one wall mesh per face row, each carries a feature id, and each resolves to the face row with its wall, side and room (through the heavy-run queue). Run: red.
+- [x] 1.3 `tests/component/export-gltf.test.ts`: in the exported GLB, every face row's id cells are `null`, entity rows keep their UUIDs, there is one wall mesh per face row, each carries a feature id, and each resolves to the face row with its wall, side and room. Run: red.
 - [x] 1.4 `uuid.test.ts`: `ifcGuid` tests on fixed UUID inputs, no `uuidV5`.
 
 ## 2. Code
@@ -22,4 +22,4 @@
 ## 4. Checks
 
 - [x] 4.1 Fast tier `bash scripts/check.sh fast`; failed files re-run alone.
-- [x] 4.2 Standard tier once at the end through the heavy-run queue. No screenshot baseline changes.
+- [x] 4.2 Standard tier once at the end. No screenshot baseline changes.
