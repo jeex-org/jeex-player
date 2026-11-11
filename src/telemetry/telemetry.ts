@@ -3,9 +3,8 @@
  * accumulates, builds each send, judges it and hands it to the transport.
  *
  * Off invariant: `createTelemetry` returns `null` when the mount said
- * `analytics: off`, when the host named no endpoint or one the check refuses,
- * or when the browser reports Global Privacy Control. There is no default
- * endpoint. `null` means no collector, no listener, no
+ * `analytics: off`, when the endpoint override is refused, or when the browser
+ * reports Global Privacy Control. `null` means no collector, no listener, no
  * timer and no request, ever; callers hold an optional and do nothing. GPC is
  * read again before every request.
  *
@@ -38,6 +37,7 @@ import { sendTelemetry } from './transport.js';
 import { MAX_ASSETS, isTelemetryEndpoint, isTelemetrySend } from './telemetry.schema.js';
 import { UUID_V7_PATTERN } from '../scene/types.js';
 import {
+  DEFAULT_TELEMETRY_ENDPOINT,
   TELEMETRY_LANGS,
   TELEMETRY_SCHEMA_VERSION,
   type CounterKey,
@@ -87,7 +87,7 @@ export type TelemetryHost = {
 /** What a mount decided about telemetry. */
 export type TelemetryConfig = {
   mode: 'on' | 'off';
-  /** Where the sends go; `undefined`, or anything the endpoint check refuses, turns sending off. */
+  /** `undefined` is the default endpoint; anything the endpoint check refuses turns sending off. */
   endpoint: string | undefined;
   embed: EmbedForm;
   /** `package.json#version` of this build. */
@@ -141,13 +141,13 @@ function unregister(telemetry: Telemetry): void {
 }
 
 /**
- * The telemetry of one mount, or `null` when nothing may be sent. No endpoint
- * is off; a refused one too, and the options resolver has already said why.
+ * The telemetry of one mount, or `null` when nothing may be sent. A refused
+ * endpoint override is off; the options resolver has already said why.
  */
 export function createTelemetry(config: TelemetryConfig): Telemetry | null {
   if (config.mode === 'off' || config.host.gpc()) return null;
-  const endpoint = config.endpoint;
-  if (endpoint === undefined || !isTelemetryEndpoint(endpoint)) return null;
+  const endpoint = config.endpoint ?? DEFAULT_TELEMETRY_ENDPOINT;
+  if (!isTelemetryEndpoint(endpoint)) return null;
   return new Telemetry(config, endpoint);
 }
 

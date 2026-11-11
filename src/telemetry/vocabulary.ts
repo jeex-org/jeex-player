@@ -17,6 +17,9 @@ import { SHIPPED_LOCALES } from '../ui/messages.js';
 /** Semver of the payload schema; every send carries it as `schema`. */
 export const TELEMETRY_SCHEMA_VERSION = '1.1.0';
 
+/** Where sends go when nothing overrides it. */
+export const DEFAULT_TELEMETRY_ENDPOINT = 'https://telemetry.jeex.org/v1/player';
+
 export const EMBED_FORMS = ['element', 'iframe', 'script'] as const;
 export type EmbedForm = (typeof EMBED_FORMS)[number];
 

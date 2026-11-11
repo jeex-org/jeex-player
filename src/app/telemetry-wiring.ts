@@ -4,8 +4,8 @@
  * turns them into the plain calls `telemetry/telemetry.ts` takes.
  *
  * Off invariant: when `createTelemetry` answers `null` (the option says off,
- * the host named no endpoint or a refused one, or the browser reports Global
- * Privacy Control) this module subscribes to nothing, adds no frame hook and returns
+ * the endpoint override was refused, or the browser reports Global Privacy
+ * Control) this module subscribes to nothing, adds no frame hook and returns
  * a wiring whose every method does nothing.
  *
  * Measurement invariants: `ready` is timed by the last frame the renderer
@@ -13,7 +13,7 @@
  * the announcement follows the first picture), once per load; frame time counts only intervals between consecutive drawn 3D frames;
  * room time counts the frame loop's ticks, drawn or not, while the camera is
  * inside the apartment (walk and tour); engaged time counts the same ticks
- * in every mode, so a pause (a hidden tab, an off-screen canvas) is left out of
+ * in every mode, so a pause (a hidden tab, a detached or hidden canvas) is left out of
  * both; a mode change counts only after the first `ready` and only when the
  * mode really changed from the one the viewer booted in or last switched to.
  *

@@ -13,11 +13,11 @@ The data is anonymous and is used only to improve the player. It is never sold, 
 
 Off means no request at all. Everything else the player does is unchanged: it still loads its scene and models from wherever they are served.
 
-The player has no default address: it sends only when the site names one with `analytics-endpoint` (`?analyticsEndpoint=`, `analytics.endpoint`), an `https:` URL, or `http:` on `localhost`/`127.0.0.1`. Without one, or with any other value, nothing is sent and no listener or timer is started.
+`analytics-endpoint` (`?analyticsEndpoint=`, `analytics.endpoint`) sends the same data to another address instead: an `https:` URL, or `http:` on `localhost`/`127.0.0.1`. Any other value turns telemetry off.
 
 ## Where it goes
 
-Every request is a `POST` of one JSON object to the endpoint the site named, made with `fetch` and `keepalive`, without credentials (`credentials: 'omit'`), without a referrer (`referrerPolicy: 'no-referrer'`), without custom headers and without retries. A failed request is ignored. A site with a Content Security Policy must allow the endpoint in `connect-src`; otherwise the requests are refused silently.
+Every request is a `POST` of one JSON object to `https://telemetry.jeex.org/v1/player`, made with `fetch` and `keepalive`, without credentials (`credentials: 'omit'`), without a referrer (`referrerPolicy: 'no-referrer'`), without custom headers and without retries. A failed request is ignored. A site with a Content Security Policy must allow the endpoint in `connect-src`; otherwise the requests are refused silently.
 
 Like any web request, a request reaches the server with the visitor's IP address and the browser's standard headers. The player cannot remove them; the player itself never sends them in the body, and the receiving server's own policy covers what it keeps of them.
 
@@ -59,7 +59,7 @@ Each request belongs to one group (`group`) and carries the shared context. Ever
 | `outcome` | `models_loaded`: `complete`, `partial` (some failed), `budget` (stopped by the size limit), `none` (nothing to load) | `"complete"` |
 | `failed` | `models_loaded`: models that could not load, at most 50 | `0` |
 | `assets` | `models_loaded`: UUIDs of the project's library assets, at most 50 | `["0192…"]` |
-| `engaged` | `engaged`: time the player was on screen and running since the view began or since the last `engaged`, in every view mode, without the time the page was hidden or the player was paused: `<10s`, `10-30s`, `30s-2m`, `2-5m`, `5-15m`, `>15m`; never sent for no time at all | `"2-5m"` |
+| `engaged` | `engaged`: time while the page was visible and the player was running, since the view began or since the last `engaged`, in every view mode: `<10s`, `10-30s`, `30s-2m`, `2-5m`, `5-15m`, `>15m`; never sent for no time at all | `"2-5m"` |
 
 `view` is sent once per player, when its first scene has loaded or failed, at most 2 seconds after the mount, with the `subject` known then (a failed load names the project and bake when its manifest was read); `ready` is sent at once (the iframe page holds both up to 2 seconds for its host to name the page first); `engaged` is sent when the page is hidden, the scene is replaced or the player is removed, for the scene the time was spent on; everything else is sent when the page is hidden or closed, every 5 minutes, and when the scene changes.
 

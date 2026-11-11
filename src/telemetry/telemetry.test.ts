@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, test } from 'bun:test';
 import { FLUSH_INTERVAL_MS, createTelemetry, type TelemetryConfig, type TelemetryHost } from './telemetry.js';
-import { COUNTER_KEYS, ERROR_CODES, ERROR_NAMES, ERROR_STAGES, EMBED_FORMS } from './vocabulary.js';
+import { COUNTER_KEYS, DEFAULT_TELEMETRY_ENDPOINT, ERROR_CODES, ERROR_NAMES, ERROR_STAGES, EMBED_FORMS } from './vocabulary.js';
 import { DWELL_BUCKETS, ENGAGED_BUCKETS, LOAD_BUCKETS, WIDTH_BUCKETS } from './buckets.js';
 
 const PROJECT = '0192f5c4-7a1b-7c3d-8e9f-0a1b2c3d4e51';
@@ -8,7 +8,6 @@ const BAKE = '0192f5c4-7a1b-7c3d-8e9f-0a1b2c3d4e52';
 const SCENE = '0192f5c4-7a1b-7c3d-8e9f-0a1b2c3d4e53';
 const ROOM = '0192f5c4-7a1b-7c3d-8e9f-0a1b2c3d4e54';
 const OWN = 'https://cdn.example/jeex/jeex-viewer.iife.js';
-const ENDPOINT = 'https://stats.agency.example/player';
 
 type FakeHost = TelemetryHost & {
   leave(): void;
@@ -91,7 +90,7 @@ const ownError = (name = 'TypeError', line = 7): Error => {
 };
 
 function config(host: TelemetryHost, overrides: Partial<TelemetryConfig> = {}): TelemetryConfig {
-  return { mode: 'on', endpoint: ENDPOINT, embed: 'element', player: '0.1.0', host, isOwn: (url) => url === OWN, ...overrides };
+  return { mode: 'on', endpoint: undefined, embed: 'element', player: '0.1.0', host, isOwn: (url) => url === OWN, ...overrides };
 }
 
 /** Uses the player the way a visitor does: every kind of data, then every trigger; `beforeDispose` sees the live state. */
@@ -120,9 +119,9 @@ function session(host: FakeHost, overrides: Partial<TelemetryConfig> = {}, befor
 }
 
 describe('createTelemetry: off means nothing at all', () => {
-  test('off, GPC, no endpoint and a refused endpoint create nothing and send nothing through a whole session', () => {
+  test('off, GPC and a refused endpoint create nothing and send nothing through a whole session', () => {
     const none = { leave: 0, pageError: 0, timers: 0, timeouts: 0 };
-    for (const overrides of [{ mode: 'off' as const }, { endpoint: undefined }, { endpoint: 'ftp://stats.example/' }, { endpoint: '' }]) {
+    for (const overrides of [{ mode: 'off' as const }, { endpoint: 'ftp://stats.example/' }, { endpoint: '' }]) {
       const host = fakeHost();
       // Nothing is listened to or timed WHILE the mount lives, not merely after it.
       session(host, overrides, () => expect(host.listeners).toEqual(none));
@@ -137,7 +136,7 @@ describe('createTelemetry: off means nothing at all', () => {
   test('positive control: the same session with telemetry on does send', () => {
     session(fakeHost());
     expect(requests.length).toBeGreaterThan(0);
-    expect(requests.every((request) => request.url === ENDPOINT)).toBe(true);
+    expect(requests.every((request) => request.url === DEFAULT_TELEMETRY_ENDPOINT)).toBe(true);
   });
 
   test('GPC turned on after the mount stops every later request', () => {
@@ -155,7 +154,7 @@ describe('createTelemetry: off means nothing at all', () => {
     expect(requests.map((request) => `${String(request.body['group'])}/${String(request.body['event'])}`)).toEqual(['lifecycle/view']);
   });
 
-  test('the endpoint the host names is used', () => {
+  test('an endpoint override is used', () => {
     const telemetry = createTelemetry(config(fakeHost(), { endpoint: 'https://stats.agency.example/p' }))!;
     telemetry.viewed();
     telemetry.dispose();

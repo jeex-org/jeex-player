@@ -11,7 +11,7 @@
 import { expect, test, type BrowserContext, type Page, type Request } from '@playwright/test';
 import { waitForBoot } from './support.js';
 
-const TELEMETRY = /^https:\/\/telemetry\.example\//;
+const TELEMETRY = /^https:\/\/telemetry\.jeex\.org\//;
 /** A baked project the dev server serves. */
 const PROJECT = '/tests/fixtures/project-library/project.json';
 const CONTEXT_KEYS = ['embed', 'group', 'lang', 'page', 'player', 'schema', 'site', 'subject'];
@@ -44,17 +44,9 @@ async function visit(page: Page, path: string): Promise<void> {
 }
 
 /** Opens the telemetry page in one form and waits until its viewer is on screen. */
-async function open(
-  page: Page,
-  form: 'element' | 'script' | 'iframe',
-  analytics?: string,
-  endpoint?: string,
-  project?: string,
-): Promise<void> {
+async function open(page: Page, form: 'element' | 'script' | 'iframe', analytics?: string): Promise<void> {
   const query = new URLSearchParams({ form });
   if (analytics !== undefined) query.set('analytics', analytics);
-  if (endpoint !== undefined) query.set('endpoint', endpoint);
-  if (project !== undefined) query.set('project', project);
   await visit(page, `/dev/telemetry.html?${query.toString()}`);
   await waitForBoot(page, form === 'element' ? 'window.__appReady === true' : 'window.jeexTelemetryReady === true');
 }
@@ -145,28 +137,7 @@ for (const { form, analytics } of OFF) {
   });
 }
 
-for (const form of ['element', 'script', 'iframe'] as const) {
-  test(`${form} with no endpoint named makes no telemetry request at all`, async ({ page, context }) => {
-    const seen = await capture(context);
-    // Every request of every frame: with no endpoint there is no host to send to,
-    // so nothing may leave for another origin, and nothing is posted anywhere.
-    const requests: Request[] = [];
-    context.on('request', (request) => requests.push(request));
-    await open(page, form, undefined, 'none');
-    await finishVisit(page);
-    expect(seen.map((entry) => entry.body)).toEqual([]);
-    const origin = new URL(page.url()).origin;
-    const stray = requests.filter((request) => {
-      const url = request.url();
-      const local = url.startsWith('blob:') || url.startsWith('data:') || new URL(url).origin === origin;
-      return !local || request.method() !== 'GET';
-    });
-    expect(stray.map((request) => `${request.method()} ${request.url()}`)).toEqual([]);
-    expect(requests.length).toBeGreaterThan(0);
-  });
-}
-
-test('positive control: the same visit with only an endpoint named does send, in all three forms', async ({ page, context }) => {
+test('positive control: the same visit with nothing said does send, in all three forms', async ({ page, context }) => {
   const seen = await capture(context);
   for (const form of ['element', 'script', 'iframe'] as const) {
     await open(page, form);
@@ -211,10 +182,9 @@ test('the iframe page holds view and ready until the host context, then names th
   await expect.poll(() => seen.map((entry) => entry.body['event'])).toEqual(['view', 'ready']);
   const origin = new URL(page.url()).origin;
   for (const { body } of seen) expect(body).toMatchObject({ embed: 'iframe', site: origin, page: '/dev/telemetry.html' });
-  // The path travelled by postMessage only: the frame URL carries the bridge's parameters and the
-  // endpoint the dev page names, no host path.
+  // The path travelled by postMessage only: the frame URL carries the bridge's parameters, no host path.
   const src = (await page.locator('#stage iframe').getAttribute('src')) ?? '';
-  expect([...new URL(src, origin).searchParams.keys()].sort()).toEqual(['analyticsEndpoint', 'host', 'viewerId']);
+  expect([...new URL(src, origin).searchParams.keys()].sort()).toEqual(['host', 'viewerId']);
 });
 
 test('without location.ancestorOrigins the iframe site is the verified host origin', async ({ page, context }) => {

@@ -16,11 +16,11 @@ as described under [Versioning](#versioning).
   a host's own Previous/Next buttons and a phone tier switch work through a
   frame as they do on the module and the element.
 - **Telemetry schema 1.1.0.** A new `lifecycle` send, `engaged`, carries
-  the time the player was on screen and running, in every view mode and
-  without hidden or paused time, as a bucket (`<10s`, `10-30s`, `30s-2m`,
-  `2-5m`, `5-15m`, `>15m`), once each time the view ends (the page hidden,
-  the scene replaced, or the player disposed), only for the time since the
-  last one and under the scene it was spent on. Every 1.0.0 field is
+  the time while the page was visible and the player was running, in every
+  view mode, as a bucket (`<10s`, `10-30s`, `30s-2m`, `2-5m`, `5-15m`,
+  `>15m`), once each time the view ends (the page hidden, the scene
+  replaced, or the player disposed), only for the time since the last one
+  and under the scene it was spent on. Every 1.0.0 field is
   unchanged; `view` now waits for the first document (at most 2 seconds) and
   names its subject, project, bake and scene, in every embed form (a failed
   first load names the project and bake its manifest gave, or nothing), and
@@ -325,11 +325,6 @@ as described under [Versioning](#versioning).
 
 ### Changed
 
-- **The player no longer sends telemetry to a default endpoint.** It sends
-  only when the host names one (`analytics-endpoint`, `?analyticsEndpoint=`,
-  `analytics.endpoint`); without one nothing is sent and no telemetry
-  listener or timer starts. `analytics="off"` and Global Privacy Control
-  work as before.
 - **The authoring tools load on demand, as one chunk.** The tour-camera
   overlay with its preview card and look-through, the asset move tool and the
   plan tool load with the first `setCheckpointOverlay(true)`,

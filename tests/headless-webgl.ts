@@ -68,13 +68,12 @@ const NVIDIA_EGL_VENDOR = '/usr/share/glvnd/egl_vendor.d/10_nvidia.json';
 const WSL_GPU_LIBRARIES = '/usr/lib/wsl/lib';
 
 /**
- * The player names no telemetry endpoint by itself; this host is the one the
- * telemetry page of the e2e suite names. Every test browser resolves it to
- * nothing, so no test, screenshot or poster run can ever reach a real
- * endpoint; a spec that asserts sends intercepts the request, which happens
- * before name resolution.
+ * The player sends anonymous telemetry to this host by default. Every test
+ * browser resolves it to nothing, so no test, screenshot or poster run can
+ * ever reach the production endpoint; a spec that asserts sends intercepts
+ * the request, which happens before name resolution.
  */
-export const TELEMETRY_HOST_RULE = '--host-resolver-rules=MAP telemetry.example ~NOTFOUND';
+export const TELEMETRY_HOST_RULE = '--host-resolver-rules=MAP telemetry.jeex.org ~NOTFOUND';
 
 /**
  * The launch options for the configured WebGL path (module comment). The

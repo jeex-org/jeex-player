@@ -19,7 +19,6 @@ const SCENE_B = '0192f5c4-7a1b-7c3d-8e9f-0a1b2c3d4e5b';
 const PROJECT = '0192f5c4-7a1b-7c3d-8e9f-0a1b2c3d4e51';
 const BAKE = '0192f5c4-7a1b-7c3d-8e9f-0a1b2c3d4e52';
 const ASSET = '0192f5c4-7a1b-7c3d-8e9f-0a1b2c3d4e53';
-const ENDPOINT = 'https://stats.agency.example/player';
 
 type Listener = () => void;
 
@@ -140,7 +139,7 @@ function rig(options: ViewerOptionsInput = {}, gpc = false, site?: TelemetryWiri
   let project: ProjectInfo | null = null;
   let manifest: { projectId: string; bakeId: string } | null = null;
   const deps: TelemetryWiringDeps = {
-    options: resolveViewerOptions({ scene: { url: 'scene.json' }, analytics: { endpoint: ENDPOINT }, ...options }),
+    options: resolveViewerOptions({ scene: { url: 'scene.json' }, ...options }),
     embed: site ? 'iframe' : 'element',
     site,
     container: page.container,
@@ -184,10 +183,9 @@ const result = (over: Partial<UpgradeResult> = {}): UpgradeResult => ({
 });
 
 describe('telemetry wiring', () => {
-  test('off, GPC and no endpoint: nothing is sent and nothing is listened to, through a whole session', () => {
+  test('off and GPC: nothing is sent and nothing is listened to, through a whole session', () => {
     for (const subject of [
       rig({ analytics: { mode: 'off' } }),
-      rig({ analytics: 'on' }),
       rig({}, true),
       rig({ analytics: { endpoint: '' }, onLog: () => undefined }),
     ]) {

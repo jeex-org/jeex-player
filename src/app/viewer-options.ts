@@ -235,11 +235,10 @@ export type ViewerOptions = {
    * absent `mode` or exactly `'on'` sends; `'off'` and every other value
    * (`false`, `null`, `'OFF'`, `'none'`, an empty attribute) send nothing at
    * all. Global Privacy Control does the same whatever this says.
-   * `analytics: 'off'` is shorthand for `{ mode: 'off' }`. `endpoint` is
-   * where the sends go: an `https:` URL, or `http:` on this machine; any other
-   * value turns sending off (it resolves to `''`). There is no default
-   * endpoint: without one nothing is sent and no listener or timer starts.
-   * Default `on`, with no endpoint.
+   * `analytics: 'off'` is shorthand for `{ mode: 'off' }`. `endpoint`
+   * replaces where the sends go: an `https:` URL, or `http:` on this machine;
+   * any other value turns sending off (it resolves to `''`). Default `on`, to
+   * the default endpoint.
    */
   analytics: { mode: 'on' | 'off'; endpoint?: string | undefined };
   /**
