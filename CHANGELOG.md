@@ -195,6 +195,10 @@ as described under [Versioning](#versioning).
   its fingers travel up or down). Such a swipe neither pauses a playing tour
   nor stops a camera step, and gives the focus back to whatever had it. After
   a tap the viewer owns the finger as before.
+- **A phone visitor is told to tap.** The first vertical swipe over an
+  untouched viewer shows a short «Tap to look around» plate (key
+  `hint.tapToLook`, in every shipped locale), once per view; it goes on the
+  tap or 1.5 s after the swipe, and takes neither the gesture nor the focus.
 - **No WebGL is a failed boot.** Without a WebGL 2 context `ready` rejects
   with `webgl-unavailable`, as the handle documents, and so does a later
   `loadScene`; before, both resolved over the fallback card.

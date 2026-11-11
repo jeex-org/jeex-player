@@ -72,6 +72,21 @@ test('a vertical swipe over an untouched viewer scrolls the page and leaves the 
   await expect(root).toHaveAttribute('data-jeex-engaged', 'false');
 });
 
+test('a vertical swipe over an untouched viewer shows «Tap to look around», and the tap takes it away', async ({ page }) => {
+  const cdp = await page.context().newCDPSession(page);
+  const plate = page.locator('#stage [data-jeex="tap-hint"]');
+  await expect(plate).toHaveAttribute('data-visible', 'false');
+  const centre = await sceneCentre(page);
+  await swipe(cdp, centre, { x: 0, y: -centre.height / 2 });
+  await expect(plate).toHaveAttribute('data-visible', 'true');
+  await expect(plate).toHaveText('Tap to look around');
+  // The page still took the swipe; the plate took nothing from it.
+  await expect.poll(async () => scrollY(page)).toBeGreaterThan(40);
+  const tapAt = await sceneCentre(page);
+  await page.touchscreen.tap(tapAt.x, tapAt.y);
+  await expect(plate).toHaveAttribute('data-visible', 'false');
+});
+
 test('a sideways drag over an untouched viewer still turns the camera, and the page stays put', async ({ page }) => {
   const cdp = await page.context().newCDPSession(page);
   const before = await camera(page);

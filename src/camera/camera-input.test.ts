@@ -729,14 +729,52 @@ describe('touch over a viewer that is not engaged', () => {
     expect(built.blurs()).toBe(1);
   });
 
-  test('a vertical swipe the page takes sends nothing, so a playing tour or a camera step goes on', () => {
+  test('a vertical swipe the page takes sends only its report, so a playing tour or a camera step goes on', () => {
     // `press` is the pointer gesture that reports manual input (the
     // controller's `onPress`), which pauses a tour and stops a step in flight.
     const built = touchRig({ value: false });
     built.canvas.fire('pointerdown', { pointerId: 1, pointerType: 'touch', clientX: 100, clientY: 300, button: 0, shiftKey: false });
     built.canvas.fire('pointermove', { pointerId: 1, pointerType: 'touch', clientX: 102, clientY: 281 });
     built.canvas.fire('pointercancel', { pointerId: 1, pointerType: 'touch' });
-    expect(built.types()).toEqual([]);
+    expect(built.types()).toEqual(['swipe-through']);
+  });
+
+  test('a vertical swipe over an untouched viewer is reported once, whether the page scrolled or could not', () => {
+    const scrolled = touchRig({ value: false });
+    scrolled.canvas.fire('pointerdown', { pointerId: 1, pointerType: 'touch', clientX: 100, clientY: 300, button: 0, shiftKey: false });
+    scrolled.canvas.fire('pointermove', { pointerId: 1, pointerType: 'touch', clientX: 101, clientY: 280 });
+    scrolled.canvas.fire('pointermove', { pointerId: 1, pointerType: 'touch', clientX: 102, clientY: 250 });
+    scrolled.canvas.fire('pointercancel', { pointerId: 1, pointerType: 'touch' });
+    expect(scrolled.types()).toEqual(['swipe-through']);
+    // The browser took it before a move crossed the threshold: the cancel reports it.
+    const early = touchRig({ value: false });
+    early.canvas.fire('pointerdown', { pointerId: 1, pointerType: 'touch', clientX: 100, clientY: 300, button: 0, shiftKey: false });
+    early.canvas.fire('pointercancel', { pointerId: 1, pointerType: 'touch' });
+    expect(early.types()).toEqual(['swipe-through']);
+    // A page that cannot scroll leaves the finger to lift: the swipe is still reported.
+    const stuck = touchRig({ value: false });
+    stuck.canvas.fire('pointerdown', { pointerId: 1, pointerType: 'touch', clientX: 100, clientY: 300, button: 0, shiftKey: false });
+    stuck.canvas.fire('pointermove', { pointerId: 1, pointerType: 'touch', clientX: 101, clientY: 260 });
+    stuck.canvas.fire('pointerup', { pointerId: 1, pointerType: 'touch' });
+    expect(stuck.types()).toEqual(['swipe-through', 'press', 'release']);
+  });
+
+  test('a tap, a sideways drag and any touch on an engaged viewer report no swipe', () => {
+    const tap = touchRig({ value: false });
+    tap.canvas.fire('pointerdown', { pointerId: 1, pointerType: 'touch', clientX: 10, clientY: 10, button: 0, shiftKey: false });
+    tap.canvas.fire('pointerup', { pointerId: 1, pointerType: 'touch' });
+    expect(tap.of('swipe-through')).toHaveLength(0);
+    const sideways = touchRig({ value: false });
+    sideways.canvas.fire('pointerdown', { pointerId: 1, pointerType: 'touch', clientX: 100, clientY: 300, button: 0, shiftKey: false });
+    sideways.canvas.fire('pointermove', { pointerId: 1, pointerType: 'touch', clientX: 130, clientY: 298 });
+    sideways.canvas.fire('pointermove', { pointerId: 1, pointerType: 'touch', clientX: 135, clientY: 260 });
+    sideways.canvas.fire('pointercancel', { pointerId: 1, pointerType: 'touch' });
+    expect(sideways.of('swipe-through')).toHaveLength(0);
+    const engaged = touchRig({ value: true });
+    engaged.canvas.fire('pointerdown', { pointerId: 1, pointerType: 'touch', clientX: 100, clientY: 300, button: 0, shiftKey: false });
+    engaged.canvas.fire('pointermove', { pointerId: 1, pointerType: 'touch', clientX: 101, clientY: 250 });
+    engaged.canvas.fire('pointercancel', { pointerId: 1, pointerType: 'touch' });
+    expect(engaged.of('swipe-through')).toHaveLength(0);
   });
 
   test('the press arrives once the viewer keeps the gesture: a tap, a sideways claim, a second finger', () => {

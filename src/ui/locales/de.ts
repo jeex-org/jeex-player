@@ -11,6 +11,7 @@ export const DE: Record<MessageKey, string> = {
     'Ziehen Sie zum Umsehen · klicken Sie auf den Boden, um dorthin zu gehen · scrollen Sie für einen Schritt vor oder zurück · Leertaste oder rechte Maustaste + Ziehen zum Bewegen',
   'hint.scrollZoom': 'Strg + Scrollen zum Zoomen',
   'hint.scrollZoomApple': '⌘ + Scrollen zum Zoomen',
+  'hint.tapToLook': 'Tippen, um sich umzusehen',
   'mark.madeWith': 'Mit JEEX erstellt',
   'hint.walkCameras': 'Frei umhergehen oder mit Bild ab und Bild auf zwischen den Kameras wechseln',
   'walkCameras.label': 'Tour-Kameras',

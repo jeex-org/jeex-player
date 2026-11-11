@@ -97,6 +97,13 @@ type InputCallbacks = WalkCallbacks & {
    * mode that would have acted on it: the caller shows «Ctrl + scroll to zoom».
    */
   onScrollThrough?: (() => void) | undefined;
+  /**
+   * A vertical swipe over a viewer not engaged went to the page, in a mode
+   * that takes input: the caller shows «Tap to look around».
+   */
+  onSwipeThrough?: (() => void) | undefined;
+  /** A pointer press reached the viewer (a tap engages it): a plate asking for one goes. */
+  onPress?: (() => void) | undefined;
 };
 
 export class CameraController {
@@ -477,6 +484,7 @@ export class CameraController {
       this.orbit.keyUp(gesture.code);
       return false;
     }
+    if (gesture.type === 'press') this.callbacks.onPress?.();
     // A plan mode owns the picture: the rig is frozen and takes no input.
     if (isPlanMode(this.mode)) return false;
     switch (gesture.type) {
@@ -511,6 +519,10 @@ export class CameraController {
         );
       case 'scroll-through':
         if (this.mode === 'orbit' || this.mode === 'walk') this.callbacks.onScrollThrough?.();
+        return false;
+      case 'swipe-through':
+        // A tap takes control in the tour too, so the tour says it as well.
+        this.callbacks.onSwipeThrough?.();
         return false;
       case 'tap':
         // A tap means "what is this?" in 360 and "take me there" on foot.

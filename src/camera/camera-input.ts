@@ -37,7 +37,8 @@
  * its `press` only once the viewer keeps the gesture. A touch the browser
  * takes for a page scroll arrives as `pointercancel`, sends nothing, and the
  * focus it took is handed back, so only a tap or a drag the viewer kept
- * engages it.
+ * engages it. Such a swipe is reported as `swipe-through` (the «Tap to look
+ * around» plate).
  */
 
 import { CAMERA_TUNING } from './camera-tuning.js';
@@ -102,7 +103,16 @@ export type CameraGesture =
    * fullscreen) and the page around it can scroll. Nothing moves; a mode that
    * would have acted on the wheel says how to make it act (Ctrl/⌘ + scroll).
    */
-  | { type: 'scroll-through' };
+  | { type: 'scroll-through' }
+  /**
+   * The touch counterpart of `scroll-through`: a vertical swipe that started
+   * on a viewer not engaged went to the page (or would have, on a page that
+   * cannot scroll). Sent once per gesture; it moves nothing, and the caller
+   * says how to engage (a tap). It is
+   * sent when the gesture ends: on the browser's `pointercancel`, or on the
+   * finger lifting after a vertical move the page could not scroll.
+   */
+  | { type: 'swipe-through' };
 
 /**
  * Where the listeners go. The canvas takes the pointer and wheel events; keys
@@ -285,7 +295,14 @@ export class CameraInput {
    * the gesture) and turns nothing; a `pointercancel` sends no gesture at all
    * and hands the focus back to `focusBefore`.
    */
-  private unengagedTouch: { pointerId: number; x: number; y: number; focusBefore: HTMLElement | null } | null = null;
+  private unengagedTouch: {
+    pointerId: number;
+    x: number;
+    y: number;
+    focusBefore: HTMLElement | null;
+    /** Whether a move past the drag threshold went up or down: the gesture is a swipe. */
+    vertical: boolean;
+  } | null = null;
 
   constructor(target: CameraInputTarget, onGesture: CameraGestureSink) {
     this.target = target;
@@ -403,7 +420,7 @@ export class CameraInput {
     const unengaged = firstTouch && this.target.keys.dataset['jeexEngaged'] !== 'true';
     if (firstTouch) this.syncEngaged();
     this.unengagedTouch = unengaged
-      ? { pointerId: event.pointerId, x: event.clientX, y: event.clientY, focusBefore: focusedElement() }
+      ? { pointerId: event.pointerId, x: event.clientX, y: event.clientY, focusBefore: focusedElement(), vertical: false }
       : null;
     // A press on the scene is what gives this viewer the keyboard: the key
     // listeners live on the shell root, so `w` after a click here walks THIS
@@ -473,7 +490,11 @@ export class CameraInput {
     if (touch === null || touch.pointerId !== event.pointerId || this.pointers.size !== 1) return false;
     const dx = Math.abs(event.clientX - touch.x);
     const dy = Math.abs(event.clientY - touch.y);
-    if (dx + dy <= POINTER.dragThresholdPx || dy >= dx) return true;
+    if (dx + dy <= POINTER.dragThresholdPx) return true;
+    if (dy >= dx) {
+      touch.vertical = true;
+      return true;
+    }
     this.unengagedTouch = null;
     this.emitPress();
     return false;
@@ -483,6 +504,9 @@ export class CameraInput {
     // A tap on an unengaged viewer (or a swipe the browser left to it): the
     // viewer kept the gesture, so its press arrives now, before the release.
     if (this.unengagedTouch?.pointerId === event.pointerId) {
+      // A swipe on a page that cannot scroll: the browser left it to the
+      // finger, and the visitor still meant to scroll.
+      if (this.unengagedTouch.vertical) this.emit({ type: 'swipe-through' });
       this.unengagedTouch = null;
       this.emitPress();
     }
@@ -503,7 +527,9 @@ export class CameraInput {
       this.onPointerUp(event);
       return;
     }
-    // The page's scroll: no press was sent, so no release is either.
+    // The page's scroll: no press was sent, so no release is either; the
+    // gesture is reported once, here, as the swipe it was.
+    this.emit({ type: 'swipe-through' });
     const { focusBefore } = this.unengagedTouch;
     this.unengagedTouch = null;
     this.pointers.delete(event.pointerId);

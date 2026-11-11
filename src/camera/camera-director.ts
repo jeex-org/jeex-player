@@ -128,6 +128,10 @@ export type CameraStackDeps = {
   onHover?: ((pick: SurfacePick | null, clientX: number, clientY: number) => void) | undefined;
   /** A plain wheel went to the page (viewer not engaged): the stage shows «Ctrl + scroll». */
   onScrollThrough?: (() => void) | undefined;
+  /** A vertical swipe went to the page (viewer not engaged): the stage shows «Tap to look around». */
+  onSwipeThrough?: (() => void) | undefined;
+  /** A pointer press reached the viewer: the stage takes that plate away. */
+  onPress?: (() => void) | undefined;
   /** A walk tap on an opening; `true` when the application consumed it. */
   onOpeningTapped?: ((openingId: string) => boolean) | undefined;
   /** Doors whose leaf is in the doorway right now, so a walk step waits at it. */
@@ -184,6 +188,8 @@ export function mountCameraDirector(deps: CameraStackDeps): CameraDirector {
     onFurniturePicked: deps.onFurniturePicked,
     onHover: deps.onHover,
     onScrollThrough: deps.onScrollThrough,
+    onSwipeThrough: deps.onSwipeThrough,
+    onPress: deps.onPress,
     onOpeningTapped: deps.onOpeningTapped,
     closedDoors: deps.closedDoors,
     lockedDoors: deps.lockedDoors,

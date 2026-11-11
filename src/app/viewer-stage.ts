@@ -22,7 +22,7 @@ import { WalkCameraBar } from '../ui/walk-camera-bar.js';
 import type { SceneData, TourCheckpoint } from '../scene/types.js';
 import { PlanModes, type PlanModeOptions } from '../ui/plan-modes.js';
 import { Minimap } from '../ui/minimap.js';
-import { ScrollHint } from '../ui/scroll-hint.js';
+import { ScrollHint, TAP_HINT_NAME } from '../ui/scroll-hint.js';
 import { cameraMarker } from '../render/viewport-projection.js';
 import { CAMERA_TUNING, FAR_PLANE_M, NEAR_PLANE_M } from '../camera/camera-tuning.js';
 import { FLOOR_RING_LAYER } from '../shared/render-layers.js';
@@ -107,7 +107,10 @@ export type ViewerStageDeps = {
    * `mountCameraDirector` so `CameraInput` is never attached; `'passive'` only
    * does the latter. Default `'full'`.
    */
-  director: Omit<CameraStackDeps, 'camera' | 'canvas' | 'keys' | 'messages' | 'dollhouse' | 'planModes' | 'onScrollThrough'>;
+  director: Omit<
+    CameraStackDeps,
+    'camera' | 'canvas' | 'keys' | 'messages' | 'dollhouse' | 'planModes' | 'onScrollThrough' | 'onSwipeThrough' | 'onPress'
+  >;
 };
 
 /**
@@ -199,6 +202,8 @@ export class ViewerStage {
   readonly selection: ViewerSelectionController;
   /** «Ctrl + scroll to zoom», shown when a plain wheel went to the page. */
   readonly scrollHint: ScrollHint;
+  /** «Tap to look around»: once per view, after a vertical swipe went to the page. */
+  readonly tapHint: ScrollHint;
   private cameraDirector?: CameraDirector;
   /** The walk and tour post-processing chain: loaded on demand, attached in those modes (`walk-post-controller.ts`). */
   readonly walkPost: WalkPostController;
@@ -346,6 +351,13 @@ export class ViewerStage {
       signal: deps.signal,
     });
     this.scrollHint = new ScrollHint({ container: deps.roots.viewport, messages: deps.messages });
+    this.tapHint = new ScrollHint({
+      container: deps.roots.viewport,
+      messages: deps.messages,
+      key: 'hint.tapToLook',
+      name: TAP_HINT_NAME,
+      once: true,
+    });
     deps.dollhouse.setState('dollhouse', this.camera);
   }
 
@@ -418,6 +430,8 @@ export class ViewerStage {
       signal: this.deps.signal,
       usage: this.deps.usage,
       onScrollThrough: () => this.scrollHint.show(),
+      onSwipeThrough: () => this.tapHint.show(),
+      onPress: () => this.tapHint.hide(),
       onWalkCamera: (camera) => {
         this.walkCameras.setCamera(camera);
         this.deps.director.onWalkCamera?.(camera);
@@ -573,6 +587,7 @@ export class ViewerStage {
     this.walkCameras.dispose();
     this.selection.dispose();
     this.scrollHint.dispose();
+    this.tapHint.dispose();
     this.lightingDocument?.off();
     this.walkLighting.dispose();
     this.walkPost.dispose();

@@ -547,3 +547,54 @@ describe('snapOrbit', () => {
     expect(controller.getPose().target.distanceTo(target)).toBeLessThan(1e-6);
   });
 });
+
+describe('a swipe over an untouched viewer', () => {
+  function touchHarness() {
+    const camera = new THREE.PerspectiveCamera(55, 4 / 3, 0.1, 200);
+    const canvas = fakeCanvas();
+    const said: string[] = [];
+    const controller = new CameraController(
+      camera,
+      canvas as unknown as HTMLCanvasElement,
+      lShapePlan,
+      solvePlan(lShapePlan),
+      new Picker(canvas),
+      {
+        keys: canvas as unknown as HTMLElement,
+        onManualInput: () => undefined,
+        onHint: () => undefined,
+        onSwipeThrough: () => said.push('swipe-through'),
+        onPress: () => said.push('press'),
+      },
+    );
+    const fire = (type: string, event: unknown): void => {
+      for (const handler of canvas.listeners.get(type) ?? []) handler(event);
+    };
+    /** One finger landing on a viewer the stylesheet sees as not engaged. */
+    const land = (): void => {
+      canvas.dataset['jeexEngaged'] = 'false';
+      fire('pointerdown', { pointerId: 1, pointerType: 'touch', clientX: 100, clientY: 300, button: 0, shiftKey: false });
+    };
+    return { controller, said, fire, land };
+  }
+
+  test('is reported to the caller, and the tap that follows reports its press', () => {
+    const { said, fire, land } = touchHarness();
+    land();
+    fire('pointermove', { pointerId: 1, pointerType: 'touch', clientX: 101, clientY: 260 });
+    fire('pointercancel', { pointerId: 1, pointerType: 'touch' });
+    expect(said).toEqual(['swipe-through']);
+    land();
+    fire('pointerup', { pointerId: 1, pointerType: 'touch' });
+    expect(said).toEqual(['swipe-through', 'press']);
+  });
+
+  test('is not reported in a plan mode, which takes no input', () => {
+    const { controller, said, fire, land } = touchHarness();
+    controller.setMode('plan2d');
+    land();
+    fire('pointermove', { pointerId: 1, pointerType: 'touch', clientX: 101, clientY: 260 });
+    fire('pointercancel', { pointerId: 1, pointerType: 'touch' });
+    expect(said).not.toContain('swipe-through');
+  });
+});
