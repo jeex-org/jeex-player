@@ -132,7 +132,7 @@ export const OPENING_EDGE_MARGIN = 0.1;
 /** Narrowest opening the clamp will produce, metres. */
 const MIN_OPENING_WIDTH = 0.3;
 /** Shortest opening the clamp will produce, metres. */
-const MIN_OPENING_HEIGHT = 0.3;
+export const MIN_OPENING_HEIGHT = 0.3;
 /**
  * Clearance the head of an opening must keep below the ceiling, metres
  * (`head <= ceilingHeight - 0.05`). Shared by the clamp and by `scene-validator.ts`, so an operation can never produce a scene the

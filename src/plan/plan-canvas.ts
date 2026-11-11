@@ -20,6 +20,7 @@
 
 import { planPoint, type PlanDrawing, type PlanPrimitive, type PlanTransform } from './plan-drawing.js';
 import { add, leftN, mul, norm, sub } from './plan-geometry.js';
+import type { PlanSelectionMark } from './plan-selection.js';
 
 export type PlanStyle = 'drawing' | 'minimap';
 
@@ -42,6 +43,8 @@ export type PlanPaintOptions = {
   coneRadius?: number;
   /** `#rrggbb` replacing the style's own accent: the host's theme (`ui/theme-colour.ts`), for the highlight, the cone and the dot. */
   accent?: string;
+  /** A host's selection (`plan-selection.selectionMark`), painted in the accent over the drawing. */
+  selection?: PlanSelectionMark | null;
 };
 
 type Palette = {
@@ -266,7 +269,54 @@ export function paintPlan(
   paintDimensions(ctx, buckets.dimension, at, transform, palette);
   paintLabels(ctx, buckets.label, at, palette);
 
+  if (options.selection) paintSelection(ctx, options.selection, at, transform, palette);
   if (options.camera) paintCamera(ctx, options.camera, transform, palette, options.coneRadius ?? DEFAULT_CONE_RADIUS_M);
+}
+
+/** Smallest stroke a selected wall or opening is drawn with, pixels: a thin partition must still read as selected. */
+const SELECTION_MIN_STROKE_PX = 3;
+/** Radius of the ring a selected placement is marked with, pixels. */
+const SELECTION_RING_PX = 9;
+
+/** A host's selection over the drawing: areas tinted and outlined, lines stroked at their width, points ringed. */
+function paintSelection(
+  ctx: CanvasRenderingContext2D,
+  mark: PlanSelectionMark,
+  at: PainterContext['at'],
+  transform: PlanTransform,
+  palette: Palette,
+): void {
+  ctx.save();
+  ctx.strokeStyle = palette.accent;
+  ctx.fillStyle = withAlpha(palette.accent, 0.25);
+  for (const area of mark.areas) {
+    tracePolygon(ctx, area, at);
+    ctx.fill();
+    ctx.lineWidth = 2;
+    ctx.stroke();
+  }
+  ctx.lineCap = 'round';
+  for (const line of mark.lines) {
+    if (line.points.length < 2) continue;
+    ctx.beginPath();
+    const first = at(line.points[0]!);
+    ctx.moveTo(first.x, first.y);
+    for (const point of line.points.slice(1)) {
+      const next = at(point);
+      ctx.lineTo(next.x, next.y);
+    }
+    ctx.lineWidth = Math.max(SELECTION_MIN_STROKE_PX, line.width * transform.scale);
+    ctx.stroke();
+  }
+  ctx.lineWidth = 2;
+  for (const point of mark.points) {
+    const centre = at(point);
+    ctx.beginPath();
+    ctx.arc(centre.x, centre.y, SELECTION_RING_PX, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.stroke();
+  }
+  ctx.restore();
 }
 
 /**

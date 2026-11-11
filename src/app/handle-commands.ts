@@ -16,7 +16,7 @@ import * as THREE from 'three';
 import { isUuidV7, type MirrorAxis, type SceneData, type ViewerMode } from '../scene/types.js';
 import { framePose, poseFromEye } from '../camera/checkpoint-placement.js';
 import type { Locale, Messages } from '../ui/messages.js';
-import type { NewCheckpoint, ViewerSlots, ViewerState } from './viewer-handle.js';
+import type { NewCheckpoint, PlanView, ViewerSlots, ViewerState } from './viewer-handle.js';
 import { readViewerState } from './viewer-state.js';
 import type { ViewerStage } from './viewer-stage.js';
 import type { ViewerUI } from '../ui/viewer-ui.js';
@@ -62,6 +62,8 @@ export type HandleCommands = {
   readonly quality: QualityControl;
   setMode(mode: ViewerMode): void;
   getMode(): ViewerMode;
+  /** The mode a host set before the camera existed, once (the start view applies it); internal, never on the public handle. */
+  takeRequestedMode(): ViewerMode | null;
   getFurnitureVisible(): boolean;
   getLocale(): Locale;
   getState(): ViewerState;
@@ -74,6 +76,7 @@ export type HandleCommands = {
   /** Re-reads the root's theme into what CSS cannot paint; before the stage exists its construction reads it anyway. */
   refreshTheme(): void;
   setSelection(target: ViewerSelectionTarget | null): void;
+  planView(): PlanView | null;
   describeSelection(target: ViewerSelection): SelectionDescription | null;
   resize(): void;
   setFurnitureVisible(visible: boolean, reapply?: boolean): void;
@@ -158,6 +161,8 @@ export function handleCommands(deps: HandleCommandsDeps): HandleCommands {
   };
   /** Where the orbit stood when a look-through began, to return to. */
   let pilotReturn: { position: THREE.Vector3; target: THREE.Vector3; mode: ViewerMode } | null = null;
+  /** A host's `setMode` before there was a camera to switch: the start view opens in it. */
+  let requestedMode: ViewerMode | null = null;
 
   /**
    * The one mode switch behind the handle. `explicit` is a host's or a
@@ -168,6 +173,12 @@ export function handleCommands(deps: HandleCommandsDeps): HandleCommands {
    * fly the pose themselves, and a reset would undo it.
    */
   function switchMode(mode: ViewerMode, explicit: boolean): void {
+    // Before the first document there is nothing to switch and nothing to
+    // announce: the start view applies the mode (`viewer-boot.ts`).
+    if (!deps.stage()?.director) {
+      requestedMode = mode;
+      return;
+    }
     // Any other mode ends a look-through without keeping it: the pilot's
     // walk is not the visitor's walk.
     if ((deps.stage()?.pilot.id ?? null) !== null) endPilot(false);
@@ -192,8 +203,8 @@ export function handleCommands(deps: HandleCommandsDeps): HandleCommands {
   // The panel opens on the mount option; every later change reaches it through `reflect`.
   deps.ui.setLightTemperature(lightTemperature.value);
 
-  /** The mode on screen: the director's once a document built it, the mount option's before that. */
-  const currentMode = (): ViewerMode => deps.stage()?.director?.controller.getMode() ?? deps.options.view.mode;
+  /** The mode on screen: the director's once a document built it, the requested one or the mount option's before that. */
+  const currentMode = (): ViewerMode => deps.stage()?.director?.controller.getMode() ?? requestedMode ?? deps.options.view.mode;
 
   const quality = new QualityControl({
     initial: deps.options.quality,
@@ -232,6 +243,12 @@ export function handleCommands(deps: HandleCommandsDeps): HandleCommands {
 
     getMode() {
       return currentMode();
+    },
+
+    takeRequestedMode() {
+      const mode = requestedMode;
+      requestedMode = null;
+      return mode;
     },
 
     getFurnitureVisible() {
@@ -298,7 +315,13 @@ export function handleCommands(deps: HandleCommandsDeps): HandleCommands {
      * target whose id is not a UUID highlights nothing, like an unknown one.
      */
     setSelection(target) {
-      deps.stage()?.selection.setSelection(target !== null && isUuidV7(target.id) ? target : null);
+      const valid = target !== null && isUuidV7(target.id) ? target : null;
+      deps.stage()?.selection.setSelection(valid);
+      deps.stage()?.planModes.setSelection(valid);
+    },
+
+    planView() {
+      return deps.stage()?.planModes.view() ?? null;
     },
 
     /**

@@ -57,12 +57,22 @@ describe('jeex-viewer/schema entry', () => {
     expect(MAX_PROJECT_TEXTURE_FILES).toBeGreaterThan(0);
   });
 
+  test('a library map path is built by the rule the manifest check reads, in the formats and sizes it accepts', () => {
+    expect(entry.libraryMapPath('01a1f6e0-0000-7000-8000-000000000001', 'albedo', '512', 'ktx2')).toBe(
+      'tex/01a1f6e0-0000-7000-8000-000000000001/albedo.512.ktx2',
+    );
+    expect(entry.LIBRARY_MAP_EXTENSIONS).toEqual(['webp', 'ktx2']);
+    expect(entry.LIBRARY_MAP_SIZES).toEqual(['128', '256', '384', '512', '768']);
+  });
+
   test('the value surface is exactly the documented list', () => {
     expect(Object.keys(entry).sort()).toEqual(
       [
         'CATALOGUE_ID_BY_SLUG',
         'CATALOGUE_REGISTRIES',
         'LAMP_MAX_CUTOFF',
+        'LIBRARY_MAP_EXTENSIONS',
+        'LIBRARY_MAP_SIZES',
         'LAMP_MAX_LIGHTS',
         'LAMP_MAX_LUMENS',
         'MAX_MODEL_BYTES',
@@ -82,6 +92,7 @@ describe('jeex-viewer/schema entry', () => {
         'isProjectDocument',
         'isSceneShape',
         'lampLightSchema',
+        'libraryMapPath',
         'libraryOf',
         'parseProjectLibrary',
         'parseProjectManifest',

@@ -1,5 +1,5 @@
 /**
- * The viewer's public event fan-out: `ready`, `error`, `scene` and `mode`.
+ * The viewer's public event fan-out: `ready`, `error`, `scene`, `mode`, `assets` and the rest of `ViewerEventMap`.
  *
  * It is the `TourEvents` pattern applied to the viewer itself (`tour-controls.ts`):
  * one registry per event, and a subscriber that throws is reported and skipped
@@ -36,6 +36,12 @@ export type ViewerError = {
   detail?: ErrorDetail | undefined;
   /** The original throw, when there was one. */
   cause?: unknown;
+  /**
+   * `true` on the failure that took the viewer down: its error card is on
+   * screen and only a `loadScene` or the card's Retry brings a scene back.
+   * Absent on an error the viewer carries on through.
+   */
+  fatal?: true | undefined;
 };
 
 /** A scene is on screen: the first one, and every one after it. */
@@ -43,6 +49,18 @@ export type ViewerReadyInfo = { options: Readonly<ViewerOptions>; sceneId: strin
 
 /** The document changed: a new scene, or a committed revision of this one. */
 export type ViewerSceneInfo = { sceneId: string; rev: number };
+
+/**
+ * What a document's libraries delivered, once its first model pass settled:
+ * the models swapped in (`upgraded`), the ones left as procedural stand-ins
+ * (`failed`), whether the byte budget stopped the pass (`budget`), and the
+ * textures whose surface stayed flat.
+ */
+export type ViewerAssetsInfo = {
+  models: { upgraded: number; failed: number; budget: boolean };
+  /** `budget`: the texture byte budget was reached, and the surfaces still waiting stayed flat. */
+  textures: { failed: number; budget: boolean };
+};
 
 /**
  * An edit made in the viewer's OWN panel while `edits: 'emit'` is in force: the
@@ -58,6 +76,8 @@ export type ViewerEventMap = {
   error: ViewerError;
   scene: ViewerSceneInfo;
   mode: ViewerMode;
+  /** Once per document, when its first model pass settled: what loaded and what fell back (`ViewerAssetsInfo`). */
+  assets: ViewerAssetsInfo;
   /** A click named something (or nothing) in the scene; only with `options.select`. */
   select: ViewerSelection;
   /** The built-in panel produced a batch the viewer did not commit; only with `edits: 'emit'`. */
@@ -136,6 +156,7 @@ export class ViewerEvents {
       error: fanout('error'),
       scene: fanout('scene'),
       mode: fanout('mode'),
+      assets: fanout('assets'),
       select: fanout('select'),
       edit: fanout('edit'),
       checkpointSelect: fanout('checkpointSelect'),

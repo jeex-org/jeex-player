@@ -10,7 +10,8 @@
  *
  * Everything is safe to call the moment `mountViewer` returns, before the first
  * scene exists: the tour remembers the last command and replays it
- * (`tour-controls.ts`), and the other commands are no-ops until there is a
+ * (`tour-controls.ts`) after the start view, `setMode` is remembered and the
+ * viewer opens in it, and the other commands are no-ops until there is a
  * camera to move.
  */
 
@@ -92,6 +93,18 @@ export type NewCheckpoint = { readonly id: string };
 export type AnchorPoint = { x: number; y: number; visible: boolean };
 
 /**
+ * What the 2D plan (`plan2d`) is fitted to: the plan's bounds in metres and
+ * the transform from plan metres to CSS pixels of the viewer's box
+ * (`x * scale + ox`, `z * scale + oy`). The drawing and the `plan2d` top view
+ * use exactly this fit, so a host overlay or an underlay drawn with it lines
+ * up with them.
+ */
+export type PlanView = {
+  readonly bounds: { readonly min: { x: number; z: number }; readonly max: { x: number; z: number } };
+  readonly transform: { readonly scale: number; readonly ox: number; readonly oy: number };
+};
+
+/**
  * The boxes a host renders its own chrome into, and the one of them the viewer
  * moves for it. The vocabulary is `SLOT_NAMES`
  * (`ui/host-slots.ts`); which boxes exist is `options.slots`.
@@ -166,10 +179,12 @@ export type ViewerHandle = {
   /**
    * Switches the mode, exactly as the mode buttons do. Choosing `'orbit'` (360)
    * ends on the Reset camera pose, from any mode and from 360 itself; the embed protocol's `setMode` and the
-   * element's `mode` attribute go through here too.
+   * element's `mode` attribute go through here too. Before the first scene
+   * nothing switches and no `mode` event fires: the viewer opens in the last
+   * mode asked for instead of `view.mode`.
    */
   setMode(mode: ViewerMode): void;
-  /** The mode on screen; the option's value until the camera stack exists. */
+  /** The mode on screen; until the camera stack exists, the mode `setMode` asked for, else the option's value. */
   getMode(): ViewerMode;
   /** Everything above in one consistent read (`ViewerState`). */
   getState(): ViewerState;
@@ -256,10 +271,12 @@ export type ViewerHandle = {
    * A target whose id is not a UUID v7, or that the current document does not
    * carry, highlights nothing, silently.
    * The highlight survives a `loadScene`/rebuild when the target is still
-   * there. Visible in `plan3d` and `orbit`; `plan2d` draws a 2D plan with the
-   * renderer off, so nothing shows there.
+   * there. Visible in every static mode: `orbit` and `plan3d` tint the
+   * meshes, `plan2d` draws the target in the accent on the 2D plan.
    */
   setSelection(target: ViewerSelectionTarget | null): void;
+  /** What the 2D plan is fitted to (`PlanView`), or `null` before the first document. */
+  planView(): PlanView | null;
   /**
    * Shows or hides the tour-camera placement overlay — the small camera
    * markers, the smooth trajectory through them, the click-to-focus gizmo and

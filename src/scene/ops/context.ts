@@ -256,6 +256,99 @@ export function forgetInPresets(scene: Draft<SceneData>, gone: (op: SceneOp) => 
   scene.interiors = kept;
 }
 
+/** What one operation names: the existing entities it reads or writes, by kind. Ids it creates are not here. */
+export type OpReferences = {
+  readonly assets: readonly string[];
+  readonly openings: readonly string[];
+  readonly walls: readonly string[];
+  readonly rooms: readonly string[];
+  readonly nodes: readonly string[];
+};
+
+const NO_REFERENCES: OpReferences = { assets: [], openings: [], walls: [], rooms: [], nodes: [] };
+
+/** The rooms and the wall a painted face names: the owner when a room owns it, and the wall. */
+function faceReferences(face: FaceKey | undefined): Pick<OpReferences, 'walls' | 'rooms'> {
+  if (face === undefined) return { walls: [], rooms: [] };
+  return { walls: [face.wallId], rooms: face.room === undefined ? [] : [face.room] };
+}
+
+const MATERIAL_ALIASES: ReadonlySet<string> = new Set(['floors', 'walls', 'facade']);
+
+/**
+ * Every existing entity `op` names, over the whole operation union.
+ *
+ * The one place that answers «does this instruction still apply once X is
+ * gone»: a removal forgets the preset instructions whose references include
+ * what it removed (`forgetInPresets`), so no operation kind can be missed by a
+ * hand-written list. The switch is exhaustive; a new operation does not
+ * compile until it says what it names.
+ */
+export function referencesOf(op: SceneOp): OpReferences {
+  switch (op.op) {
+    case 'set_material': {
+      if (op.surface !== undefined) {
+        const face = faceReferences(op.face);
+        return { ...NO_REFERENCES, walls: face.walls, rooms: [...(op.room === undefined ? [] : [op.room]), ...face.rooms] };
+      }
+      if (typeof op.target === 'object') return { ...NO_REFERENCES, ...faceReferences(op.target) };
+      return MATERIAL_ALIASES.has(op.target) ? NO_REFERENCES : { ...NO_REFERENCES, rooms: [op.target] };
+    }
+    case 'replace_asset_variant':
+    case 'replace_asset':
+    case 'rotate_object':
+    case 'set_object':
+    case 'remove_object':
+    case 'mirror_object':
+      return { ...NO_REFERENCES, assets: [op.assetId] };
+    case 'move_object':
+      return { ...NO_REFERENCES, assets: [op.assetId], rooms: typeof op.room === 'string' ? [op.room] : [] };
+    case 'place_object':
+      return { ...NO_REFERENCES, rooms: op.room === undefined ? [] : [op.room] };
+    case 'replace_opening_variant':
+    case 'remove_opening':
+      return { ...NO_REFERENCES, openings: [op.openingId] };
+    case 'set_opening':
+      return { ...NO_REFERENCES, openings: [op.openingId], walls: op.wallId === undefined ? [] : [op.wallId] };
+    case 'add_opening':
+      return { ...NO_REFERENCES, walls: [op.wallId] };
+    case 'set_camera':
+      return typeof op.target === 'object' ? { ...NO_REFERENCES, rooms: [op.target.room] } : NO_REFERENCES;
+    case 'set_room':
+    case 'remove_room':
+    case 'set_room_purpose':
+      return { ...NO_REFERENCES, rooms: [op.roomId] };
+    case 'move_node':
+    case 'remove_node':
+      return { ...NO_REFERENCES, nodes: [op.nodeId] };
+    case 'add_wall':
+      return { ...NO_REFERENCES, nodes: [op.a, op.b] };
+    case 'set_wall':
+    case 'remove_wall':
+    case 'split_wall':
+      return { ...NO_REFERENCES, walls: [op.wallId] };
+    case 'merge_wall':
+      return { ...NO_REFERENCES, walls: [...op.wallIds] };
+    case 'set_ceiling':
+    case 'set_navigation':
+    case 'set_autotour':
+    case 'set_tour_checkpoints':
+    case 'add_room':
+    case 'add_node':
+    case 'set_site':
+      return NO_REFERENCES;
+    default: {
+      const unknown: never = op;
+      return unknown;
+    }
+  }
+}
+
+/** `forgetInPresets` for one removed entity: every instruction whose references of that kind include `id`. */
+export function forgetReferencesInPresets(scene: Draft<SceneData>, kind: keyof OpReferences, id: string): void {
+  forgetInPresets(scene, (op) => referencesOf(op)[kind].includes(id));
+}
+
 /* -------------------------------------------------------- shared refusals --- */
 
 /** Refuses a coordinate pair or triple that is not finite, naming the field. */

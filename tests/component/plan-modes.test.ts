@@ -402,3 +402,75 @@ describe('fixtures come from the document’s own bank', () => {
     local.runtime.dispose();
   });
 });
+
+describe("plan2d draws the host's selection and publishes its fit", () => {
+  const NO_CAMERA = (): PlanModeOptions => ({ labels: false, dimensions: false, camera: false });
+
+  test('setSelection on a wall paints it in the accent on the drawing, and null takes it away', async () => {
+    const modes = build(NO_CAMERA);
+    try {
+      modes.modes.setDocument(demoPlan(), demoScene());
+      modes.modes.setMode('plan2d');
+      await until(() => modes.modes.element.width > 0, 'the overlay to get a backing store');
+      expect(hasAccentPixel(modes.modes.element)).toBe(false);
+      modes.modes.setSelection({ kind: 'wall', id: demoScene().walls[0]!.id });
+      expect(hasAccentPixel(modes.modes.element)).toBe(true);
+      modes.modes.setSelection(null);
+      expect(hasAccentPixel(modes.modes.element)).toBe(false);
+    } finally {
+      modes.modes.dispose();
+      modes.runtime.dispose();
+    }
+  });
+
+  test('a placement moved without a rebuild moves its selection mark with it', async () => {
+    const modes = build(NO_CAMERA);
+    try {
+      const scene = demoScene();
+      const asset = scene.assets[0]!;
+      modes.modes.setDocument(demoPlan(), scene);
+      modes.modes.setMode('plan2d');
+      await until(() => modes.modes.element.width > 0, 'the overlay to get a backing store');
+      modes.modes.setSelection({ kind: 'furniture', id: asset.id });
+      const moved = {
+        ...scene,
+        assets: scene.assets.map((candidate) =>
+          candidate === asset ? { ...asset, position: { ...asset.position, x: asset.position.x + 1.5 } } : candidate,
+        ),
+      };
+      modes.modes.placementsChanged(moved);
+      const { transform } = modes.modes.view()!;
+      const at = (x: number, z: number) => ({ x: x * transform.scale + transform.ox, y: z * transform.scale + transform.oy });
+      const canvas = modes.modes.element;
+      const ratio = canvas.width / modes.shell.roots.viewport.clientWidth;
+      const accentNear = (point: { x: number; y: number }): boolean => {
+        const ctx = canvas.getContext('2d')!;
+        const size = Math.round(24 * ratio);
+        const { data } = ctx.getImageData(Math.round((point.x - 12) * ratio), Math.round((point.y - 12) * ratio), size, size);
+        for (let i = 0; i < data.length; i += 4) if (data[i] === 223 && data[i + 1] === 189 && data[i + 2] === 125) return true;
+        return false;
+      };
+      expect(accentNear(at(asset.position.x + 1.5, asset.position.z))).toBe(true);
+      expect(accentNear(at(asset.position.x, asset.position.z))).toBe(false);
+    } finally {
+      modes.modes.dispose();
+      modes.runtime.dispose();
+    }
+  });
+
+  test('view() is null before a document; with one, a plan point projected through the pick camera lands where view() puts it', async () => {
+    expect(harness.modes.view()).toBeNull();
+    harness.modes.setDocument(demoPlan(), demoScene());
+    harness.modes.setMode('plan2d');
+    await until(() => harness.modes.element.width > 0, 'the overlay to get a backing store');
+    const view = harness.modes.view()!;
+    const box = harness.shell.roots.viewport;
+    const point = { x: (view.bounds.min.x * 3 + view.bounds.max.x) / 4, z: (view.bounds.min.z + view.bounds.max.z * 3) / 4 };
+    const camera = harness.modes.pickCamera()!;
+    camera.updateMatrixWorld();
+    const projected = new THREE.Vector3(point.x, 0, point.z).project(camera);
+    const pixel = { x: ((projected.x + 1) / 2) * box.clientWidth, y: ((1 - projected.y) / 2) * box.clientHeight };
+    expect(pixel.x).toBeCloseTo(point.x * view.transform.scale + view.transform.ox, 0);
+    expect(pixel.y).toBeCloseTo(point.z * view.transform.scale + view.transform.oy, 0);
+  });
+});

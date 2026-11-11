@@ -55,7 +55,7 @@ export type RoomGraphNode = {
   normal?: Vec2;
 };
 
-/** `[nodeIndex, nodeIndex, metres]`; every edge joins a room to one of its doors. */
+/** `[nodeIndex, nodeIndex, metres]`; an edge joins a room to one of its doors, or a zone to the room it lies in. */
 export type RoomGraph = { nodes: RoomGraphNode[]; edges: Array<[number, number, number]> };
 
 /**
@@ -256,6 +256,16 @@ export function buildRoomGraph(plan: SolvedPlan, scene: SceneData, obstacles: re
       nodes.push({ id: door.openingId, kind: 'door', point: at.point, roomIds: [roomA, roomB], normal: leftN(at.tangent) });
       edges.push([a, index, dist(nodes[a]!.point, at.point)], [b, index, dist(nodes[b]!.point, at.point)]);
     }
+  }
+
+  // A zone of an open plan is joined to the room it lies in through open
+  // floor, not a door: an edge from centre to centre.
+  for (const room of plan.rooms) {
+    if (room.host === undefined) continue;
+    const zone = roomIndex.get(room.roomId);
+    const host = roomIndex.get(room.host);
+    if (zone === undefined || host === undefined) continue;
+    edges.push([zone, host, dist(nodes[zone]!.point, nodes[host]!.point)]);
   }
 
   return { nodes, edges };

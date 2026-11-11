@@ -38,7 +38,6 @@ import type {
   RemoveNodeOp,
   RemoveWallOp,
   SceneData,
-  SceneOp,
   SetCeilingOp,
   SetWallOp,
   SplitWallOp,
@@ -49,13 +48,14 @@ import type {
   WallArc,
   WallSide,
 } from '../types.js';
-import { faceKey } from '../types.js';
+import { TOUR_CHECKPOINT_HEIGHT_MARGIN_M, faceKey } from '../types.js';
 import {
   OpError,
   TOUCHED_SHELL,
+  TOUCHED_TOUR_CHECKPOINTS,
   claimedIds,
   dropFaceFinishes,
-  forgetInPresets,
+  forgetReferencesInPresets,
   requireFinite,
   requireNewId,
   round,
@@ -68,6 +68,7 @@ import {
 } from './context.js';
 import { MAX_CEILING_HEIGHT, MIN_CEILING_HEIGHT, MIN_SPLIT_HALF, MIN_WALL_LENGTH, WALL_THICKNESS } from './limits.js';
 import { forgetOpeningInPresets, reclampOpeningsUnder, rescaleOpeningsOnWall } from './openings.js';
+import { splitWallInPresets } from './preset-rewrite.js';
 
 /** Ceiling height, with every opening re-clamped underneath it. */
 export function applySetCeiling(scene: Draft<SceneData>, op: SetCeilingOp): OpOutcome {
@@ -77,7 +78,19 @@ export function applySetCeiling(scene: Draft<SceneData>, op: SetCeilingOp): OpOu
   }
   scene.ceilingHeight = op.height;
   reclampOpeningsUnder(scene, op.height);
-  return { summary: `Ceiling height set to ${round(op.height)} m`, touched: [TOUCHED_SHELL] };
+  // A checkpoint keeps the same headroom under the ceiling the validator
+  // demands, exactly as `set_tour_checkpoints` clamps it.
+  const heightMax = op.height - TOUR_CHECKPOINT_HEIGHT_MARGIN_M;
+  let lowered = false;
+  for (const checkpoint of scene.tourCheckpoints ?? []) {
+    if (checkpoint.position.y <= heightMax) continue;
+    checkpoint.position = { ...checkpoint.position, y: heightMax };
+    lowered = true;
+  }
+  return {
+    summary: `Ceiling height set to ${round(op.height)} m`,
+    touched: lowered ? [TOUCHED_SHELL, TOUCHED_TOUR_CHECKPOINTS] : [TOUCHED_SHELL],
+  };
 }
 
 /* -------------------------------------------------------------- nodes --- */
@@ -92,10 +105,10 @@ export function applyAddNode(scene: Draft<SceneData>, op: AddNodeOp): OpOutcome 
 
 /**
  * Moves a node; every wall on it follows, and every opening on those walls
- * keeps its SHARE of the wall it sits on (`center / length`) rather than its
- * metre coordinate — a door in the middle of a wall that grew stays in the
- * middle. An opening whose share no longer fits the new length is clamped back
- * onto the wall, which is the same rule `add_opening` applies.
+ * keeps its distance in metres from the wall's OTHER end, the one that did not
+ * move (`rescaleOpeningsOnWall`). An opening that no longer fits the new
+ * length is clamped back onto the wall, which is the same rule `add_opening`
+ * applies.
  */
 export function applyMoveNode(scene: Draft<SceneData>, op: MoveNodeOp): OpOutcome {
   if (op.p !== undefined && op.dp !== undefined) throw new OpError('move_node takes p or dp, not both');
@@ -107,7 +120,7 @@ export function applyMoveNode(scene: Draft<SceneData>, op: MoveNodeOp): OpOutcom
 
   // Measured before anything is written: a refusal must leave the plan exactly
   // as it was, and half a moved node is not a plan.
-  const moves: { wall: Draft<Wall>; from: number; to: number }[] = [];
+  const moves: { wall: Draft<Wall>; from: number; to: number; fixed: 'a' | 'b' }[] = [];
   for (const wall of scene.walls) {
     if (wall.a !== op.nodeId && wall.b !== op.nodeId) continue;
     const other = pointOf(scene, wall.a === op.nodeId ? wall.b : wall.a, wall.id);
@@ -117,11 +130,11 @@ export function applyMoveNode(scene: Draft<SceneData>, op: MoveNodeOp): OpOutcom
         `move_node ${op.nodeId} would leave wall ${wall.id} ${after.toFixed(3)} m long, below the minimum ${MIN_WALL_LENGTH} m`,
       );
     }
-    moves.push({ wall, from: wallCentrelineLength(scene, wall), to: after });
+    moves.push({ wall, from: wallCentrelineLength(scene, wall), to: after, fixed: wall.a === op.nodeId ? 'b' : 'a' });
   }
 
   node.p = { x: to.x, z: to.z };
-  for (const move of moves) rescaleOpeningsOnWall(scene, move.wall, move.from, move.to);
+  for (const move of moves) rescaleOpeningsOnWall(scene, move.wall, move.from, move.to, move.fixed);
   return { summary: `Node ${op.nodeId}: moved to (${round(to.x)}, ${round(to.z)})`, touched: [TOUCHED_SHELL] };
 }
 
@@ -148,7 +161,7 @@ export function applyAddWall(scene: Draft<SceneData>, op: AddWallOp): OpOutcome 
   const duplicate = scene.walls.find((wall) => (wall.a === op.a && wall.b === op.b) || (wall.a === op.b && wall.b === op.a));
   if (duplicate) throw new OpError(`Nodes ${op.a} and ${op.b} are already joined by wall ${duplicate.id}`);
   const thickness = clampThickness(op.thickness, 'add_wall');
-  if (op.arc) centrelineLength(a, b, op.arc, id);
+  requireWallLength(centrelineLength(a, b, op.arc, id), 'add_wall', id);
 
   const wall: Draft<Wall> = { id, a: op.a, b: op.b, thickness };
   if (op.role !== undefined) wall.role = op.role;
@@ -170,6 +183,12 @@ export function applySetWall(scene: Draft<SceneData>, op: SetWallOp): OpOutcome 
   if (!wall) throw new OpError(`Unknown wall ${op.wallId}`);
   const before = wallCentrelineLength(scene, wall);
   const changes: string[] = [];
+  // The new centreline first, so a refusal leaves the wall as it was.
+  if (op.arc !== undefined) {
+    const a = pointOf(scene, wall.a, wall.id);
+    const b = pointOf(scene, wall.b, wall.id);
+    requireWallLength(centrelineLength(a, b, op.arc ?? undefined, wall.id), 'set_wall', wall.id);
+  }
 
   if (op.thickness !== undefined) {
     wall.thickness = clampThickness(op.thickness, 'set_wall');
@@ -183,9 +202,6 @@ export function applySetWall(scene: Draft<SceneData>, op: SetWallOp): OpOutcome 
     delete wall.arc;
     changes.push('arc removed');
   } else if (op.arc !== undefined) {
-    const a = pointOf(scene, wall.a, wall.id);
-    const b = pointOf(scene, wall.b, wall.id);
-    centrelineLength(a, b, op.arc, wall.id);
     wall.arc = { radius: op.arc.radius, ccw: op.arc.ccw };
     changes.push(`arc radius ${round(op.arc.radius)} m`);
   }
@@ -347,6 +363,8 @@ export function applySplitWall(scene: Draft<SceneData>, op: SplitWallOp): OpOutc
   const index = scene.walls.indexOf(wall);
   scene.nodes.push({ id: op.nodeId, p: point });
   scene.walls.splice(index, 1, ...halves);
+  // A split loses nothing, so a preset dressing the wall keeps dressing both halves.
+  splitWallInPresets(scene, op);
 
   // The paint follows the geometry: one remap entry per painted face of the
   // old wall (owner and side preserved), both heirs inherit, `primary` is the
@@ -595,16 +613,7 @@ function mergeRemap(
  * (`context.forgetInPresets`).
  */
 function forgetWallInPresets(scene: Draft<SceneData>, wallId: string): void {
-  forgetInPresets(scene, (candidate) => namesWall(candidate, wallId));
-}
-
-function namesWall(op: SceneOp, wallId: string): boolean {
-  if (op.op === 'set_material') {
-    const face = op.surface === undefined ? (typeof op.target === 'object' ? op.target : undefined) : op.face;
-    return face?.wallId === wallId;
-  }
-  if (op.op === 'set_wall' || op.op === 'remove_wall' || op.op === 'set_opening') return op.wallId === wallId;
-  return false;
+  forgetReferencesInPresets(scene, 'walls', wallId);
 }
 
 /* ------------------------------------------------------------ helpers --- */
@@ -638,6 +647,13 @@ function clampThickness(value: number, op: string): number {
  * `arcFromChord` would otherwise take the square root of a negative number and
  * hand back a silent NaN.
  */
+/** Refuses a centreline the validator would refuse at commit (`WALL_LIMITS.minCentrelineLength`), as `move_node` does. */
+function requireWallLength(length: number, owner: string, wallId: string): void {
+  if (length < MIN_WALL_LENGTH) {
+    throw new OpError(`${owner} would leave wall ${wallId} ${length.toFixed(3)} m long, below the minimum ${MIN_WALL_LENGTH} m`);
+  }
+}
+
 function centrelineLength(a: Vec2, b: Vec2, arc: WallArc | undefined, wallId: string): number {
   const chord = dist(a, b);
   if (!arc) return chord;

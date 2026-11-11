@@ -335,10 +335,16 @@ export function embedViewer(container: HTMLElement, options: EmbedOptions): Jeex
 
   const pending = new Map<string, Pending>();
   const listeners = new Map<EventName, Set<(payload: never) => void>>();
-  /** Set once the frame is up; the reply clock starts here for a queued command. */
-  /** Commands raised before `ready`; sent, in order, the moment it arrives. */
-  let queue: Array<() => void> = [];
+  /**
+   * Commands raised before `ready`; sent, in order, the moment it arrives.
+   * Each keeps its own boot clock and its rejection, so `dispose()` can stop
+   * the one and call the other.
+   */
+  let queue: Array<{ method: CommandMethod; post: () => void; reject: (error: Error) => void; booting: ReturnType<typeof setTimeout> }> =
+    [];
   let ready = false;
+  /** The frame reported an `error` before its first `ready`: it is up, and another scene is what it can take. */
+  let failed = false;
   let disposed = false;
   let nextId = 0;
 
@@ -404,8 +410,20 @@ export function embedViewer(container: HTMLElement, options: EmbedOptions): Jeex
         announceReady(info);
         const held = queue;
         queue = [];
-        for (const send of held) send();
+        for (const queued of held) queued.post();
       }
+    }
+    const failure = data.event === 'error' ? (data.payload as { code?: ErrorCode; message?: string; fatal?: unknown } | null) : null;
+    if (failure?.fatal === true && !ready) {
+      // The first scene failed and took the viewer down: `ready` says so with
+      // the frame's own code, and `loadScene` (the one command that can bring
+      // a scene up) goes through. An error the viewer carries on through
+      // leaves `ready` to the frame.
+      failed = true;
+      failReady(new EmbedError(failure?.code ?? 'internal', failure?.message ?? 'the frame gave no reason'));
+      const scenes = queue.filter((queued) => queued.method === 'loadScene');
+      queue = queue.filter((queued) => queued.method !== 'loadScene');
+      for (const queued of scenes) queued.post();
     }
     if (autoHeight && data.event === 'size') {
       // Proved by hand like `readyPayload`: no Zod in this 4 KB helper. The
@@ -463,18 +481,19 @@ export function embedViewer(container: HTMLElement, options: EmbedOptions): Jeex
       };
       // `getScene` joins `dispose`: a host may ask what is on screen before the
       // frame has anything, and `null` is the honest answer rather than a wait
-      // for a `ready` that has not happened yet.
-      if (ready || method === 'dispose' || method === 'getScene') {
+      // for a `ready` that has not happened yet. After a failed first scene,
+      // `loadScene` joins them: no `ready` comes until another scene loads.
+      if (ready || method === 'dispose' || method === 'getScene' || (failed && method === 'loadScene')) {
         post();
         return;
       }
       // Queued, and on its own clock: a frame that never comes up must reject
       // the command rather than leave it pending for the life of the page.
       booting = setTimeout(() => {
-        queue = queue.filter((queued) => queued !== post);
+        queue = queue.filter((queued) => queued.post !== post);
         reject(new EmbedError('timeout', `the frame was not ready within ${QUEUE_TIMEOUT_MS} ms, so ${method} was never sent`));
       }, QUEUE_TIMEOUT_MS);
-      queue.push(post);
+      queue.push({ method, post, reject, booting });
     });
   };
 
@@ -569,6 +588,10 @@ export function embedViewer(container: HTMLElement, options: EmbedOptions): Jeex
         waiting.reject(new EmbedError('disposed', 'this embed has been disposed'));
       }
       pending.clear();
+      for (const queued of queue) {
+        clearTimeout(queued.booting);
+        queued.reject(new EmbedError('disposed', 'this embed was disposed before the frame was ready'));
+      }
       queue = [];
       // Told synchronously, before listeners are cleared: guards against
       // `dispose()` clearing its own `message` listener in the same tick it

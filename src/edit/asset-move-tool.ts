@@ -126,6 +126,7 @@ type Drag = {
   pointerId: number | null;
   drag: DragContext;
   surface: MaskSurface;
+  startScene: string;
   startRev: number;
   start: DragPose;
   /** What the pointer or the keys ask for; the yaw is the person's (sticky after a wall snap turned it). */
@@ -327,8 +328,8 @@ export class AssetMoveTool {
   revert(): void {
     this.cancel();
     // Only while the document is still the one the edits were made on: after a
-    // commit the rebuilt bodies already stand where the document says.
-    for (const [id, start] of this.pending.take(this.host.document()?.rev) ?? []) {
+    // commit, or on another scene, the rebuilt bodies already stand where the document says.
+    for (const [id, start] of this.pending.take(this.host.document()) ?? []) {
       if (start.mirror) this.host.show(id, start.pose, start.mirror);
       else this.host.show(id, start.pose);
     }
@@ -355,16 +356,16 @@ export class AssetMoveTool {
       return true;
     }
     this.host.show(assetId, plan.pose, plan.mirror);
-    this.pending.record(record.startRev, assetId, [
+    this.pending.record(record.startScene, record.startRev, assetId, [
       { id: assetId, before: { pose: record.start, mirror: plan.before }, after: { pose: plan.pose, mirror: plan.mirror } },
     ]);
     this.host.onEdit({ assetId, ops: plan.ops, baseRev: record.startRev, summary: plan.summary, gesture: 'mirror' });
     return true;
   }
 
-  /** A new committed document: a pending edit is answered, a running move is void. */
+  /** The document was handed over again: another scene, or a revision past a pending edit's, answers it; a running move is void. */
   documentChanged(): void {
-    this.pending.clear();
+    this.pending.answered(this.host.document());
     this.cancel();
   }
 
@@ -415,6 +416,7 @@ export class AssetMoveTool {
       pointerId,
       drag,
       surface,
+      startScene: doc.scene.id,
       startRev: doc.rev,
       start,
       request,
@@ -677,7 +679,7 @@ export class AssetMoveTool {
     }
     this.showAt(drag, pose);
     const carried = carriedPoses(drag.drag, pose);
-    this.pending.record(drag.startRev, drag.assetId, [
+    this.pending.record(drag.startScene, drag.startRev, drag.assetId, [
       { id: drag.assetId, before: { pose: drag.start }, after: { pose } },
       ...carried.map(({ placement, pose: at }) => ({
         id: placement.id,

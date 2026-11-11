@@ -157,3 +157,31 @@ export function ownFloors<R extends Floor>(rooms: readonly R[], zoneIds: Readonl
   }
   return { rooms: rooms.map((room) => solved.get(room.roomId)!), caveats };
 }
+
+/**
+ * The floor a person can stand on, once ownership is settled, and the room
+ * each zone lies in.
+ *
+ * Walls bound the walkable floor, zone outlines do not: every wall-bounded
+ * room walks on its WHOLE face (`face`, zones included, when they were cut
+ * out of it), and a zone is floor of its own only when it lies in no such face
+ * (an outline a source drew where the walls close around nothing). A zone
+ * lies in a face by the same rule as the cut: more than half of its own area.
+ */
+export function walkableFloors<R extends Floor>(
+  rooms: readonly R[],
+  zoneIds: ReadonlySet<string>,
+): { walkable: (readonly Vec2[])[]; hosts: Map<string, string> } {
+  const faces = rooms.filter((room) => !zoneIds.has(room.roomId));
+  const walkable: (readonly Vec2[])[] = faces.map((room) => room.face ?? room.polygon);
+  const hosts = new Map<string, string>();
+  for (const zone of rooms) {
+    if (!zoneIds.has(zone.roomId)) continue;
+    const own = polygonOf(zone.polygon);
+    const half = areaOf([own]) / 2;
+    const host = faces.find((room) => areaOf(polygonClipping.intersection(polygonOf(room.face ?? room.polygon), own)) > half);
+    if (host) hosts.set(zone.roomId, host.roomId);
+    else walkable.push(zone.polygon);
+  }
+  return { walkable, hosts };
+}

@@ -52,7 +52,7 @@ import { schemaRefusal } from '../shared/schema-issues.js';
 import type { SchemaIssue } from '../shared/schema-issues.js';
 import { HEX_COLOUR_PATTERN, isUuidV7 } from '../scene/types.js';
 import { MAX_PROJECT_TEXTURE_FILES } from '../shared/limits.js';
-import type { LibraryMapRole } from '../materials/finish-types.js';
+import type { LibraryMapRole, LibraryMapSize } from '../materials/finish-types.js';
 import { ASSET_ANCHORS, KNEE_SIDES, VARIANT_ACCESS, isHttpUrl } from './asset-types.js';
 import { PROJECT_FORMAT } from './project-manifest.js';
 import type { BakedProjectManifest, ProjectLibraryManifest } from './project-manifest.js';
@@ -322,7 +322,7 @@ const libraryFactsSchema = z.strictObject({
 });
 
 /** The sizes a map may be listed at, smallest first: the keys of `LibraryMap.files`. */
-const LIBRARY_MAP_SIZES = ['128', '256', '384', '512', '768'] as const;
+export const LIBRARY_MAP_SIZES = ['128', '256', '384', '512', '768'] as const satisfies readonly LibraryMapSize[];
 
 /** `LibraryMap`. `files` is strict over the five sizes, so a `1024` file is an unknown key. */
 const libraryMapSchema = z.strictObject({
@@ -362,11 +362,16 @@ type LibraryShape = z.infer<typeof libraryMaterialSchema>;
 type LibraryMapShape = z.infer<typeof libraryMapSchema>;
 
 /** The two image formats a library map may be shipped in. */
-const LIBRARY_MAP_EXTENSIONS = ['webp', 'ktx2'] as const;
-type LibraryMapExtension = (typeof LIBRARY_MAP_EXTENSIONS)[number];
+export const LIBRARY_MAP_EXTENSIONS = ['webp', 'ktx2'] as const;
+export type LibraryMapExtension = (typeof LIBRARY_MAP_EXTENSIONS)[number];
 
-/** The one file name a map of `role` at `size` may have: `tex/<versionId>/<role>.<px>.<ext>`. */
-function libraryMapPath(versionId: string, role: LibraryMapRole, size: string, extension: LibraryMapExtension): string {
+/**
+ * The one file name a map of `role` at `size` may have:
+ * `tex/<versionId>/<role>.<px>.<ext>`. Published (`jeex-viewer/schema`) so a
+ * service that writes or explains a bake builds the path by the rule this
+ * check reads, not by a copy of it.
+ */
+export function libraryMapPath(versionId: string, role: LibraryMapRole, size: string, extension: LibraryMapExtension): string {
   return `tex/${versionId}/${role}.${size}.${extension}`;
 }
 

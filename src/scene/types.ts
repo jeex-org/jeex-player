@@ -547,6 +547,13 @@ export type SetRoomOp = {
   readonly kind?: RoomKind;
   readonly anchor?: Vec2;
   readonly accent?: string;
+  /**
+   * `null` attaches a zone (a room with its own `polygon`, as a merge keeps
+   * one) to the walls again: its outline is dropped and the face its anchor
+   * lies in is the room. The commit does the same by itself when a wall
+   * closes round a zone's anchor and no other room claims that face.
+   */
+  readonly polygon?: null;
 };
 
 export type RemoveRoomOp = { readonly op: 'remove_room'; readonly roomId: string };

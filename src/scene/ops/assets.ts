@@ -37,7 +37,16 @@ import type {
   SetObjectOp,
   Vec3,
 } from '../types.js';
-import { OpError, forgetInPresets, requireFinite, requireNewId, round, touchedAsset, type OpOutcome } from './context.js';
+import {
+  OpError,
+  forgetInPresets,
+  forgetReferencesInPresets,
+  requireFinite,
+  requireNewId,
+  round,
+  touchedAsset,
+  type OpOutcome,
+} from './context.js';
 import { OBJECT_SCALE } from './limits.js';
 
 /** `(x, y, z)` for a summary line: two decimals, so two placements read as one column. */
@@ -226,7 +235,7 @@ export function applySetObject(scene: Draft<SceneData>, op: SetObjectOp, registr
 export function applyRemoveObject(scene: Draft<SceneData>, op: RemoveObjectOp): OpOutcome {
   const asset = findAsset(scene, op.assetId);
   scene.assets.splice(scene.assets.indexOf(asset), 1);
-  forgetInPresets(scene, (candidate) => candidate.op === 'replace_asset_variant' && candidate.assetId === op.assetId);
+  forgetReferencesInPresets(scene, 'assets', op.assetId);
   return { summary: `Object ${op.assetId}: removed`, touched: [touchedAsset(op.assetId)] };
 }
 

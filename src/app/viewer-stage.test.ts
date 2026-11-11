@@ -63,7 +63,7 @@ describe('anchorCamera', () => {
 
   test('plan3d projects through the top view, so the anchor sits where the plan draws the object', () => {
     const view = top();
-    const camera = anchorCamera({ activeCamera: () => view }, rig());
+    const camera = anchorCamera({ pickCamera: () => view }, rig());
     const projected = projectToViewport(camera, point, viewport);
     const expected = projectToViewport(view, point, viewport);
     expect(camera).toBe(view);
@@ -75,6 +75,6 @@ describe('anchorCamera', () => {
 
   test('a mode without a plan camera keeps the perspective rig', () => {
     const perspective = rig();
-    expect(anchorCamera({ activeCamera: () => undefined }, perspective)).toBe(perspective);
+    expect(anchorCamera({ pickCamera: () => undefined }, perspective)).toBe(perspective);
   });
 });

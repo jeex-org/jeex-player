@@ -326,6 +326,37 @@ describe('the queue', () => {
     expect(await embed.ready).toEqual({ sceneId: DEMO.scene, options: { locale: 'en' } });
   });
 
+  test('an `error` before the first `ready` rejects `ready` with its code', async () => {
+    const embed = make();
+    fromFrame(frameEvent('error', { code: 'scene-load', message: 'the tour answered 404', fatal: true }));
+    const outcome = await embed.ready.then(
+      () => 'resolved',
+      (error: unknown) => error,
+    );
+    expect(outcome).toBeInstanceOf(EmbedError);
+    expect((outcome as EmbedError).code).toBe('scene-load');
+  });
+
+  test('after a failed first scene `loadScene` reaches the frame without waiting for a `ready`', async () => {
+    const embed = make();
+    void embed.play().catch(() => undefined);
+    const early = embed.loadScene({ url: '/early.json' });
+    fromFrame(frameEvent('error', { code: 'scene-load', message: 'the tour answered 404', fatal: true }));
+    const late = embed.loadScene({ url: '/fallback.json' });
+    await settled();
+    expect(iframe.contentWindow.commands.map((command) => command.method)).toEqual(['loadScene', 'loadScene']);
+    for (const command of iframe.contentWindow.commands) fromFrame(frameReply(command.id, { ok: true }));
+    await expect(early).resolves.toBeUndefined();
+    await expect(late).resolves.toBeUndefined();
+  });
+
+  test('an error that does not end the boot leaves `ready` to the frame: it still resolves', async () => {
+    const embed = make();
+    fromFrame(frameEvent('error', { code: 'internal', message: 'a frame hook threw' }));
+    fromFrame(frameEvent('ready', { sceneId: DEMO.scene }));
+    await expect(embed.ready).resolves.toBeDefined();
+  });
+
   test('a second `ready` (a later scene) does not re-flush the queue', async () => {
     const embed = make();
     void embed.play().catch(() => undefined);
@@ -750,6 +781,21 @@ describe('dispose', () => {
     const pending = embed.progress();
     embed.dispose();
     await expect(pending).rejects.toThrow(/disposed/);
+  });
+
+  test('a command still queued for `ready` rejects as `disposed` at once', async () => {
+    const embed = make();
+    const queued = embed.play();
+    embed.dispose();
+    const outcome = await Promise.race([
+      queued.then(
+        () => 'resolved',
+        (error: unknown) => error,
+      ),
+      settled().then(() => 'pending'),
+    ]);
+    expect(outcome).toBeInstanceOf(EmbedError);
+    expect((outcome as EmbedError).code).toBe('disposed');
   });
 
   test('a command after dispose rejects instead of reaching a frame that is gone', async () => {

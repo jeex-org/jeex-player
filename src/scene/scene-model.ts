@@ -34,6 +34,7 @@ import { validateScene } from './scene-validator.js';
 import { ViewerLibError } from '../shared/errors.js';
 import { applyOp, OpError, sameTouched, type SceneOp, type TouchedEntity } from './scene-ops.js';
 import { applyRoomMerges, planRoomMerges, type RoomMerge } from './room-merge.js';
+import { SHELL_EDITS, rebindMovedPlacements, settleShellEdit, zoneLeavingItsRoom } from './shell-settle.js';
 import { heirsOf, inheritedCirculation, inheritedKeys, inheritedPath, issueKey } from './issue-heirs.js';
 import { diffScenes, sameData } from './scene-diff.js';
 import { Fanout } from '../shared/fanout.js';
@@ -312,6 +313,15 @@ export class SceneModel {
       }
     }
 
+    // Which room owns a wall side, and which side is a wall's interior, are the
+    // solver's answers: a shell edit re-reads the paint and the door swings
+    // stored against them (`shell-settle.ts`).
+    if (batch.ops.some((op) => SHELL_EDITS.has(op.op))) {
+      for (const entity of settleShellEdit(draft, this.committed, this.solved, this.catalogues, batch.ops)) {
+        if (!touched.some((seen) => sameTouched(seen, entity))) touched.push(entity);
+      }
+    }
+
     let candidate: SceneData;
     let candidatePlan: SolvedPlan;
     try {
@@ -320,6 +330,17 @@ export class SceneModel {
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
       return { error: 'validation_failed', message };
+    }
+    // A zone's outline is stored: a shell edit may not leave it outside its room.
+    if (batch.ops.some((op) => SHELL_EDITS.has(op.op))) {
+      const message = zoneLeavingItsRoom(candidate, this.solved, candidatePlan);
+      if (message !== undefined) return { error: 'validation_failed', message };
+    }
+
+    // The position is the truth for which room a bound placement is in: one
+    // moved without naming a room is bound to the room it now stands in.
+    for (const entity of rebindMovedPlacements(draft, batch.ops, candidatePlan)) {
+      if (!touched.some((seen) => sameTouched(seen, entity))) touched.push(entity);
     }
 
     const linted = this.lint(batch.lint ?? 'off', candidate, candidatePlan, batch.ops, roomMerges);

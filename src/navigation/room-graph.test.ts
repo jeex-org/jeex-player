@@ -26,6 +26,7 @@ import { apartmentScene } from '../demo/scene-data.js';
 import { DEMO } from '../demo/demo-ids.js';
 import { lShapePlan, spawnlessLShapePlan } from '../fixtures/plan-l-shape.js';
 import { L_SHAPE } from '../fixtures/plan-l-shape-ids.js';
+import { ZONED, ZONE_OUTLINES, zone, zonedLivingPlan } from '../fixtures/plan-zoned-living.js';
 import type { SceneData, Vec2 } from '../scene/types.js';
 
 const scene = apartmentScene;
@@ -346,5 +347,33 @@ describe('roomStandingPoint: where a walker jumped into a room stands', () => {
   test('a clear room: its centre', () => {
     const lPlan = solvePlan(lShapePlan);
     expect(roomStandingPoint(lPlan, lShapePlan, L_SHAPE.room.b, [])).toEqual(roomCentre(lPlan, lShapePlan, L_SHAPE.room.b, []));
+  });
+});
+
+describe('a zone of an open plan is floor to walk on, and a room to route to', () => {
+  // The living room with the kitchen kept as a zone of it: the solver cuts the
+  // kitchen out of the living room's floor, but nothing stands between them.
+  const zoned = zonedLivingPlan([zone(ZONED.room.kitchen, 'Kitchen', ZONE_OUTLINES.kitchen)]);
+  const zonedPlan = solvePlan(zoned);
+  const living = { x: 4, y: EYE_HEIGHT_M, z: 5 };
+  const kitchen = { x: 8.5, y: EYE_HEIGHT_M, z: 3.5 };
+
+  test('the line where the zone was cut out is not a wall: the floor beside it is navigable and a walk crosses it', () => {
+    expect(isNavigable(zonedPlan, { x: 7.05, y: EYE_HEIGHT_M, z: 3.5 })).toBe(true);
+    expect(isNavigable(zonedPlan, { x: 7.15, y: EYE_HEIGHT_M, z: 3.5 })).toBe(true);
+    expect(canTraverse(zonedPlan, living, kitchen)).toBe(true);
+    expect(canTraverse(zonedPlan, kitchen, living)).toBe(true);
+  });
+
+  test('the zone is reached from its room and its room from the zone', () => {
+    const zonedGraph = buildRoomGraph(zonedPlan, zoned, []);
+    expect(routeToRoom(zonedGraph, zonedPlan, living, ZONED.room.kitchen)).not.toBeNull();
+    expect(routeToRoom(zonedGraph, zonedPlan, kitchen, ZONED.room.living)).not.toBeNull();
+  });
+
+  test('a leg from the room to a point in the zone is routed, and ends on that point', () => {
+    const route = routeBetween(buildRoomGraph(zonedPlan, zoned, []), zonedPlan, living, kitchen);
+    expect(route).not.toBeNull();
+    expect(route!.at(-1)).toEqual({ x: kitchen.x, z: kitchen.z });
   });
 });

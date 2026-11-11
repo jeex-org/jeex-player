@@ -37,7 +37,7 @@ import type {
 import {
   OpError,
   TOUCHED_SHELL,
-  forgetInPresets,
+  forgetReferencesInPresets,
   requireNewId,
   round,
   touchedOpening,
@@ -94,30 +94,52 @@ function writeGeometry(opening: Draft<Opening>, geometry: OpeningGeometry, ceili
 }
 
 /**
- * Re-fits one wall's openings after its centreline length changed, keeping
- * each opening's SHARE of the wall (`center / length`).
+ * Re-fits one wall's openings after its centreline length changed.
  *
- * The share, not the metre coordinate: a door in the middle of a wall that was
- * stretched stays in the middle, which is what an editor dragging a node
- * expects to see. The share is only a request — `clampOpening` still has the
- * last word, so an opening whose share no longer leaves room for its own width
- * slides back onto the wall instead of hanging off its end.
+ * When one end of the wall moved (`move_node`), `fixed` names the end that
+ * did not, and every opening keeps its distance in metres from it: a door
+ * sits where it sits in the building, and stretching the far end of a wall
+ * must not walk a door away from the corner nobody touched. When the wall's
+ * curve changed instead (`set_wall` with an arc), both ends stay put and each
+ * opening keeps its SHARE of the new length.
+ *
+ * Either way the position is only a request: `clampOpening` still has the
+ * last word, so an opening that no longer fits slides back onto the wall, and
+ * openings that then overlap slide toward the fixed end just far enough to
+ * clear each other. What still does not fit is the validator's to refuse.
  *
  * It lives here rather than in `shell.ts` for the same reason
  * `reclampOpeningsUnder` does: `shell.ts` may read openings, openings never
  * reads shell.
  */
-export function rescaleOpeningsOnWall(scene: Draft<SceneData>, wall: Draft<Wall>, from: number, to: number): void {
+export function rescaleOpeningsOnWall(scene: Draft<SceneData>, wall: Draft<Wall>, from: number, to: number, fixed?: 'a' | 'b'): void {
   if (!wall.openings || wall.openings.length === 0) return;
   // A zero-length source has no share to preserve; every opening is simply
   // re-clamped onto the new wall.
   const scale = from > 0 ? to / from : 1;
-  for (const opening of wall.openings) {
+  const bounds = { wallLength: to, ceilingHeight: scene.ceilingHeight };
+  const fitted = wall.openings.map((opening) => {
     const current = effectiveOpening(opening, scene.ceilingHeight);
-    const requested = { ...current, center: current.center * scale };
-    const bounds = { wallLength: to, ceilingHeight: scene.ceilingHeight };
-    writeGeometry(opening, clampOpening(opening.type, requested, bounds), scene.ceilingHeight);
+    const center = fixed === 'a' ? current.center : fixed === 'b' ? current.center + (to - from) : current.center * scale;
+    return { opening, geometry: clampOpening(opening.type, { ...current, center }, bounds) };
+  });
+  if (fixed !== undefined) {
+    // From the moved end toward the fixed one: each opening clears the one
+    // beyond it by sliding toward the fixed end, never away from it.
+    const towardFixed = [...fitted].sort((p, q) =>
+      fixed === 'a' ? q.geometry.center - p.geometry.center : p.geometry.center - q.geometry.center,
+    );
+    for (let index = 1; index < towardFixed.length; index += 1) {
+      const beyond = towardFixed[index - 1]!.geometry;
+      const current = towardFixed[index]!.geometry;
+      const half = current.width / 2;
+      if (fixed === 'a' && current.center + half > beyond.center - beyond.width / 2)
+        current.center = beyond.center - beyond.width / 2 - half;
+      if (fixed === 'b' && current.center - half < beyond.center + beyond.width / 2)
+        current.center = beyond.center + beyond.width / 2 + half;
+    }
   }
+  for (const { opening, geometry } of fitted) writeGeometry(opening, geometry, scene.ceilingHeight);
 }
 
 /**
@@ -307,5 +329,5 @@ export function applyRemoveOpening(scene: Draft<SceneData>, op: RemoveOpeningOp)
  * it.
  */
 export function forgetOpeningInPresets(scene: Draft<SceneData>, openingId: string): void {
-  forgetInPresets(scene, (op) => op.op === 'replace_opening_variant' && op.openingId === openingId);
+  forgetReferencesInPresets(scene, 'openings', openingId);
 }

@@ -24,7 +24,7 @@
  * else with it.
  */
 
-import type { ProjectInfo } from './project-wiring.js';
+import type { LoadedDocument, ProjectInfo } from './project-wiring.js';
 import type { SceneSource } from '../scene/scene-repository.js';
 import { DocumentSource } from './document-source.js';
 import { SceneModel } from '../scene/scene-model.js';
@@ -32,22 +32,18 @@ import { Picker } from '../geometry/picker.js';
 import { hasWebGL } from '../render/webgl-probe.js';
 import { ViewerUI, type ViewerCommands } from '../ui/viewer-ui.js';
 import { createViewerContext, ViewerDisposedError, type ViewerContext } from './viewer-context.js';
+import { ViewerLibError } from '../shared/errors.js';
 import { ViewerPageGlobals } from './viewer-page-globals.js';
-import {
-  sceneErrorCode,
-  ViewerEvents,
-  toViewerError,
-  type ViewerError,
-  type ViewerEventMap,
-  type ViewerEventName,
-} from './viewer-events.js';
+import { sceneErrorCode, ViewerEvents, toViewerError, type ViewerEventMap, type ViewerEventName } from './viewer-events.js';
 import type { Messages } from '../ui/messages.js';
 import { FullscreenController } from '../ui/fullscreen-controller.js';
 import { Dollhouse } from '../geometry/dollhouse.js';
 import { FurnitureAnimator } from '../geometry/furniture-animator.js';
 import { SceneMount, createKtx2Support, textureEnvOf } from './scene-mount.js';
 import { editsWiring } from './edits-wiring.js';
-import { createTourControls, TourEvents, type TourControls } from '../camera/tour-controls.js';
+import { TourEvents, type TourControls } from '../camera/tour-controls.js';
+import { stageTourControls } from './tour-surface.js';
+import { AssetsReport } from './assets-report.js';
 import type { ViewerOptions } from './viewer-options.js';
 import { prefersReducedMotion, resolveMotionInstant, watchMotion } from './motion-wiring.js';
 import { handleCommands, type HandleCommands } from './handle-commands.js';
@@ -61,7 +57,7 @@ import { stageWiring } from './stage-wiring.js';
 import { applyStartView, firstPicture, loadWithNoiseTiles, nextFrame, showBootStep } from './viewer-boot.js';
 import { ViewerStage } from './viewer-stage.js';
 import type { Logger } from '../shared/logger.js';
-import { instanceLogger, raiseFailure } from './viewer-failure.js';
+import { failureRaiser, instanceLogger } from './viewer-failure.js';
 import { telemetryWiring, type Embedding, type TelemetryWiring } from './telemetry-wiring.js';
 import type { UsageSink } from '../shared/usage.js';
 
@@ -72,28 +68,20 @@ export class ViewerApp {
   private messages: Messages;
   private readonly picker: Picker;
   private readonly shell: FullscreenController;
+  /** The `assets` event of each document; it counts the texture warnings of the log below (`assets-report.ts`). */
+  private readonly assets = new AssetsReport((info) => this.events.emit('assets', info));
   /** This instance's sink: `options.onLog`, else the console (`viewer-failure.ts`). */
-  private readonly log: Logger = instanceLogger(() => this.options);
+  private readonly log: Logger = instanceLogger(
+    () => this.options,
+    (entry) => this.assets.observe(entry),
+  );
   private readonly tourEvents = new TourEvents(this.log);
   private readonly events = new ViewerEvents(this.log);
   /** Anonymous telemetry (`telemetry-wiring.ts`); every method a no-op when it is off. */
   private readonly telemetry: TelemetryWiring;
   private readonly usage: UsageSink = (action) => this.telemetry.usage(action);
-  /**
-   * The public tour surface. It is created before the camera stack exists and
-   * defers to it, so a host can hold `handle.tour` from the moment
-   * `mountViewer` returns; a command issued that early is replayed on the first
-   * route (`tour-controls.ts`).
-   */
-  readonly tour: TourControls = createTourControls(
-    {
-      engageTour: () => this.stage?.director?.engageTour() ?? null,
-      toggleTour: () => this.stage?.director?.toggleTour(),
-      player: () => this.stage?.director?.tour ?? null,
-      onSpeed: (speed) => this.events.emit('tourSpeed', { speed }),
-    },
-    this.tourEvents,
-  );
+  /** The public tour surface, usable before the camera stack exists (`tour-surface.ts`). */
+  readonly tour: TourControls = stageTourControls(() => this.stage, this.events, this.tourEvents);
   /** The commands the control bar and the progress bar can ask of the application. */
   private readonly commands: ViewerCommands = uiCommands({
     mount: () => this.mount,
@@ -157,6 +145,12 @@ export class ViewerApp {
     },
     syncMinimap: () => this.stage?.syncMinimap(),
     released: () => this.released,
+  });
+  /** The card and the `error` event together (`viewer-failure.ts`). */
+  private readonly fail = failureRaiser({
+    emitError: (error) => this.events.emit('error', error),
+    teardown: () => this.teardown(),
+    showError: (cardTitle, message, offerRetry) => this.ui.showError(cardTitle, message, offerRetry),
   });
 
   constructor(container: HTMLElement, options: ViewerOptions, embedding: Embedding = { embed: 'script' }) {
@@ -223,11 +217,14 @@ export class ViewerApp {
       renderPreview: (group) => this.stage?.runtime.preview.render(group) ?? null,
       edits: editsWiring(this.options, (edit) => this.events.emit('edit', edit)),
       onDocument: (model) => this.onDocument(model),
-      onAssetsChanged: (model) => this.stage?.director?.controller.refreshObstacles(model.scene),
+      onAssetsChanged: (model) => this.stage?.placementsChanged(model.scene),
       // A variant swap hands out a new opening group with its leaf open again.
       onOpeningsChanged: () => this.doors.reapply(),
       onError: (error) => this.events.emit('error', error),
-      onModelsSettled: (model, result) => this.telemetry.modelsSettled(model, result),
+      onModelsSettled: (model, result, maps) => {
+        this.telemetry.modelsSettled(model, result);
+        void this.assets.settled(result, maps);
+      },
       usage: this.usage,
       textureEnv: () => textureEnvOf(this.stage?.runtime.renderer, this.options.resolveTexture, this.log, this.ktx2),
       artificialLights: (root) => this.handle.lightTemperature.apply(root),
@@ -275,7 +272,8 @@ export class ViewerApp {
     return this.events.on(event, callback);
   }
 
-  async init(): Promise<void> {
+  /** Boots this instance: on `preloaded` when a `loadScene` already loaded it, else from the latest source. */
+  async init(preloaded?: LoadedDocument): Promise<void> {
     try {
       // Re-claimed, not assumed: the Retry path runs `init()` again on an
       // instance whose failure may have given the globals back, and a viewer
@@ -284,15 +282,13 @@ export class ViewerApp {
       this.globals.claim();
       showBootStep(this.ui, this.messages, 'support');
       if (!hasWebGL(this.roots.canvas)) {
-        this.fail(
-          { code: 'webgl-unavailable', message: this.messages.t('error.noWebglBody') },
-          this.messages.t('error.noWebglTitle'),
-          false,
-        );
-        return;
+        const failure = { code: 'webgl-unavailable', message: this.messages.t('error.noWebglBody') } as const;
+        this.fail(failure, this.messages.t('error.noWebglTitle'), false);
+        // Reported, and the card is up: the boot still FAILED, so `ready` and a `loadScene` reject.
+        throw new ViewerLibError(failure.code, failure.message);
       }
       showBootStep(this.ui, this.messages, 'scene');
-      const loaded = await loadWithNoiseTiles(this.documents.boot(), this.context.signal);
+      const loaded = await loadWithNoiseTiles(preloaded ? Promise.resolve(preloaded) : this.documents.boot(), this.context.signal);
       const model = loaded.model;
       showBootStep(this.ui, this.messages, 'geometry');
       await nextFrame(this.context.signal);
@@ -312,6 +308,7 @@ export class ViewerApp {
       const { options, ui, tour } = this;
       applyStartView({
         options,
+        requestedMode: this.handle.takeRequestedMode(),
         ui,
         tour,
         setMode: (mode) => this.handle.setMode(mode),
@@ -333,6 +330,8 @@ export class ViewerApp {
       // A boot the host cut short is not a failure to report: the shell it
       // would put the card in has already been removed from the container.
       if (error instanceof ViewerDisposedError) throw error;
+      // Already reported where it happened (no WebGL): the instance is torn down.
+      if (this.disposed) throw error;
       const failure = toViewerError(sceneErrorCode(error), error, this.messages.t('error.unknown'));
       this.fail(failure, this.messages.t('error.title'), true);
       throw error;
@@ -385,6 +384,8 @@ export class ViewerApp {
     );
     if (loaded === null) return;
     this.telemetry.beforePresent(loaded.model.scene.id);
+    // A failure tore this instance down (`fail`): there is no stage to present into, so the scene is booted.
+    if (this.disposed) return this.boot(loaded);
     this.mount.present(loaded);
     await this.announceReady(loaded.model);
   }
@@ -401,6 +402,7 @@ export class ViewerApp {
 
   /** Re-seeds every consumer of a new document, in one pass (`document-wiring.ts`). */
   private onDocument(model: SceneModel): void {
+    this.assets.document(model);
     seedForDocument(
       {
         ui: this.ui,
@@ -425,35 +427,26 @@ export class ViewerApp {
 
   // ------------------------------------------------------------ internals ---
 
-  /**
-   * The Retry button: tears this instance down and boots it again in the same
-   * container. `disposed` is cleared first, because the error card the button
-   * sits on is shown by a path that disposed the instance.
-   */
+  /** The Retry button: boots this instance again in the same container, from the latest source. */
   private async retry(): Promise<void> {
     // A released instance has no shell left to boot into: its Retry button is
     // gone with the rest of the markup, but a host may still hold the closure.
     if (this.released) return;
-    this.teardown(); // a lost context's card sits over a live instance (`context-recovery.ts`)
-    this.disposed = false;
-    this.ui.showLoading();
-    await this.init().catch((error: unknown) => {
+    await this.boot().catch((error: unknown) => {
       this.log.error('retry-failed', 'viewer retry failed', error);
     });
   }
 
-  /** The card and the `error` event together (`viewer-failure.ts`). */
-  private fail(failure: ViewerError, title: string, retry: boolean): void {
-    raiseFailure(
-      {
-        emitError: (error) => this.events.emit('error', error),
-        teardown: () => this.teardown(),
-        showError: (cardTitle, message, offerRetry) => this.ui.showError(cardTitle, message, offerRetry),
-      },
-      failure,
-      title,
-      retry,
-    );
+  /**
+   * Tears this instance down and boots it again. `disposed` is cleared after
+   * the teardown, because what calls this (the error card's Retry, a
+   * `loadScene` after a failure) follows a path that disposed the instance.
+   */
+  private async boot(preloaded?: LoadedDocument): Promise<void> {
+    this.teardown(); // a lost context's card sits over a live instance (`context-recovery.ts`)
+    this.disposed = false;
+    this.ui.showLoading();
+    await this.init(preloaded);
   }
 
   /**

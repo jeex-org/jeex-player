@@ -77,6 +77,7 @@ type Fired = {
   state: (state: string) => void;
   ended: () => void;
   lightTemperature: (change: { temperature: number | null; source: 'host' | 'panel' }) => void;
+  assets: (info: unknown) => void;
 };
 
 /** The viewer window the bridge installs itself on. */
@@ -205,6 +206,7 @@ function fakeHandle(
       state: fireOne('tour:state'),
       ended: fireOne('tour:ended'),
       lightTemperature: fireOne('lightTemperature'),
+      assets: fireOne('assets'),
     },
   };
 }
@@ -646,6 +648,16 @@ describe('the failures', () => {
     expect(built.calls.tour).toEqual([]);
   });
 
+  test('`loadScene` is answered before the first `ready`: after a failed first scene it is how a host gives the frame another one', async () => {
+    const built = fakeHandle();
+    installFrameBridge(built.handle, { hostOrigin: HOST_ORIGIN, target: hostWindow as unknown as Window, viewerId: VIEWER_ID });
+    built.fire.error({ code: 'scene-load', message: 'the tour answered 404', cause: undefined });
+    sendCommand('loadScene', { url: '/fallback.json' });
+    await settled();
+    expect(replies()[0]).toMatchObject({ ok: true });
+    expect(built.calls.scenes).toEqual([{ url: '/fallback.json', revision: undefined }]);
+  });
+
   test('`dispose` is answered before the first scene, because teardown always works', async () => {
     const built = fakeHandle();
     installFrameBridge(built.handle, { hostOrigin: HOST_ORIGIN, target: hostWindow as unknown as Window, viewerId: VIEWER_ID });
@@ -712,6 +724,7 @@ describe('the events', () => {
     fire.state('playing');
     fire.ended();
     fire.lightTemperature({ temperature: 6500, source: 'host' });
+    fire.assets({ models: { upgraded: 2, failed: 1, budget: false }, textures: { failed: 0, budget: false } });
     expect(events().map((entry) => entry.event)).toEqual([
       'ready',
       'error',
@@ -721,8 +734,20 @@ describe('the events', () => {
       'state',
       'ended',
       'lightTemperature',
+      'assets',
     ]);
-    expect(events().at(-1)!.payload).toEqual({ temperature: 6500, source: 'host' });
+    expect(events().at(-2)!.payload).toEqual({ temperature: 6500, source: 'host' });
+    expect(events().at(-1)!.payload).toEqual({ models: { upgraded: 2, failed: 1, budget: false }, textures: { failed: 0, budget: false } });
+  });
+
+  test('a boot failure is marked fatal on the wire; any other error is not', () => {
+    const { fire } = bridge();
+    fire.error({ code: 'scene-load', message: '404', cause: undefined, fatal: true });
+    fire.error({ code: 'internal', message: 'a frame hook threw', cause: undefined });
+    expect(events().map((entry) => entry.payload)).toEqual([
+      { code: 'scene-load', message: '404', fatal: true },
+      { code: 'internal', message: 'a frame hook threw' },
+    ]);
   });
 
   test('an error event carries the code and the message, never the cause', () => {

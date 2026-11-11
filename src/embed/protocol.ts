@@ -155,13 +155,14 @@ export type ErrorCode =
 /**
  * What the frame pushes to the host, unasked, and what each event carries.
  *
- * It mirrors a part of `ViewerEventMap` (`app/viewer-events.ts`, `lightTemperature` included) and adds the tour's four:
+ * It mirrors a part of `ViewerEventMap` (`app/viewer-events.ts`, `lightTemperature` and `assets` included) and adds the tour's four:
  * `progress`, `state`, `ended` — and `disposed`, which the HOST handle raises
  * for itself when it tears the frame down.
  */
 export type EmbedEventMap = {
   ready: { options: unknown; sceneId: string };
-  error: { code: ErrorCode; message: string };
+  /** `fatal`: the boot failed and the viewer is down; only `loadScene` brings a scene back. */
+  error: { code: ErrorCode; message: string; fatal?: true };
   scene: { sceneId: string; rev: number };
   mode: ViewerMode;
   /** A click named something in the frame's scene; only with `select` on. */
@@ -179,6 +180,8 @@ export type EmbedEventMap = {
   size: { width: number; height: number };
   /** The colour temperature of the artificial light changed: kelvin or `null` («Original»), and who changed it. */
   lightTemperature: { temperature: number | null; source: 'host' | 'panel' };
+  /** Once per document, when its first model pass settled: what loaded and what fell back (`ViewerAssetsInfo`). */
+  assets: { models: { upgraded: number; failed: number; budget: boolean }; textures: { failed: number; budget: boolean } };
   disposed: undefined;
 };
 

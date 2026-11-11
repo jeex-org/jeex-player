@@ -26,7 +26,8 @@
 
 import type { AssetFactsSource } from '../assets/asset-facts.js';
 import * as THREE from 'three';
-import { buildPlanDrawing, fitTransform, type PlanBounds, type PlanDrawing } from '../plan/plan-drawing.js';
+import { buildPlanDrawing, fitTransform, type PlanBounds, type PlanDrawing, type PlanTransform } from '../plan/plan-drawing.js';
+import { selectionMark, type PlanSelectionMark, type PlanSelectionTarget } from '../plan/plan-selection.js';
 import { planDrawingInputs } from '../assets/plan-fixtures.js';
 import { PLAN_PADDING, fitCanvasToBox, paintPlan, type PlanCameraMarker } from '../plan/plan-canvas.js';
 import { cameraMarker } from '../render/viewport-projection.js';
@@ -120,6 +121,11 @@ export class PlanModes {
   private readonly watching = new AbortController();
   private drawing: PlanDrawing | null = null;
   private bounds: PlanBounds | null = null;
+  /** The document the drawing was built from, for the selection mark. */
+  private source: { plan: SolvedPlan; scene: SceneData } | null = null;
+  /** The host's selection (`ViewerHandle.setSelection`) and what it marks on the current document. */
+  private selection: PlanSelectionTarget | null = null;
+  private mark: PlanSelectionMark | null = null;
   private mode: ViewerMode = 'orbit';
 
   constructor(deps: PlanModesDeps) {
@@ -165,8 +171,46 @@ export class PlanModes {
       dimensions: options.dimensions,
     });
     this.bounds = this.drawing.bounds;
+    this.source = { plan, scene };
+    this.mark = this.selection === null ? null : selectionMark(plan, scene, this.selection);
     if (this.mode === 'plan2d') this.paint();
     if (this.mode === 'plan3d') this.fitTopView();
+  }
+
+  /**
+   * The host's selection, drawn on the 2D plan in the accent (`plan2d` has no
+   * meshes to tint). It survives a new document while the target is still
+   * there, like the 3D highlight; `null` clears it.
+   */
+  setSelection(target: PlanSelectionTarget | null): void {
+    this.selection = target;
+    this.mark = target === null || this.source === null ? null : selectionMark(this.source.plan, this.source.scene, target);
+    if (this.mode === 'plan2d') this.paint();
+  }
+
+  /**
+   * A revision that moved, added or removed placements without rebuilding the
+   * plan: the selection mark is read again from the new document.
+   */
+  placementsChanged(scene: SceneData): void {
+    if (this.source === null) return;
+    this.source = { plan: this.source.plan, scene };
+    if (this.selection === null) return;
+    this.mark = selectionMark(this.source.plan, scene, this.selection);
+    if (this.mode === 'plan2d') this.paint();
+  }
+
+  /**
+   * What the 2D drawing is fitted to: the plan bounds in metres and the
+   * metres-to-pixels transform over the viewport box (CSS pixels, the same fit
+   * `plan2d` paints with), or `null` before a document. A host overlay or an
+   * underlay uses it instead of solving the plan a second time.
+   */
+  view(): { bounds: PlanBounds; transform: PlanTransform } | null {
+    if (!this.drawing) return null;
+    const w = Math.max(1, Math.round(this.deps.viewport.clientWidth));
+    const h = Math.max(1, Math.round(this.deps.viewport.clientHeight));
+    return { bounds: this.drawing.bounds, transform: fitTransform(this.drawing.bounds, { w, h }, PLAN_PADDING) };
   }
 
   /**
@@ -258,6 +302,7 @@ export class PlanModes {
     const options = this.planOptions();
     paintPlan(fitted.ctx, drawing, fitTransform(drawing.bounds, { w: fitted.w, h: fitted.h }, PLAN_PADDING), 'drawing', {
       camera: options.camera ? this.marker() : null,
+      selection: this.mark,
     });
   }
 

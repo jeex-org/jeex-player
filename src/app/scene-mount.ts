@@ -97,7 +97,8 @@ type SceneMountDeps = {
    * short by a dispose or another document. Passes after an edit or a rebuild
    * are not reported: they say nothing about how the document loaded.
    */
-  onModelsSettled?: ((model: SceneModel, result: UpgradeResult) => void) | undefined;
+  /** `maps` resolves once the shell's library maps have attached or given up (`SceneBuilder.mapsSettled`). */
+  onModelsSettled?: ((model: SceneModel, result: UpgradeResult, maps: Promise<void>) => void) | undefined;
   /** Hears accepted actions in the built-in panels (`shared/usage.ts`). */
   usage?: UsageSink | undefined;
   /**
@@ -498,7 +499,7 @@ export class SceneMount {
             this.invalidate();
           },
         );
-        if (reportFor && !signal.aborted) this.deps.onModelsSettled?.(reportFor, result);
+        if (reportFor && !signal.aborted) this.deps.onModelsSettled?.(reportFor, result, builder.mapsSettled());
       })
       .catch(() => undefined);
   }

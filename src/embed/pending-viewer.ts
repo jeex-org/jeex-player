@@ -31,7 +31,7 @@
  * kept this object keeps driving the running viewer.
  */
 
-import type { AnchorPoint, AnchorTarget, NewCheckpoint, ViewerHandle, ViewerSlots, ViewerState } from '../app/viewer-handle.js';
+import type { AnchorPoint, AnchorTarget, NewCheckpoint, PlanView, ViewerHandle, ViewerSlots, ViewerState } from '../app/viewer-handle.js';
 import type { ViewerOptions } from '../app/viewer-options.js';
 import type { ViewerEventMap, ViewerEventName } from '../app/viewer-events.js';
 import type { CaptureCommands } from '../app/capture-commands.js';
@@ -86,7 +86,11 @@ export class PendingViewer implements ViewerHandle {
   private answering = false;
   /** True once the element let go of this stand-in, or a host disposed it. */
   private closed = false;
-  private readonly queue: Array<(handle: ViewerHandle) => void> = [];
+  private queue: Array<(handle: ViewerHandle) => void> = [];
+  /** The queued calls that are `loadScene`s: the ones a failed boot takes at once. */
+  private readonly loadCalls = new Set<(handle: ViewerHandle) => void>();
+  /** The boot failed (a fatal `error` before the first `ready`): only `loadScene` reaches the viewer now. */
+  private down = false;
   /** This object's own listeners on the started viewer, undone when it lets go. */
   private ownOffs: Array<() => void> = [];
   /** The rejections of the queued `loadScene` calls, for a stand-in that will never start them. */
@@ -137,9 +141,10 @@ export class PendingViewer implements ViewerHandle {
    * and the opening view would overwrite one), and they are replayed inside
    * that event, before the element's own `jeex-ready`, so a host's
    * `jeex-ready` listener already sees them applied. Calls made while the boot
-   * runs join the queue, so the order holds. A boot that fails replays
-   * nothing: the queue waits for a Retry that reaches `ready`, or rejects its
-   * `loadScene` calls as `disposed` when the element leaves.
+   * runs join the queue, so the order holds. A boot that fails sends its
+   * queued `loadScene` calls at once, and later ones straight through (a new
+   * scene is how it comes back); the other commands wait for a `ready`, or the
+   * loads reject as `disposed` when the element leaves first.
    *
    * Registered before the element's own subscriptions (`element-controller.ts`
    * attaches first), so these run first for each event.
@@ -151,11 +156,22 @@ export class PendingViewer implements ViewerHandle {
       this.answering = true;
       offScene();
     });
+    // A boot that FAILED takes a scene and nothing else: `loadScene` is how it
+    // comes back, so the queued loads go now and later ones go straight
+    // through; every other command still waits for the `ready` that follows.
+    const offFatal = handle.on('error', (error) => {
+      if (error.fatal !== true || this.booted) return;
+      this.down = true;
+      const loads = this.queue.filter((call) => this.loadCalls.has(call));
+      this.queue = this.queue.filter((call) => !this.loadCalls.has(call));
+      for (const call of loads) call(handle);
+    });
     const offReady = handle.on('ready', () => {
       offReady();
       offScene();
       this.answering = true;
       this.booted = true;
+      this.down = false;
       for (const call of this.queue.splice(0)) {
         try {
           call(handle);
@@ -167,7 +183,7 @@ export class PendingViewer implements ViewerHandle {
     for (const listener of this.listeners) listener.off = handle.on(listener.event, listener.callback as never);
     for (const listener of this.tourListeners)
       listener.off = (handle.tour.on as (event: string, callback: never) => () => void)(listener.event, listener.callback as never);
-    this.ownOffs = [offScene, offReady];
+    this.ownOffs = [offScene, offReady, offFatal];
     const settle = this.settle;
     this.settle = null;
     if (settle) handle.ready.then(settle.resolve, settle.reject);
@@ -193,6 +209,7 @@ export class PendingViewer implements ViewerHandle {
     if (this.closed) return;
     this.closed = true;
     this.queue.length = 0;
+    this.loadCalls.clear();
     // A queued `loadScene` will never run: its caller hears why instead of waiting forever.
     for (const reject of this.waitingLoads) reject(error);
     this.waitingLoads.clear();
@@ -218,15 +235,18 @@ export class PendingViewer implements ViewerHandle {
   }
 
   loadScene(source: SceneSource): Promise<void> {
-    const live = this.direct();
+    const live = this.direct() ?? (this.down ? this.real : null);
     if (live) return live.loadScene(source);
     if (this.closed) return Promise.reject(disposed());
     return new Promise<void>((resolve, reject) => {
       this.waitingLoads.add(reject);
-      this.queue.push((handle) => {
+      const call = (handle: ViewerHandle): void => {
         this.waitingLoads.delete(reject);
+        this.loadCalls.delete(call);
         handle.loadScene(source).then(resolve, reject);
-      });
+      };
+      this.loadCalls.add(call);
+      this.queue.push(call);
     });
   }
 
@@ -359,6 +379,9 @@ export class PendingViewer implements ViewerHandle {
   }
   describeSelection(target: ViewerSelection): SelectionDescription | null {
     return this.live()?.describeSelection(target) ?? null;
+  }
+  planView(): PlanView | null {
+    return this.live()?.planView() ?? null;
   }
   resize(): void {
     this.command((handle) => handle.resize());

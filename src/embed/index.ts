@@ -38,7 +38,7 @@ export type { ErrorDetail, ViewerLibErrorOptions } from '../shared/errors.js';
 export type { LogEntry, LogLevel, LogSink, Logger } from '../shared/logger.js';
 
 export type { JeexViewerElement } from './element.js';
-export type { AnchorPoint, AnchorTarget, NewCheckpoint, ViewerHandle, ViewerSlots, ViewerState } from '../app/viewer-handle.js';
+export type { AnchorPoint, AnchorTarget, NewCheckpoint, PlanView, ViewerHandle, ViewerSlots, ViewerState } from '../app/viewer-handle.js';
 export type { SlotName } from '../ui/host-slots.js';
 export type { DeepPartial, TourStartMode, ViewerOptions } from '../app/viewer-options.js';
 export type { TourControls, TourProgress, TourState } from '../camera/tour-controls.js';

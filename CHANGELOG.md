@@ -9,6 +9,34 @@ as described under [Versioning](#versioning).
 
 ### Added
 
+- **`error.fatal`.** The failure that took the viewer down (its error card is
+  on screen) carries `fatal: true`, on the module, the element and the wire;
+  only a fatal `error` before the first `ready` rejects the iframe helper's
+  `ready`.
+- **`plan2d` shows a host's selection.** `setSelection` draws its wall,
+  opening, room or placement on the 2D plan in the accent, and the
+  `selection-anchor` slot is projected through the plan's top view in
+  `plan2d` as in `plan3d`, so a host's card sits on the drawing.
+  `handle.planView()` answers what the 2D plan is fitted to: the bounds in
+  metres and the metres-to-pixels transform over the viewer's box.
+- **`set_room { polygon: null }`** attaches a zone to the walls again; the
+  commit does it by itself when a new wall closes round a zone's anchor in a
+  face no other room claims.
+- **The library map vocabulary on `jeex-viewer/schema`.** `libraryMapPath`,
+  `LIBRARY_MAP_EXTENSIONS` and `LIBRARY_MAP_SIZES`: the file name rule, the
+  formats (`webp`, `ktx2`) and the sizes a baked library material's maps are
+  checked against, for a service that writes or explains a bake.
+
+- **The `assets` event.** Once per document, when its first model pass
+  and its library maps have settled, the viewer says what its libraries delivered:
+  `{ models: { upgraded, failed, budget }, textures: { failed, budget } }`,
+  the models swapped in, the ones left as procedural stand-ins, whether the
+  byte budget stopped the pass, the textures whose surface stayed flat, and
+  whether the texture byte budget left the remaining surfaces flat. A tour
+  that loads only in part still fires `ready`; this event is how a host
+  learns it. The element raises it as `jeex-assets`, and it crosses the
+  iframe boundary as the `assets` event.
+
 - **Quality tiers.** Walk and tour render on one of two tiers: `high` is the
   look every earlier release shipped, and `low` trades the drawing-buffer
   resolution for frame rate on a slow device (the ambient occlusion stays
@@ -141,6 +169,74 @@ as described under [Versioning](#versioning).
 
 ### Fixed
 
+- **No WebGL is a failed boot.** Without a WebGL 2 context `ready` rejects
+  with `webgl-unavailable`, as the handle documents, and so does a later
+  `loadScene`; before, both resolved over the fallback card.
+- **A door pushed to the start of its wall commits.** The edge-margin check
+  of an opening compares with the plan tolerance, so a door the clamp puts
+  exactly on the margin (0.8, 1.0, 1.2 or 1.6 m wide against the start of a
+  wall) is no longer refused.
+- **Presets follow the edits that remove or cut what they dress.** Removing
+  a placement, an opening, a wall or a room forgets every preset
+  instruction that names it, whatever the operation; a `split_wall` rewrites
+  the preset's face paint, `set_wall` and `set_opening` onto the two halves
+  instead of vetoing the split.
+- **Lowering the ceiling lowers the tour cameras with it.** `set_ceiling`
+  brings a tour checkpoint under the new headroom, as `set_tour_checkpoints`
+  clamps one, instead of refusing the batch.
+- **An opening is judged at the heights it is drawn at.** A window whose
+  raised sill meets its default head (no height left) is refused instead of
+  silently not drawn.
+- **`add_wall` and `set_wall` prove the centreline before they write.** A
+  wall shorter than the minimum is refused by the operation, and a `set_wall`
+  whose arc cannot span the chord leaves the thickness and the role as they
+  were.
+- **An open-plan zone is walked into.** Walk, the room router and the tour
+  read one walkable floor: the line where a zone was cut out of its room is
+  no longer an invisible wall, and a zone is reached through the room it
+  lies in instead of being an island.
+- **A painted face keeps its paint when another room comes to own it.**
+  Dividing a room, moving an anchor or building a room against a painted
+  facade wall re-keys the paint (and a preset's) to the new owner instead of
+  refusing the batch.
+- **A door keeps the side its leaf opens to.** A door with an explicit
+  `swing` on a wall that gains or loses a room on its other side keeps
+  opening into the same room. A door that `set_opening` moves onto another
+  wall keeps the swing it was given.
+- **A zone may not be left outside its room.** A shell edit that would put a
+  vertex of a zone's stored outline outside the room it lies in is refused;
+  attach the zone first or move the walls back.
+- **A refused turn turns back after the host repeats the document.**
+  `revertAssetEdit` after the host handed the same document back at the same
+  revision puts the object back at its yaw; before, it stayed turned.
+- **A moved bound placement belongs to the room it stands in.** A
+  `move_object` without a `room` binds a bound placement to the room its new
+  position lies in.
+- **A scene after a failed first one is shown.** A `loadScene` after the
+  first scene failed (or a corrected `src` on the element) boots the new
+  scene: the error card goes, the scene is drawn and `ready` fires once.
+  Before, `ready` fired over an empty canvas. In the iframe form the frame
+  answers `loadScene` before its first `ready`, the helper sends it at once
+  after the frame reported an `error`, and `embed.ready` rejects with that
+  error's code instead of waiting for the life of the page.
+- **`embed.dispose()` rejects queued commands at once.** A command still
+  waiting for the frame's `ready` rejects with `disposed` and its 20-second
+  clock is stopped, instead of rejecting as `timeout` 20 seconds later.
+- **The same document handed back keeps a pending asset edit.** A
+  `loadScene` of the document on screen at the same revision no longer
+  answers the asset move tool's pending edit, so a later
+  `revertAssetEdit()` still puts the object back; only a later revision
+  answers it.
+- **Retry boots the latest scene with its own library and revision.** After
+  a `loadScene`, the error card's Retry validates the new document against
+  the library it came with and starts at its revision, not the first
+  mount's.
+- **`setMode` and tour commands before the first scene.** A `setMode` before
+  the first scene no longer fires `mode` while the viewer then opens in
+  `view.mode`: the viewer opens in the mode asked for. A tour command issued
+  before the first scene is replayed after the opening view instead of being
+  overwritten by `tour.start`.
+
 - **`<jeex-viewer src="">` shows the no-scene card.** An empty value means
   `true` only on an on/off attribute (`minimap`, `analytics`); on every other
   attribute it is the same as no attribute. An empty `src` no longer fetches
@@ -184,6 +280,11 @@ as described under [Versioning](#versioning).
 
 ### Changed
 
+- **Openings keep their place when a wall end moves.** On `move_node` an
+  opening keeps its distance in metres from the wall end that did not move,
+  instead of its share of the wall, and openings that no longer fit slide
+  toward that end before the batch is refused; two doors that still fit
+  where they stood on a shortened wall now commit there.
 - **Cooler default light.** The interior's artificial light now defaults to a
   neutral 5000 K instead of «Original», and the daylight sky walk and tour
   are lit by is a neutral grey (`#d4d4d4` to `#b9b9b9`) instead of a warm

@@ -19,6 +19,7 @@ import { afterEach, describe, expect, test } from 'vitest';
 import { mountViewer } from '../../src/app/viewer-api.js';
 import type { ViewerHandle } from '../../src/app/viewer-handle.js';
 import type { ViewerSelection } from '../../src/app/selection.js';
+import type { ViewerAssetsInfo } from '../../src/app/viewer-events.js';
 import { PROJECT_FIXTURE } from '../fixtures/project/fixture-ids.js';
 import { SETTLE_FRAMES, closeContainers, demoScene, nextFrame, openContainer, until, untilCameraStill, untilFrames } from './support.js';
 
@@ -111,6 +112,27 @@ describe('a baked project by url', () => {
       const swapped = bodies()[0]!;
       expect(swapped.degraded).toBeUndefined();
       expect(swapped.triangles).toBeGreaterThan(0);
+    },
+    PROJECT_TIMEOUT_MS,
+  );
+});
+
+describe('a project whose library lost a model', () => {
+  test(
+    'says so once, in the `assets` event: the model that fell back is counted',
+    async () => {
+      const { manifest, scene } = await fetchFixture();
+      const library = (manifest as { library: { objects: Array<{ model: string; variants: Array<{ model: string }> }> } }).library;
+      for (const object of library.objects) {
+        object.model = 'obj/withdrawn@1.0.0.glb';
+        for (const variant of object.variants) variant.model = 'obj/withdrawn@1.0.0.glb';
+      }
+      const handle = mount({ scene: { document: scene, library: { manifest, baseUrl: PROJECT_BASE } } });
+      const reports: ViewerAssetsInfo[] = [];
+      handle.on('assets', (info) => reports.push(info));
+      await handle.ready;
+      await until(() => reports.length > 0, 'the first model pass to settle');
+      expect(reports).toEqual([{ models: { upgraded: 0, failed: 1, budget: false }, textures: { failed: 0, budget: false } }]);
     },
     PROJECT_TIMEOUT_MS,
   );

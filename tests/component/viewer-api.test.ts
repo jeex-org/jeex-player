@@ -170,6 +170,35 @@ describe('mounting', () => {
   });
 
   test(
+    'loadScene after a failed first scene boots it: a stage, a drawn frame and one ready',
+    async () => {
+      const container = openContainer();
+      const failures: ViewerError[] = [];
+      const handle = mountViewer(container, {
+        scene: { repository: { load: () => Promise.reject(new Error('the tour was withdrawn')) } },
+        tour: { mode: 'off' },
+        debug: false,
+      });
+      handles.push(handle);
+      handle.on('error', (error) => failures.push(error));
+      await expect(handle.ready).rejects.toThrow();
+      const readyEvents: ViewerReadyInfo[] = [];
+      handle.on('ready', (payload) => readyEvents.push(payload));
+      const fallback = demoScene();
+      await handle.loadScene({ document: fallback });
+      expect(readyEvents.map((payload) => payload.sceneId)).toEqual([fallback.id]);
+      expect(failures.map((failure) => failure.code)).toEqual(['scene-load']);
+      expect(handle.element.querySelector('[data-jeex="error-state"]')?.classList.contains('is-hidden')).toBe(true);
+      // The camera stack exists only on a stage: an instance that presented into
+      // a torn-down viewer answers `false` here over an empty canvas.
+      expect(handle.focusRoom(fallback.rooms[0]!.id)).toBe(true);
+      const canvas = handle.element.querySelector<HTMLCanvasElement>('[data-jeex="scene-canvas"]');
+      expect(canvas?.width).toBeGreaterThan(0);
+    },
+    MOUNT_PLUS_RELOAD_TIMEOUT_MS,
+  );
+
+  test(
     'Retry recovers after the GL context was lost and never came back',
     async () => {
       const { handle } = mount();
