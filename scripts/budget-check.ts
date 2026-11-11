@@ -142,15 +142,17 @@ export const LIGHTMAP_BUDGET_FAIL_BYTES = 106_841 + 1024;
  * dynamic import), and this is the number that catches it being pulled back
  * into the element's static graph.
  *
- * The gate is the measured size (42,452 gzip bytes: the entry, the element's
+ * The gate is the measured size (43,830 gzip bytes: the entry, the element's
  * own chunk and the option reader it shares with the other entries, from
- * `measureBundle('dist-lib')` right after `bun run build:lib`, once the host
- * sky's option joined the reader: the entry schema that judges
- * `lighting.hdri` and its fold; 41,552 before, 39,297 before the light
+ * `measureBundle('dist-lib')` right after `bun run build:lib`, once the plan
+ * tool's two hints joined every locale catalogue the reader carries and the
+ * element's pending handle queued its two commands; 42,452 before, once the
+ * host sky's option joined the reader: the entry schema that judges
+ * `lighting.hdri` and its fold; 41,552 before that, 39,297 before the light
  * temperature) plus 1 KB.
  */
 export const ELEMENT_ENTRY = 'jeex-viewer-element.js';
-export const ELEMENT_BOOT_FAIL_BYTES = 42_452 + 1024;
+export const ELEMENT_BOOT_FAIL_BYTES = 43_830 + 1024;
 /** A three.js chunk's name (`jeex-viewer-three.core-<hash>.js`); none may be in the element's static graph. */
 const THREE_CHUNK = /^jeex-viewer-three\./;
 
@@ -226,11 +228,11 @@ export const LAZY_LIMITS: Readonly<Record<string, number>> = {
   'lazy-jeex-viewer-basis-transcoder-': 15_259 + 1024,
   // The authoring tools (`src/app/authoring.ts`, behind `authoring-port.ts`):
   // the tour-camera overlay with its gestures, gizmo and badges, the
-  // look-through pilot and bar, the camera-preview card, and the asset move
-  // tool with its legality mask, loaded on the first tool a host turns on.
-  // 28,795 gzip bytes in the ES build (25,488 in the demo build) from
-  // `measureBundle` after the builds, plus 1 KB.
-  'lazy-jeex-viewer-authoring-': 28_795 + 1024,
+  // look-through pilot and bar, the camera-preview card, the asset move tool
+  // with its legality mask, and the plan tool, loaded on the first tool a host
+  // turns on. 31,832 gzip bytes in the ES build (28,264 in the demo build)
+  // from `measureBundle` after the builds, plus 1 KB.
+  'lazy-jeex-viewer-authoring-': 31_832 + 1024,
 };
 
 /**
