@@ -1,6 +1,6 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://player.jeex.org/schema/telemetry/1.0.0.json",
+  "$id": "https://player.jeex.org/schema/telemetry/1.1.0.json",
   "title": "JEEX player telemetry send",
   "description": "One anonymous telemetry request body of the JEEX player. TELEMETRY.md explains every field.",
   "oneOf": [
@@ -258,6 +258,140 @@
             "group",
             "event",
             "load"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "schema": {
+              "type": "string",
+              "pattern": "^\\d+\\.\\d+\\.\\d+(?:-[0-9A-Za-z.-]{1,32})?$"
+            },
+            "player": {
+              "type": "string",
+              "pattern": "^\\d+\\.\\d+\\.\\d+(?:-[0-9A-Za-z.-]{1,32})?$"
+            },
+            "embed": {
+              "type": "string",
+              "enum": [
+                "element",
+                "iframe",
+                "script"
+              ]
+            },
+            "site": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "maxLength": 253,
+                  "pattern": "^https?:\\/\\/[a-z0-9.-]+(?::\\d{1,5})?$"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "page": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "maxLength": 200,
+                  "pattern": "^\\/[^?#\\s]*$"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "subject": {
+              "type": "object",
+              "properties": {
+                "project": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "bake": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "scene": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                }
+              },
+              "required": [
+                "project",
+                "bake",
+                "scene"
+              ],
+              "additionalProperties": false
+            },
+            "lang": {
+              "type": "string",
+              "enum": [
+                "en",
+                "de",
+                "fr",
+                "it",
+                "es",
+                "sr-Latn",
+                "ru",
+                "other"
+              ]
+            },
+            "group": {
+              "type": "string",
+              "const": "lifecycle"
+            },
+            "event": {
+              "type": "string",
+              "const": "engaged"
+            },
+            "engaged": {
+              "type": "string",
+              "enum": [
+                "<10s",
+                "10-30s",
+                "30s-2m",
+                "2-5m",
+                "5-15m",
+                ">15m"
+              ]
+            }
+          },
+          "required": [
+            "schema",
+            "player",
+            "embed",
+            "site",
+            "page",
+            "subject",
+            "lang",
+            "group",
+            "event",
+            "engaged"
           ],
           "additionalProperties": false
         },

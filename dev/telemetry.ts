@@ -7,7 +7,8 @@
  *   verbatim, any spelling included.
  * - `?form=script`: `mountViewer` with `analytics` taken from `?analytics=`,
  *   where `false`, `null` and `object-off` stand for those JS values
- *   (`false`, `null`, `{ mode: 'off' }`).
+ *   (`false`, `null`, `{ mode: 'off' }`); `?project=<url>` mounts that baked
+ *   project instead of the demo scene.
  * - `?form=iframe`: `embedViewer` on `/embed.html`, `analytics` read the same way.
  *
  * Every other development page sends no telemetry; this one sends unless told not to.
@@ -46,7 +47,7 @@ if (form === 'element') {
   defineJeexViewer();
 } else if (form === 'script') {
   element.remove();
-  const handle = mountViewer(stage, { scene: { url: sceneUrl }, analytics: analyticsValue() as 'off' });
+  const handle = mountViewer(stage, { scene: { url: query.get('project') ?? sceneUrl }, analytics: analyticsValue() as 'off' });
   window.jeexTelemetryHandle = handle;
   void handle.ready.then(() => {
     window.jeexTelemetryReady = true;
@@ -64,7 +65,7 @@ declare global {
   interface Window {
     /** Set once the script or iframe form is on screen. */
     jeexTelemetryReady?: boolean;
-    /** The script form's handle, so a check can end the visit the way a host does. */
-    jeexTelemetryHandle?: { dispose(): void };
+    /** The script form's handle, so a check can drive and end the visit the way a host does. */
+    jeexTelemetryHandle?: { dispose(): void; setLocale(locale: 'en' | 'de'): void; setMode(mode: 'walk'): void };
   }
 }

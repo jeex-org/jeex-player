@@ -13,6 +13,14 @@
  * describes), judged by `isTelemetrySend`, and dropped when it fails. No
  * field links two sends beyond that shared context.
  *
+ * View invariant: one `view` per mount, held until the first document settles
+ * (loaded, failed, or `ready`), at most `CONTEXT_HOLD_MS`, and built with the
+ * subject known then (before that, with the subject `viewed` was told how to
+ * read). One `engaged` per end of the view (the page hidden, the scene
+ * replaced, or the mount disposed), for the engaged time since the last one,
+ * under the subject it was gathered for; none for none. It goes through the
+ * same iframe hold as `view`, so it never leaves before it.
+ *
  * Page invariant: the page-wide error listeners exist once per page while any
  * telemetry is live, and route each error to the OLDEST live instance, so one
  * error is reported once however many players the page mounts.
@@ -22,7 +30,7 @@
 
 import { reportOf } from './error-report.js';
 import { TelemetryCollector } from './collector.js';
-import { COUNTER_CAP, dwellBucket, loadBucket, shareBucket, type FpsBucket, type WidthBucket } from './buckets.js';
+import { COUNTER_CAP, dwellBucket, engagedBucket, loadBucket, shareBucket, type FpsBucket, type WidthBucket } from './buckets.js';
 import { sanitisePagePath } from './page-path.js';
 import { isOwnFile } from './own-files.js';
 import { sendTelemetry } from './transport.js';
@@ -49,9 +57,10 @@ import {
 export const FLUSH_INTERVAL_MS = 5 * 60 * 1000;
 
 /**
- * How long the iframe page holds `view` and `ready` for its host's `context`,
- * in ms: long enough for a host on the same connection to answer the frame's
- * load, short enough that a host which never sends it does not lose the view.
+ * How long `view` waits for the first document, and the iframe page holds
+ * `view` and `ready` for its host's `context`, in ms: long enough for a host on
+ * the same connection to answer the frame's load, short enough that a slow or
+ * silent one does not lose the view.
  */
 export const CONTEXT_HOLD_MS = 2000;
 
@@ -65,7 +74,7 @@ export type TelemetryHost = {
   page(): string | null;
   /** `browser`: family and bucketed major version. */
   browser(): string;
-  /** Calls `listener` when the document becomes hidden and on `pagehide`, until `signal` aborts. */
+  /** Calls `listener` when the document becomes hidden and on `pagehide`, until `signal` aborts: the end of a view. */
   onLeave(listener: () => void, signal: AbortSignal): void;
   /** Calls `listener` for every page-wide error and unhandled rejection, until `signal` aborts. */
   onPageError(listener: (code: 'exception' | 'rejection', error: unknown) => void, signal: AbortSignal): void;
@@ -105,6 +114,11 @@ const ORIGIN = /^https?:\/\/[a-z0-9.-]+(?::\d{1,5})?$/i;
 /** A UUID, or `null`. */
 export function uuidOrNull(value: unknown): string | null {
   return typeof value === 'string' && UUID_V7_PATTERN.test(value) ? value : null;
+}
+
+/** `subject` with every id that is not a UUID as `null`. */
+function idsOf(subject: TelemetrySubject): TelemetrySubject {
+  return { project: uuidOrNull(subject.project), bake: uuidOrNull(subject.bake), scene: uuidOrNull(subject.scene) };
 }
 
 /** The live instances, oldest first, and the one set of page-wide listeners they share. */
@@ -147,6 +161,11 @@ export class Telemetry {
   /** `models_loaded` waits for the next flush, with the context of its own scene. */
   private pendingLifecycle: TelemetrySend[] = [];
   private viewSent = false;
+  /** `view` was asked for and waits for the first document. */
+  private viewPending = false;
+  private stopViewHold: () => void = () => undefined;
+  /** What `view` names when it leaves before the first document settled. */
+  private early: () => TelemetrySubject | null = () => null;
   private disposed = false;
   /** `view`/`ready` waiting for the iframe host's context; `null` once released. */
   private held: Array<() => TelemetrySend> | null = null;
@@ -158,7 +177,7 @@ export class Telemetry {
   constructor(config: TelemetryConfig, endpoint: string) {
     this.config = config;
     this.endpoint = endpoint;
-    config.host.onLeave(() => this.flush(), this.lifetime.signal);
+    config.host.onLeave(() => this.endView(), this.lifetime.signal);
     this.stopTimer = config.host.every(FLUSH_INTERVAL_MS, () => this.flush());
     register(this, config.host);
     if (config.hold) {
@@ -183,9 +202,9 @@ export class Telemetry {
     else this.held.push(build);
   }
 
-  /** What is played from now on; data gathered so far keeps the old subject (flush first). */
+  /** What is played from now on; data gathered so far keeps the old subject (end the view first). */
   setSubject(subject: TelemetrySubject): void {
-    this.subject = { project: uuidOrNull(subject.project), bake: uuidOrNull(subject.bake), scene: uuidOrNull(subject.scene) };
+    this.subject = idsOf(subject);
   }
 
   setLang(locale: string): void {
@@ -196,15 +215,37 @@ export class Telemetry {
     this.device = device;
   }
 
-  /** `view`, once per mount, sent now. */
-  viewed(): void {
+  /**
+   * `view`, once per mount: it leaves when the first document settles, or
+   * earlier (after `CONTEXT_HOLD_MS`, or when the view ends) with the subject
+   * `early` gives then, when it gives one (a manifest already read).
+   */
+  viewed(early?: () => TelemetrySubject | null): void {
     if (this.viewSent) return;
     this.viewSent = true;
-    this.soon(() => ({ ...this.context(), group: 'lifecycle', event: 'view' }));
+    this.viewPending = true;
+    if (early) this.early = early;
+    this.stopViewHold = this.config.host.after(CONTEXT_HOLD_MS, () => this.sendView(false));
+  }
+
+  /** The first document settled, loaded or failed: `view` leaves with the subject set now. Idempotent. */
+  documentSettled(): void {
+    this.sendView(true);
+  }
+
+  private sendView(settled: boolean): void {
+    if (!this.viewPending) return;
+    this.viewPending = false;
+    this.stopViewHold();
+    const early = settled ? null : this.early();
+    const subject = early === null ? { ...this.subject } : idsOf(early);
+    this.soon(() => ({ ...this.context(), subject, group: 'lifecycle', event: 'view' }));
   }
 
   /** `ready` for the scene on screen, sent now; `seconds` since the mount or the `loadScene` call. */
   ready(seconds: number): void {
+    // A scene on screen is a settled document, and `view` always goes first.
+    this.sendView(true);
     // The subject and the bucket are fixed now; only `site`/`page` may still be learnt.
     const subject = { ...this.subject };
     const load = loadBucket(seconds);
@@ -237,6 +278,11 @@ export class Telemetry {
     this.collector.dwell(room, ms);
   }
 
+  /** `ms` more of engaged time, in any mode; the caller leaves pauses out. */
+  engage(ms: number): void {
+    this.collector.engage(ms);
+  }
+
   /** An error at `stage`; reported only when `reportOf` allows it. */
   error(code: TelemetryErrorCode, stage: ErrorStage, error: unknown): void {
     if (this.disposed) return;
@@ -247,6 +293,7 @@ export class Telemetry {
   /** Sends everything gathered, one request per group and per error report. */
   flush(): void {
     if (this.disposed) return;
+    this.sendView(false);
     this.release();
     const lifecycle = this.pendingLifecycle;
     this.pendingLifecycle = [];
@@ -273,10 +320,25 @@ export class Telemetry {
     for (const { report, count } of snapshot.errors) this.dispatch({ ...context, group: 'error', ...report, browser, count });
   }
 
-  /** Flushes, then stops every listener and timer of this mount. Idempotent. */
-  dispose(): void {
+  /**
+   * The view ends (the page hidden, the scene replaced, or the mount disposed):
+   * flush, then the engaged time since the last end, both under the subject
+   * they were gathered for.
+   */
+  endView(): void {
     if (this.disposed) return;
     this.flush();
+    const ms = this.collector.takeEngaged();
+    if (ms === 0) return;
+    const engaged = engagedBucket(ms / 1000);
+    const subject = { ...this.subject };
+    this.soon(() => ({ ...this.context(), subject, group: 'lifecycle', event: 'engaged', engaged }));
+  }
+
+  /** Ends the view, then stops every listener and timer of this mount. Idempotent. */
+  dispose(): void {
+    if (this.disposed) return;
+    this.endView();
     this.disposed = true;
     this.stopTimer();
     this.lifetime.abort();

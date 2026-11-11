@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'bun:test';
-import { COUNTER_CAP, cappedCount, dwellBucket, fpsBucket, loadBucket, shareBucket, widthBucket } from './buckets.js';
+import { COUNTER_CAP, cappedCount, dwellBucket, engagedBucket, fpsBucket, loadBucket, shareBucket, widthBucket } from './buckets.js';
 
 describe('buckets', () => {
   test('dwell time, edges belong to the bucket above', () => {
@@ -14,6 +14,23 @@ describe('buckets', () => {
       '2-10m',
       '>10m',
       '>10m',
+    ]);
+  });
+
+  test('engaged time per view, edges belong to the bucket above', () => {
+    expect([0.1, 9.9, 10, 29.9, 30, 119, 120, 299, 300, 899, 900, 99_999].map((value) => engagedBucket(value))).toEqual([
+      '<10s',
+      '<10s',
+      '10-30s',
+      '10-30s',
+      '30s-2m',
+      '30s-2m',
+      '2-5m',
+      '2-5m',
+      '5-15m',
+      '5-15m',
+      '>15m',
+      '>15m',
     ]);
   });
 

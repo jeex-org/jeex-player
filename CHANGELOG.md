@@ -15,6 +15,16 @@ as described under [Versioning](#versioning).
   host helper has `embed.stepCamera(to)` and `embed.setQuality(quality)`, so
   a host's own Previous/Next buttons and a phone tier switch work through a
   frame as they do on the module and the element.
+- **Telemetry schema 1.1.0.** A new `lifecycle` send, `engaged`, carries
+  the time while the page was visible and the player was running, in every
+  view mode, as a bucket (`<10s`, `10-30s`, `30s-2m`, `2-5m`, `5-15m`,
+  `>15m`), once each time the view ends (the page hidden, the scene
+  replaced, or the player disposed), only for the time since the last one
+  and under the scene it was spent on. Every 1.0.0 field is
+  unchanged; `view` now waits for the first document (at most 2 seconds) and
+  names its subject, project, bake and scene, in every embed form (a failed
+  first load names the project and bake its manifest gave, or nothing), and
+  `actions.counts.mode` now counts the first switch.
 - **The plan tool.** `handle.setPlanTool(true)` arms handles on the wall or
   opening `setSelection` highlighted in `plan2d`: drag an end node, move the
   wall sideways, slide an opening or change its width with a jamb. The drag
@@ -199,6 +209,11 @@ as described under [Versioning](#versioning).
   untouched viewer shows a short «Tap to look around» plate (key
   `hint.tapToLook`, in every shipped locale), once per view; it goes on the
   tap or 1.5 s after the swipe, and takes neither the gesture nor the focus.
+- **Telemetry counts the first mode switch.** `actions.counts.mode` starts
+  from the mode the viewer opened in, so 360 then Walk is one change; the
+  opening mode itself is still not one.
+- **Telemetry `lang` follows `handle.setLocale`**, not only the mount's
+  `lang`.
 - **No WebGL is a failed boot.** Without a WebGL 2 context `ready` rejects
   with `webgl-unavailable`, as the handle documents, and so does a later
   `loadScene`; before, both resolved over the fallback card.

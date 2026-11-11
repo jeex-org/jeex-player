@@ -14,6 +14,9 @@
  * snapshots), and at most `MAX_ERROR_REPORTS` error reports are ever handed
  * over: a report that recurs after a snapshot is a new send and spends one.
  *
+ * Engaged time is the one sum `snapshot()` leaves alone: it belongs to the
+ * end of a view (`takeEngaged()`), not to every flush.
+ *
  * Pure module: no `three`, no DOM.
  */
 
@@ -52,6 +55,8 @@ export class TelemetryCollector {
   private errors = new Map<string, { report: ErrorReport; count: number }>();
   /** Error reports already handed over by `snapshot()`; never reset. */
   private errorsHanded = 0;
+  /** Engaged time since the last `takeEngaged()`, in ms. */
+  private engagedMs = 0;
 
   /** One accepted action; beyond the mount's allowance it is not counted. */
   count(key: CounterKey): void {
@@ -73,6 +78,18 @@ export class TelemetryCollector {
     if (!UUID_V7_PATTERN.test(room) || !Number.isFinite(ms) || ms <= 0) return;
     if (!this.rooms.has(room) && this.rooms.size >= MAX_ROOMS) return;
     this.rooms.set(room, (this.rooms.get(room) ?? 0) + ms);
+  }
+
+  /** `ms` more of engaged time, in any mode; a pause is never handed in. */
+  engage(ms: number): void {
+    if (Number.isFinite(ms) && ms > 0) this.engagedMs += ms;
+  }
+
+  /** The engaged time since the last call, in ms; it starts again from zero. */
+  takeEngaged(): number {
+    const ms = this.engagedMs;
+    this.engagedMs = 0;
+    return ms;
   }
 
   /** One error report; repeats are counted, a new one beyond the mount's allowance is dropped. */

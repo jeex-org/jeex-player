@@ -56,16 +56,29 @@ function fakeWindow(gpc = false) {
     clearTimeout: (handle: number) => timers.delete(handle),
     matchMedia: () => ({ matches: false }),
   };
+  const visibility = new Set<Listener>();
   const doc = {
     visibilityState: 'visible',
-    addEventListener: (type: string, _callback: Listener, options?: { signal?: AbortSignal }) => bind(type, options),
+    addEventListener: (type: string, callback: Listener, options?: { signal?: AbortSignal }) => {
+      bind(type, options);
+      if (type !== 'visibilitychange') return;
+      visibility.add(callback);
+      options?.signal?.addEventListener('abort', () => visibility.delete(callback), { once: true });
+    },
     defaultView: win,
+  };
+  const setVisibility = (state: 'visible' | 'hidden') => {
+    doc.visibilityState = state;
+    for (const listener of [...visibility]) listener();
   };
   return {
     container: { ownerDocument: doc, clientWidth: 1200 } as unknown as HTMLElement,
     leave: () => {
       for (const listener of [...leave]) listener();
     },
+    /** The tab hidden, then shown again: `visibilitychange` both times. */
+    hide: () => setVisibility('hidden'),
+    show: () => setVisibility('visible'),
     advance: (ms: number) => {
       clock += ms;
     },
@@ -124,6 +137,7 @@ function rig(options: ViewerOptionsInput = {}, gpc = false, site?: TelemetryWiri
   const events = new ViewerEvents();
   const tourEvents = new TourEvents();
   let project: ProjectInfo | null = null;
+  let manifest: { projectId: string; bakeId: string } | null = null;
   const deps: TelemetryWiringDeps = {
     options: resolveViewerOptions({ scene: { url: 'scene.json' }, ...options }),
     embed: site ? 'iframe' : 'element',
@@ -132,6 +146,7 @@ function rig(options: ViewerOptionsInput = {}, gpc = false, site?: TelemetryWiri
     events,
     tourEvents,
     project: () => project,
+    manifestRead: () => manifest,
     plan: () => plan,
     fullscreen: () => false,
   };
@@ -145,6 +160,10 @@ function rig(options: ViewerOptionsInput = {}, gpc = false, site?: TelemetryWiri
     stage,
     setProject: (next: ProjectInfo | null) => {
       project = next;
+    },
+    /** The boot read and judged a manifest; its scene may still be loading, or have failed. */
+    readManifest: () => {
+      manifest = { projectId: PROJECT, bakeId: BAKE };
     },
     ready: (sceneId: string) => events.emit('ready', { options: deps.options, sceneId }),
   };
@@ -182,15 +201,15 @@ describe('telemetry wiring', () => {
     expect(bodies).toEqual([]);
   });
 
-  test('view at once with a null subject; ready on the first DRAWN frame, with the ids', () => {
+  test('view waits for the first document and names it; ready on the first DRAWN frame, with the ids', () => {
     const subject = rig();
-    expect(bodies.map((body) => [body['event'], body['subject']])).toEqual([['view', { project: null, bake: null, scene: null }]]);
+    expect(bodies).toEqual([]);
     subject.wiring.attach(subject.stage.stage);
     subject.setProject(projectInfo);
     subject.page.advance(2400);
     subject.ready(SCENE_A);
     subject.stage.frame(16, false);
-    expect(bodies).toHaveLength(1);
+    expect(bodies.map((body) => [body['event'], body['subject']])).toEqual([['view', { project: PROJECT, bake: BAKE, scene: SCENE_A }]]);
     subject.stage.frame(16, true);
     expect(bodies[1]).toMatchObject({
       event: 'ready',
@@ -297,6 +316,138 @@ describe('telemetry wiring', () => {
     subject.page.leave();
     expect(bodies.find((body) => body['event'] === 'models_loaded')).toMatchObject({ outcome: 'none', assets: [ASSET] });
     subject.wiring.dispose();
+  });
+});
+
+describe('telemetry wiring: schema 1.1', () => {
+  const views = () => bodies.filter((body) => body['event'] === 'view');
+  const engaged = () => bodies.filter((body) => body['event'] === 'engaged').map((body) => body['engaged']);
+
+  test('a project mount sends one view carrying the project and the bake as soon as the document is loaded', () => {
+    const subject = rig({}, false);
+    subject.wiring.attach(subject.stage.stage);
+    subject.setProject(projectInfo);
+    subject.wiring.documentLoaded(SCENE_A);
+    expect(views().map((body) => [body['embed'], body['subject']])).toEqual([
+      ['element', { project: PROJECT, bake: BAKE, scene: SCENE_A }],
+    ]);
+    subject.ready(SCENE_A);
+    subject.stage.frame();
+    subject.page.leave();
+    subject.wiring.dispose();
+    expect(views()).toHaveLength(1);
+  });
+
+  test('a failed first load sends one view with the subject the manifest gave, or nulls', () => {
+    const withManifest = rig();
+    // The manifest was read, its scene was not: no document, so no project on screen.
+    withManifest.readManifest();
+    withManifest.events.emit('error', { code: 'scene-load', message: 'Scene fetch failed: 404', cause: new TypeError('x'), fatal: true });
+    expect(views().map((body) => body['subject'])).toEqual([{ project: PROJECT, bake: BAKE, scene: null }]);
+    withManifest.page.leave();
+    withManifest.wiring.dispose();
+    expect(views()).toHaveLength(1);
+    bodies = [];
+    const without = rig();
+    without.events.emit('error', { code: 'scene-load', message: 'Scene fetch failed: 404', cause: new TypeError('x'), fatal: true });
+    without.wiring.dispose();
+    expect(views().map((body) => body['subject'])).toEqual([{ project: null, bake: null, scene: null }]);
+  });
+
+  test('a tab hidden before the first document still names the manifest the boot read', () => {
+    const subject = rig();
+    subject.wiring.attach(subject.stage.stage);
+    subject.readManifest();
+    subject.page.hide();
+    expect(views().map((body) => body['subject'])).toEqual([{ project: PROJECT, bake: BAKE, scene: null }]);
+    subject.wiring.dispose();
+  });
+
+  test('engaged time stays with its scene: four minutes on A, then twenty seconds on B, are two sends', () => {
+    const subject = rig();
+    subject.wiring.attach(subject.stage.stage);
+    subject.ready(SCENE_A);
+    for (let index = 0; index < 480; index += 1) subject.stage.frame(500, false);
+    subject.wiring.loadStarted();
+    subject.wiring.beforePresent(SCENE_B);
+    subject.ready(SCENE_B);
+    for (let index = 0; index < 40; index += 1) subject.stage.frame(500, false);
+    subject.wiring.dispose();
+    const sends = bodies.filter((body) => body['event'] === 'engaged');
+    expect(sends.map((body) => [body['engaged'], (body['subject'] as { scene: string }).scene])).toEqual([
+      ['2-5m', SCENE_A],
+      ['10-30s', SCENE_B],
+    ]);
+  });
+
+  test('a hide shorter than a second is no engaged time', () => {
+    const subject = rig();
+    subject.wiring.attach(subject.stage.stage);
+    for (let index = 0; index < 59; index += 1) subject.stage.frame(500, false);
+    subject.page.hide();
+    subject.page.advance(800);
+    subject.page.show();
+    // The first tick after the show spans the hide.
+    subject.stage.frame(0, false);
+    subject.wiring.dispose();
+    expect(engaged()).toEqual(['10-30s']);
+  });
+
+  test('the first switch from the start view counts: 360 then Walk is one mode change', () => {
+    const subject = rig();
+    subject.wiring.attach(subject.stage.stage);
+    subject.ready(SCENE_A);
+    subject.events.emit('mode', 'walk');
+    subject.page.leave();
+    expect(bodies.find((body) => body['group'] === 'actions')?.['counts']).toMatchObject({ mode: 1 });
+    subject.wiring.dispose();
+  });
+
+  test('three minutes in orbit give one engaged send in 2-5m when the viewer is disposed', () => {
+    const subject = rig();
+    subject.wiring.attach(subject.stage.stage);
+    subject.ready(SCENE_A);
+    for (let index = 0; index < 360; index += 1) subject.stage.frame(500, false);
+    expect(engaged()).toEqual([]);
+    subject.wiring.dispose();
+    expect(engaged()).toEqual(['2-5m']);
+  });
+
+  test('engaged time counts every mode and leaves out a hidden tab', () => {
+    const subject = rig();
+    subject.wiring.attach(subject.stage.stage);
+    for (const mode of ['orbit', 'walk', 'plan2d', 'plan3d'] as const) {
+      subject.stage.setMode(mode);
+      for (let index = 0; index < 20; index += 1) subject.stage.frame(500, false);
+    }
+    // Ten minutes hidden: the loop stopped, the next tick comes that much later.
+    subject.stage.frame(600_000, false);
+    subject.wiring.dispose();
+    expect(engaged()).toEqual(['30s-2m']);
+  });
+
+  test('hide, show, more time, hide: a second engaged send for the new time only', () => {
+    const subject = rig();
+    subject.wiring.attach(subject.stage.stage);
+    for (let index = 0; index < 360; index += 1) subject.stage.frame(500, false);
+    subject.page.leave();
+    expect(engaged()).toEqual(['2-5m']);
+    subject.stage.frame(60_000, false);
+    for (let index = 0; index < 40; index += 1) subject.stage.frame(500, false);
+    subject.page.leave();
+    subject.wiring.dispose();
+    expect(engaged()).toEqual(['2-5m', '10-30s']);
+  });
+
+  test('a new locale changes lang in every later send', () => {
+    const subject = rig({ locale: 'en' });
+    subject.wiring.usage('door');
+    subject.page.leave();
+    subject.wiring.localeChanged('de');
+    subject.wiring.usage('door');
+    subject.page.leave();
+    subject.wiring.dispose();
+    expect(bodies.filter((body) => body['group'] === 'actions').map((body) => body['lang'])).toEqual(['en', 'de']);
   });
 });
 

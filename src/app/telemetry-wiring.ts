@@ -12,8 +12,16 @@
  * actually DREW once a document was announced (`RenderRuntime.lastDrawnAt`;
  * the announcement follows the first picture), once per load; frame time counts only intervals between consecutive drawn 3D frames;
  * room time counts the frame loop's ticks, drawn or not, while the camera is
- * inside the apartment (walk and tour); a mode change counts only
- * after the first `ready` and only when the mode really changed.
+ * inside the apartment (walk and tour); engaged time counts the same ticks
+ * in every mode, so a pause (a hidden tab, a detached or hidden canvas) is left out of
+ * both; a mode change counts only after the first `ready` and only when the
+ * mode really changed from the one the viewer booted in or last switched to.
+ *
+ * View invariant: `view` names the first document: the one loaded, or the
+ * manifest's project and bake when the first load failed or the view ended
+ * before it loaded. Engaged time belongs to the scene it was gathered on: a
+ * replacement ends the view of the old one, and a tick that spans a hidden
+ * tab adds nothing.
  */
 
 import { createTelemetry, type Telemetry } from '../telemetry/telemetry.js';
@@ -59,6 +67,8 @@ export type TelemetryWiringDeps = {
   events: ViewerEvents;
   tourEvents: TourEvents;
   project: () => ProjectInfo | null;
+  /** The ids of the manifest the boot read, judged, even before or without its scene; `null` for a bare scene. */
+  manifestRead: () => { projectId: string; bakeId: string } | null;
   plan: () => SceneModel['plan'] | undefined;
   fullscreen: () => boolean;
 };
@@ -71,6 +81,10 @@ export type TelemetryWiring = {
   attach(stage: ViewerStage): void;
   /** `loadScene` was called: its load time starts now. */
   loadStarted(): void;
+  /** The boot loaded its document (before any geometry): `view` can name it. */
+  documentLoaded(sceneId: string): void;
+  /** `handle.setLocale` switched the chrome's language. */
+  localeChanged(locale: string): void;
   /**
    * A loaded document is about to replace the one on screen: send what belongs
    * to the old one. A new revision of the SAME scene (an editor host answering
@@ -86,6 +100,8 @@ const NOTHING: TelemetryWiring = {
   usage: () => undefined,
   attach: () => undefined,
   loadStarted: () => undefined,
+  documentLoaded: () => undefined,
+  localeChanged: () => undefined,
   beforePresent: () => undefined,
   modelsSettled: () => undefined,
   dispose: () => undefined,
@@ -130,7 +146,12 @@ export function telemetryWiring(deps: TelemetryWiringDeps): TelemetryWiring {
 function live(telemetry: Telemetry, deps: TelemetryWiringDeps, win: Window): TelemetryWiring {
   const clock = (): number => win.performance.now();
   telemetry.setLang(deps.options.locale);
-  telemetry.viewed();
+  /** The subject a manifest names before its scene is known, or `null`. */
+  const manifestSubject = () => {
+    const read = deps.manifestRead();
+    return read === null ? null : { project: read.projectId, bake: read.bakeId, scene: null };
+  };
+  telemetry.viewed(manifestSubject);
 
   let loadOrigin = clock();
   let nextOrigin = loadOrigin;
@@ -149,10 +170,22 @@ function live(telemetry: Telemetry, deps: TelemetryWiringDeps, win: Window): Tel
     const manifest = deps.project()?.manifest;
     telemetry.setSubject({ project: manifest?.projectId ?? null, bake: manifest?.bakeId ?? null, scene: sceneId });
   };
+  /** Whether the first document settled, loaded or failed. */
+  let settled = false;
+  const documentSettled = (sceneId: string | null): void => {
+    if (settled) return;
+    settled = true;
+    if (sceneId === null) telemetry.setSubject(manifestSubject() ?? { project: null, bake: null, scene: null });
+    else subjectFromDocument(sceneId);
+    telemetry.documentSettled();
+  };
 
   const subscriptions = [
     deps.events.on('ready', (info) => {
+      // The boot is not a switch: the mode on screen now is where switching starts.
+      if (!booted) lastMode = stage?.mode ?? lastMode ?? deps.options.view.mode;
       booted = true;
+      documentSettled(info.sceneId);
       if (!readyArmed) return;
       readyArmed = false;
       subjectFromDocument(info.sceneId);
@@ -166,6 +199,8 @@ function live(telemetry: Telemetry, deps: TelemetryWiringDeps, win: Window): Tel
       if (selection.kind !== 'none') telemetry.count(`select_${selection.kind}`);
     }),
     deps.events.on('error', (error) => {
+      // A fatal error before any document is the first load failing.
+      if (error.fatal === true) documentSettled(null);
       const code = codeOfViewerError(error.code, error.cause);
       if (code !== null) telemetry.error(code, stageOf(error.code), error.cause);
     }),
@@ -178,6 +213,16 @@ function live(telemetry: Telemetry, deps: TelemetryWiringDeps, win: Window): Tel
   let previousDrawn: number | null = null;
   let previousTick: number | null = null;
   let roomTime = 0;
+  // A hide or a show starts the tick measurement over: a tick that spans a
+  // hidden tab, however short, is no engaged time and no time in a room.
+  const lifetime = new AbortController();
+  deps.container.ownerDocument.addEventListener(
+    'visibilitychange',
+    () => {
+      previousTick = null;
+    },
+    { signal: lifetime.signal },
+  );
   /**
    * Every tick of the frame loop, drawn or not: every mode but `plan2d` draws
    * only on demand (`render/render-demand.ts`), so a visitor standing still makes
@@ -191,8 +236,11 @@ function live(telemetry: Telemetry, deps: TelemetryWiringDeps, win: Window): Tel
     const tick = previousTick === null ? 0 : now - previousTick;
     previousTick = now;
     const mode = current.mode;
-    // A pause (a hidden tab, an off-screen canvas) is no time in a room.
-    if (mode !== undefined && ROOM_MODES.has(mode) && tick > 0 && tick <= MAX_FRAME_INTERVAL_MS) dwellFor(current, tick);
+    // A pause (a hidden tab, an off-screen canvas) is no engaged time and no time in a room.
+    if (mode !== undefined && tick > 0 && tick <= MAX_FRAME_INTERVAL_MS) {
+      telemetry.engage(tick);
+      if (ROOM_MODES.has(mode)) dwellFor(current, tick);
+    }
     // `ready` follows the first picture (`render/first-draw.ts`), and a resting
     // walk may draw nothing after it: the load is timed by the last draw.
     const drawnAt = current.runtime.lastDrawnAt;
@@ -253,9 +301,16 @@ function live(telemetry: Telemetry, deps: TelemetryWiringDeps, win: Window): Tel
     loadStarted() {
       nextOrigin = clock();
     },
+    documentLoaded(sceneId) {
+      documentSettled(sceneId);
+    },
+    localeChanged(locale) {
+      telemetry.setLang(locale);
+    },
     beforePresent(sceneId) {
       if (sceneId === shownScene) return;
-      telemetry.flush();
+      // The old scene's view ends here: its data and its engaged time keep its subject.
+      telemetry.endView();
       loadOrigin = nextOrigin;
       readyArmed = true;
     },
@@ -269,6 +324,7 @@ function live(telemetry: Telemetry, deps: TelemetryWiringDeps, win: Window): Tel
     dispose() {
       detach?.();
       for (const unsubscribe of subscriptions) unsubscribe();
+      lifetime.abort();
       telemetry.dispose();
     },
   };

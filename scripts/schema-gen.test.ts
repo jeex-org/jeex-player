@@ -229,7 +229,7 @@ describe('the telemetry schema', () => {
   test('it is closed: every object refuses keys it does not name', () => {
     const text = schemaText(generateTelemetrySchema());
     expect(text).toContain('"additionalProperties": false');
-    expect(generateTelemetrySchema()['$id']).toBe('https://player.jeex.org/schema/telemetry/1.0.0.json');
+    expect(generateTelemetrySchema()['$id']).toBe('https://player.jeex.org/schema/telemetry/1.1.0.json');
   });
 
   test('each branch of the schema has exactly the documented keys', () => {
@@ -249,6 +249,7 @@ describe('the telemetry schema', () => {
     expect(Object.fromEntries(branches.map((branch) => keysOf(branch)))).toEqual({
       'lifecycle/view': [...context, 'event'].sort(),
       'lifecycle/ready': [...context, 'event', 'load'].sort(),
+      'lifecycle/engaged': [...context, 'engaged', 'event'].sort(),
       'lifecycle/models_loaded': [...context, 'assets', 'event', 'failed', 'load', 'outcome'].sort(),
       'actions/': [...context, 'counts'].sort(),
       'rooms/': [...context, 'rooms'].sort(),
@@ -261,7 +262,7 @@ describe('the telemetry schema', () => {
   test('the published schema and the runtime schema agree on a valid send and on a forbidden key', () => {
     const validate = new Ajv2020({ strict: false }).compile(generateTelemetrySchema());
     const view = {
-      schema: '1.0.0',
+      schema: '1.1.0',
       player: '0.1.0',
       embed: 'script',
       site: 'https://agency.example',
@@ -274,6 +275,9 @@ describe('the telemetry schema', () => {
     expect(validate(view)).toBe(true);
     expect(validate({ ...view, visitor: 'x' })).toBe(false);
     expect(validate({ ...view, page: '/flat?email=a@b.example' })).toBe(false);
+    const engaged = { ...view, event: 'engaged', engaged: '2-5m' };
+    expect(validate(engaged)).toBe(true);
+    expect(validate({ ...engaged, engaged: '3m' })).toBe(false);
   });
 });
 

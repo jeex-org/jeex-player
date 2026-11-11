@@ -33,7 +33,7 @@ Each request belongs to one group (`group`) and carries the shared context. Ever
 
 | Field | Meaning | Example |
 |---|---|---|
-| `schema` | version of this payload format | `"1.0.0"` |
+| `schema` | version of this payload format | `"1.1.0"` |
 | `player` | version of the player | `"0.1.0"` |
 | `embed` | how the player is embedded: `element`, `iframe` or `script` | `"element"` |
 | `site` | origin of the page; for the iframe page, the embedding page's origin as the browser reports it or as the host's verified messages prove it; `null` when not known | `"https://agency.example"` |
@@ -54,13 +54,14 @@ Each request belongs to one group (`group`) and carries the shared context. Ever
 
 | Field | Meaning | Example |
 |---|---|---|
-| `event` | `view` (the player mounted), `ready` (the first frame was drawn), `models_loaded` (the 3D models finished loading) | `"ready"` |
+| `event` | `view` (the player mounted), `ready` (the first frame was drawn), `models_loaded` (the 3D models finished loading), `engaged` (the view ended: the page was hidden, the scene replaced or the player removed) | `"ready"` |
 | `load` | `ready` and `models_loaded`: time since the mount or the scene change: `<1s`, `1-3s`, `3-10s`, `10-30s`, `>30s` | `"1-3s"` |
 | `outcome` | `models_loaded`: `complete`, `partial` (some failed), `budget` (stopped by the size limit), `none` (nothing to load) | `"complete"` |
 | `failed` | `models_loaded`: models that could not load, at most 50 | `0` |
 | `assets` | `models_loaded`: UUIDs of the project's library assets, at most 50 | `["0192…"]` |
+| `engaged` | `engaged`: time while the page was visible and the player was running, since the view began or since the last `engaged`, in every view mode: `<10s`, `10-30s`, `30s-2m`, `2-5m`, `5-15m`, `>15m`; never sent for no time at all | `"2-5m"` |
 
-`view` and `ready` are sent at once (the iframe page waits up to 2 seconds for its host to name the page first); everything else is sent when the page is hidden or closed, every 5 minutes, and when the scene changes.
+`view` is sent once per player, when its first scene has loaded or failed, at most 2 seconds after the mount, with the `subject` known then (a failed load names the project and bake when its manifest was read); `ready` is sent at once (the iframe page holds both up to 2 seconds for its host to name the page first); `engaged` is sent when the page is hidden, the scene is replaced or the player is removed, for the scene the time was spent on; everything else is sent when the page is hidden or closed, every 5 minutes, and when the scene changes.
 
 ### `actions`
 
@@ -72,7 +73,7 @@ The actions in `counts`:
 
 | Field | Meaning | Example |
 |---|---|---|
-| `mode` | the view mode changed (not the start mode) | `3` |
+| `mode` | the view mode changed, from the start mode on (opening in one mode is not a change) | `3` |
 | `interior` | an interior style was applied | `0` |
 | `select_furniture` | a piece of furniture was selected (when the site enables selection) | `0` |
 | `select_opening` | a door or window was selected | `0` |
@@ -128,4 +129,4 @@ An exception whose stack has no frame in the player's own files (the site's code
 
 ## Schema
 
-[`telemetry.schema.json`](telemetry.schema.json) is the exact JSON Schema of every request body, generated from the schema the player checks each request against before it is sent. It is also published at `https://player.jeex.org/schema/telemetry/1.0.0.json` and in the package as `jeex-viewer/schema/telemetry.json`. Any change to these fields changes the schema version and is listed in [CHANGELOG.md](CHANGELOG.md).
+[`telemetry.schema.json`](telemetry.schema.json) is the exact JSON Schema of every request body, generated from the schema the player checks each request against before it is sent. It is also published at `https://player.jeex.org/schema/telemetry/1.1.0.json` and in the package as `jeex-viewer/schema/telemetry.json`. Any change to these fields changes the schema version and is listed in [CHANGELOG.md](CHANGELOG.md).

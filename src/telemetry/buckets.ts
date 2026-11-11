@@ -14,11 +14,13 @@
 export const COUNTER_CAP = 50;
 
 export const DWELL_BUCKETS = ['<5s', '5-30s', '30s-2m', '2-10m', '>10m'] as const;
+export const ENGAGED_BUCKETS = ['<10s', '10-30s', '30s-2m', '2-5m', '5-15m', '>15m'] as const;
 export const LOAD_BUCKETS = ['<1s', '1-3s', '3-10s', '10-30s', '>30s'] as const;
 export const FPS_BUCKETS = ['<20', '20-30', '30-50', '>50'] as const;
 export const WIDTH_BUCKETS = ['<480', '480-1024', '1024-1600', '>1600'] as const;
 
 export type DwellBucket = (typeof DWELL_BUCKETS)[number];
+export type EngagedBucket = (typeof ENGAGED_BUCKETS)[number];
 export type LoadBucket = (typeof LOAD_BUCKETS)[number];
 export type FpsBucket = (typeof FPS_BUCKETS)[number];
 export type WidthBucket = (typeof WIDTH_BUCKETS)[number];
@@ -31,6 +33,8 @@ function bucket<T extends string>(value: number, edges: readonly number[], label
 
 /** Time spent in a room, in seconds. */
 export const dwellBucket = (seconds: number): DwellBucket => bucket(seconds, [5, 30, 120, 600], DWELL_BUCKETS);
+/** Time the visitor spent with one view, in seconds. */
+export const engagedBucket = (seconds: number): EngagedBucket => bucket(seconds, [10, 30, 120, 300, 900], ENGAGED_BUCKETS);
 /** Time from mount to a lifecycle step, in seconds. */
 export const loadBucket = (seconds: number): LoadBucket => bucket(seconds, [1, 3, 10, 30], LOAD_BUCKETS);
 /** Frames per second over one frame interval. */

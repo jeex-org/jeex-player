@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, test } from 'bun:test';
 import { FLUSH_INTERVAL_MS, createTelemetry, type TelemetryConfig, type TelemetryHost } from './telemetry.js';
 import { COUNTER_KEYS, DEFAULT_TELEMETRY_ENDPOINT, ERROR_CODES, ERROR_NAMES, ERROR_STAGES, EMBED_FORMS } from './vocabulary.js';
-import { DWELL_BUCKETS, LOAD_BUCKETS, WIDTH_BUCKETS } from './buckets.js';
+import { DWELL_BUCKETS, ENGAGED_BUCKETS, LOAD_BUCKETS, WIDTH_BUCKETS } from './buckets.js';
 
 const PROJECT = '0192f5c4-7a1b-7c3d-8e9f-0a1b2c3d4e51';
 const BAKE = '0192f5c4-7a1b-7c3d-8e9f-0a1b2c3d4e52';
@@ -104,6 +104,7 @@ function session(host: FakeHost, overrides: Partial<TelemetryConfig> = {}, befor
   for (const key of COUNTER_KEYS) telemetry?.count(key);
   for (let index = 0; index < 120; index += 1) telemetry?.frame(1000 / 60, index % 2 === 0);
   telemetry?.dwell(ROOM, 40_000);
+  telemetry?.engage(40_000);
   telemetry?.modelsLoaded(4, 'partial', 1, [SCENE, PROJECT, 'not-a-uuid']);
   telemetry?.error('network', 'scene_load', new TypeError('Failed to fetch https://site.example/?token=1'));
   telemetry?.error('exception', 'tour', ownError());
@@ -142,11 +143,15 @@ describe('createTelemetry: off means nothing at all', () => {
     const host = fakeHost();
     const telemetry = createTelemetry(config(host))!;
     telemetry.viewed();
+    telemetry.documentSettled();
+    telemetry.engage(20_000);
     host.gpcValue = true;
     telemetry.count('mode');
     host.leave();
+    telemetry.engage(20_000);
     telemetry.dispose();
-    expect(requests.map((request) => request.body['event'])).toEqual(['view']);
+    expect(requests).toHaveLength(1);
+    expect(requests.map((request) => `${String(request.body['group'])}/${String(request.body['event'])}`)).toEqual(['lifecycle/view']);
   });
 
   test('an endpoint override is used', () => {
@@ -158,24 +163,97 @@ describe('createTelemetry: off means nothing at all', () => {
 });
 
 describe('sends', () => {
-  test('view leaves at once with a null subject and a sanitised page', () => {
-    const telemetry = createTelemetry(config(fakeHost()))!;
+  test('view waits for the first document and leaves once, with its subject and a sanitised page', () => {
+    const host = fakeHost();
+    const telemetry = createTelemetry(config(host))!;
     telemetry.viewed();
+    expect(requests).toEqual([]);
+    telemetry.setSubject({ project: PROJECT, bake: BAKE, scene: SCENE });
+    telemetry.documentSettled();
     telemetry.viewed();
+    telemetry.documentSettled();
+    host.elapse();
+    host.leave();
     expect(requests.map((request) => request.body)).toEqual([
       {
-        schema: '1.0.0',
+        schema: '1.1.0',
         player: '0.1.0',
         embed: 'element',
         site: 'https://agency.example',
         page: '/flats/:id',
-        subject: { project: null, bake: null, scene: null },
+        subject: { project: PROJECT, bake: BAKE, scene: SCENE },
         lang: 'other',
         group: 'lifecycle',
         event: 'view',
       },
     ]);
     telemetry.dispose();
+    expect(host.listeners.timeouts).toBe(0);
+  });
+
+  test('view leaves at the ceiling with whatever subject exists then, and before ready when ready comes first', () => {
+    const capped = fakeHost();
+    const first = createTelemetry(config(capped))!;
+    first.viewed();
+    first.setSubject({ project: PROJECT, bake: BAKE, scene: null });
+    capped.elapse();
+    expect(requests.map((request) => [request.body['event'], request.body['subject']])).toEqual([
+      ['view', { project: PROJECT, bake: BAKE, scene: null }],
+    ]);
+    first.dispose();
+    requests = [];
+    const second = createTelemetry(config(fakeHost()))!;
+    second.viewed();
+    second.setSubject({ project: PROJECT, bake: BAKE, scene: SCENE });
+    second.ready(0.5);
+    expect(requests.map((request) => [request.body['event'], (request.body['subject'] as { scene: string }).scene])).toEqual([
+      ['view', SCENE],
+      ['ready', SCENE],
+    ]);
+    second.dispose();
+  });
+
+  test('engaged time leaves once per view end, as a bucket, never as seconds', () => {
+    const host = fakeHost();
+    const telemetry = createTelemetry(config(host))!;
+    for (let index = 0; index < 360; index += 1) telemetry.engage(500);
+    // The five-minute timer is not the end of the view.
+    host.tick();
+    expect(requests.filter((request) => request.body['event'] === 'engaged')).toEqual([]);
+    host.leave();
+    host.leave();
+    const engaged = requests.filter((request) => request.body['event'] === 'engaged').map((request) => request.body);
+    expect(engaged).toHaveLength(1);
+    expect(Object.keys(engaged[0]!).sort()).toEqual([
+      'embed',
+      'engaged',
+      'event',
+      'group',
+      'lang',
+      'page',
+      'player',
+      'schema',
+      'site',
+      'subject',
+    ]);
+    expect(engaged[0]).toMatchObject({ group: 'lifecycle', event: 'engaged', engaged: '2-5m' });
+    // Back from hidden: the next end covers only the time since.
+    telemetry.engage(20_000);
+    telemetry.dispose();
+    expect(requests.filter((request) => request.body['event'] === 'engaged').map((request) => request.body['engaged'])).toEqual([
+      '2-5m',
+      '10-30s',
+    ]);
+    expect(JSON.stringify(requests)).not.toMatch(/180|20000/);
+  });
+
+  test('no engaged time, no engaged send', () => {
+    const host = fakeHost();
+    const telemetry = createTelemetry(config(host))!;
+    telemetry.count('door');
+    host.leave();
+    telemetry.dispose();
+    expect(requests.map((request) => request.body['group'])).toEqual(['actions']);
   });
 
   test('a flush makes one request per group and one per error report, models_loaded first', () => {
@@ -297,6 +375,7 @@ describe('the never-list walk', () => {
       ...LOAD_BUCKETS,
       ...DWELL_BUCKETS,
       ...WIDTH_BUCKETS,
+      ...ENGAGED_BUCKETS,
       'lifecycle',
       'actions',
       'rooms',
@@ -305,12 +384,13 @@ describe('the never-list walk', () => {
       'view',
       'ready',
       'models_loaded',
+      'engaged',
       'partial',
       'mid',
       'pointer',
       'de',
       'other',
-      '1.0.0',
+      '1.1.0',
       '0.1.0',
       'https://agency.example',
       '/flats/:id',
@@ -336,6 +416,7 @@ describe('the never-list walk', () => {
     const expected: Record<string, string[]> = {
       'lifecycle/view': [...context, 'event'],
       'lifecycle/ready': [...context, 'event', 'load'],
+      'lifecycle/engaged': [...context, 'engaged', 'event'],
       'lifecycle/models_loaded': [...context, 'assets', 'event', 'failed', 'load', 'outcome'],
       'actions/': [...context, 'counts'],
       'rooms/': [...context, 'rooms'],
@@ -375,6 +456,21 @@ describe('the iframe hold', () => {
     ]);
     release();
     expect(requests).toHaveLength(2);
+    telemetry.dispose();
+  });
+
+  test('a view that ends inside the hold sends view, then engaged, with the same context', () => {
+    const host = fakeHost();
+    const telemetry = createTelemetry(config(host, { hold: () => undefined }))!;
+    telemetry.viewed();
+    telemetry.setSubject({ project: PROJECT, bake: BAKE, scene: SCENE });
+    telemetry.documentSettled();
+    telemetry.engage(500);
+    // Hidden at 500 ms: the host has not answered and the cap has not run out.
+    host.leave();
+    expect(requests.map((request) => request.body['event'])).toEqual(['view', 'engaged']);
+    const context = ({ group: _group, event: _event, engaged: _engaged, ...rest }: Record<string, unknown>) => rest;
+    expect(context(requests[1]!.body)).toEqual(context(requests[0]!.body));
     telemetry.dispose();
   });
 

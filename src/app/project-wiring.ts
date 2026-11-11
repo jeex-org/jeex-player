@@ -126,6 +126,22 @@ export function manifestSourceOf(repository: SceneRepository, source: SceneSourc
 }
 
 /**
+ * The project and bake ids of the manifest `repository` read last, judged, as
+ * soon as it is read: also while its scene loads and after that load failed.
+ * `null` for a bare scene, before any read, and for a manifest its schema refuses.
+ */
+export function manifestIdsOf(repository: SceneRepository): { projectId: string; bakeId: string } | null {
+  const read = repository instanceof ProjectRepository ? repository.manifestRead() : null;
+  if (read === null) return null;
+  try {
+    const { projectId, bakeId } = parseProjectManifest(read.manifest);
+    return { projectId, bakeId };
+  } catch {
+    return null;
+  }
+}
+
+/**
  * Everything the viewer needs to validate and draw one document's libraries:
  * the baked project's, the host's offers, or both.
  *
