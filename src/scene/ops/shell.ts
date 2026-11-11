@@ -105,10 +105,10 @@ export function applyAddNode(scene: Draft<SceneData>, op: AddNodeOp): OpOutcome 
 
 /**
  * Moves a node; every wall on it follows, and every opening on those walls
- * keeps its SHARE of the wall it sits on (`center / length`) rather than its
- * metre coordinate — a door in the middle of a wall that grew stays in the
- * middle. An opening whose share no longer fits the new length is clamped back
- * onto the wall, which is the same rule `add_opening` applies.
+ * keeps its distance in metres from the wall's OTHER end, the one that did not
+ * move (`rescaleOpeningsOnWall`). An opening that no longer fits the new
+ * length is clamped back onto the wall, which is the same rule `add_opening`
+ * applies.
  */
 export function applyMoveNode(scene: Draft<SceneData>, op: MoveNodeOp): OpOutcome {
   if (op.p !== undefined && op.dp !== undefined) throw new OpError('move_node takes p or dp, not both');
@@ -120,7 +120,7 @@ export function applyMoveNode(scene: Draft<SceneData>, op: MoveNodeOp): OpOutcom
 
   // Measured before anything is written: a refusal must leave the plan exactly
   // as it was, and half a moved node is not a plan.
-  const moves: { wall: Draft<Wall>; from: number; to: number }[] = [];
+  const moves: { wall: Draft<Wall>; from: number; to: number; fixed: 'a' | 'b' }[] = [];
   for (const wall of scene.walls) {
     if (wall.a !== op.nodeId && wall.b !== op.nodeId) continue;
     const other = pointOf(scene, wall.a === op.nodeId ? wall.b : wall.a, wall.id);
@@ -130,11 +130,11 @@ export function applyMoveNode(scene: Draft<SceneData>, op: MoveNodeOp): OpOutcom
         `move_node ${op.nodeId} would leave wall ${wall.id} ${after.toFixed(3)} m long, below the minimum ${MIN_WALL_LENGTH} m`,
       );
     }
-    moves.push({ wall, from: wallCentrelineLength(scene, wall), to: after });
+    moves.push({ wall, from: wallCentrelineLength(scene, wall), to: after, fixed: wall.a === op.nodeId ? 'b' : 'a' });
   }
 
   node.p = { x: to.x, z: to.z };
-  for (const move of moves) rescaleOpeningsOnWall(scene, move.wall, move.from, move.to);
+  for (const move of moves) rescaleOpeningsOnWall(scene, move.wall, move.from, move.to, move.fixed);
   return { summary: `Node ${op.nodeId}: moved to (${round(to.x)}, ${round(to.z)})`, touched: [TOUCHED_SHELL] };
 }
 

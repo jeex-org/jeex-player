@@ -29,6 +29,8 @@ import { FINISH } from '../../materials/finish-ids.js';
 /** Ids of the nodes and walls these tests create (and of nothing at all), minted offline. */
 const NEW = {
   checkpoint: '01a1f6c0-2b10-7a00-9e00-0000000000c1',
+  doorA: '01a1f6c0-2b10-7a00-9e00-0000000000d1',
+  doorB: '01a1f6c0-2b10-7a00-9e00-0000000000d2',
   nMid: '01a12ff3-0a51-7b61-9487-2ab39ac44052',
   wL: '01a12ff3-0a52-7c8e-b4be-e3d9291e4f4a',
   wR: '01a12ff3-0a53-7182-a933-16c5ed5c4db9',
@@ -194,19 +196,62 @@ describe('move_node', () => {
     expect(scene.nodes.find((node) => node.id === N.n2)!.p).toEqual({ x: 6.5, z: 0 });
   });
 
-  test('openings on a stretched wall keep their share of it', () => {
+  test('openings keep their distance from the end of the wall that did not move', () => {
     const scene = opDraft();
-    const wall = scene.walls.find((candidate) => candidate.id === W.wSA)!;
-    const before = wallCentrelineLength(scene, wall);
-    const shares = (wall.openings ?? []).map((opening) => opening.center / before);
+    const south = scene.walls.find((candidate) => candidate.id === W.wSA)!;
+    const east = scene.walls.find((candidate) => candidate.id === W.wE)!;
+    const southBefore = (south.openings ?? []).map((opening) => opening.center);
+    const eastBefore = wallCentrelineLength(scene, east);
+    const eastWindow = east.openings![0]!.center;
 
+    // n2 is the far end (b) of the south wall: its openings keep their metres from n1.
     applyOp(scene, { op: 'move_node', nodeId: N.n2, p: { x: 7, z: 0 } }, CATALOGUE_REGISTRIES);
+    expect((south.openings ?? []).map((opening) => opening.center)).toEqual(southBefore);
 
-    const after = wallCentrelineLength(scene, wall);
-    expect(after).toBeCloseTo(7, 9);
-    for (const [index, opening] of (wall.openings ?? []).entries()) {
-      expect(opening.center / after).toBeCloseTo(shares[index]!, 9);
-    }
+    // n3 is the near end (a) of the east wall: its window keeps its metres from n4.
+    applyOp(scene, { op: 'move_node', nodeId: N.n3, p: { x: 9, z: 0 } }, CATALOGUE_REGISTRIES);
+    const eastAfter = wallCentrelineLength(scene, east);
+    expect(east.openings![0]!.center).toBeCloseTo(eastWindow + (eastAfter - eastBefore), 9);
+  });
+
+  test('two doors on a shortened wall that still fit where they stood commit where they stood', () => {
+    const scene: SceneData = {
+      ...lShapePlan,
+      walls: lShapePlan.walls.map((wall) =>
+        wall.id === W.wSB
+          ? {
+              ...wall,
+              openings: [
+                { id: NEW.doorA, type: 'door', center: 0.6, width: 0.9 },
+                { id: NEW.doorB, type: 'door', center: 1.6, width: 0.9 },
+              ],
+            }
+          : wall,
+      ),
+    };
+    const model = SceneModel.load(scene, CATALOGUE_REGISTRIES);
+    // n3 is the far end of the 4 m wall: dragging it to x = 9 leaves 3 m.
+    const result = model.apply({ baseRev: 0, ops: [{ op: 'move_node', nodeId: N.n3, p: { x: 9, z: 0 } }] });
+    expect(result).toMatchObject({ rev: 1 });
+    const doors = model.scene.walls.find((wall) => wall.id === W.wSB)!.openings!.map((opening) => opening.center);
+    expect(doors).toEqual([0.6, 1.6]);
+  });
+
+  test('openings that no longer fit slide toward the end that did not move before they are refused', () => {
+    const scene = opDraft();
+    const wall = scene.walls.find((candidate) => candidate.id === W.wSB)!;
+    wall.openings = [
+      { id: NEW.doorA, type: 'door', center: 1.3, width: 0.9 },
+      { id: NEW.doorB, type: 'door', center: 3.2, width: 0.9 },
+    ];
+    // 4 m -> 2.5 m: door B is clamped back to end at 2.4 and would overlap
+    // door A where it stands (0.85..1.75); door A slides toward n2 just far
+    // enough to make room.
+    applyOp(scene, { op: 'move_node', nodeId: N.n3, p: { x: 8.5, z: 0 } }, CATALOGUE_REGISTRIES);
+    const [a, b] = wall.openings.map((opening) => [opening.center - opening.width / 2, opening.center + opening.width / 2]);
+    expect(b![1]!).toBeCloseTo(2.5 - OPENING_EDGE_MARGIN, 9);
+    expect(a![1]!).toBeCloseTo(b![0]!, 9);
+    expect(a![0]!).toBeGreaterThanOrEqual(OPENING_EDGE_MARGIN - 1e-9);
   });
 
   test('an opening that no longer fits the shortened wall is clamped back onto it', () => {
