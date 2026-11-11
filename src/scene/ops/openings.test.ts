@@ -10,7 +10,11 @@
 import { CATALOGUE_REGISTRIES } from '../../assets/catalogue-registries.js';
 import { describe, expect, test } from 'bun:test';
 import { opDraft, openingOf, rejectsOp } from '../../fixtures/op-drafts.js';
-import { CEILING_OPENING_MARGIN, OPENING_EDGE_MARGIN, effectiveOpening } from '../../plan/plan-openings.js';
+import { CEILING_OPENING_MARGIN, OPENING_EDGE_MARGIN, clampOpening, effectiveOpening } from '../../plan/plan-openings.js';
+import { lShapePlan } from '../../fixtures/plan-l-shape.js';
+import { ZONED, zonedLivingPlan } from '../../fixtures/plan-zoned-living.js';
+import { SceneModel } from '../scene-model.js';
+import { validateScene } from '../scene-validator.js';
 import { TOUCHED_SHELL, applyOp, touchedOpening, wallCentrelineLength } from '../scene-ops.js';
 import type { Draft } from '../../shared/committed.js';
 import type { SceneData, SceneOp, Wall } from '../types.js';
@@ -276,5 +280,52 @@ describe('set_opening onto another wall', () => {
       `Unknown wall ${NEW.door}`,
     );
     expect(wallOf(scene, L_SHAPE.wall.wPart).openings!.map((opening) => opening.id)).toEqual([L_SHAPE.opening.doorAb]);
+  });
+});
+
+describe('an opening clamped to the end of its wall is one the validator accepts', () => {
+  /** The zoned living room with no zones, its north wall stretched to `length` and carrying one door. */
+  function oneDoorScene(length: number, door: { center: number; width: number }): SceneData {
+    const scene = zonedLivingPlan([]);
+    const corner = { x: Math.min(0.5, length / 4), z: 4 };
+    return {
+      ...scene,
+      nodes: scene.nodes.map((node) => (node.p.x === 10 ? { ...node, p: { x: length, z: node.p.z } } : node)),
+      walls: scene.walls.map((wall) =>
+        wall.id === ZONED.wall.north ? { ...wall, openings: [{ id: NEW.door, type: 'door', center: door.center, width: door.width }] } : wall,
+      ),
+      rooms: scene.rooms.map((room) => ({ ...room, anchor: corner })),
+      presentationCamera: { position: { x: corner.x, y: 12, z: 12 }, target: { x: corner.x, y: 0, z: 4 } },
+      navigation: { points: [{ x: corner.x, y: 0, z: 4 }] },
+      autotour: { speed: 1.2, path: [{ x: corner.x, y: 1.6, z: 4 }, { x: corner.x, y: 1.6, z: 6 }], gaze: [], zones: [] },
+    };
+  }
+
+  test('every width from 0.3 to 3 m, at both ends of every wall length from 1 to 12 m', () => {
+    const refused: string[] = [];
+    for (let length = 1; length <= 12; length += 0.137) {
+      for (let width = 0.3; width <= 3.0001; width += 0.05) {
+        for (const wanted of [0, length + 5]) {
+          const door = clampOpening('door', { center: wanted, width, sill: 0, head: 2.1 }, { wallLength: length, ceilingHeight: 2.7 });
+          try {
+            validateScene(oneDoorScene(length, door), CATALOGUE_REGISTRIES);
+          } catch (error) {
+            refused.push(`length ${length.toFixed(3)} width ${width.toFixed(2)} at ${wanted === 0 ? 'start' : 'end'}: ${String(error)}`);
+          }
+        }
+      }
+    }
+    expect(refused).toEqual([]);
+  });
+
+  test('an 0.8 m door pushed to the start of its wall commits', () => {
+    const model = SceneModel.load(lShapePlan, CATALOGUE_REGISTRIES);
+    const result = model.apply({
+      baseRev: model.rev,
+      ops: [{ op: 'set_opening', openingId: L_SHAPE.opening.doorEntry, width: 0.8, center: 0 }],
+    });
+    expect(result).toMatchObject({ rev: 1 });
+    const door = model.scene.walls.flatMap((wall) => wall.openings ?? []).find((opening) => opening.id === L_SHAPE.opening.doorEntry)!;
+    expect(door.center - door.width / 2).toBeCloseTo(OPENING_EDGE_MARGIN, 9);
   });
 });

@@ -37,7 +37,7 @@ import type {
 import {
   OpError,
   TOUCHED_SHELL,
-  forgetInPresets,
+  forgetReferencesInPresets,
   requireNewId,
   round,
   touchedOpening,
@@ -307,5 +307,5 @@ export function applyRemoveOpening(scene: Draft<SceneData>, op: RemoveOpeningOp)
  * it.
  */
 export function forgetOpeningInPresets(scene: Draft<SceneData>, openingId: string): void {
-  forgetInPresets(scene, (op) => op.op === 'replace_opening_variant' && op.openingId === openingId);
+  forgetReferencesInPresets(scene, 'openings', openingId);
 }

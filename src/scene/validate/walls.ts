@@ -67,7 +67,10 @@ function checkOpening(ctx: ValidationContext, wall: Wall, opening: Opening, path
   }
   const t0 = opening.center - opening.width / 2;
   const t1 = opening.center + opening.width / 2;
-  if (t0 < OPENING_EDGE_MARGIN || t1 > wallLength - OPENING_EDGE_MARGIN) {
+  // With the plan tolerance, as `openings-overlap` and the wall-length checks
+  // compare: `clampOpening` puts an edge exactly on the margin, and in doubles
+  // `0.5 - 0.8 / 2` is a hair under 0.1.
+  if (t0 < OPENING_EDGE_MARGIN - EPS || t1 > wallLength - OPENING_EDGE_MARGIN + EPS) {
     ctx.fail('opening-outside-wall', `${path}.center`, `Opening ${openingId} does not fit inside wall ${wall.id}`, {
       t0,
       t1,

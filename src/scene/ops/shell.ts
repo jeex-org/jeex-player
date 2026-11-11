@@ -55,7 +55,8 @@ import {
   TOUCHED_SHELL,
   claimedIds,
   dropFaceFinishes,
-  forgetInPresets,
+  forgetReferencesInPresets,
+  referencesOf,
   requireFinite,
   requireNewId,
   round,
@@ -347,6 +348,8 @@ export function applySplitWall(scene: Draft<SceneData>, op: SplitWallOp): OpOutc
   const index = scene.walls.indexOf(wall);
   scene.nodes.push({ id: op.nodeId, p: point });
   scene.walls.splice(index, 1, ...halves);
+  // A split loses nothing, so a preset dressing the wall keeps dressing both halves.
+  splitWallInPresets(scene, op);
 
   // The paint follows the geometry: one remap entry per painted face of the
   // old wall (owner and side preserved), both heirs inherit, `primary` is the
@@ -595,16 +598,42 @@ function mergeRemap(
  * (`context.forgetInPresets`).
  */
 function forgetWallInPresets(scene: Draft<SceneData>, wallId: string): void {
-  forgetInPresets(scene, (candidate) => namesWall(candidate, wallId));
+  forgetReferencesInPresets(scene, 'walls', wallId);
 }
 
-function namesWall(op: SceneOp, wallId: string): boolean {
-  if (op.op === 'set_material') {
-    const face = op.surface === undefined ? (typeof op.target === 'object' ? op.target : undefined) : op.face;
-    return face?.wallId === wallId;
-  }
-  if (op.op === 'set_wall' || op.op === 'remove_wall' || op.op === 'set_opening') return op.wallId === wallId;
-  return false;
+
+/**
+ * The preset instructions naming a split wall, rewritten onto its halves: a
+ * face paint and a `set_wall` (or `remove_wall`) become one per half with the
+ * same owner and side, and a `set_opening` that puts an opening on the wall
+ * moves to the half its `center` falls in, measured from that half's start.
+ * Anything else that names the wall is forgotten, as a removal forgets it.
+ */
+function splitWallInPresets(scene: Draft<SceneData>, op: SplitWallOp): void {
+  if (!scene.interiors) return;
+  const [first, second] = op.ids;
+  const rewrite = (candidate: Draft<SceneOp>): Draft<SceneOp>[] => {
+    if (!referencesOf(candidate).walls.includes(op.wallId)) return [candidate];
+    const onBoth = (wallId: string): Draft<SceneOp> | undefined => {
+      if (candidate.op === 'set_wall' || candidate.op === 'remove_wall') return { ...candidate, wallId };
+      if (candidate.op !== 'set_material') return undefined;
+      if (candidate.surface !== undefined) return candidate.face === undefined ? undefined : { ...candidate, face: { ...candidate.face, wallId } };
+      return typeof candidate.target === 'object' ? { ...candidate, target: { ...candidate.target, wallId } } : undefined;
+    };
+    const firstCopy = onBoth(first);
+    const secondCopy = onBoth(second);
+    if (firstCopy !== undefined && secondCopy !== undefined) return [firstCopy, secondCopy];
+    if (candidate.op === 'set_opening') {
+      const center = candidate.center;
+      if (center === undefined || center < op.at) return [{ ...candidate, wallId: first }];
+      return [{ ...candidate, wallId: second, center: center - op.at }];
+    }
+    return [];
+  };
+  scene.interiors = scene.interiors.flatMap((preset) => {
+    const ops = preset.ops.flatMap(rewrite);
+    return ops.length === 0 ? [] : [{ ...preset, ops }];
+  });
 }
 
 /* ------------------------------------------------------------ helpers --- */

@@ -22,12 +22,12 @@ import type { Draft } from '../../shared/committed.js';
 import type { SceneRegistries } from '../registries.js';
 import { ROOM_PURPOSES, isMemberOf } from '../schema-sets.js';
 import { schemaVersionBefore } from '../types.js';
-import type { AddRoomOp, RemoveRoomOp, Room, SceneData, SceneOp, SetMaterialOp, SetRoomOp, SetRoomPurposeOp, Vec2 } from '../types.js';
+import type { AddRoomOp, RemoveRoomOp, Room, SceneData, SetRoomOp, SetRoomPurposeOp, Vec2 } from '../types.js';
 import {
   OpError,
   TOUCHED_SHELL,
   dropFaceFinishes,
-  forgetInPresets,
+  forgetReferencesInPresets,
   requireFinite,
   requireNewId,
   touchedAsset,
@@ -153,7 +153,7 @@ export function applyRemoveRoom(scene: Draft<SceneData>, op: RemoveRoomOp): OpOu
   }
   if (unbound > 0) notes.unshift(`${unbound} object${unbound === 1 ? '' : 's'} unbound`);
 
-  forgetInPresets(scene, (candidate) => presetNamesRoom(candidate, op.roomId));
+  forgetReferencesInPresets(scene, 'rooms', op.roomId);
 
   const tail = notes.length === 0 ? '' : `, ${notes.join(', ')}`;
   return { summary: `Room ${op.roomId}: removed ${room.name}${tail}`, touched };
@@ -187,28 +187,3 @@ export function applySetRoomPurpose(scene: Draft<SceneData>, op: SetRoomPurposeO
   return { summary: `Room ${op.roomId}: purpose ${previous} → ${purpose ?? 'none'}`, touched: [] };
 }
 
-/**
- * True when a `set_material` paints the room itself or one of its faces, in
- * either form: the legacy `target` (the room or a face it owns), or the
- * explicit `room` / `face.room`.
- *
- * Shared with the commit-time room merge (`scene/room-merge.ts`), which
- * forgets the instructions naming an absorbed room by the same test.
- */
-export function namesRoom(op: SetMaterialOp, roomId: string): boolean {
-  if (op.surface !== undefined) return op.room === roomId || op.face?.room === roomId;
-  const target = op.target;
-  return typeof target === 'object' ? target.room === roomId : target === roomId;
-}
-
-/**
- * True when a preset instruction names the room in any field: a `set_material`
- * in either form (`namesRoom`), a room camera, or the `room` /
- * `roomId` of any other preset-legal operation.
- */
-export function presetNamesRoom(op: SceneOp, roomId: string): boolean {
-  if (op.op === 'set_material') return namesRoom(op, roomId);
-  if (op.op === 'set_camera') return typeof op.target === 'object' && op.target.room === roomId;
-  const fields = op as { readonly room?: unknown; readonly roomId?: unknown };
-  return fields.room === roomId || fields.roomId === roomId;
-}

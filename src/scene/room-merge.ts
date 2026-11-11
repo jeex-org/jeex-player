@@ -47,7 +47,7 @@ import { anchorsPerFace, buildGraph, type PlanGraph } from '../plan/plan-graph.j
 import type { SolvedPlan } from '../plan/plan-solver.js';
 import {
   TOUCHED_SHELL,
-  forgetInPresets,
+  forgetReferencesInPresets,
   sameTouched,
   touchedAsset,
   touchedCamera,
@@ -58,7 +58,6 @@ import {
   touchedTrim,
   type TouchedEntity,
 } from './ops/context.js';
-import { presetNamesRoom } from './ops/rooms.js';
 import { faceKey } from './types.js';
 import type { SceneData } from './types.js';
 
@@ -167,7 +166,7 @@ export function applyRoomMerges(
       for (const entity of [touchedFloor(id), touchedRoomWalls(id), touchedCeiling(id), touchedTrim(id)]) touch(entity);
 
       rekeyFaces(draft, id, group.survivor, touch);
-      forgetInPresets(draft, (op) => presetNamesRoom(op, id));
+      forgetReferencesInPresets(draft, 'rooms', id);
     }
   }
   merges.sort((a, b) => compareIds(a.from, b.from));
