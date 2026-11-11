@@ -279,6 +279,18 @@ describe('onRevision', () => {
     ok(subject.apply({ baseRev: 1, ops: [{ op: 'set_material', target: 'facade', material: FINISH.sage }] }));
     expect(seen).toEqual(['a', 'b', 'a']);
   });
+
+  test('a trial from inside a revision listener answers the failure an apply there answers', () => {
+    const subject = model();
+    const answers: unknown[] = [];
+    subject.onRevision((rev) => {
+      const batch = { baseRev: rev, ops: [{ op: 'set_material' as const, target: 'facade' as const, material: FINISH.sage }] };
+      answers.push(subject.trial(batch), subject.apply(batch));
+    });
+    ok(subject.apply({ baseRev: 0, ops: [{ op: 'set_material', target: 'facade', material: FINISH.terra }] }));
+    expect(answers[1]).toHaveProperty('error', 'validation_failed');
+    expect(answers[0]).toEqual(answers[1]);
+  });
 });
 
 describe('toJSON round trip', () => {

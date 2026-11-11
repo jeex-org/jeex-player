@@ -6,8 +6,10 @@
  * the scene canvas (in `plan2d` every pointer event lands there: the plan's
  * own canvas does not take pointer events), so a claimed press never reaches
  * the selection controller and the click after it is consumed. A press
- * anywhere else passes through untouched. Esc on the viewer's key target ends
- * a drag. Over a handle the scene canvas carries `data-plan-handle="<kind>"`
+ * anywhere else passes through untouched, and so does every move, release or
+ * cancel of a pointer other than the one that pressed. A cancelled pointer
+ * lets go of a claimed press, dragging or not. Esc on the viewer's key target
+ * ends a drag. Over a handle the scene canvas carries `data-plan-handle="<kind>"`
  * (and `data-plan-drag` while dragging), which `viewer.css` turns into the
  * grab cursors.
  *
@@ -52,28 +54,36 @@ export function bindPlanToolInput(tool: PlanTool, deps: PlanToolInputDeps): () =
     if (tool.dragging()) deps.canvas.dataset['planDrag'] = 'true';
     else delete deps.canvas.dataset['planDrag'];
   };
+  /** Whether the tool holds a press of another pointer than `event`'s. */
+  const other = (event: PointerEvent): boolean => {
+    const held = tool.pressedBy();
+    return held !== null && held !== event.pointerId;
+  };
   const onDown = (event: PointerEvent): void => {
+    if (other(event)) return;
     consumeClick = false;
     if (event.button !== 0 || event.altKey || event.ctrlKey || event.metaKey || event.target !== deps.canvas) return;
-    if (!tool.press(point(event))) return;
+    if (!tool.press(point(event), event.pointerId)) return;
     consumeClick = true;
     claimPointer(deps.canvas, event);
   };
   const onMove = (event: PointerEvent): void => {
+    if (other(event)) return;
     if (tool.move(point(event))) event.stopImmediatePropagation();
     else tool.hover(point(event));
     cursor();
   };
   const onUp = (event: PointerEvent): void => {
+    if (other(event)) return;
     if (!tool.release(point(event))) return;
     event.stopImmediatePropagation();
     releasePointer(deps.canvas, event.pointerId);
     cursor();
   };
   const onCancel = (event: PointerEvent): void => {
-    if (!tool.dragging()) return;
-    tool.cancel();
+    if (other(event) || !tool.cancel()) return;
     event.stopImmediatePropagation();
+    releasePointer(deps.canvas, event.pointerId);
     cursor();
   };
   const onClick = (event: MouseEvent): void => {

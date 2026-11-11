@@ -31,7 +31,10 @@ export type PlanEdit = {
 export type PlanEditRefused = {
   readonly target: PlanEditTarget;
   readonly ops: readonly PlanEditOp[];
-  /** The model's refusal, verbatim: `validation_failed` with the validator's English message. */
+  /**
+   * `validation_failed` with the model's refusal verbatim (the validator's English message), or,
+   * when the drag never reached a position the tool could compute, with a message from the tool.
+   */
   readonly reason: { readonly code: 'validation_failed'; readonly message: string };
 };
 

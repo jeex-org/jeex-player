@@ -18,7 +18,7 @@ import type { NewCheckpoint, PlanView, ViewerSlots, ViewerState } from './viewer
 import { readViewerState } from './viewer-state.js';
 import type { ViewerStage } from './viewer-stage.js';
 import type { ViewerUI } from '../ui/viewer-ui.js';
-import type { ViewerEvents } from './viewer-events.js';
+import { toViewerError, type ViewerEvents } from './viewer-events.js';
 import type { TourControls } from '../camera/tour-controls.js';
 import type { SceneMount } from './scene-mount.js';
 import type { ExportSurfaces } from './export-surfaces.js';
@@ -132,6 +132,7 @@ export function handleCommands(deps: HandleCommandsDeps): HandleCommands {
         switchMode,
       }),
     log: defaultLogger,
+    report: (error) => deps.events.emit('error', toViewerError('internal', error, deps.messages().t('error.unknown'))),
   });
   /** A host's `setMode` before there was a camera to switch: the start view opens in it. */
   let requestedMode: ViewerMode | null = null;

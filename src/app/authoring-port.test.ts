@@ -58,11 +58,12 @@ function recordingTools(calls: string[]): Authoring {
 }
 
 /** A port over a stage the test sets, with loads the test settles. */
-function harness() {
+function harness(start: AuthoringPortDeps<Stage, 'module'>['start'] | null = null) {
   const loads: Array<ReturnType<typeof deferred<'module'>>> = [];
   const started: string[] = [];
   const calls: string[] = [];
   const log = collectLogger();
+  const reports: unknown[] = [];
   let stage: Stage | undefined;
   const deps: AuthoringPortDeps<Stage, 'module'> = {
     stage: () => stage,
@@ -71,11 +72,14 @@ function harness() {
       loads.push(load);
       return load.promise;
     },
-    start: (_module, on) => {
-      started.push(on.name);
-      return recordingTools(calls);
-    },
+    start:
+      start ??
+      ((_module, on) => {
+        started.push(on.name);
+        return recordingTools(calls);
+      }),
     log: log.log,
+    report: (error) => reports.push(error),
   };
   const port = authoringPort(deps);
   return {
@@ -84,6 +88,7 @@ function harness() {
     started,
     calls,
     log,
+    reports,
     setStage: (next: Stage | undefined) => {
       stage = next;
     },
@@ -197,5 +202,39 @@ describe('the authoring port', () => {
     await h.port.ready();
     expect(h.started).toEqual(['first', 'second']);
     expect(h.calls).toEqual(['overlay:true', 'asset:false', 'plan:false', 'dispose', 'overlay:true', 'asset:false', 'plan:false']);
+  });
+
+  test('a «Move» armed while the chunk loads is armed once the tools are bound', async () => {
+    const h = harness();
+    h.setStage({ name: 'stage' });
+    h.port.setAssetMoveTool(true);
+    h.port.armAssetMove();
+    h.loads[0]!.resolve('module');
+    await h.port.ready();
+    expect(h.calls).toEqual(['overlay:false', 'asset:true', 'plan:false', 'arm']);
+  });
+
+  test('a «Move» armed and then switched off while the chunk loads is not armed', async () => {
+    const h = harness();
+    h.setStage({ name: 'stage' });
+    h.port.setAssetMoveTool(true);
+    h.port.armAssetMove();
+    h.port.setAssetMoveTool(false);
+    h.loads[0]!.resolve('module');
+    await h.port.ready();
+    expect(h.calls).toEqual(['overlay:false', 'asset:false', 'plan:false']);
+  });
+
+  test('tools that throw while they are built are reported as an internal error, not as a chunk that did not load', async () => {
+    const failure = new Error('the tools broke');
+    const h = harness(() => {
+      throw failure;
+    });
+    h.setStage({ name: 'stage' });
+    h.port.setPlanTool(true);
+    h.loads[0]!.resolve('module');
+    await h.port.ready();
+    expect(h.log.codes()).toEqual([]);
+    expect(h.reports).toEqual([failure]);
   });
 });

@@ -40,10 +40,12 @@ type BootUI = {
  * host that switched a tool on before the boot (a studio reload that reopens
  * the camera it was editing) gets them in force at the first `scene` event.
  * Waits only for a load that was started; a page that turned nothing on
- * mounts at once.
+ * mounts at once. A rejection, and no mount, when the viewer is disposed
+ * during the wait.
  */
-export async function mountAfterAuthoring(authoring: Pick<AuthoringPort, 'ready'>, mount: () => void): Promise<void> {
+export async function mountAfterAuthoring(authoring: Pick<AuthoringPort, 'ready'>, mount: () => void, signal: AbortSignal): Promise<void> {
   await authoring.ready();
+  if (signal.aborted) throw new ViewerDisposedError();
   mount();
 }
 

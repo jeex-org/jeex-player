@@ -9,6 +9,8 @@ import { planHandles, type PlanHandle } from '../plan/plan-handles.js';
 import { solvePlan } from '../plan/plan-solver.js';
 import { lShapePlan } from '../fixtures/plan-l-shape.js';
 import { L_SHAPE } from '../fixtures/plan-l-shape-ids.js';
+import { SceneModel } from '../scene/scene-model.js';
+import { CATALOGUE_REGISTRIES } from '../assets/catalogue-registries.js';
 
 const start = { scene: lShapePlan, plan: solvePlan(lShapePlan) };
 const wallHandles = planHandles(start.plan, lShapePlan, { kind: 'wall', id: L_SHAPE.wall.wSA });
@@ -56,5 +58,18 @@ describe('gestureOps', () => {
       gesture: 'opening-width',
       ops: [{ op: 'set_opening', openingId: L_SHAPE.opening.doorEntry, center: 1.375, width: 1.25 }],
     });
+  });
+
+  test('a jamb dragged closer than the narrowest opening stops there: the fixed jamb stays exactly where it was', () => {
+    const jambB = pick(doorHandles, (handle) => handle.kind === 'opening-end' && handle.end === 'b');
+    // The door spans 0.75..1.75; its far jamb goes to 0.85, a 0.1 m door.
+    const op = gestureOps(jambB, { x: 1.75, z: 0 }, { x: 0.85, z: 0 }, start)?.ops[0];
+    if (op?.op !== 'set_opening') throw new Error('expected a set_opening');
+    expect(op.center! - op.width! / 2).toBeCloseTo(0.75, 9);
+    // The model commits the op as it is: the narrowest door, its near jamb still at 0.75.
+    const judged = new SceneModel(lShapePlan, CATALOGUE_REGISTRIES).trial({ baseRev: 0, ops: [op] });
+    if ('error' in judged) throw new Error(judged.message);
+    const door = judged.scene.walls.flatMap((wall) => wall.openings ?? []).find((item) => item.id === L_SHAPE.opening.doorEntry)!;
+    expect(door.center - door.width / 2).toBeCloseTo(0.75, 9);
   });
 });

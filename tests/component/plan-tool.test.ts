@@ -2,7 +2,8 @@
  * The plan tool end to end, in a mounted viewer in `plan2d`: a wall selected
  * by the host, the tool armed, real pointer events on the scene canvas at the
  * pixels `planView()` names. A legal drag emits one `planEdit` and touches
- * nothing in 3D; the host's applied document answers it; an illegal drag is
+ * nothing in 3D; the host's applied document answers it, so the next drag
+ * starts from what the host applied; an illegal drag is
  * refused with the drawing put back; `revertPlanEdit` puts the committed
  * drawing back after a legal one.
  */
@@ -83,19 +84,25 @@ async function mounted() {
     return canvas.dataset['planHandle'] === 'node';
   }, 'the plan tool over the node handle');
   await nextFrame();
-  /** Press on the node's handle, drag in steps to `to`, a frame, release. */
-  const drag = async (to: Vec2): Promise<void> => {
+  /** Press on the node's handle at `from`, drag in steps to `to`, a frame, release. */
+  const drag = async (to: Vec2, from: Vec2 = moves.from): Promise<void> => {
     const id = (pointerId += 1);
-    fire('pointerdown', moves.from, id);
+    fire('pointerdown', from, id);
     for (let step = 1; step <= 6; step += 1) {
       const k = step / 6;
-      fire('pointermove', { x: moves.from.x + (to.x - moves.from.x) * k, z: moves.from.z + (to.z - moves.from.z) * k }, id);
+      fire('pointermove', { x: from.x + (to.x - from.x) * k, z: from.z + (to.z - from.z) * k }, id);
     }
     await nextFrame();
     fire('pointerup', to, id);
   };
+  /** Waits until a pointer at `at` is over the node's handle. */
+  const overNode = (at: Vec2): Promise<void> =>
+    until(() => {
+      fire('pointermove', at, 1);
+      return canvas.dataset['planHandle'] === 'node';
+    }, 'the plan tool over the node handle');
   const pixels = (): Uint8ClampedArray => plan.getContext('2d')!.getImageData(0, 0, plan.width, plan.height).data;
-  return { handle, scene, moves, edits, refusals, states, scenes, drag, pixels };
+  return { handle, scene, moves, edits, refusals, states, scenes, drag, overNode, pixels };
 }
 
 describe('the plan tool', () => {
@@ -111,17 +118,24 @@ describe('the plan tool', () => {
     // The 3D scene is rebuilt only by a mounted document, and every mounted document raises `scene`: none so far.
     expect(m.scenes).toEqual([]);
 
-    // The host commits the batch and hands the document back.
+    // The host commits its own answer, the node halfway to where it was dragged, and hands the document back.
+    const applied = { x: (m.moves.from.x + m.moves.legal.x) / 2, z: (m.moves.from.z + m.moves.legal.z) / 2 };
     const host = new SceneModel(m.scene, CATALOGUE_REGISTRIES);
-    expect(isApplyOk(host.apply({ baseRev: host.rev, ops: [...edit.ops] }))).toBe(true);
+    expect(isApplyOk(host.apply({ baseRev: host.rev, ops: [{ op: 'move_node', nodeId: m.moves.nodeId, p: applied }] }))).toBe(true);
     await m.handle.loadScene({ document: host.toJSON() });
-    // One document mounted, so one rebuild, for the host's document; and the pending edit is answered: nothing is left to revert.
+    // One document mounted, so one rebuild, for the host's document.
     expect(m.scenes).toEqual([1]);
     expect(m.handle.getState().rev).toBe(1);
-    await nextFrame();
-    const answered = m.pixels();
-    m.handle.revertPlanEdit();
-    expect(m.pixels()).toEqual(answered);
+    // The document answered the pending edit: the handle stands where the host put the node, and a drag
+    // from there back to the start moves it by its own travel from the applied position.
+    await m.overNode(applied);
+    await m.drag(m.moves.from, applied);
+    expect(m.edits).toHaveLength(2);
+    expect(m.edits[1]).toMatchObject({ gesture: 'node', baseRev: 1 });
+    const second = m.edits[1]!.ops[0]!;
+    if (second.op !== 'move_node' || !second.p) throw new Error('expected a move_node to a point');
+    expect(second.p.x).toBeCloseTo(m.moves.from.x, 2);
+    expect(second.p.z).toBeCloseTo(m.moves.from.z, 2);
   }, 120_000);
 
   test('an illegal drag is refused with the model’s message and the drawing as it was', async () => {

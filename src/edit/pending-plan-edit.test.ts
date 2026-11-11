@@ -1,8 +1,9 @@
 /**
  * The plan edits the viewer emitted and the host has not answered: a later
  * revision or another document answers them, the same document at the same
- * revision answers nothing, a second drag builds on the first, and a revert
- * with nothing pending does nothing.
+ * revision answers nothing, a second record appends to the first (the plan
+ * tool's own tests drive a second drag through it), and a revert with nothing
+ * pending does nothing.
  */
 
 import { describe, expect, test } from 'bun:test';
@@ -49,7 +50,7 @@ describe('PendingPlanEdit', () => {
     expect(pending.ops()).toEqual(FIRST);
   });
 
-  test('a second drag is judged on the first: its trial runs the recorded ops in front of its own', () => {
+  test('a second record on the same document and revision appends its ops after the first and keeps the newer draft', () => {
     const { model, pending } = pendingAfterFirst();
     const second = model.trial({ baseRev: model.rev, ops: [...pending.ops(), ...SECOND] });
     if ('error' in second) throw new Error(second.message);

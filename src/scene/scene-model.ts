@@ -204,6 +204,12 @@ function sealCollection(collection: Map<unknown, unknown> | Set<unknown>): void 
   }
 }
 
+/** The answer to a batch judged from inside a revision listener, while the commit in flight is still notifying. */
+const REENTRANT_APPLY: ApplyFailure = Object.freeze({
+  error: 'validation_failed',
+  message: 'A revision listener cannot apply another batch; the commit in flight has not finished notifying',
+});
+
 export class SceneModel {
   private readonly catalogues: SceneRegistries;
   /** The injected layout linter, or `undefined` when this model never lints. */
@@ -279,9 +285,11 @@ export class SceneModel {
    * Judges a batch as `apply` would, without committing it: the candidate
    * scene and its solved plan, or the failure `apply` would answer. The
    * revision, the committed state and the listeners are left alone, and the
-   * candidate is not kept. One judgement for a live preview and the commit.
+   * candidate is not kept. One judgement for a live preview and the commit:
+   * from inside a revision listener it refuses as `apply` does there.
    */
   trial(batch: ApplyBatch): { scene: SceneData; plan: SolvedPlan } | ApplyFailure {
+    if (this.applying) return REENTRANT_APPLY;
     const candidate = this.candidate(batch);
     return 'error' in candidate ? candidate : { scene: candidate.draft, plan: candidate.plan };
   }
@@ -292,12 +300,7 @@ export class SceneModel {
    * touched entities in operation order.
    */
   apply(batch: ApplyBatch): ApplyResult {
-    if (this.applying) {
-      return {
-        error: 'validation_failed',
-        message: 'A revision listener cannot apply another batch; the commit in flight has not finished notifying',
-      };
-    }
+    if (this.applying) return REENTRANT_APPLY;
     const candidate = this.candidate(batch);
     if ('error' in candidate) return candidate;
     const { draft, plan: candidatePlan, applied, touched, roomMerges, linted } = candidate;

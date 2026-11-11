@@ -12,10 +12,15 @@
  * tools; until then a command that answers a boolean answers `false`, a void
  * one does nothing, `lookThroughId()` is `null` and `placing()` is `false`.
  *
+ * A «Move» armed before the tools are bound is remembered like a switch and
+ * armed once they are; switching the asset tool off forgets it.
+ *
  * Invariants: at most one load is in flight; a failed load is logged and
- * retried on the next switch turned on, never before; the tools are bound to
- * one stage at a time and disposed before another stage gets its own; a port
- * disposed while its load is in flight binds nothing when it resolves.
+ * retried on the next switch turned on, never before; tools that throw while
+ * they are built or bound are reported as an internal error (`report`) and
+ * promise no retry; the tools are bound to one stage at a time and disposed
+ * before another stage gets its own; a port disposed while its load is in
+ * flight binds nothing when it resolves.
  */
 
 import type * as THREE from 'three';
@@ -69,6 +74,8 @@ export type AuthoringPortDeps<S, M> = {
   /** Builds the tools of `stage` from the loaded chunk. */
   start: (module: M, stage: S) => Authoring;
   log: Logger;
+  /** An error thrown while the tools were built or bound: the viewer's internal error. */
+  report: (error: unknown) => void;
 };
 
 /** The port's own surface: the switches, the binding and the forwarded commands. */
@@ -85,20 +92,31 @@ export type AuthoringPort = Omit<Authoring, 'debug' | 'dispose'> & {
 
 export function authoringPort<S, M>(deps: AuthoringPortDeps<S, M>): AuthoringPort {
   const switches = { checkpointOverlay: false, assetMove: false, planTool: false };
+  /** A «Move» armed while no tools were bound. */
+  let armed = false;
   let module: M | null = null;
   let loading: Promise<void> | null = null;
   let bound: { stage: S; tools: Authoring } | null = null;
+  /** The stage whose tools threw while they were built: reported once, not built again. */
+  let broken: S | null = null;
   let disposed = false;
 
   const bind = (): void => {
     const stage = deps.stage();
-    if (disposed || module === null || stage === undefined || bound?.stage === stage) return;
+    if (disposed || module === null || stage === undefined || bound?.stage === stage || broken === stage) return;
     unbind();
-    const tools = deps.start(module, stage);
-    bound = { stage, tools };
-    tools.setCheckpointOverlay(switches.checkpointOverlay);
-    tools.setAssetMoveTool(switches.assetMove);
-    tools.setPlanTool(switches.planTool);
+    try {
+      const tools = deps.start(module, stage);
+      bound = { stage, tools };
+      tools.setCheckpointOverlay(switches.checkpointOverlay);
+      tools.setAssetMoveTool(switches.assetMove);
+      tools.setPlanTool(switches.planTool);
+      if (armed && switches.assetMove) tools.armAssetMove();
+      armed = false;
+    } catch (error) {
+      broken = stage;
+      deps.report(error);
+    }
   };
 
   const unbind = (): void => {
@@ -109,18 +127,18 @@ export function authoringPort<S, M>(deps: AuthoringPortDeps<S, M>): AuthoringPor
   /** Starts the one load unless it is in or in flight. */
   const load = (): void => {
     if (module !== null || loading !== null || disposed) return;
-    loading = deps
-      .load()
-      .then((loaded) => {
+    loading = deps.load().then(
+      (loaded) => {
         module = loaded;
         bind();
-      })
-      .catch((cause: unknown) => {
+      },
+      (cause: unknown) => {
         // A chunk that did not load (a dropped connection, a redeploy) is
         // tried again on the next switch turned on instead of leaving it dead.
         loading = null;
         deps.log.warn('authoring-chunk', 'the authoring tools did not load; turn a tool on again to retry', cause);
-      });
+      },
+    );
   };
 
   /** One forward: the bound tools' answer, or `fallback` while none are bound. */
@@ -135,6 +153,7 @@ export function authoringPort<S, M>(deps: AuthoringPortDeps<S, M>): AuthoringPor
     setAssetMoveTool(enabled) {
       switches.assetMove = enabled;
       if (enabled) load();
+      else armed = false;
       bound?.tools.setAssetMoveTool(enabled);
     },
     setPlanTool(enabled) {
@@ -162,7 +181,10 @@ export function authoringPort<S, M>(deps: AuthoringPortDeps<S, M>): AuthoringPor
     endLookThrough: (commit) => call(false, (tools) => tools.endLookThrough(commit)),
     focusCheckpoint: (id) => call(false, (tools) => tools.focusCheckpoint(id)),
     revertCheckpointEdit: () => call(undefined, (tools) => tools.revertCheckpointEdit()),
-    armAssetMove: () => call(undefined, (tools) => tools.armAssetMove()),
+    armAssetMove() {
+      if (bound) bound.tools.armAssetMove();
+      else armed = true;
+    },
     revertAssetEdit: () => call(undefined, (tools) => tools.revertAssetEdit()),
     mirrorAsset: (assetId, axis) => call(false, (tools) => tools.mirrorAsset(assetId, axis)),
     turnAsset: (assetId, steps) => call(false, (tools) => tools.turnAsset(assetId, steps)),
@@ -176,7 +198,7 @@ export function authoringPort<S, M>(deps: AuthoringPortDeps<S, M>): AuthoringPor
         : {
             loaded: false,
             checkpointOverlay: undefined,
-            // The asset tool reports its switch while its chunk is on the way, as it did when it loaded alone.
+            // While the chunk is on the way the asset tool reports its switch, not yet loaded.
             assetMove: switches.assetMove ? { enabled: true, loaded: false, state: null } : null,
           },
   };

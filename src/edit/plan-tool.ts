@@ -75,6 +75,8 @@ type Drag = {
   readonly target: PlanEditTarget;
   readonly handle: PlanHandle;
   readonly press: CanvasPoint;
+  /** The pointer that pressed: the drag hears no other. */
+  readonly pointerId: number;
   readonly pressPlan: Vec2;
   /** The document the handles were read from: the pending draft, else the committed one. */
   readonly start: PlanDraft;
@@ -115,8 +117,13 @@ export class PlanTool {
     return this.drag?.dragging === true;
   }
 
-  /** A primary press at `point`: `true` when it landed on a handle and the tool claims it. */
-  press(point: CanvasPoint): boolean {
+  /** The pointer whose press the tool holds; `null` while it holds none. */
+  pressedBy(): number | null {
+    return this.drag?.pointerId ?? null;
+  }
+
+  /** A primary press of `pointerId` at `point`: `true` when it landed on a handle and the tool claims it. */
+  press(point: CanvasPoint, pointerId: number): boolean {
     const target = this.target();
     const model = this.host.model();
     const transform = this.host.transform();
@@ -128,6 +135,7 @@ export class PlanTool {
       target,
       handle,
       press: point,
+      pointerId,
       pressPlan: planPointAt(transform, point),
       start,
       sceneId: model.scene.id,
@@ -193,16 +201,17 @@ export class PlanTool {
     return true;
   }
 
-  /** Ends a drag with no edit and puts the drawing of before the press back. */
-  cancel(): void {
+  /** Ends a claimed press, dragging or not, with no edit and puts the drawing of before the press back; `true` when one was claimed. */
+  cancel(): boolean {
     const drag = this.drag;
-    if (!drag) return;
+    if (!drag) return false;
     if (drag.dragging) {
       this.host.showDraft(this.pending.draft());
       this.end();
-      return;
+      return true;
     }
     this.drag = null;
+    return true;
   }
 
   /** A key on the viewer: Esc ends a drag. `true` when the tool used it. */

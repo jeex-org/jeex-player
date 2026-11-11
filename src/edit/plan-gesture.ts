@@ -10,18 +10,20 @@
  * 3. `opening`: the body's start point plus the travel, projected onto the
  *    host wall's centreline and kept on it; `set_opening { center }`.
  * 4. `opening-end`: the dragged jamb projected the same way, the other jamb
- *    where it was; `set_opening { center, width }`. A jamb dragged past the
- *    other gives a negative width, which `set_opening` clamps to its minimum
- *    as it clamps every out-of-range value: the tool does not reorder them.
+ *    where it was; `set_opening { center, width }`. The dragged jamb stops
+ *    the narrowest opening's width (`minOpeningWidth`, the limit `set_opening`
+ *    clamps with) short of the fixed one, so the clamp never widens the
+ *    opening around its centre and moves the jamb that was not dragged; the
+ *    jambs are never reordered.
  *
  * Every value is rounded to the millimetre so a batch carries no float noise;
- * there is no other snapping and no limit of the tool's own: every limit is
- * the validator's.
+ * there is no other snapping, and every other limit is the validator's.
  *
  * Pure module: no `three`, no DOM.
  */
 
 import { add, dot, mul, projectOnPolyline, sub } from '../plan/plan-geometry.js';
+import { minOpeningWidth } from '../plan/plan-openings.js';
 import type { PlanHandle } from '../plan/plan-handles.js';
 import type { SolvedPlan } from '../plan/plan-solver.js';
 import type { SceneData, Vec2 } from '../scene/types.js';
@@ -56,7 +58,8 @@ export function gestureOps(
       const t = Math.min(line.length, Math.max(0, hit.t));
       if (handle.kind === 'opening') return { gesture: 'opening', ops: [{ op: 'set_opening', openingId: opening.id, center: mm(t) }] };
       const fixed = handle.end === 'a' ? opening.center + opening.width / 2 : opening.center - opening.width / 2;
-      const [from, to] = handle.end === 'a' ? [t, fixed] : [fixed, t];
+      const narrowest = minOpeningWidth(line.length);
+      const [from, to] = handle.end === 'a' ? [Math.min(t, fixed - narrowest), fixed] : [fixed, Math.max(t, fixed + narrowest)];
       return {
         gesture: 'opening-width',
         ops: [{ op: 'set_opening', openingId: opening.id, center: mm((from + to) / 2), width: mm(to - from) }],

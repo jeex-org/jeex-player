@@ -298,39 +298,95 @@ describe('mountAfterAuthoring', () => {
   /** The camera the host focuses on the first `scene`, as its reload path does. */
   const CAM = '01a13a41-0b7c-7d52-8e3a-6c1f2b9d4e07';
 
+  /** The whole tools surface, idle, with `overrides` on top. */
+  const standInTools = (overrides: Partial<Authoring>): Authoring => ({
+    setCheckpointOverlay: () => undefined,
+    setAssetMoveTool: () => undefined,
+    setPlanTool: () => undefined,
+    revertPlanEdit: () => undefined,
+    addCheckpoint: () => false,
+    startCheckpointPlacement: () => false,
+    cancelCheckpointPlacement: () => undefined,
+    setCheckpointFromView: () => false,
+    frameCheckpoint: () => false,
+    lookThroughCheckpoint: () => false,
+    endLookThrough: () => false,
+    focusCheckpoint: () => false,
+    revertCheckpointEdit: () => undefined,
+    armAssetMove: () => undefined,
+    revertAssetEdit: () => undefined,
+    mirrorAsset: () => false,
+    turnAsset: () => false,
+    modeChanged: () => undefined,
+    retranslate: () => undefined,
+    lookThroughId: () => null,
+    placing: () => false,
+    debug: () => ({ checkpointOverlay: undefined, assetMove: null }),
+    dispose: () => undefined,
+    ...overrides,
+  });
+
+  /** The chunk arrives a task later than the boot reaches the mount. */
+  const lateLoad = (): Promise<'module'> =>
+    new Promise<'module'>((resolve) => {
+      setTimeout(() => resolve('module'), 0);
+    });
+
   test('a tool switched on before the boot is bound before the first document, so the first `scene` subscriber can focus a checkpoint', async () => {
     const events = new ViewerEvents();
     /** The checkpoints of the documents the tools were handed, as the stage's `document` hook hands them. */
     const known = new Set<string>();
     let bound = false;
-    const tools = { focusCheckpoint: (id: string | null) => id !== null && known.has(id) } as Partial<Authoring>;
+    const log = collectLogger();
+    const reports: unknown[] = [];
     const port = authoringPort({
       stage: () => 'stage',
-      // The chunk arrives a task later than the boot reaches the mount.
-      load: () =>
-        new Promise<'module'>((resolve) => {
-          setTimeout(() => resolve('module'), 0);
-        }),
+      load: lateLoad,
       start: () => {
         bound = true;
-        return {
-          ...tools,
-          setCheckpointOverlay: () => undefined,
-          setAssetMoveTool: () => undefined,
-          dispose: () => undefined,
-        } as Authoring;
+        return standInTools({ focusCheckpoint: (id) => id !== null && known.has(id) });
       },
-      log: collectLogger().log,
+      log: log.log,
+      report: (error) => reports.push(error),
     });
     port.setCheckpointOverlay(true);
     const focused: boolean[] = [];
     events.on('scene', () => focused.push(port.focusCheckpoint(CAM)));
 
-    await mountAfterAuthoring(port, () => {
-      // `SceneMount.mountDocument`: the stage adopts the document (the tools hear it), then `scene` announces it.
-      if (bound) known.add(CAM);
-      events.emit('scene', { sceneId: 'scene', rev: 1 });
-    });
+    await mountAfterAuthoring(
+      port,
+      () => {
+        // `SceneMount.mountDocument`: the stage adopts the document (the tools hear it), then `scene` announces it.
+        if (bound) known.add(CAM);
+        events.emit('scene', { sceneId: 'scene', rev: 1 });
+      },
+      new AbortController().signal,
+    );
     expect(focused).toEqual([true]);
+    expect(log.codes()).toEqual([]);
+    expect(reports).toEqual([]);
+  });
+
+  test('a viewer disposed during the authoring load mounts no document', async () => {
+    const controller = new AbortController();
+    const port = authoringPort({
+      stage: () => 'stage',
+      load: lateLoad,
+      start: () => standInTools({}),
+      log: collectLogger().log,
+      report: () => undefined,
+    });
+    port.setCheckpointOverlay(true);
+    let mounted = false;
+    const waiting = mountAfterAuthoring(
+      port,
+      () => {
+        mounted = true;
+      },
+      controller.signal,
+    );
+    controller.abort();
+    await expect(waiting).rejects.toBeInstanceOf(ViewerDisposedError);
+    expect(mounted).toBe(false);
   });
 });

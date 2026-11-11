@@ -289,7 +289,7 @@ export class ViewerApp {
       this.buildStage(model);
       if (this.stage) this.telemetry.attach(this.stage);
       // A tool switched on before the first scene is bound before it, so the first `scene` event finds it.
-      await mountAfterAuthoring(this.handle.authoring, () => this.mount.mountDocument(loaded));
+      await mountAfterAuthoring(this.handle.authoring, () => this.mount.mountDocument(loaded), this.context.signal);
       this.stage?.director?.setMotion(resolveMotionInstant(this.options.motion, prefersReducedMotion()));
       showBootStep(this.ui, this.messages, 'furniture');
       await nextFrame(this.context.signal);
