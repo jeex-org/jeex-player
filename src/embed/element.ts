@@ -34,12 +34,11 @@
  * the start are simply read at the start.
  */
 
-import type { TourControls, TourProgress, TourState } from '../camera/tour-controls.js';
+import type { TourControls } from '../camera/tour-controls.js';
 import type { ViewerHandle } from '../app/viewer-handle.js';
 import type { LogSink } from '../shared/logger.js';
-import type { ViewerEditRequest, ViewerError, ViewerReadyInfo, ViewerSceneInfo } from '../app/viewer-events.js';
-import type { ViewerMode } from '../scene/types.js';
-import type { ViewerSelection, ViewerSelectionTarget } from '../app/selection.js';
+import type { ElementEventMap } from './delivery-contract.js';
+import type { ViewerSelectionTarget } from '../app/selection.js';
 import { watchStart } from './element-start.js';
 import { ViewerElementController } from './element-controller.js';
 import {
@@ -97,24 +96,15 @@ export type JeexViewerElement = HTMLElement & {
 };
 
 /**
- * The element's public event map: what a `jeex-*` event carries.
+ * The element's public event map: what a `jeex-*` event carries, one per
+ * handle event the delivery table re-emits (`delivery-contract.ts`).
  *
  * Merged into `HTMLElementEventMap` below, which is what types
  * `element.addEventListener('jeex-ready', …)`. `HTMLElementTagNameMap` alone
  * types `querySelector`/`createElement` and does NOT type events — both merges
  * are needed.
  */
-type JeexViewerEventMap = {
-  'jeex-ready': CustomEvent<ViewerReadyInfo>;
-  'jeex-error': CustomEvent<ViewerError>;
-  'jeex-scene': CustomEvent<ViewerSceneInfo>;
-  'jeex-mode': CustomEvent<ViewerMode>;
-  'jeex-select': CustomEvent<ViewerSelection>;
-  'jeex-edit': CustomEvent<ViewerEditRequest>;
-  'jeex-tour-progress': CustomEvent<TourProgress>;
-  'jeex-tour-state': CustomEvent<{ state: TourState }>;
-  'jeex-tour-ended': CustomEvent<Record<string, never>>;
-};
+type JeexViewerEventMap = { [K in keyof ElementEventMap]: CustomEvent<ElementEventMap[K]> };
 
 declare global {
   interface HTMLElementTagNameMap {

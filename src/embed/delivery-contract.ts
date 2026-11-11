@@ -205,6 +205,25 @@ export function elementEventName<K extends string>(name: K): ElementEventName<K>
   return `jeex-${name.replaceAll(/[A-Z]/g, (letter) => `-${letter.toLowerCase()}`)}` as ElementEventName<K>;
 }
 
+export type TourEventName = keyof typeof TOUR_EVENTS;
+/** The tour's events, in table order; every one is on the wire and on the element. */
+export const TOUR_EVENT_NAMES = Object.keys(TOUR_EVENTS) as readonly TourEventName[];
+
+/** The element's name for a tour event: `progress` is `jeex-tour-progress`. */
+export function tourElementEventName(name: TourEventName): ElementEventName<`tour${Capitalize<TourEventName>}`> {
+  return elementEventName(`tour${name[0]!.toUpperCase()}${name.slice(1)}` as `tour${Capitalize<TourEventName>}`);
+}
+
+/**
+ * What a tour event carries once it leaves the handle, on the wire and on
+ * the element alike: the state wrapped as `{ state }` (a host reads
+ * `payload.state`), `ended` as `{}`, the progress as it is.
+ */
+export function tourEventPayload(name: TourEventName, value: unknown): unknown {
+  if (name === 'state') return { state: value };
+  return name === 'ended' ? {} : value;
+}
+
 /** The DOM events the element raises, each with its payload. */
 export type ElementEventMap = { [K in ElementViewerEvent as ElementEventName<K>]: ViewerEventMap[K] } & {
   'jeex-tour-progress': TourProgress;

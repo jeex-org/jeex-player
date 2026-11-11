@@ -414,6 +414,40 @@ describe('the events', () => {
     });
   });
 
+  test('the walk camera, the tour speed and every authoring event become `jeex-` events too, payload untouched', () => {
+    const { controller, record } = harness();
+    controller.connect();
+    const fired: Array<[string, unknown]> = [
+      ['walkCamera', { index: 2, count: 5 }],
+      ['tourSpeed', { speed: 2 }],
+      ['checkpointSelect', { id: null }],
+      ['checkpointEdit', { cameras: [] }],
+      ['checkpointLookThrough', { id: null }],
+      ['checkpointPlacing', { active: true }],
+      ['assetEdit', { ops: [], baseRev: 4 }],
+      ['assetEditRefused', { issues: [] }],
+      ['assetMoveState', { phase: 'dragging' }],
+      ['planEdit', { ops: [], baseRev: 4 }],
+      ['planEditRefused', { reason: 'too short' }],
+      ['planToolState', { phase: 'idle' }],
+    ];
+    for (const [event, payload] of fired) record.fire(event, payload);
+    expect(record.emitted).toEqual([
+      { type: 'jeex-walk-camera', detail: { index: 2, count: 5 } },
+      { type: 'jeex-tour-speed', detail: { speed: 2 } },
+      { type: 'jeex-checkpoint-select', detail: { id: null } },
+      { type: 'jeex-checkpoint-edit', detail: { cameras: [] } },
+      { type: 'jeex-checkpoint-look-through', detail: { id: null } },
+      { type: 'jeex-checkpoint-placing', detail: { active: true } },
+      { type: 'jeex-asset-edit', detail: { ops: [], baseRev: 4 } },
+      { type: 'jeex-asset-edit-refused', detail: { issues: [] } },
+      { type: 'jeex-asset-move-state', detail: { phase: 'dragging' } },
+      { type: 'jeex-plan-edit', detail: { ops: [], baseRev: 4 } },
+      { type: 'jeex-plan-edit-refused', detail: { reason: 'too short' } },
+      { type: 'jeex-plan-tool-state', detail: { phase: 'idle' } },
+    ]);
+  });
+
   test('the payloads are the documented shapes, not the internal ones', () => {
     const { controller, record } = harness();
     controller.connect();
