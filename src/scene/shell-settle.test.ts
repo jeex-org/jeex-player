@@ -100,6 +100,23 @@ describe('a painted face keeps its paint when another room comes to own it', () 
       { op: 'set_material', target: { room: NEW.study, wallId: ZONED.wall.north, side: 'L' }, material: FINISH.graphite },
     ]);
   });
+
+  test('moving the anchors across the partition, in a batch of set_room alone, re-keys the accent to the room that now owns the face', () => {
+    // The divided plan as a document of its own: the living room in the north half, owning the accent wall.
+    const divided = commit(livingRoom(), DIVIDE).scene;
+    const scene: SceneData = {
+      ...divided,
+      rooms: divided.rooms.map((room) =>
+        room.id === LIVING ? { ...room, anchor: { x: 5, z: 2 } } : room.id === NEW.study ? { ...room, anchor: { x: 5, z: 6 } } : room,
+      ),
+      finishes: { faces: [{ room: LIVING, wallId: ZONED.wall.north, side: 'L', finish: FINISH.graphite }] },
+    };
+    const model = commit(scene, [
+      { op: 'set_room', roomId: LIVING, anchor: { x: 5, z: 6 } },
+      { op: 'set_room', roomId: NEW.study, anchor: { x: 5, z: 2 } },
+    ]);
+    expect(faceFinishOf(model.scene, { room: NEW.study, wallId: ZONED.wall.north, side: 'L' })).toBe(FINISH.graphite);
+  });
 });
 
 describe('a preset painting a facade face follows it when a room is built against the wall', () => {
@@ -167,6 +184,43 @@ describe('a door with an authored swing keeps the side its leaf opens to', () =>
     const after = model.scene;
     const door = wallOf(after).openings![0]!;
     expect(resolveDoorSwing(after, model.plan, wallOf(after), door, () => 0).roomId).toBe(LIVING);
+
+    // The loggia removed again, its walls and nodes with it: the leaf still opens into the living room.
+    expect(
+      model.apply({
+        baseRev: 1,
+        ops: [
+          { op: 'remove_room', roomId: NEW.loggia },
+          { op: 'remove_wall', wallId: NEW.wAP },
+          { op: 'remove_wall', wallId: NEW.wPQ },
+          { op: 'remove_wall', wallId: NEW.wQB },
+          { op: 'remove_node', nodeId: NEW.p },
+          { op: 'remove_node', nodeId: NEW.q },
+        ],
+      }),
+    ).toMatchObject({ rev: 2 });
+    const reopened = model.scene;
+    expect(resolveDoorSwing(reopened, model.plan, wallOf(reopened), wallOf(reopened).openings![0]!, () => 0).roomId).toBe(LIVING);
+  });
+});
+
+describe('a door moved to another wall keeps the swing its move names', () => {
+  test('set_opening carries an inward door onto a perpendicular wall in a batch with an unrelated add_node: it still opens in', () => {
+    const base = livingRoom();
+    const scene: SceneData = {
+      ...base,
+      walls: base.walls.map((wall) =>
+        wall.id === ZONED.wall.north ? { ...wall, openings: [{ id: NEW.door, type: 'door', center: 5, width: 0.9, swing: 'in' }] } : wall,
+      ),
+    };
+    const model = commit(scene, [
+      { op: 'set_opening', openingId: NEW.door, wallId: ZONED.wall.east, center: 4 },
+      // A node added and removed again: a shell edit that changes no wall side.
+      { op: 'add_node', id: NEW.p, p: { x: 20, z: 20 } },
+      { op: 'remove_node', nodeId: NEW.p },
+    ]);
+    const east = model.scene.walls.find((wall) => wall.id === ZONED.wall.east)!;
+    expect(east.openings?.[0]).toMatchObject({ id: NEW.door, swing: 'in' });
   });
 });
 
@@ -196,20 +250,21 @@ describe('a door carried onto a split wall keeps its side too', () => {
   });
 });
 
+/** The L-shape at schema 2.4, room A the living room and room B the kitchen: removing the partition keeps B as a zone. */
+function openPlan(): SceneModel {
+  const scene: SceneData = {
+    ...lShapePlan,
+    schemaVersion: '2.4',
+    rooms: lShapePlan.rooms.map((room) => ({ ...room, purpose: room.id === L_SHAPE.room.a ? 'living' : 'kitchen' })),
+  };
+  const model = SceneModel.load(scene, CATALOGUE_REGISTRIES);
+  const merged = model.apply({ baseRev: 0, ops: [{ op: 'remove_wall', wallId: L_SHAPE.wall.wPart }] });
+  expect(merged).toMatchObject({ rev: 1, roomMerges: [{ kept: 'zone' }] });
+  expect(model.scene.rooms.find((room) => room.id === L_SHAPE.room.b)?.polygon).toBeDefined();
+  return model;
+}
+
 describe('a zone kept by a merge is a room again once a wall closes round it', () => {
-  /** The L-shape at schema 2.4, room A the living room and room B the kitchen: removing the partition keeps B as a zone. */
-  function openPlan(): SceneModel {
-    const scene: SceneData = {
-      ...lShapePlan,
-      schemaVersion: '2.4',
-      rooms: lShapePlan.rooms.map((room) => ({ ...room, purpose: room.id === L_SHAPE.room.a ? 'living' : 'kitchen' })),
-    };
-    const model = SceneModel.load(scene, CATALOGUE_REGISTRIES);
-    const merged = model.apply({ baseRev: 0, ops: [{ op: 'remove_wall', wallId: L_SHAPE.wall.wPart }] });
-    expect(merged).toMatchObject({ rev: 1, roomMerges: [{ kept: 'zone' }] });
-    expect(model.scene.rooms.find((room) => room.id === L_SHAPE.room.b)?.polygon).toBeDefined();
-    return model;
-  }
   const REBUILD: SceneOp = { op: 'add_wall', id: NEW.partition, a: L_SHAPE.node.n2, b: L_SHAPE.node.n5, thickness: 0.1, role: 'partition' };
 
   test('building the partition back commits, and the kitchen is an attached room under the same id', () => {
@@ -230,6 +285,21 @@ describe('a zone kept by a merge is a room again once a wall closes round it', (
       error: 'validation_failed',
       message: expect.stringContaining('already attached to its walls'),
     });
+  });
+});
+
+describe('a zone may not be left outside the room it lies in', () => {
+  test('pulling a facade corner of the open plan in through the kitchen zone is refused', () => {
+    const model = openPlan();
+    expect(model.apply({ baseRev: 1, ops: [{ op: 'move_node', nodeId: L_SHAPE.node.n4, p: { x: 8, z: 5 } }] })).toEqual({
+      error: 'validation_failed',
+      message: `Zone ${L_SHAPE.room.b} would stand outside room ${L_SHAPE.room.a}: move the wall back, or attach the zone with set_room { polygon: null } first`,
+    });
+  });
+
+  test('moving the corner out, so the outline stays inside, commits', () => {
+    const model = openPlan();
+    expect(model.apply({ baseRev: 1, ops: [{ op: 'move_node', nodeId: L_SHAPE.node.n4, p: { x: 11, z: 5 } }] })).toMatchObject({ rev: 2 });
   });
 });
 

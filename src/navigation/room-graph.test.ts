@@ -370,4 +370,10 @@ describe('a zone of an open plan is floor to walk on, and a room to route to', (
     expect(routeToRoom(zonedGraph, zonedPlan, living, ZONED.room.kitchen)).not.toBeNull();
     expect(routeToRoom(zonedGraph, zonedPlan, kitchen, ZONED.room.living)).not.toBeNull();
   });
+
+  test('a leg from the room to a point in the zone is routed, and ends on that point', () => {
+    const route = routeBetween(buildRoomGraph(zonedPlan, zoned, []), zonedPlan, living, kitchen);
+    expect(route).not.toBeNull();
+    expect(route!.at(-1)).toEqual({ x: kitchen.x, z: kitchen.z });
+  });
 });

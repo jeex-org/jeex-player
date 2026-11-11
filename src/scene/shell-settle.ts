@@ -23,12 +23,13 @@
  * Beside them, two smaller re-reads of the same kind: a zone kept by a merge
  * is attached to the walls again when a wall closes round its anchor, and a
  * bound placement moved without naming a room is bound to the room its
- * position now lies in.
+ * position now lies in. And one refusal: a zone's outline is stored, so an
+ * edit that would leave it outside the room it lies in is refused.
  *
  * Pure module: no `three`, no DOM.
  */
 
-import { dot, pointInPolygon } from '../plan/plan-geometry.js';
+import { EPS, distanceToPolygon, dot, pointInPolygon } from '../plan/plan-geometry.js';
 import { anchorsPerFace, buildGraph, type PlanGraph } from '../plan/plan-graph.js';
 import { interiorSideOf, pointAt } from '../plan/door-swing.js';
 import { roomOf } from '../plan/plan-rooms.js';
@@ -111,9 +112,36 @@ function rekeyPresetOp(
   return { ...op, target: next };
 }
 
-/** Rewrites every explicit door swing whose wall's interior side turned round between the two plans. */
-function keepSwingSides(draft: Draft<SceneData>, committed: SceneData, before: SolvedPlan, after: SolvedPlan): TouchedEntity[] {
+/**
+ * The committed walls each wall of the batch descends from: itself, and the
+ * wall a `split_wall` cut it from or the walls a `merge_wall` joined into it,
+ * in the order the batch ran. A descendant keeps its ancestor's direction.
+ */
+function ancestry(ops: readonly SceneOp[]): (wallId: string) => ReadonlySet<string> {
+  const from = new Map<string, Set<string>>();
+  const of = (wallId: string): Set<string> => from.get(wallId) ?? new Set([wallId]);
+  for (const op of ops) {
+    if (op.op === 'split_wall') for (const id of op.ids) from.set(id, new Set([id, ...of(op.wallId)]));
+    else if (op.op === 'merge_wall') from.set(op.id, new Set([op.id, ...op.wallIds.flatMap((id) => [...of(id)])]));
+  }
+  return of;
+}
+
+/**
+ * Rewrites every explicit door swing whose wall's interior side turned round
+ * between the two plans. A door moved onto an unrelated wall (`set_opening`
+ * naming another `wallId`) is the caller's: its swing is read on the wall it
+ * joined, so it is left as written.
+ */
+function keepSwingSides(
+  draft: Draft<SceneData>,
+  committed: SceneData,
+  before: SolvedPlan,
+  after: SolvedPlan,
+  ops: readonly SceneOp[],
+): TouchedEntity[] {
   const touched: TouchedEntity[] = [];
+  const ancestorsOf = ancestry(ops);
   // Found by OPENING id: a split in the same batch carries a door onto a new wall id.
   const doorsBefore = new Map(
     committed.walls.flatMap((wall) => (wall.openings ?? []).map((opening) => [opening.id, { wall, opening }] as const)),
@@ -124,6 +152,7 @@ function keepSwingSides(draft: Draft<SceneData>, committed: SceneData, before: S
       const found = doorsBefore.get(opening.id);
       if (found?.opening.swing === undefined) continue;
       const { wall: old, opening: was } = found;
+      if (!ancestorsOf(wall.id).has(old.id)) continue;
       const oldInterior = interiorSideOf(before, old.id, pointAt(committed, old, was.center).tangent).normal;
       const newInterior = interiorSideOf(after, wall.id, pointAt(draft, wall, opening.center).tangent).normal;
       const physical = was.swing === 'in' ? oldInterior : { x: -oldInterior.x, z: -oldInterior.z };
@@ -164,14 +193,15 @@ function reattachZones(draft: Draft<SceneData>): TouchedEntity[] {
 
 /**
  * Re-reads, on the plan the draft solves to, the painted faces (document and
- * presets) and the explicit door swings of a batch that edited the shell or
- * the rooms. A draft that does not solve is left alone: validation names why.
+ * presets) and the explicit door swings of a batch (`ops`) that edited the
+ * shell or the rooms. A draft that does not solve is left alone: validation names why.
  */
 export function settleShellEdit(
   draft: Draft<SceneData>,
   committed: SceneData,
   committedPlan: SolvedPlan,
   registries: SceneRegistries,
+  ops: readonly SceneOp[],
 ): TouchedEntity[] {
   const reattached = reattachZones(draft);
   let plan: SolvedPlan;
@@ -184,14 +214,39 @@ export function settleShellEdit(
   const touched = [...reattached, ...rekeyFaceFinishes(draft, plan, owners, registries)];
   if (draft.interiors) {
     draft.interiors = draft.interiors.flatMap((preset) => {
-      const ops = preset.ops.map((op) => rekeyPresetOp(op, plan, owners, registries));
-      if (ops.every((op, index) => op === preset.ops[index])) return [preset];
-      const kept = ops.filter((op): op is Draft<SceneOp> => op !== null);
+      const presetOps = preset.ops.map((op) => rekeyPresetOp(op, plan, owners, registries));
+      if (presetOps.every((op, index) => op === preset.ops[index])) return [preset];
+      const kept = presetOps.filter((op): op is Draft<SceneOp> => op !== null);
       return kept.length === 0 ? [] : [{ ...preset, ops: kept }];
     });
   }
-  touched.push(...keepSwingSides(draft, committed, committedPlan, plan));
+  touched.push(...keepSwingSides(draft, committed, committedPlan, plan, ops));
   return touched;
+}
+
+/**
+ * The refusal for a shell edit that would leave a zone outside the room it
+ * lies in, or `undefined`. A zone's outline (`Room.polygon`) is stored, not
+ * derived, so it does not follow the walls: every vertex must stay inside or on
+ * the whole face of its host room on the new plan. A zone with no host before,
+ * one that found another host, and one attached to its walls are not checked.
+ */
+export function zoneLeavingItsRoom(candidate: SceneData, before: SolvedPlan, after: SolvedPlan): string | undefined {
+  for (const zone of candidate.rooms) {
+    if (zone.polygon === undefined) continue;
+    const host = before.rooms.find((room) => room.roomId === zone.id)?.host;
+    if (host === undefined) continue;
+    const now = after.rooms.find((room) => room.roomId === zone.id)?.host;
+    if (now !== undefined && now !== host) continue;
+    const hostFace = after.rooms.find((room) => room.roomId === host);
+    if (hostFace === undefined) continue;
+    const face = hostFace.face ?? hostFace.polygon;
+    const inside = zone.polygon.every((p) => pointInPolygon(p, face) || distanceToPolygon(p, face).distance <= EPS);
+    if (!inside) {
+      return `Zone ${zone.id} would stand outside room ${host}: move the wall back, or attach the zone with set_room { polygon: null } first`;
+    }
+  }
+  return undefined;
 }
 
 /**

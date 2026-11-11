@@ -54,6 +54,12 @@ export function assetMoveWiring(deps: AssetMoveWiringDeps): AssetMoveControl {
   let armPending = false;
   const bodies = new Map<string, Body>();
   let bodiesRoot: THREE.Object3D | undefined;
+  /** The document (scene id and revision) the cached bodies were measured on. */
+  let bodiesDoc = '';
+  const docKey = (): string => {
+    const model = deps.mount().model;
+    return model ? `${model.scene.id}|${model.rev}` : '';
+  };
 
   const placementOf = (assetId: string): DemoAsset | undefined => deps.mount().model?.scene.assets.find((asset) => asset.id === assetId);
 
@@ -65,6 +71,7 @@ export function assetMoveWiring(deps: AssetMoveWiringDeps): AssetMoveControl {
       bodies.clear();
       bodiesRoot = root;
     }
+    if (bodies.size === 0) bodiesDoc = docKey();
     const cached = bodies.get(assetId);
     if (cached && cached.group.parent !== null) return cached;
     let found: THREE.Object3D | null = null;
@@ -212,8 +219,10 @@ export function assetMoveWiring(deps: AssetMoveWiringDeps): AssetMoveControl {
   };
 
   // A revision past a pending edit answers it (the tool compares), a running move is void; the graph may be new too.
+  // The same document at the same revision keeps the cache: a body still drawn at an
+  // unanswered edit's pose would measure that edit's turn into its yaw offset.
   const offScene = deps.events.on('scene', () => {
-    bodies.clear();
+    if (docKey() !== bodiesDoc) bodies.clear();
     session?.tool.documentChanged();
   });
 

@@ -201,7 +201,14 @@ as described under [Versioning](#versioning).
   refusing the batch.
 - **A door keeps the side its leaf opens to.** A door with an explicit
   `swing` on a wall that gains or loses a room on its other side keeps
-  opening into the same room.
+  opening into the same room. A door that `set_opening` moves onto another
+  wall keeps the swing it was given.
+- **A zone may not be left outside its room.** A shell edit that would put a
+  vertex of a zone's stored outline outside the room it lies in is refused;
+  attach the zone first or move the walls back.
+- **A refused turn turns back after the host repeats the document.**
+  `revertAssetEdit` after the host handed the same document back at the same
+  revision puts the object back at its yaw; before, it stayed turned.
 - **A moved bound placement belongs to the room it stands in.** A
   `move_object` without a `room` binds a bound placement to the room its new
   position lies in.
