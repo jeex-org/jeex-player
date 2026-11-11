@@ -126,13 +126,17 @@ export function rescaleOpeningsOnWall(scene: Draft<SceneData>, wall: Draft<Wall>
   if (fixed !== undefined) {
     // From the moved end toward the fixed one: each opening clears the one
     // beyond it by sliding toward the fixed end, never away from it.
-    const towardFixed = [...fitted].sort((p, q) => (fixed === 'a' ? q.geometry.center - p.geometry.center : p.geometry.center - q.geometry.center));
+    const towardFixed = [...fitted].sort((p, q) =>
+      fixed === 'a' ? q.geometry.center - p.geometry.center : p.geometry.center - q.geometry.center,
+    );
     for (let index = 1; index < towardFixed.length; index += 1) {
       const beyond = towardFixed[index - 1]!.geometry;
       const current = towardFixed[index]!.geometry;
       const half = current.width / 2;
-      if (fixed === 'a' && current.center + half > beyond.center - beyond.width / 2) current.center = beyond.center - beyond.width / 2 - half;
-      if (fixed === 'b' && current.center - half < beyond.center + beyond.width / 2) current.center = beyond.center + beyond.width / 2 + half;
+      if (fixed === 'a' && current.center + half > beyond.center - beyond.width / 2)
+        current.center = beyond.center - beyond.width / 2 - half;
+      if (fixed === 'b' && current.center - half < beyond.center + beyond.width / 2)
+        current.center = beyond.center + beyond.width / 2 + half;
     }
   }
   for (const { opening, geometry } of fitted) writeGeometry(opening, geometry, scene.ceilingHeight);

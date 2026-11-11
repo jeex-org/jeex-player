@@ -160,7 +160,9 @@ describe('a zone kept by a merge is a room again once a wall closes round it', (
 
   test('set_room with polygon: null re-attaches a zone explicitly', () => {
     const model = openPlan();
-    expect(model.apply({ baseRev: 1, ops: [REBUILD, { op: 'set_room', roomId: L_SHAPE.room.b, polygon: null }] })).toMatchObject({ rev: 2 });
+    expect(model.apply({ baseRev: 1, ops: [REBUILD, { op: 'set_room', roomId: L_SHAPE.room.b, polygon: null }] })).toMatchObject({
+      rev: 2,
+    });
     expect(model.scene.rooms.find((room) => room.id === L_SHAPE.room.b)!.polygon).toBeUndefined();
   });
 });

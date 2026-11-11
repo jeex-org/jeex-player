@@ -115,7 +115,8 @@ export function applySetRoom(scene: Draft<SceneData>, op: SetRoomOp): OpOutcome 
     room.accent = op.accent;
   }
   if (op.polygon === null) {
-    if (room.polygon === undefined) throw new OpError(`set_room: room ${op.roomId} has no outline of its own; it is already attached to its walls`);
+    if (room.polygon === undefined)
+      throw new OpError(`set_room: room ${op.roomId} has no outline of its own; it is already attached to its walls`);
     changes.push('attached to its walls');
     delete room.polygon;
   }

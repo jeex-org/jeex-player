@@ -23,7 +23,7 @@ export { VIEWER_VERSION } from '../shared/version.js';
 export type { TourControls, TourDebugControls, TourProgress, TourState } from '../camera/tour-controls.js';
 export type { DeepPartial, ViewerOptions, ViewerOptionsInput, TourStartMode } from './viewer-options.js';
 export type { HdriEntry, HdriOption } from '../lighting/hdri-entry.js';
-export type { AnchorPoint, AnchorTarget, NewCheckpoint, ViewerHandle, ViewerSlots, ViewerState } from './viewer-handle.js';
+export type { AnchorPoint, AnchorTarget, NewCheckpoint, PlanView, ViewerHandle, ViewerSlots, ViewerState } from './viewer-handle.js';
 export type { SelectionDescription, SelectionDescriptionKind, SelectionOption, SelectionScope } from '../ui/selection-options.js';
 export type { ViewerError, ViewerErrorCode, ViewerEventMap, ViewerEventName } from './viewer-events.js';
 export { SceneValidationError, ViewerLibError, isViewerLibError } from '../shared/errors.js';
@@ -123,6 +123,7 @@ export function mountViewerAs(embedding: Embedding, container: HTMLElement, opti
     refreshTheme: () => app.handle.refreshTheme(),
     setLocale: (locale) => app.handle.setLocale(locale),
     setSelection: (target) => app.handle.setSelection(target),
+    planView: () => app.handle.planView(),
     describeSelection: (target) => app.handle.describeSelection(target),
     setCheckpointOverlay: (visible) => app.handle.setCheckpointOverlay(visible),
     isCheckpointOverlayVisible: () => app.handle.isCheckpointOverlayVisible(),

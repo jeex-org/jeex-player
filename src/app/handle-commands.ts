@@ -16,7 +16,7 @@ import * as THREE from 'three';
 import { isUuidV7, type MirrorAxis, type SceneData, type ViewerMode } from '../scene/types.js';
 import { framePose, poseFromEye } from '../camera/checkpoint-placement.js';
 import type { Locale, Messages } from '../ui/messages.js';
-import type { NewCheckpoint, ViewerSlots, ViewerState } from './viewer-handle.js';
+import type { NewCheckpoint, PlanView, ViewerSlots, ViewerState } from './viewer-handle.js';
 import { readViewerState } from './viewer-state.js';
 import type { ViewerStage } from './viewer-stage.js';
 import type { ViewerUI } from '../ui/viewer-ui.js';
@@ -74,6 +74,7 @@ export type HandleCommands = {
   /** Re-reads the root's theme into what CSS cannot paint; before the stage exists its construction reads it anyway. */
   refreshTheme(): void;
   setSelection(target: ViewerSelectionTarget | null): void;
+  planView(): PlanView | null;
   describeSelection(target: ViewerSelection): SelectionDescription | null;
   resize(): void;
   setFurnitureVisible(visible: boolean, reapply?: boolean): void;
@@ -298,7 +299,13 @@ export function handleCommands(deps: HandleCommandsDeps): HandleCommands {
      * target whose id is not a UUID highlights nothing, like an unknown one.
      */
     setSelection(target) {
-      deps.stage()?.selection.setSelection(target !== null && isUuidV7(target.id) ? target : null);
+      const valid = target !== null && isUuidV7(target.id) ? target : null;
+      deps.stage()?.selection.setSelection(valid);
+      deps.stage()?.planModes.setSelection(valid);
+    },
+
+    planView() {
+      return deps.stage()?.planModes.view() ?? null;
     },
 
     /**

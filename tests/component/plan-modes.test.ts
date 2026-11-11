@@ -11,6 +11,8 @@ import * as THREE from 'three';
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest';
 import { PlanModes, type PlanModeOptions } from '../../src/ui/plan-modes.js';
 import { RenderRuntime } from '../../src/render/render-runtime.js';
+import { fitTransform } from '../../src/plan/plan-drawing.js';
+import { PLAN_PADDING } from '../../src/plan/plan-canvas.js';
 import { fieldOfViewFor } from '../../src/camera/camera-tuning.js';
 import { OVERLAY_NAMES } from '../../src/ui/viewer-shell.js';
 import { projectAssetFacts, type AssetFactsSource } from '../../src/assets/asset-facts.js';
@@ -400,5 +402,37 @@ describe('fixtures come from the document’s own bank', () => {
     expect(harness.modes.planDrawing!.primitives.filter((primitive) => primitive.kind === 'fixture')).toHaveLength(0);
     local.modes.dispose();
     local.runtime.dispose();
+  });
+});
+
+describe("plan2d draws the host's selection and publishes its fit", () => {
+  const NO_CAMERA = (): PlanModeOptions => ({ labels: false, dimensions: false, camera: false });
+
+  test('setSelection on a wall paints it in the accent on the drawing, and null takes it away', async () => {
+    const modes = build(NO_CAMERA);
+    try {
+      modes.modes.setDocument(demoPlan(), demoScene());
+      modes.modes.setMode('plan2d');
+      await until(() => modes.modes.element.width > 0, 'the overlay to get a backing store');
+      expect(hasAccentPixel(modes.modes.element)).toBe(false);
+      modes.modes.setSelection({ kind: 'wall', id: demoScene().walls[0]!.id });
+      expect(hasAccentPixel(modes.modes.element)).toBe(true);
+      modes.modes.setSelection(null);
+      expect(hasAccentPixel(modes.modes.element)).toBe(false);
+    } finally {
+      modes.modes.dispose();
+      modes.runtime.dispose();
+    }
+  });
+
+  test('view() answers the bounds and the transform the drawing is fitted with, and null before a document', () => {
+    expect(harness.modes.view()).toBeNull();
+    harness.modes.setDocument(demoPlan(), demoScene());
+    const view = harness.modes.view()!;
+    const box = harness.shell.roots.viewport;
+    expect(view.bounds).toEqual(harness.modes.planDrawing!.bounds);
+    expect(view.transform).toEqual(
+      fitTransform(view.bounds, { w: Math.round(box.clientWidth), h: Math.round(box.clientHeight) }, PLAN_PADDING),
+    );
   });
 });

@@ -194,3 +194,34 @@ describe('paintPlan accent', () => {
     expect(fills.some((fill) => /224, 138, 60|#e08a3c/.test(fill))).toBe(false);
   });
 });
+
+describe('paintPlan selection', () => {
+  test("a host's selection is stroked and filled in the accent, over the drawing", () => {
+    const { ctx, calls } = recordingContext();
+    paintPlan(ctx, DRAWING, TRANSFORM, 'drawing', {
+      accent: '#4f8cff',
+      selection: {
+        lines: [
+          {
+            points: [
+              { x: 0, z: 0 },
+              { x: 1, z: 0 },
+            ],
+            width: 0.2,
+          },
+        ],
+        areas: [
+          [
+            { x: 0, z: 0 },
+            { x: 1, z: 0 },
+            { x: 1, z: 1 },
+          ],
+        ],
+        points: [],
+      },
+    });
+    const accent = calls.filter((call) => call.strokeStyle === '#4f8cff' || call.fillStyle.startsWith('rgba(79, 140, 255'));
+    expect(accent.some((call) => call.method === 'stroke' && call.lineWidth >= 2)).toBe(true);
+    expect(accent.some((call) => call.method === 'fill')).toBe(true);
+  });
+});

@@ -169,16 +169,18 @@ function isUnder(object: THREE.Object3D, root: THREE.Object3D): boolean {
 }
 
 /**
- * The camera a host anchor projects through: the one the mode DRAWS with.
+ * The camera a host anchor projects through: the one that puts the object
+ * where the visitor SEES it.
  *
- * In `plan3d` that is the plan's top view, not the perspective rig, which the
- * plan modes freeze where the last 3D mode left it — projecting through the
- * rig placed a host editor's selection card where the object had been in
- * orbit. The checkpoint overlay draws through
- * the same `activeCamera()`.
+ * In both plan modes that is the plan's top view, not the perspective rig,
+ * which the plan modes freeze where the last 3D mode left it — projecting
+ * through the rig placed a host editor's selection card where the object had
+ * been in orbit. In `plan3d` the top view draws; in `plan2d` the drawing is
+ * fitted to the same bounds with the same padding, which is why a pick there
+ * is cast through it too (`PlanModes.pickCamera`).
  */
-export function anchorCamera(planModes: Pick<PlanModes, 'activeCamera'>, perspective: THREE.Camera): THREE.Camera {
-  return planModes.activeCamera() ?? perspective;
+export function anchorCamera(planModes: Pick<PlanModes, 'pickCamera'>, perspective: THREE.Camera): THREE.Camera {
+  return planModes.pickCamera() ?? perspective;
 }
 
 export class ViewerStage {

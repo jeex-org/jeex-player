@@ -31,7 +31,7 @@
  * kept this object keeps driving the running viewer.
  */
 
-import type { AnchorPoint, AnchorTarget, NewCheckpoint, ViewerHandle, ViewerSlots, ViewerState } from '../app/viewer-handle.js';
+import type { AnchorPoint, AnchorTarget, NewCheckpoint, PlanView, ViewerHandle, ViewerSlots, ViewerState } from '../app/viewer-handle.js';
 import type { ViewerOptions } from '../app/viewer-options.js';
 import type { ViewerEventMap, ViewerEventName } from '../app/viewer-events.js';
 import type { CaptureCommands } from '../app/capture-commands.js';
@@ -359,6 +359,9 @@ export class PendingViewer implements ViewerHandle {
   }
   describeSelection(target: ViewerSelection): SelectionDescription | null {
     return this.live()?.describeSelection(target) ?? null;
+  }
+  planView(): PlanView | null {
+    return this.live()?.planView() ?? null;
   }
   resize(): void {
     this.command((handle) => handle.resize());
