@@ -80,6 +80,8 @@ describe('construction and reset', () => {
       'click',
       'contextmenu',
       'dblclick',
+      'focusin',
+      'focusout',
       'keydown',
       'keyup',
       'pointercancel',

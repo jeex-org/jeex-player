@@ -181,6 +181,12 @@ as described under [Versioning](#versioning).
 
 ### Fixed
 
+- **A swipe over an untouched viewer on a phone scrolls the page.** Touch
+  follows the wheel's engagement rule: until the viewer is engaged (a tap,
+  focus inside it, fullscreen, or a page that cannot scroll) its canvas takes
+  `touch-action: pan-y`, so a vertical swipe scrolls the page and turns
+  nothing, while a sideways drag and a pinch still reach the viewer. After a
+  tap the viewer owns the finger as before.
 - **No WebGL is a failed boot.** Without a WebGL 2 context `ready` rejects
   with `webgl-unavailable`, as the handle documents, and so does a later
   `loadScene`; before, both resolved over the fallback card.

@@ -616,6 +616,98 @@ describe('the wheel over a viewer that is not engaged', () => {
   });
 });
 
+/**
+ * Cooperative touch: the stylesheet gives the canvas `touch-action: pan-y`
+ * while the shell root says `data-jeex-engaged="false"`, so a vertical swipe
+ * over an unengaged viewer scrolls the page. The input keeps that attribute
+ * current; the browser's half (the scroll itself) is proved in
+ * `tests/e2e/embed-scroll-touch.spec.ts`.
+ */
+describe('touch over a viewer that is not engaged', () => {
+  /** A rig whose engagement answer the test flips, with a counted `blur` on the key target. */
+  function touchRig(engaged: { value: boolean }): Rig & { blurs: () => number } {
+    let blurs = 0;
+    const built = rig(
+      () => true,
+      'full',
+      () => engaged.value,
+    );
+    Object.assign(built.keys, {
+      focus: () => undefined,
+      blur: () => {
+        blurs += 1;
+      },
+    });
+    return Object.assign(built, { blurs: () => blurs });
+  }
+
+  test('the shell root says whether the viewer is engaged from the start', () => {
+    expect(touchRig({ value: false }).keys.dataset['jeexEngaged']).toBe('false');
+    expect(touchRig({ value: true }).keys.dataset['jeexEngaged']).toBe('true');
+  });
+
+  test('focus coming and going re-reads the answer', () => {
+    const engaged = { value: false };
+    const built = touchRig(engaged);
+    engaged.value = true;
+    built.keys.fire('focusin', {});
+    expect(built.keys.dataset['jeexEngaged']).toBe('true');
+    engaged.value = false;
+    built.keys.fire('focusout', {});
+    expect(built.keys.dataset['jeexEngaged']).toBe('false');
+  });
+
+  test('a touch press the browser took for a page scroll gives the focus back, so the viewer stays unengaged', () => {
+    const engaged = { value: false };
+    const built = touchRig(engaged);
+    built.canvas.fire('pointerdown', { pointerId: 1, pointerType: 'touch', clientX: 10, clientY: 10, button: 0, shiftKey: false });
+    built.canvas.fire('pointercancel', { pointerId: 1, pointerType: 'touch' });
+    expect(built.blurs()).toBe(1);
+    expect(built.types()).toEqual(['press', 'release']);
+  });
+
+  test('the move the browser reports before it takes a vertical swipe turns nothing', () => {
+    // Chrome sends the move that crosses its slop, then `pointercancel`.
+    const built = touchRig({ value: false });
+    built.canvas.fire('pointerdown', { pointerId: 1, pointerType: 'touch', clientX: 100, clientY: 300, button: 0, shiftKey: false });
+    built.canvas.fire('pointermove', { pointerId: 1, pointerType: 'touch', clientX: 102, clientY: 281 });
+    built.canvas.fire('pointercancel', { pointerId: 1, pointerType: 'touch' });
+    expect(built.of('drag')).toHaveLength(0);
+    expect(built.blurs()).toBe(1);
+  });
+
+  test('a sideways drag is the viewer’s: it turns the camera and keeps the focus', () => {
+    const built = touchRig({ value: false });
+    built.canvas.fire('pointerdown', { pointerId: 1, pointerType: 'touch', clientX: 100, clientY: 300, button: 0, shiftKey: false });
+    built.canvas.fire('pointermove', { pointerId: 1, pointerType: 'touch', clientX: 120, clientY: 298 });
+    built.canvas.fire('pointermove', { pointerId: 1, pointerType: 'touch', clientX: 125, clientY: 280 });
+    built.canvas.fire('pointercancel', { pointerId: 1, pointerType: 'touch' });
+    expect(built.of('drag').map(({ dx, dy }) => [dx, dy])).toEqual([
+      [20, -2],
+      [5, -18],
+    ]);
+    expect(built.blurs()).toBe(0);
+  });
+
+  test('a tap keeps the focus it gave: that is what engages the viewer', () => {
+    const built = touchRig({ value: false });
+    built.canvas.fire('pointerdown', { pointerId: 1, pointerType: 'touch', clientX: 10, clientY: 10, button: 0, shiftKey: false });
+    built.canvas.fire('pointerup', { pointerId: 1, pointerType: 'touch' });
+    expect(built.blurs()).toBe(0);
+  });
+
+  test('a cancelled press on an engaged viewer, or by a mouse, leaves the focus alone', () => {
+    const engagedRig = touchRig({ value: true });
+    engagedRig.canvas.fire('pointerdown', { pointerId: 1, pointerType: 'touch', clientX: 10, clientY: 10, button: 0, shiftKey: false });
+    engagedRig.canvas.fire('pointercancel', { pointerId: 1, pointerType: 'touch' });
+    expect(engagedRig.blurs()).toBe(0);
+    const mouseRig = touchRig({ value: false });
+    mouseRig.canvas.fire('pointerdown', { pointerId: 1, pointerType: 'mouse', clientX: 10, clientY: 10, button: 0, shiftKey: false });
+    mouseRig.canvas.fire('pointercancel', { pointerId: 1, pointerType: 'mouse' });
+    expect(mouseRig.blurs()).toBe(0);
+  });
+});
+
 describe('keyDirection', () => {
   test('forward and right from the held keys, arrows and letters alike, opposites cancelling', () => {
     expect(keyDirection(new Set(['w']))).toEqual({ forward: 1, right: 0 });

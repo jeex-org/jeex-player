@@ -1,12 +1,15 @@
 /**
  * A viewer embedded in a page that scrolls: the acceptance page of the
- * cooperative wheel (`tests/e2e/embed-scroll.spec.ts` drives it).
+ * cooperative wheel and touch (`tests/e2e/embed-scroll.spec.ts` and
+ * `tests/e2e/embed-scroll-touch.spec.ts` drive it).
  *
  * - A plain wheel over the viewer before it is engaged scrolls the PAGE and
  *   shows «Ctrl + scroll to zoom».
  * - Ctrl/⌘ + wheel zooms (360) or steps (walk) and the page stays put.
- * - A click on the scene engages the viewer: the wheel and Space are its own
- *   until focus leaves.
+ * - A vertical swipe that starts on the viewer before it is engaged scrolls
+ *   the page; a sideways drag still turns the camera.
+ * - A click or tap on the scene engages the viewer: the wheel, Space and the
+ *   finger are its own until focus leaves.
  *
  * It is a dev page, never part of the production bundle.
  */

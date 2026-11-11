@@ -188,6 +188,12 @@
     block-size: 100%;
     touch-action: none;
   }
+  /* Not engaged yet (no focus, not fullscreen, a page that scrolls): a
+     vertical swipe is the page's, as the plain wheel is
+     (`camera/camera-input.ts` writes the attribute). */
+  .jeex-viewer[data-jeex-engaged='false'] .scene-canvas {
+    touch-action: pan-y;
+  }
 
   .jeex-viewer .is-hidden {
     display: none !important;
