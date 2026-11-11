@@ -2,9 +2,9 @@
  * Walk-mode collision and routing on solved plan data: room polygons, wall
  * centrelines with their door intervals, and furniture footprints.
  *
- * Invariant: navigation reads PLAN DATA and nothing else. Rooms come from
- * `SolvedPlan.rooms[].polygon` (already offset inwards by half the wall
- * thickness) and passages from `SolvedPlan.centrelines`; furniture arrives as
+ * Invariant: navigation reads PLAN DATA and nothing else. The floor comes
+ * from `SolvedPlan.walkable` (room faces already offset inwards by half the
+ * wall thickness, a zone's outline never a wall) and passages from `SolvedPlan.centrelines`; furniture arrives as
  * an `Obstacle[]` the caller resolved (`assets/asset-footprint.ts`), because
  * asking the object bank how big a sofa is would make the walk depend on the
  * catalogue four layers above it (a `navigation -> assets` dependency).
@@ -12,8 +12,8 @@
  * Pure module: no `three`, no DOM.
  */
 
-import { EPS, add, closestOnSegment, cross, dist, distanceToPolygon, len, mul, norm, pointInPolygon, sub } from '../plan/plan-geometry.js';
-import type { RoomFace, SolvedPlan, WallCentreline } from '../plan/plan-solver.js';
+import { EPS, add, boundsOf, closestOnSegment, cross, dist, distanceToPolygon, len, mul, norm, pointInPolygon, sub } from '../plan/plan-geometry.js';
+import type { SolvedPlan, WallCentreline } from '../plan/plan-solver.js';
 import type { SceneData, Vec2, Vec3 } from '../scene/types.js';
 
 export type Obstacle = { x: number; z: number; hx: number; hz: number; cos: number; sin: number };
@@ -188,11 +188,11 @@ export function crossesClosedDoor(plan: SolvedPlan, closed: ReadonlySet<string>,
   });
 }
 
-/** True when the point lies inside a room polygon with at least `margin` clearance. */
+/** True when the point lies on the walkable floor with at least `margin` clearance from its boundary. */
 export function isNavigable(plan: SolvedPlan, point: Vec3, margin = ROOM_MARGIN): boolean {
-  for (const room of plan.rooms) {
-    if (!pointInPolygon(point, room.polygon)) continue;
-    if (distanceToPolygon(point, room.polygon).distance >= margin) return true;
+  for (const floor of plan.walkable) {
+    if (!pointInPolygon(point, floor)) continue;
+    if (distanceToPolygon(point, floor).distance >= margin) return true;
   }
   return false;
 }
@@ -219,12 +219,12 @@ export function doorwayAt(plan: SolvedPlan, point: Vec2): string | null {
   return null;
 }
 
-/** Room whose polygon boundary is closest to the point, with that closest point. */
-function nearestRoom(plan: SolvedPlan, point: Vec3): { room: RoomFace; closest: Vec2; distance: number } | null {
-  let best: { room: RoomFace; closest: Vec2; distance: number } | null = null;
-  for (const room of plan.rooms) {
-    const hit = distanceToPolygon(point, room.polygon);
-    if (!best || hit.distance < best.distance) best = { room, closest: hit.closest, distance: hit.distance };
+/** The piece of walkable floor whose boundary is closest to the point, with that closest point. */
+function nearestFloor(plan: SolvedPlan, point: Vec3): { floor: readonly Vec2[]; closest: Vec2; distance: number } | null {
+  let best: { floor: readonly Vec2[]; closest: Vec2; distance: number } | null = null;
+  for (const floor of plan.walkable) {
+    const hit = distanceToPolygon(point, floor);
+    if (!best || hit.distance < best.distance) best = { floor, closest: hit.closest, distance: hit.distance };
   }
   return best;
 }
@@ -237,11 +237,11 @@ export function clampToNavigation(plan: SolvedPlan, ceilingHeight: number, point
   // `isNavigable` rejects, which is what made clamped positions sticky.
   if (isNavigable(plan, point) || isInDoorway(plan, point)) return { ...point, y };
 
-  const nearest = nearestRoom(plan, point);
+  const nearest = nearestFloor(plan, point);
   if (!nearest) return { ...point, y };
-  const { room, closest } = nearest;
+  const { floor, closest } = nearest;
 
-  const centre = polygonCentroid(room);
+  const centre = polygonCentroid(floor);
   const toCentre = norm(sub(centre, closest));
   // The point sits outside, so its own direction to the boundary IS the inward
   // normal there: perpendicular on an edge, radial at a vertex of a curved wall.
@@ -261,12 +261,11 @@ export function clampToNavigation(plan: SolvedPlan, ceilingHeight: number, point
   return { x: centre.x, y, z: centre.z };
 }
 
-/** Area centroid of a room polygon; the bbox centre can fall outside an L-shape. */
-function polygonCentroid(room: RoomFace): Vec2 {
+/** Area centroid of a polygon; the bbox centre can fall outside an L-shape. */
+function polygonCentroid(poly: readonly Vec2[]): Vec2 {
   let area = 0;
   let cx = 0;
   let cz = 0;
-  const poly = room.polygon;
   for (let i = 0; i < poly.length; i += 1) {
     const a = poly[i]!;
     const b = poly[(i + 1) % poly.length]!;
@@ -276,7 +275,8 @@ function polygonCentroid(room: RoomFace): Vec2 {
     cz += (a.z + b.z) * w;
   }
   if (Math.abs(area) < EPS) {
-    return { x: (room.bbox.minX + room.bbox.maxX) / 2, z: (room.bbox.minZ + room.bbox.maxZ) / 2 };
+    const bounds = boundsOf(poly);
+    return { x: (bounds.minX + bounds.maxX) / 2, z: (bounds.minZ + bounds.maxZ) / 2 };
   }
   return { x: cx / (3 * area), z: cz / (3 * area) };
 }

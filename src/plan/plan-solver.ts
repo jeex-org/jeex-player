@@ -30,7 +30,7 @@ import { faceQuads, openingsForFace } from './plan-openings.js';
 import type { FaceEdgeInput } from './plan-offset.js';
 import { offsetEdges } from './plan-offset.js';
 import { readonlyMapView, type ReadonlyKeyed } from '../shared/readonly-map.js';
-import { ownFloors, type PlanCaveat } from './floor-ownership.js';
+import { ownFloors, walkableFloors, type PlanCaveat } from './floor-ownership.js';
 import type { FaceKey, SceneData, Vec2, Wall, WallSide } from '../scene/types.js';
 import { FaceMap, faceKey, isDoorLike } from '../scene/types.js';
 
@@ -68,6 +68,8 @@ export type RoomFace = {
    * this room reads this one.
    */
   readonly face?: readonly Vec2[];
+  /** On a zone (`Room.polygon`), the room whose face it lies in; absent on a face's room and on a zone in no face. */
+  readonly host?: string;
   readonly loop: readonly WallFace[];
   readonly bbox: Bounds;
 };
@@ -98,6 +100,13 @@ export type SolvedPlan = {
   readonly faces: ReadonlyFaceMap<WallFace>;
   readonly centrelines: readonly WallCentreline[];
   readonly bounds: Bounds;
+  /**
+   * The floor a person can stand on (`floor-ownership.walkableFloors`): every
+   * wall-bounded room's whole face, zones included, and each zone that lies in
+   * no face. Walls bound it, zone outlines do not; navigation reads this, not
+   * `rooms[].polygon`, so the line where a zone was cut out is never a wall.
+   */
+  readonly walkable: readonly (readonly Vec2[])[];
   /** What the solver left as the source drew it (`floor-ownership.ts`); empty for a plan it settled. */
   readonly caveats: readonly PlanCaveat[];
 };
@@ -294,8 +303,15 @@ export function solvePlan(scene: Pick<SceneData, 'nodes' | 'walls' | 'rooms' | '
   for (const node of graph.nodes.values()) extent.push(node.p);
   for (const room of owned.rooms) extent.push(...room.polygon);
 
+  const floors = walkableFloors(owned.rooms, zoneIds);
+  const hosted = owned.rooms.map((room) => {
+    const host = floors.hosts.get(room.roomId);
+    return host === undefined ? room : { ...room, host };
+  });
+
   return {
-    rooms: owned.rooms,
+    rooms: hosted,
+    walkable: floors.walkable,
     facade: outer.faces,
     // The backing map goes out of scope here, so the view is the only handle.
     faces: readonlyMapView(faces),
