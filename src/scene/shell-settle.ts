@@ -20,16 +20,22 @@
  * Both are repairs of a key, not policy: a later document version that keys a
  * face and a swing by wall side alone makes this step unnecessary.
  *
+ * Beside them, two smaller re-reads of the same kind: a zone kept by a merge
+ * is attached to the walls again when a wall closes round its anchor, and a
+ * bound placement moved without naming a room is bound to the room its
+ * position now lies in.
+ *
  * Pure module: no `three`, no DOM.
  */
 
 import { dot, pointInPolygon } from '../plan/plan-geometry.js';
 import { anchorsPerFace, buildGraph, type PlanGraph } from '../plan/plan-graph.js';
 import { interiorSideOf, pointAt } from '../plan/door-swing.js';
+import { roomOf } from '../plan/plan-rooms.js';
 import { solvePlan, type SolvedPlan } from '../plan/plan-solver.js';
 import type { Draft } from '../shared/committed.js';
 import { finishMaterialOf } from './finish-value.js';
-import { TOUCHED_SHELL, touchedFace, touchedOpening, type TouchedEntity } from './ops/context.js';
+import { TOUCHED_SHELL, touchedAsset, touchedFace, touchedOpening, type TouchedEntity } from './ops/context.js';
 import { surfacesIn, type SceneRegistries } from './registries.js';
 import { FaceMap, type FaceKey, type FinishRef, type Room, type SceneData, type SceneOp } from './types.js';
 
@@ -171,6 +177,30 @@ export function settleShellEdit(
     });
   }
   touched.push(...keepSwingSides(draft, committed, committedPlan, plan));
+  return touched;
+}
+
+/**
+ * Binds every placement a `move_object` of the batch moved WITHOUT naming a
+ * room to the room its position lies in on the committed plan, when it was
+ * bound to one before. A piece standing in no room keeps its binding; an
+ * unbound piece stays unbound; a room the caller named is the caller's.
+ */
+export function rebindMovedPlacements(draft: Draft<SceneData>, ops: readonly SceneOp[], plan: SolvedPlan): TouchedEntity[] {
+  const moved = new Set<string>();
+  for (const op of ops) {
+    if (op.op !== 'move_object') continue;
+    if (op.room === undefined) moved.add(op.assetId);
+    else moved.delete(op.assetId);
+  }
+  const touched: TouchedEntity[] = [];
+  for (const asset of draft.assets) {
+    if (!moved.has(asset.id) || asset.room === undefined) continue;
+    const room = roomOf(plan, asset.position);
+    if (room === null || room === asset.room) continue;
+    asset.room = room;
+    touched.push(touchedAsset(asset.id));
+  }
   return touched;
 }
 

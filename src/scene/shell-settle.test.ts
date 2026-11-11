@@ -164,3 +164,24 @@ describe('a zone kept by a merge is a room again once a wall closes round it', (
     expect(model.scene.rooms.find((room) => room.id === L_SHAPE.room.b)!.polygon).toBeUndefined();
   });
 });
+
+describe('a placement moved without a room is bound to the room it now stands in', () => {
+  const SOFA = L_SHAPE.asset.sofa;
+  const bound: SceneData = {
+    ...lShapePlan,
+    assets: lShapePlan.assets.map((asset) => (asset.id === SOFA ? { ...asset, room: L_SHAPE.room.a } : asset)),
+  };
+  const roomOfSofa = (model: SceneModel) => model.scene.assets.find((asset) => asset.id === SOFA)!.room;
+
+  test('dragged across the partition, a bound sofa belongs to the room it stands in', () => {
+    const model = commit(bound, [{ op: 'move_object', assetId: SOFA, position: { x: 8, y: 0, z: 2.5 } }]);
+    expect(roomOfSofa(model)).toBe(L_SHAPE.room.b);
+  });
+
+  test('a room the caller names is kept, and an unbound placement stays unbound', () => {
+    const named = commit(bound, [{ op: 'move_object', assetId: SOFA, position: { x: 8, y: 0, z: 2.5 }, room: L_SHAPE.room.a }]);
+    expect(roomOfSofa(named)).toBe(L_SHAPE.room.a);
+    const unbound = commit(lShapePlan, [{ op: 'move_object', assetId: SOFA, position: { x: 8, y: 0, z: 2.5 } }]);
+    expect(roomOfSofa(unbound)).toBeUndefined();
+  });
+});
