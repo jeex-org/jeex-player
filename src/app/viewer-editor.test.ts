@@ -298,17 +298,6 @@ describe('edits', () => {
     expect(emitting.sent[0]!.baseRev).toBe(local.committed[0]!.baseRev);
   });
 
-  test("an interior preset in 'emit' sends its whole batch and commits nothing", () => {
-    const built = editsHarness('emit');
-    const before = built.rev();
-    built.editor.openInteriorPanel();
-    built.panel().onPick({ id: ID.oak, scopeChecked: false });
-    expect(built.committed).toEqual([]);
-    expect(built.rev()).toBe(before);
-    expect(built.sent).toHaveLength(1);
-    expect(built.sent[0]!.baseRev).toBe(before);
-  });
-
   /**
    * `'off'`: a click opens NO panel (only `select` reaches the
    * host). The control bar's interiors button drives `openInteriorPanel`, so
@@ -323,19 +312,6 @@ describe('edits', () => {
     expect(built.committed).toEqual([]);
     expect(built.sent).toEqual([]);
     expect(built.rev()).toBe(before);
-  });
-
-  /**
-   * `__viewerDebug.applyPreset` is an AUTHORING surface behind
-   * `options.debug`, driven by `scripts/browser-check/presets.ts`, and the host
-   * never sees it. It commits in every mode.
-   */
-  test("the debug `applyPreset` is ungated: it commits even in 'emit'", () => {
-    const built = editsHarness('emit');
-    const before = built.rev();
-    built.editor.applyPreset(ID.oak);
-    expect(built.rev()).toBeGreaterThan(before);
-    expect(built.sent).toEqual([]);
   });
 });
 

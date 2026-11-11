@@ -66,6 +66,8 @@ type Recorder = {
   boxes: Array<string | null>;
   /** Every quality mode the running viewer was given, oldest first. */
   qualities: string[];
+  /** Every plan tool switch and revert the running viewer was given, oldest first. */
+  planTool: string[];
   /** Subscriptions still open on the handle; teardown must empty this. */
   open: () => number;
   /** Fires one handle event at whoever subscribed to it. */
@@ -99,6 +101,7 @@ function harness(
   const states: string[] = [];
   const boxes: Array<string | null> = [];
   const qualities: string[] = [];
+  const planTool: string[] = [];
   let disposals = 0;
   const listeners = new Map<string, Set<(payload: never) => void>>();
   const subscribe = (event: string, callback: (payload: never) => void): (() => void) => {
@@ -131,6 +134,12 @@ function harness(
     },
     setQuality: (quality: string) => {
       qualities.push(quality);
+    },
+    setPlanTool: (enabled: boolean) => {
+      planTool.push(`armed:${String(enabled)}`);
+    },
+    revertPlanEdit: () => {
+      planTool.push('revert');
     },
     refreshTheme: () => {
       themeRefreshes += 1;
@@ -191,6 +200,7 @@ function harness(
       mounted,
       loaded,
       modes,
+      planTool,
       temperatures,
       themeRefreshes: () => themeRefreshes,
       states,
@@ -732,6 +742,18 @@ describe('the start', () => {
     expect(record.modes).toEqual(['walk', 'orbit']);
     await swapped;
     expect(record.loaded).toEqual([{ url: '/b.json' }]);
+  });
+
+  test('the plan tool switched on and a plan edit reverted before the start are replayed on the started viewer', () => {
+    const { controller, record } = harness({ src: '/a.json' }, { deferred: true });
+    controller.connect();
+    const viewer = controller.viewer!;
+    viewer.setPlanTool(true);
+    viewer.revertPlanEdit();
+    record.start();
+    expect(record.planTool).toEqual([]);
+    record.fire('ready', { sceneId: 'flat-a', options: {} });
+    expect(record.planTool).toEqual(['armed:true', 'revert']);
   });
 
   test('a capture or an export before the start rejects not-ready, as before the first frame', async () => {

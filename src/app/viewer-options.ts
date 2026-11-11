@@ -25,10 +25,13 @@ import { SLOT_VALUES, closedSet } from './option-sets.js';
 import type { Locale } from '../ui/messages.js';
 import type { SceneSource } from '../scene/scene-repository.js';
 import type { OffersSource } from '../assets/offers.js';
-import { createLogger, type Logger, type LogSink } from '../shared/logger.js';
-import { resolveBySpec, resolveHdri, warnInvalid, withOptionSink, type OptionSpec } from './option-resolvers.js';
+import { createLogger, type LogSink } from '../shared/logger.js';
+import { resolveBySpec, resolveHdri, withOptionSink, type OptionSpec } from './option-resolvers.js';
 import { blankRecord, containerFor, descend, split, toDatasetKey, type SectionShorthands } from './option-paths.js';
-import { asFlag, convertRaw } from './option-raw.js';
+import { convertRaw } from './option-raw.js';
+import { applyCompounds, chromeFlagPaths, OVERLAY_PRESETS as OVERLAY_PRESET_ROWS, type Overlay } from './option-overlays.js';
+
+export { COMPOUND_SCHEMA, type Overlay } from './option-overlays.js';
 
 export type TourStartMode = 'play' | 'paused' | 'off';
 
@@ -482,109 +485,11 @@ export const OPTION_SCHEMA = {
   quality: { kind: 'enum', values: QUALITY_MODES, default: DEFAULT_VIEWER_OPTIONS.quality, query: 'quality', attr: 'quality' },
 } as const satisfies Record<OptionPath, OptionSpec>;
 
-/** `overlay="kiosk"`/`"embed"`/`"unbranded"`: sugar over other options, not itself a `ViewerOptions` field. */
-export type Overlay = (typeof OVERLAY_MODES)[number];
-const OVERLAY_MODES = ['none', 'kiosk', 'embed', 'unbranded'] as const;
+/** The overlay presets, checked here against the options they write (`option-overlays.ts` cannot name `ViewerOptions` without an import cycle). */
+export const OVERLAY_PRESETS = OVERLAY_PRESET_ROWS satisfies Record<Overlay, DeepPartial<ViewerOptions>>;
 
-/** The compound `chrome`/`overlay`/`unbranded` attributes; none is a `ViewerOptions` field, so all three live here, not as an `OPTION_SCHEMA` row. `unbranded` aliases `overlay=unbranded` (MLS-feed spelling, README); an explicit `overlay=` always wins — `applyOverlayPreset`. */
-export const COMPOUND_SCHEMA = {
-  chrome: { kind: 'flag', default: true, query: 'chrome', attr: 'chrome' },
-  overlay: { kind: 'enum', values: OVERLAY_MODES, default: 'none', query: 'overlay', attr: 'overlay' },
-  unbranded: { kind: 'flag', default: false, query: 'unbranded', attr: 'unbranded' },
-} as const satisfies Record<'chrome' | 'overlay' | 'unbranded', OptionSpec>;
-
-/** One preset per `Overlay`, merged onto the result before the compound `chrome` and the individual attributes (order: overlay -> chrome -> individual). `kiosk` also zeroes `chrome.hint`. `unbranded` is the strictest portal rule set (Idealista): brand/status/switcher/hint off, controls and minimap kept, tour paused at its start rather than playing before input, full pointer interaction. */
-export const OVERLAY_PRESETS = {
-  none: {},
-  kiosk: {
-    chrome: { controls: false, brand: false, status: false, modeSwitcher: false, hint: false },
-    interaction: 'none',
-  },
-  embed: {
-    chrome: { controls: false, brand: false },
-    tour: { progressBar: true, pauseOnInput: false },
-  },
-  unbranded: {
-    chrome: { brand: false, status: false, modeSwitcher: false, hint: false, controls: true },
-    tour: { mode: 'paused', progressBar: true, pauseOnInput: true },
-    view: { minimap: true },
-    interaction: 'full',
-  },
-} as const satisfies Record<Overlay, DeepPartial<ViewerOptions>>;
-
-/** Every `OPTION_SCHEMA` path under a dotted prefix, so a new row there needs no edit here. */
-function pathsUnder(prefix: string): string[] {
-  return Object.keys(OPTION_SCHEMA).filter((path) => path.startsWith(prefix));
-}
-
-/** The one `chrome.*` row the compound attribute must not zero. `satisfies OptionPath` is the point: `pathsUnder` hands back plain strings, so without it a typo here — or a rename of the schema row — would compile, quietly drop the exclusion and revert the contract below. */
-const CHROME_BEHAVIOUR_PATH = 'chrome.autoHide' satisfies OptionPath;
-/** The compound `chrome` attribute zeroes the chrome's VISIBILITY rows only. `chrome.autoHide` is deliberately not one of them: `chrome` says what is on screen, and `chrome="false" controls="true"` must give back exactly the bar the default gives, idle behaviour included. */
-const CHROME_FLAG_PATHS = pathsUnder('chrome.').filter((path) => path !== CHROME_BEHAVIOUR_PATH);
-
-/**
- * `chrome="false"`/`chrome=0` zeroes every path in `CHROME_FLAG_PATHS` before
- * the per-field loop runs, so `chrome-status="true"` alongside it still
- * wins. Reported through the LOGGER GIVEN — not the module `sink` — because
- * parsing runs before a host's `onLog` is known to `resolveViewerOptions`.
- */
-function applyChromeCompound(
-  result: Record<string, unknown>,
-  read: (key: string) => string | undefined,
-  keyOf: 'query' | 'attr',
-  log: Logger,
-): void {
-  const spec = COMPOUND_SCHEMA.chrome;
-  const raw = read(keyOf === 'query' ? spec.query : toDatasetKey(spec.attr));
-  if (raw === undefined) return;
-  const value = asFlag(raw);
-  if (typeof value !== 'boolean') {
-    warnInvalid(log, 'chrome', raw, spec.default);
-    return;
-  }
-  if (value) return; // `chrome="true"` (or `1`) is a no-op.
-  const chrome = (result['chrome'] ??= {}) as Record<string, unknown>;
-  for (const path of CHROME_FLAG_PATHS) chrome[split(path).field] = false;
-}
-
-/** Merges one section-shaped partial — a row of `OVERLAY_PRESETS` — onto `result`, one level deep. */
-function mergeSections(result: Record<string, unknown>, partial: Record<string, unknown>): void {
-  for (const [key, value] of Object.entries(partial)) {
-    if (value !== null && typeof value === 'object' && !Array.isArray(value)) {
-      Object.assign((result[key] ??= {}) as Record<string, unknown>, value);
-    } else {
-      result[key] = value;
-    }
-  }
-}
-
-/** `overlay="kiosk"`/`"embed"`/`"unbranded"` merges its `OVERLAY_PRESETS` row before `chrome` and the per-field loop. An explicit `overlay=` is decided on its own, valid or not, without ever looking at `unbranded` — so it wins in either order (`?unbranded=1&overlay=kiosk` and the reverse both resolve to plain `kiosk`). With no `overlay=` given, only `unbranded=true` does anything; `unbranded=0` is a no-op, not a request for `'none'`. */
-function applyOverlayPreset(
-  result: Record<string, unknown>,
-  read: (key: string) => string | undefined,
-  keyOf: 'query' | 'attr',
-  log: Logger,
-): void {
-  const overlaySpec = COMPOUND_SCHEMA.overlay;
-  const rawOverlay = read(keyOf === 'query' ? overlaySpec.query : toDatasetKey(overlaySpec.attr));
-  if (rawOverlay !== undefined) {
-    if (!(overlaySpec.values as readonly string[]).includes(rawOverlay)) {
-      warnInvalid(log, 'overlay', rawOverlay, overlaySpec.default);
-      return;
-    }
-    mergeSections(result, OVERLAY_PRESETS[rawOverlay as Overlay]);
-    return;
-  }
-  const unbrandedSpec = COMPOUND_SCHEMA.unbranded;
-  const rawUnbranded = read(keyOf === 'query' ? unbrandedSpec.query : toDatasetKey(unbrandedSpec.attr));
-  if (rawUnbranded === undefined) return;
-  const unbranded = asFlag(rawUnbranded);
-  if (typeof unbranded !== 'boolean') {
-    warnInvalid(log, 'unbranded', rawUnbranded, unbrandedSpec.default);
-    return;
-  }
-  if (unbranded) mergeSections(result, OVERLAY_PRESETS.unbranded);
-}
+/** The one `chrome.*` row the compound `chrome` attribute must not zero (`option-overlays.ts`). `satisfies OptionPath` is the point: a typo here — or a rename of the schema row — must not compile, or the exclusion would quietly drop and revert that contract. */
+const CHROME_FLAG_PATHS = chromeFlagPaths(Object.keys(OPTION_SCHEMA), 'chrome.autoHide' satisfies OptionPath);
 
 /**
  * What `resolveViewerOptions` reads about the environment it is running in,
@@ -668,14 +573,9 @@ function foldOptions(given: (path: string) => unknown): ViewerOptions {
  *
  * `log` is the sink an unrecognised COMPOUND value (`chrome="maybe"`,
  * `overlay="maybe"`) is reported through — optional because most callers have
- * none to give yet (see `applyChromeCompound`, `applyOverlayPreset`); the
- * ordinary per-field garbage below is left for `resolveViewerOptions`'s single
- * validator, as before.
- *
- * Pre-pass order — overlay, then chrome, then the per-field loop — is what
- * lets `overlay="kiosk" chrome-status="true"` still turn the status pill back
- * on, and `overlay="embed" chrome="false"` still zero every `chrome.*` field
- * embed's own preset left alone.
+ * none to give yet (`applyCompounds`, which runs before the per-field loop);
+ * the ordinary per-field garbage below is left for `resolveViewerOptions`'s
+ * single validator.
  */
 export function optionsFromRecord(
   read: (key: string) => string | undefined,
@@ -684,8 +584,7 @@ export function optionsFromRecord(
 ): DeepPartial<ViewerOptions> {
   const logger = createLogger(log);
   const result: Record<string, unknown> = {};
-  applyOverlayPreset(result, read, keyOf, logger);
-  applyChromeCompound(result, read, keyOf, logger);
+  applyCompounds(result, read, keyOf, logger, CHROME_FLAG_PATHS);
   for (const [path, spec] of Object.entries(OPTION_SCHEMA)) {
     const key = keyOf === 'query' ? spec.query : toDatasetKey(spec.attr);
     const raw = read(key);

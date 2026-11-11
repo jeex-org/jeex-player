@@ -13,7 +13,8 @@ import type * as THREE from 'three';
 import type { MirrorAxis } from '../scene/types.js';
 import { listenerOptions } from '../shared/abort.js';
 import { claimPointer, releasePointer } from './drag-kit.js';
-import { AssetMoveTool, type AssetMoveHost, type AssetMoveState, type PointerSample } from './asset-move-tool.js';
+import { AssetMoveTool, type AssetMoveHost, type PointerSample } from './asset-move-tool.js';
+import type { AssetMoveDebug } from './asset-edit.js';
 import { AssetSurfaceOverlay } from './asset-surface-overlay.js';
 import { AssetHandlesView } from './asset-handles-view.js';
 import { handleAt, handleShape, type HandlePixel, type HandlePoint } from './asset-handles.js';
@@ -21,23 +22,18 @@ import { dragCatalogue } from './asset-move-catalogue.js';
 import { dragContext, poseItem, type DragContext } from '../layout/asset-legality.js';
 import { shippedFacts } from '../layout/layout-lint.js';
 
-/** `__viewerDebug.assetMove()`: the switch, the chunk, and the tool's own state once it is there. */
-export type AssetMoveDebug = { readonly enabled: boolean; readonly loaded: boolean; readonly state: AssetMoveState | null };
-
 /** The switch `handle-commands.ts` drives and the stage keeps (`app/asset-move-wiring.ts` builds it). */
 export type AssetMoveControl = {
-  /** `handle.setAssetMoveTool`: arms or disarms the tool; the first arming loads it. */
+  /** `handle.setAssetMoveTool`: arms or disarms the tool; the first arming builds it. */
   setEnabled(enabled: boolean): void;
   /** The next press moves the selected object to it (a host card's «Move» toggle). */
   arm(): void;
   /** `handle.revertAssetEdit`: the host refused the last edit. */
   revert(): void;
-  /** `handle.mirrorAsset`: toggles one axis; `false` with no event while the chunk is not in. */
+  /** `handle.mirrorAsset`: toggles one axis; `false` with no event before the first arming. */
   mirror(assetId: string, axis: MirrorAxis): boolean;
-  /** `handle.turnAsset`: `false` until the chunk is in, or when the tool refuses to judge it. */
+  /** `handle.turnAsset`: `false` before the first arming, or when the tool refuses to judge it. */
   turnAsset(assetId: string, steps: number): boolean;
-  /** Resolves once the lazy chunk is in (immediately when it already is, or never armed). */
-  loaded(): Promise<void>;
   debug(): AssetMoveDebug;
   dispose(): void;
 };

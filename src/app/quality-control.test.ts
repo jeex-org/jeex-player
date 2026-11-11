@@ -299,8 +299,6 @@ function commandHarness(options: { initial?: 'auto' | 'low' | 'high' } = {}) {
     } as unknown as ViewerOptions,
     furnitureVisible: () => true,
     setFurnitureVisible: () => undefined,
-    checkpointsVisible: () => false,
-    setCheckpointsVisible: () => undefined,
     messages: () => {
       throw new Error('commandHarness: the messages are not part of this test');
     },

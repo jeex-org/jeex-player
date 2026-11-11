@@ -105,8 +105,7 @@ function layerOf(modulePath) {
 const escaped = (modulePath) => `^src/${modulePath.replace(/\./g, '\\.')}$`;
 
 /** Modules of `layer` that carry an exception, whatever it is for. */
-const exceptionsIn = (layer) =>
-  Object.keys(KNOWN_VIOLATIONS).filter((modulePath) => layerOf(modulePath) === layer);
+const exceptionsIn = (layer) => Object.keys(KNOWN_VIOLATIONS).filter((modulePath) => layerOf(modulePath) === layer);
 
 const forbidden = [
   {
@@ -119,7 +118,8 @@ const forbidden = [
   {
     name: 'no-orphans',
     severity: 'warn',
-    comment: 'A module nothing imports and that imports nothing is either dead (knip says so) or an entry point that should be declared as one.',
+    comment:
+      'A module nothing imports and that imports nothing is either dead (knip says so) or an entry point that should be declared as one.',
     from: { orphan: true, pathNot: ['\\.d\\.ts$', '(^|/)\\.[^/]+\\.(js|cjs|mjs|ts)$', '\\.(json|md)$'] },
     to: {},
   },
@@ -163,14 +163,16 @@ forbidden.push(
   {
     name: 'embed-is-a-leaf',
     severity: 'error',
-    comment: 'Only `main-embed.ts`, the iframe page entry, may reach into `src/embed`; everything else is a consumer of the published package.',
+    comment:
+      'Only `main-embed.ts`, the iframe page entry, may reach into `src/embed`; everything else is a consumer of the published package.',
     from: { path: '^src/', pathNot: ['^src/embed/', '^src/main-embed\\.ts$', '\\.test\\.ts$'] },
     to: { path: '^src/embed/' },
   },
   {
     name: 'embed-carries-no-demo',
     severity: 'error',
-    comment: 'The demo apartment is the sample data of this repository, not of the published library: nothing an embedding page loads may reach it.',
+    comment:
+      'The demo apartment is the sample data of this repository, not of the published library: nothing an embedding page loads may reach it.',
     from: { path: '^src/embed/', pathNot: ['\\.test\\.ts$'] },
     to: { path: '^src/demo/' },
   },
@@ -193,6 +195,26 @@ forbidden.push(
     to: { path: '^node_modules/zod(/|$)', pathNot: '^node_modules/zod/mini/' },
   },
 );
+
+// The authoring tools (the tour-camera overlay with its preview card and
+// look-through, the asset move tool, the plan tool) load as ONE lazy chunk
+// (`src/app/authoring.ts`, behind `src/app/authoring-port.ts`): a page that
+// never turns a tool on downloads none of them. A static import from outside
+// this set would pull a tool into the boot bundle; a type-only import and the
+// port's one dynamic import cost nothing at runtime and stay allowed.
+const AUTHORING_LAZY = [
+  '^src/camera/checkpoint-(?!types)',
+  '^src/ui/(camera-preview|look-through-bar)\\.ts$',
+  '^src/edit/(?!(asset-edit|plan-edit|pending-edits)\\.ts$)',
+  '^src/app/(authoring|authoring-checkpoints|checkpoints-wiring|asset-move-wiring|plan-tool-wiring)\\.ts$',
+];
+forbidden.push({
+  name: 'authoring-is-lazy',
+  severity: 'error',
+  comment: 'The authoring tools load lazily, behind `app/authoring-port.ts`; only the authoring set itself may import them statically.',
+  from: { path: '^src/', pathNot: [...AUTHORING_LAZY, '\\.test\\.ts$'] },
+  to: { path: AUTHORING_LAZY, dependencyTypesNot: ['type-only', 'dynamic-import'] },
+});
 
 /** @type {import('dependency-cruiser').IConfiguration} */
 module.exports = {

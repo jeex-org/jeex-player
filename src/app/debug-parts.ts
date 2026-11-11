@@ -27,6 +27,7 @@ import type { ViewerOptions } from './viewer-options.js';
 import type { ViewerStage } from './viewer-stage.js';
 import type { FullscreenController } from '../ui/fullscreen-controller.js';
 import type { QualityControl } from './quality-control.js';
+import type { AuthoringPort } from './authoring-port.js';
 
 type DebugPartsDeps = {
   options: ViewerOptions;
@@ -39,6 +40,8 @@ type DebugPartsDeps = {
   furnitureVisible: () => boolean;
   /** The application-level quality control (`handle-commands.ts` built it): one per application, not per stage, so a no-stage window still answers for it. */
   quality: () => QualityControl;
+  /** The authoring tools' port: the overlay and the asset tool answer through it, `undefined`/`null` until their chunk is in. */
+  authoring: () => AuthoringPort;
   /** The loaded bake's object bank for the layout linter; absent for a bare scene. */
   projectLibrary: () => ProjectLibraryManifest | undefined;
 };
@@ -81,9 +84,9 @@ export function debugHostFor(model: SceneModel, deps: DebugPartsDeps): ViewerDeb
     routeToRoom: (roomId) => stage()?.director?.routeToRoom(roomId) ?? null,
     travelPath: (roomId) => stage()?.director?.travelPath(roomId) ?? null,
     pickCamera: () => stage()?.planModes.pickCamera(),
-    checkpointOverlay: () => stage()?.overlay.group,
+    checkpointOverlay: () => deps.authoring().debug().checkpointOverlay,
     selection: () => stage()?.selection.current() ?? null,
-    assetMove: () => stage()?.assetMove?.debug() ?? null,
+    assetMove: () => deps.authoring().debug().assetMove,
 
     // ---- DoorDebug
     doors: () => deps.doors.list(),

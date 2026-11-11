@@ -70,6 +70,8 @@ export const ES: Record<MessageKey, string> = {
   'cameraPreview.lookThrough': 'Mirar a través',
   'hint.checkpointPlacing': 'Colocando una cámara — haz clic en el suelo (arrastra para orientarla) · Esc para cancelar',
   'hint.assetMove': 'Arrastra para mover, Q/E para girar, Esc para cancelar',
+  'hint.planTool': 'Arrastra un tirador para moverlo, Esc para cancelar',
+  'hint.planEditIllegal': 'Esta posición no está permitida',
   'hint.lookThrough':
     'Mirando a través de la cámara — arrastra para mirar · WASD para moverte · Q/E para la altura · Intro para guardar · Esc para cancelar',
   'lookThrough.label': 'Mirando a través de la cámara {n}',

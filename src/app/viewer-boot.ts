@@ -26,6 +26,7 @@ import { debugCamera, type DebugCamera } from '../shared/debug-flags.js';
 import { COMMON_NOISE_TILES } from '../materials/noise-tiles.js';
 import { prewarmNoiseTiles } from '../materials/texture-prewarm.js';
 import { sharedTextureCache, type TextureCache } from '../materials/texture-cache.js';
+import type { AuthoringPort } from './authoring-port.js';
 
 /** The part of `ViewerUI` a boot step writes to. */
 type BootUI = {
@@ -33,6 +34,20 @@ type BootUI = {
   setModeButtons: (mode: ViewerMode) => void;
   setHintForMode: (mode: ViewerMode) => void;
 };
+
+/**
+ * Mounts the first document of a boot once the authoring tools are bound: a
+ * host that switched a tool on before the boot (an editor host that reopens
+ * the camera it was editing) gets them in force at the first `scene` event.
+ * Waits only for a load that was started; a page that turned nothing on
+ * mounts at once. A rejection, and no mount, when the viewer is disposed
+ * during the wait.
+ */
+export async function mountAfterAuthoring(authoring: Pick<AuthoringPort, 'ready'>, mount: () => void, signal: AbortSignal): Promise<void> {
+  await authoring.ready();
+  if (signal.aborted) throw new ViewerDisposedError();
+  mount();
+}
 
 /**
  * The first picture a started loop owes (`RenderRuntime.firstDraw.next`; it

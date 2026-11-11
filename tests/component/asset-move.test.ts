@@ -13,7 +13,7 @@ import { afterEach, describe, expect, test } from 'vitest';
 import { InlineSceneRepository, mountViewer } from '../../src/app/viewer-api.js';
 import type { ViewerHandle } from '../../src/app/viewer-handle.js';
 import type { AssetEdit, AssetEditRefused } from '../../src/edit/asset-move-tool.js';
-import type { AssetMoveDebug } from '../../src/edit/asset-move-session.js';
+import type { AssetMoveDebug } from '../../src/edit/asset-edit.js';
 import { DEMO } from '../../src/demo/demo-ids.js';
 import { dragContext, judge, poseItem } from '../../src/layout/asset-legality.js';
 import { mask } from '../../src/layout/asset-mask.js';
@@ -23,7 +23,7 @@ import type { SceneData } from '../../src/scene/types.js';
 import type { SlotName } from '../../src/ui/host-slots.js';
 import { BAR_GAP_M, RING_MARGIN_M } from '../../src/edit/asset-handles.js';
 import { HEIGHT_M_PER_PX } from '../../src/edit/asset-move-tool.js';
-import { ASSET_MOVE_CHUNK_TIMEOUT_MS, closeContainers, demoScene, nextFrame, openContainer, until } from './support.js';
+import { AUTHORING_CHUNK_TIMEOUT_MS, closeContainers, demoScene, nextFrame, openContainer, until } from './support.js';
 
 type Debug = {
   mode: () => string | undefined;
@@ -64,7 +64,7 @@ async function mount(mode: 'orbit' | 'plan3d', assetId: string, slots: readonly 
   await until(() => debug().mode() === mode, mode);
   handle.setSelection({ kind: 'furniture', id: assetId });
   handle.setAssetMoveTool(true);
-  await until(() => debug().assetMove().loaded, 'the asset move chunk', ASSET_MOVE_CHUNK_TIMEOUT_MS);
+  await until(() => debug().assetMove().loaded, 'the authoring chunk', AUTHORING_CHUNK_TIMEOUT_MS);
   await nextFrame();
   const canvas = container.querySelector<HTMLCanvasElement>('[data-jeex="scene-canvas"]');
   if (!canvas) throw new Error('no scene canvas');
@@ -133,7 +133,7 @@ function placement(scene: SceneData, id: string) {
 
 /**
  * Every test here mounts the demo apartment, waits up to 15 s for the mode and
- * then up to `ASSET_MOVE_CHUNK_TIMEOUT_MS` for the tool before it drags
+ * then up to `AUTHORING_CHUNK_TIMEOUT_MS` for the tool before it drags
  * anything, so the 60 s light-path default could fire before the chunk wait
  * gives its own, clearer, error. The budget covers the three waits in series.
  */
@@ -151,7 +151,7 @@ describe('the asset move tool', { timeout: MOUNT_PLUS_CHUNK_TIMEOUT_MS }, () => 
     await handle.ready;
     expect(debug().assetMove()).toEqual({ enabled: false, loaded: false, state: null });
     handle.setAssetMoveTool(true);
-    await until(() => debug().assetMove().loaded, 'the asset move chunk', ASSET_MOVE_CHUNK_TIMEOUT_MS);
+    await until(() => debug().assetMove().loaded, 'the authoring chunk', AUTHORING_CHUNK_TIMEOUT_MS);
     expect(debug().assetMove().state?.phase).toBe('idle');
   });
 

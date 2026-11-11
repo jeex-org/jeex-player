@@ -11,7 +11,7 @@ import { checkpointsWiring } from './checkpoints-wiring.js';
 import type { SceneMount } from './scene-mount.js';
 import type { ViewerEvents } from './viewer-events.js';
 import type { ViewerUI } from '../ui/viewer-ui.js';
-import type { HandleCommands } from './handle-commands.js';
+import type { CheckpointHostCommands } from './checkpoints-wiring.js';
 
 function obstaclesWith(facts: AssetFactsSource): number {
   const mount = { model: { scene: { ...apartmentScene, assets: STORE_IDS.assets } }, assetFacts: () => facts } as unknown as SceneMount;
@@ -20,7 +20,7 @@ function obstaclesWith(facts: AssetFactsSource): number {
     events: {} as ViewerEvents,
     mount: () => mount,
     stage: () => undefined,
-    handle: () => ({}) as HandleCommands,
+    handle: () => ({}) as CheckpointHostCommands,
     ui: {} as ViewerUI,
   });
   return wiring.obstacles().length;

@@ -465,7 +465,7 @@ Across an iframe, `embed.exportUsdz(options?): Promise<ArrayBuffer>`, the same s
 An editor host arms the asset move tool on the handle (ES module only; the iframe protocol does not carry it). A published tour never arms it.
 
 ```ts
-setAssetMoveTool(enabled: boolean): void;   // the first arming loads the tool as its own chunk
+setAssetMoveTool(enabled: boolean): void;   // the first arming loads the authoring tools (below)
 armAssetMove(): void;                       // the next press on the canvas moves the selected object there
 revertAssetEdit(): void;                    // the host refused the last assetEdit: the start poses come back
 turnAsset(assetId: string, steps: number): boolean;  // steps × 15°, positive counter-clockwise from above (as Q)
@@ -483,6 +483,27 @@ Events:
 | `assetMoveState` | `{ phase: 'idle' \| 'dragging' \| 'nudging' }` on each edge of a drag or a key burst, never per frame |
 
 What may combine with what is a catalogue fact of the asset, never a scene field: `onSurface: true` (may stand on a top), `top: { y }` (holds what stands on it, `y` above its base), `kneeSpace: { height, sides, depth? }` (a seat may go under it from those sides, `front` being the side it faces), `tuck: { depth, height }` (a seat that goes under a knee space by up to `depth`). All are optional, an absent one means "not allowed", and a baked project's `ProjectObject` accepts the same fields. A mirror moves the sides with the object (`x` swaps `left` and `right`, `z` swaps `front` and `back`), and mirroring a host leaves what stands on it in place.
+
+### Editing the plan in `plan2d`
+
+An editor host arms the plan tool on the handle (ES module and custom element; the iframe protocol does not carry it). A published tour never arms it.
+
+```ts
+setPlanTool(enabled: boolean): void;  // the first arming loads the authoring tools (below)
+revertPlanEdit(): void;               // the host refused the last planEdit: the committed drawing comes back
+```
+
+Armed, in `plan2d` only, the wall or opening `setSelection` highlighted carries handles on the drawing: a wall its two end nodes and its middle, an opening its body and its two jambs. A handle answers within 12 px of its centre (mouse, pen and touch alike); a press elsewhere passes through, so a click on another wall still raises `select`. Past 3 px of travel the drag previews the change on the 2D plan only (the 3D scene is not touched until the host's next document): a node moves with the pointer, the middle moves the wall sideways along its normal (walls sharing a node follow), the body slides the opening along its wall and a jamb changes its width with the other jamb fixed and stops at the narrowest width an opening may have. Each preview is judged by the scene model exactly as a commit would be; a position the model refuses keeps the last legal drawing and turns the handle red. A legal release emits `planEdit` and the draft stays on screen until the host's document answers it; an illegal one puts the drawing back and emits `planEditRefused`. Esc cancels a drag. A second drag before the host answered builds on the first, and its `planEdit` carries only its own ops on the same `baseRev`. The viewer mints no id: a batch carries only `move_node` and `set_opening` on ids the document already has, rounded to the millimetre.
+
+| Handle event | Payload |
+|---|---|
+| `planEdit` | `{ target: { kind: 'wall' \| 'opening', id }, ops, baseRev, gesture }`: `move_node` (one, or two for a wall moved sideways) or one `set_opening`, for the HOST to commit on `baseRev`; `gesture` is `node`, `wall`, `opening` or `opening-width` |
+| `planEditRefused` | `{ target, ops, reason: { code: 'validation_failed', message } }`: the model's refusal, verbatim (English), or, when the drag never reached a position the tool could compute, a `validation_failed` message from the tool; the viewer shows its own localised hint |
+| `planToolState` | `{ phase: 'idle' \| 'dragging' }` on each edge of a drag, never per frame: a host holds its own field edits meanwhile |
+
+### The authoring tools load on demand
+
+The tour-camera overlay (with its preview card and look-through), the asset move tool and the plan tool are one lazily loaded chunk (`lazy-jeex-viewer-authoring-*`). The first `setCheckpointOverlay(true)`, `setAssetMoveTool(true)` or `setPlanTool(true)` loads it; a page that never turns one on downloads none of it. A switch turned on before the first scene is in force at that scene's first `scene` event. Turned on later, until the chunk is in, the commands that answer a boolean (`addCheckpoint`, `focusCheckpoint`, `turnAsset` and the rest) answer `false` and the void ones do nothing; `focusCheckpoint(null)` has nothing to clear and answers `true`, as before. The IIFE build cannot split code and carries the tools inline.
 
 ## Capture: stills, panoramas and provenance
 
@@ -581,6 +602,8 @@ Handle (`viewer.on(...)`) and custom element (`addEventListener(...)`, `detail` 
 | `tour.on('ended')` | `jeex-tour-ended` | `{}` |
 | `lightTemperature` | `jeex-light-temperature` | `{ temperature: number \| null, source: 'host' \| 'panel' }` when the light temperature changes, from any host door or from the settings panel; never for an unchanged value. Crosses the iframe boundary as the `lightTemperature` event |
 | `assets` | `jeex-assets` | `{ models: { upgraded, failed, budget }, textures: { failed, budget } }` once per document, when its first model pass and its library maps have settled: the library models swapped in, the ones left as procedural stand-ins, whether the byte budget stopped the pass, the library textures whose surface stayed flat, and whether the texture byte budget left the remaining surfaces flat. `ready` fires for a tour that loaded only in part; this says so. Crosses the iframe boundary as the `assets` event |
+
+The authoring tools' handle events (`checkpointSelect`, `checkpointEdit`, `checkpointLookThrough`, `checkpointPlacing`, `assetEdit`, `assetEditRefused`, `assetMoveState`, `planEdit`, `planEditRefused`, `planToolState`) are listed with their tools above; they reach the module and the element's `viewer` handle, and do not cross the iframe boundary.
 
 A subscriber that throws is skipped and reported through the [log sink](#logging) with code `listener-failed`; the other subscribers still run.
 

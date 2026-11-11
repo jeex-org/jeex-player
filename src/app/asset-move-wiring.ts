@@ -1,10 +1,8 @@
 /**
- * The asset move tool's switch and its view of the running viewer:
- * `handle.setAssetMoveTool(true)` loads the tool
- * as a LAZY chunk on first arming and binds it; until then nothing of it is in
- * the boot bundle and a published tour never pays for it. `viewer-app.ts` is
- * at its size limit, so the wiring lives here and `handle-commands.ts` owns
- * the one instance.
+ * The asset move tool's switch and its view of the running viewer. It is part
+ * of the authoring chunk (`authoring.ts` builds one per stage), so nothing of
+ * the tool is in the boot bundle and a published tour never pays for it; the
+ * session itself is built on the first arming.
  *
  * What the tool reads, all of it late-bound: the mode (it works in `orbit`
  * and `plan3d` only), the host's selection, the picker and the camera a ray is
@@ -16,19 +14,19 @@
 
 import * as THREE from 'three';
 import { isTypingTarget } from '../camera/camera-input.js';
-import { AUTHORING_MODES } from '../camera/checkpoint-overlay.js';
+import { AUTHORING_MODES } from '../camera/authoring-modes.js';
 import { effectiveAsset, type DemoAsset, type Mirror } from '../scene/types.js';
 import { mirrorFactsOf, setBodyMirror } from '../geometry/asset-mirror.js';
 import type { BodyFacts } from '../edit/asset-move-catalogue.js';
 import type { SurfaceFacts } from '../assets/asset-types.js';
-import type { AssetMoveControl, AssetMoveSession } from '../edit/asset-move-session.js';
+import { startAssetMove, type AssetMoveControl, type AssetMoveSession } from '../edit/asset-move-session.js';
 import type { DragPose } from '../layout/asset-legality.js';
-import type { AssetMoveStateEvent, ViewerEvents } from './viewer-events.js';
+import type { AssetMoveStateEvent } from './authoring-events.js';
+import type { ViewerEvents } from './viewer-events.js';
 import type { ViewerStage } from './viewer-stage.js';
 import type { SceneMount } from './scene-mount.js';
 import type { ViewerUI } from '../ui/viewer-ui.js';
 import type { ViewerRoots } from '../ui/viewer-shell.js';
-import { defaultLogger } from '../shared/logger.js';
 
 /** The object tints while it drags: the camera tool's ghost colours. */
 export const MOVE_OK_TINT = 0x3fbf6f;
@@ -50,7 +48,6 @@ type Body = { group: THREE.Object3D; yawOffset: number };
 export function assetMoveWiring(deps: AssetMoveWiringDeps): AssetMoveControl {
   let enabled = false;
   let session: AssetMoveSession | null = null;
-  let loading: Promise<void> | null = null;
   let armPending = false;
   const bodies = new Map<string, Body>();
   let bodiesRoot: THREE.Object3D | undefined;
@@ -128,94 +125,85 @@ export function assetMoveWiring(deps: AssetMoveWiringDeps): AssetMoveControl {
     return Math.atan2(ahead.x, ahead.z);
   };
 
-  const load = (): Promise<void> => {
-    loading ??= import('../edit/asset-move-session.js')
-      .then((module) => {
-        const stage = deps.stage();
-        if (!stage || deps.signal.aborted) return;
-        session = module.startAssetMove(
-          {
-            active: () => {
-              const mode = deps.stage()?.mode;
-              return enabled && mode !== undefined && AUTHORING_MODES.has(mode);
-            },
-            selected: () => {
-              const target = deps.stage()?.selection.current().highlight;
-              return target?.kind === 'furniture' ? target.id : null;
-            },
-            pickAsset: (clientX, clientY) => {
-              const current = deps.stage();
-              if (!current) return null;
-              const hit = current.picker.pickSelection(clientX, clientY, current.pickCamera());
-              return hit?.pick.surface === 'furniture' ? (hit.pick.assetId ?? null) : null;
-            },
-            ray: (clientX, clientY) => {
-              const current = deps.stage();
-              return current ? current.picker.pointerRay(clientX, clientY, current.pickCamera()).clone() : null;
-            },
-            document: () => {
-              const model = deps.mount().model;
-              return model ? { scene: model.scene, plan: model.plan, rev: model.rev } : null;
-            },
-            bodyFacts,
-            layoutCatalogue: () => deps.mount().layoutCatalogue(),
-            show,
-            // The editing modes draw on demand: a preview pose or a field is a new picture.
-            redraw: () => deps.stage()?.runtime.demand.invalidate(),
-            tint: (state) => deps.stage()?.selection.tint(state === null ? null : TINTS[state]),
-            viewYaw,
-            handles: {
-              addFrameHook: (hook) => deps.stage()?.runtime.addFrameHook(hook),
-              removeFrameHook: (hook) => deps.stage()?.runtime.removeFrameHook(hook),
-              project: (point) => {
-                const current = deps.stage();
-                if (!current) return null;
-                const ndc = new THREE.Vector3(point.x, point.y, point.z).project(current.pickCamera());
-                if (ndc.z > 1) return null;
-                const rect = deps.roots.canvas.getBoundingClientRect();
-                return { x: rect.left + ((ndc.x + 1) / 2) * rect.width, y: rect.top + ((1 - ndc.y) / 2) * rect.height };
-              },
-              screenUp: () => {
-                const yaw = viewYaw();
-                return { x: Math.sin(yaw), z: Math.cos(yaw) };
-              },
-              mode: () => {
-                const mode = deps.stage()?.mode;
-                return mode === 'orbit' || mode === 'plan3d' ? mode : null;
-              },
-            },
-            onEdit: (edit) => deps.events.emit('assetEdit', edit),
-            onRefused: (refusal) => deps.events.emit('assetEditRefused', refusal),
-            onMoving: (moving) => {
-              // A drag or a key burst ended (committed, cancelled or reverted): fit the apartment again.
-              if (!moving) deps.mount().sunShadow?.endPreview();
-              const current = deps.stage();
-              if (moving) current?.director?.hint('hint.assetMove');
-              else if (current?.mode) deps.ui.setHintForMode(current.mode);
-              let phase: AssetMoveStateEvent['phase'] = 'idle';
-              if (moving) phase = session?.tool.state().phase === 'nudging' ? 'nudging' : 'dragging';
-              deps.events.emit('assetMoveState', { phase });
-            },
+  /** Builds the session on the first arming; it rides in the authoring chunk with this wiring. */
+  const start = (): void => {
+    const stage = deps.stage();
+    if (session || !stage || deps.signal.aborted) return;
+    session = startAssetMove(
+      {
+        active: () => {
+          const mode = deps.stage()?.mode;
+          return enabled && mode !== undefined && AUTHORING_MODES.has(mode);
+        },
+        selected: () => {
+          const target = deps.stage()?.selection.current().highlight;
+          return target?.kind === 'furniture' ? target.id : null;
+        },
+        pickAsset: (clientX, clientY) => {
+          const current = deps.stage();
+          if (!current) return null;
+          const hit = current.picker.pickSelection(clientX, clientY, current.pickCamera());
+          return hit?.pick.surface === 'furniture' ? (hit.pick.assetId ?? null) : null;
+        },
+        ray: (clientX, clientY) => {
+          const current = deps.stage();
+          return current ? current.picker.pointerRay(clientX, clientY, current.pickCamera()).clone() : null;
+        },
+        document: () => {
+          const model = deps.mount().model;
+          return model ? { scene: model.scene, plan: model.plan, rev: model.rev } : null;
+        },
+        bodyFacts,
+        layoutCatalogue: () => deps.mount().layoutCatalogue(),
+        show,
+        // The editing modes draw on demand: a preview pose or a field is a new picture.
+        redraw: () => deps.stage()?.runtime.demand.invalidate(),
+        tint: (state) => deps.stage()?.selection.tint(state === null ? null : TINTS[state]),
+        viewYaw,
+        handles: {
+          addFrameHook: (hook) => deps.stage()?.runtime.addFrameHook(hook),
+          removeFrameHook: (hook) => deps.stage()?.runtime.removeFrameHook(hook),
+          project: (point) => {
+            const current = deps.stage();
+            if (!current) return null;
+            const ndc = new THREE.Vector3(point.x, point.y, point.z).project(current.pickCamera());
+            if (ndc.z > 1) return null;
+            const rect = deps.roots.canvas.getBoundingClientRect();
+            return { x: rect.left + ((ndc.x + 1) / 2) * rect.width, y: rect.top + ((1 - ndc.y) / 2) * rect.height };
           },
-          {
-            container: deps.roots.canvas.parentElement ?? deps.roots.viewport,
-            canvas: deps.roots.canvas,
-            keys: deps.roots.root,
-            typing: (event) => isTypingTarget(typeof event.composedPath === 'function' ? event.composedPath() : []),
-            signal: deps.signal,
+          screenUp: () => {
+            const yaw = viewYaw();
+            return { x: Math.sin(yaw), z: Math.cos(yaw) };
           },
-          stage.runtime.scene,
-        );
-        if (armPending) session.tool.arm();
-        armPending = false;
-      })
-      .catch((cause: unknown) => {
-        // A chunk that did not load (a dropped connection, a redeploy) is tried
-        // again on the next arming instead of leaving the switch dead.
-        loading = null;
-        defaultLogger.warn('asset-move-chunk', 'the asset move tool did not load; arm it again to retry', cause);
-      });
-    return loading;
+          mode: () => {
+            const mode = deps.stage()?.mode;
+            return mode === 'orbit' || mode === 'plan3d' ? mode : null;
+          },
+        },
+        onEdit: (edit) => deps.events.emit('assetEdit', edit),
+        onRefused: (refusal) => deps.events.emit('assetEditRefused', refusal),
+        onMoving: (moving) => {
+          // A drag or a key burst ended (committed, cancelled or reverted): fit the apartment again.
+          if (!moving) deps.mount().sunShadow?.endPreview();
+          const current = deps.stage();
+          if (moving) current?.director?.hint('hint.assetMove');
+          else if (current?.mode) deps.ui.setHintForMode(current.mode);
+          let phase: AssetMoveStateEvent['phase'] = 'idle';
+          if (moving) phase = session?.tool.state().phase === 'nudging' ? 'nudging' : 'dragging';
+          deps.events.emit('assetMoveState', { phase });
+        },
+      },
+      {
+        container: deps.roots.canvas.parentElement ?? deps.roots.viewport,
+        canvas: deps.roots.canvas,
+        keys: deps.roots.root,
+        typing: (event) => isTypingTarget(typeof event.composedPath === 'function' ? event.composedPath() : []),
+        signal: deps.signal,
+      },
+      stage.runtime.scene,
+    );
+    if (armPending) session.tool.arm();
+    armPending = false;
   };
 
   // A revision past a pending edit answers it (the tool compares), a running move is void; the graph may be new too.
@@ -230,7 +218,7 @@ export function assetMoveWiring(deps: AssetMoveWiringDeps): AssetMoveControl {
     setEnabled(next) {
       enabled = next;
       if (next) {
-        void load();
+        start();
         return;
       }
       // Disarming also drops a «Move» toggle that was never used: re-arming
@@ -250,7 +238,6 @@ export function assetMoveWiring(deps: AssetMoveWiringDeps): AssetMoveControl {
     },
     mirror: (assetId, axis) => session?.tool.mirror(assetId, axis) ?? false,
     turnAsset: (assetId, steps) => session?.tool.turnAsset(assetId, steps) ?? false,
-    loaded: () => loading ?? Promise.resolve(),
     debug: () => ({ enabled, loaded: session !== null, state: session?.tool.state() ?? null }),
     dispose() {
       offScene();

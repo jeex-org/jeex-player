@@ -284,7 +284,10 @@ export type ViewerHandle = {
    * viewer never see any of it, and the host that wants it turns it on
    * (an editor host's header does, from its own toggle). While visible,
    * `checkpointSelect`/`checkpointEdit` report the author's gestures and the
-   * HOST commits each edit as one `set_tour_checkpoints` op.
+   * HOST commits each edit as one `set_tour_checkpoints` op. The first
+   * switch-on loads the authoring tools; turned on before the first scene,
+   * they are in at its `scene` event, and turned on later, the checkpoint
+   * commands below answer `false` (and the void ones do nothing) until they are.
    */
   setCheckpointOverlay(visible: boolean): void;
   /** The overlay switch as it stands now. */
@@ -354,8 +357,8 @@ export type ViewerHandle = {
    * drawn on the surface. A legal release emits `assetEdit` for the host to
    * commit; an illegal one reverts and emits `assetEditRefused`;
    * `assetMoveState` reports each edge of a drag or a key burst. The first
-   * arming loads the tool as its own chunk. Default off; a published tour
-   * never arms it.
+   * arming loads the tool with the other authoring tools. Default off; a
+   * published tour never arms it.
    */
   setAssetMoveTool(enabled: boolean): void;
   /**
@@ -385,6 +388,19 @@ export type ViewerHandle = {
    * a drag is running, the id is unknown, or the object hangs on a wall.
    */
   turnAsset(assetId: string, steps: number): boolean;
+  /**
+   * Arms (`true`) or disarms the plan tool. Armed, in `plan2d` only, the wall or
+   * opening `setSelection` highlighted shows handles on the drawing: a press and
+   * a drag on one previews the change on the 2D plan, a legal release emits
+   * `planEdit` for the host to commit, an illegal one puts the drawing back and
+   * emits `planEditRefused`; `planToolState` reports each edge of a drag. The
+   * first arming loads the tool with the other authoring tools. Default off; a
+   * published tour never arms it. The viewer mints no id and emits no add,
+   * remove, split or merge.
+   */
+  setPlanTool(enabled: boolean): void;
+  /** The host refused the last `planEdit` (a 409, a 422): the drawing goes back to the committed document. */
+  revertPlanEdit(): void;
   /**
    * Everything the viewer's OWN selection panel would show for a selection,
    * as data: the title, the subject, the option in force, and one entry per

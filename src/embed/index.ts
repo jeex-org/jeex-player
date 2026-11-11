@@ -58,7 +58,9 @@ export type {
 // the op it commits, and the payloads of the two overlay events a host
 // subscribes to.
 export type { SceneOp, TourCheckpoint, SetTourCheckpointsOp } from '../scene/types.js';
-export type { CheckpointEdit, CheckpointSelect } from '../camera/checkpoint-overlay.js';
+export type { CheckpointEdit, CheckpointSelect } from '../camera/checkpoint-types.js';
+// The plan tool's payloads: the batch a host commits, a refusal, and the edges of a drag.
+export type { PlanEdit, PlanEditOp, PlanEditRefused, PlanEditTarget, PlanToolStateEvent } from '../edit/plan-edit.js';
 export type { ViewerSelection, ViewerSelectionKind, ViewerSelectionTarget } from '../app/selection.js';
 // The answer of `ViewerHandle.describeSelection`, next to the selection it
 // describes. Types only: a host reads them, and nothing here

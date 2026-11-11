@@ -371,6 +371,12 @@ export class PendingViewer implements ViewerHandle {
   revertAssetEdit(): void {
     this.command((handle) => handle.revertAssetEdit());
   }
+  setPlanTool(enabled: boolean): void {
+    this.command((handle) => handle.setPlanTool(enabled));
+  }
+  revertPlanEdit(): void {
+    this.command((handle) => handle.revertPlanEdit());
+  }
   mirrorAsset(assetId: string, axis: MirrorAxis): boolean {
     return this.live()?.mirrorAsset(assetId, axis) ?? false;
   }

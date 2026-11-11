@@ -54,7 +54,7 @@ import { DoorController } from './door-controller.js';
 import { contextRecovery } from './context-recovery.js';
 import { uiCommands } from './ui-commands.js';
 import { stageWiring } from './stage-wiring.js';
-import { applyStartView, firstPicture, loadWithNoiseTiles, nextFrame, showBootStep } from './viewer-boot.js';
+import { applyStartView, firstPicture, loadWithNoiseTiles, mountAfterAuthoring, nextFrame, showBootStep } from './viewer-boot.js';
 import { ViewerStage } from './viewer-stage.js';
 import type { Logger } from '../shared/logger.js';
 import { failureRaiser, instanceLogger } from './viewer-failure.js';
@@ -124,8 +124,6 @@ export class ViewerApp {
   /** The renderer, camera, view modes, map and director; `undefined` before boot. */
   private stage?: ViewerStage | undefined;
   private furnitureVisible = true;
-  /** The placement overlay's switch; default OFF, like every published-tour behaviour. */
-  private checkpointsVisible = false;
   /** True from the first frame of the first document until the next teardown. */
   private booted = false;
   /** True between `teardown()` and the next `init()`; Retry clears it. */
@@ -253,10 +251,6 @@ export class ViewerApp {
       setFurnitureVisible: (visible) => {
         this.furnitureVisible = visible;
       },
-      checkpointsVisible: () => this.checkpointsVisible,
-      setCheckpointsVisible: (visible) => {
-        this.checkpointsVisible = visible;
-      },
       messages: () => this.messages,
       setMessages: (messages) => {
         this.messages = messages;
@@ -294,7 +288,8 @@ export class ViewerApp {
       await nextFrame(this.context.signal);
       this.buildStage(model);
       if (this.stage) this.telemetry.attach(this.stage);
-      this.mount.mountDocument(loaded);
+      // A tool switched on before the first scene is bound before it, so the first `scene` event finds it.
+      await mountAfterAuthoring(this.handle.authoring, () => this.mount.mountDocument(loaded), this.context.signal);
       this.stage?.director?.setMotion(resolveMotionInstant(this.options.motion, prefersReducedMotion()));
       showBootStep(this.ui, this.messages, 'furniture');
       await nextFrame(this.context.signal);
@@ -353,7 +348,6 @@ export class ViewerApp {
         onContextLost: () => this.recovery.onLost(),
         onContextRestored: () => this.recovery.onRestored(),
         stage: () => this.stage,
-        checkpointsVisible: () => this.checkpointsVisible,
         handle: () => this.handle,
         picker: this.picker,
         ui: this.ui,
@@ -417,6 +411,7 @@ export class ViewerApp {
         messages: () => this.messages,
         furnitureVisible: () => this.furnitureVisible,
         quality: () => this.handle.quality,
+        authoring: () => this.handle.authoring,
         projectLibrary: () => this.project()?.manifest.library,
         reapplyFurniture: () => this.handle.setFurnitureVisible(this.furnitureVisible, true),
         emitScene: (info) => this.events.emit('scene', info),
@@ -458,6 +453,7 @@ export class ViewerApp {
     if (this.disposed) return;
     this.disposed = true;
     this.booted = false;
+    this.handle.authoring.unbind();
     this.stage?.dispose();
     this.stage = undefined;
     this.doors.dispose();
@@ -481,6 +477,7 @@ export class ViewerApp {
     if (this.released) return;
     this.released = true;
     this.teardown();
+    this.handle.authoring.dispose();
     this.ktx2.dispose();
     this.telemetry.dispose();
     this.tourEvents.clear();

@@ -15,7 +15,8 @@
  * commits exactly what is drawn or refuses (reverts and reports why). The
  * field of legal places (`layout/asset-mask.ts`) is drawn while it moves and
  * redrawn whenever its yaw changes. Q/E turn it `TURN_STEP_DEG`, judged like
- * a move; a host's top carries what stands on it. The edit goes to the
+ * a move; a host's top carries what stands on it. The keys live in
+ * `asset-move-keys.ts`. The edit goes to the
  * HOST to commit: the viewer never commits a move itself.
  *
  * The canvas listeners and the lazy session live in `asset-move-session.ts`.
@@ -29,46 +30,27 @@ import * as THREE from 'three';
 import { shippedFacts, type LayoutCatalogue } from '../layout/layout-lint.js';
 import { roomOf } from '../plan/plan-rooms.js';
 import { dragCatalogue, type BodyFacts } from './asset-move-catalogue.js';
-import {
-  dragContext,
-  faceOf,
-  nearestReachableFace,
-  poseItem,
-  wallAlong,
-  type DragContext,
-  type DragPose,
-} from '../layout/asset-legality.js';
+import { dragContext, faceOf, nearestReachableFace, poseItem, type DragContext, type DragPose } from '../layout/asset-legality.js';
 import { carriedPoses, proposePose, type Placed, type PoseRequest, type Proposal } from '../layout/asset-pose.js';
 import { mask, type LegalityMask, type MaskSurface } from '../layout/asset-mask.js';
 import { DRAG_PX, IdleCommit, YawSweep, floorAngle, sameAngle, samePosition, snapAngle, wrapAngle, type Scheduler } from './drag-kit.js';
 import { assetEditOf } from './asset-edit-ops.js';
 import type { AssetHandle } from './asset-handles.js';
-import type { SolvedPlan, WallFace } from '../plan/plan-solver.js';
+import type { SolvedPlan } from '../plan/plan-solver.js';
 import type { Mirror, MirrorAxis, SceneData } from '../scene/types.js';
 import { isMirrorAxis } from '../scene/mirror.js';
 import { planMirror } from './mirror-edit.js';
 import { PendingEdits } from './pending-edits.js';
 import type { AssetEdit, AssetEditRefused } from './asset-edit.js';
+import { AssetMoveKeys, TURN_STEP_RAD } from './asset-move-keys.js';
 
 /* ---------------------------------------------------------------- model --- */
 
 export type { AssetEdit, AssetEditRefused } from './asset-edit.js';
 export type { AssetHandle } from './asset-handles.js';
+export { TURN_STEP_DEG } from './asset-move-keys.js';
 
-/** The tool's state as `__viewerDebug.assetMove()` reports it. */
-export type AssetMoveState = {
-  readonly phase: 'idle' | 'pressed' | 'dragging' | 'nudging';
-  readonly assetId: string | null;
-  readonly surface: MaskSurface | null;
-  /** The pose drawn: the settled one, else the pointer's. */
-  readonly pose: DragPose | null;
-  /** Whether a release would commit (a settled pose exists); `null` when nothing moves. */
-  readonly legal: boolean | null;
-  /** Cells of the legality field on screen. */
-  readonly maskCells: number;
-  /** An emitted edit the host may still refuse (`revertAssetEdit`). */
-  readonly pending: string | null;
-};
+import type { AssetMoveState } from './asset-edit.js';
 
 /** A pointer sample, in client pixels. */
 export type PointerSample = { readonly clientX: number; readonly clientY: number; readonly pointerId: number; readonly shiftKey: boolean };
@@ -102,12 +84,6 @@ export type AssetMoveHost = {
   onMoving(moving: boolean): void;
 };
 
-/** Arrow nudge, metres; Shift nudges `NUDGE_FAR_M`. */
-export const NUDGE_M = 0.05;
-export const NUDGE_FAR_M = 0.5;
-/** One Q/E turn, degrees; Shift does not change it. */
-export const TURN_STEP_DEG = 15;
-const TURN_STEP_RAD = (TURN_STEP_DEG / 180) * Math.PI;
 /**
  * A wall drag whose first movement is vertical by more than this many pixels
  * beyond its horizontal travel changes the mount height instead of sliding;
@@ -118,8 +94,6 @@ export const WALL_VERTICAL_PX = 8;
 export const HEIGHT_M_PER_PX = 0.005;
 
 const UP = new THREE.Vector3(0, 1, 0);
-/** Q turns left (counter-clockwise from above), E right. */
-const TURN_KEYS: Readonly<Record<string, number>> = { q: 1, e: -1 };
 
 type Drag = {
   assetId: string;
@@ -168,6 +142,8 @@ export class AssetMoveTool {
   private readonly burst: IdleCommit;
   private readonly hit = new THREE.Vector3();
   private readonly catalogue: LayoutCatalogue;
+  /** The arrows and Q/E (`asset-move-keys.ts`). */
+  private readonly keys: AssetMoveKeys<Drag>;
 
   constructor(host: AssetMoveHost, schedule?: Scheduler) {
     this.host = host;
@@ -175,7 +151,27 @@ export class AssetMoveTool {
       (assetId) => host.bodyFacts(assetId),
       (placement) => (host.layoutCatalogue?.() ?? shippedFacts)(placement),
     );
-    this.burst = new IdleCommit(() => this.finishNudge(), schedule);
+    this.burst = new IdleCommit(() => this.keys.finishNudge(), schedule);
+    this.keys = new AssetMoveKeys<Drag>({
+      active: () => host.active(),
+      selected: () => host.selected(),
+      viewYaw: () => host.viewYaw(),
+      onRefused: (refusal) => host.onRefused(refusal),
+      onMoving: (moving) => host.onMoving(moving),
+      moving: () => this.moving,
+      nudging: () => this.nudging,
+      setNudging: (drag) => {
+        this.nudging = drag;
+      },
+      cancel: () => this.cancel(),
+      touchBurst: () => this.burst.touch(),
+      prepare: (assetId) => this.prepare(assetId, null),
+      pose: (drag) => this.pose(drag),
+      propose: (drag, request) => this.propose(drag, request),
+      apply: (drag, proposal) => this.apply(drag, proposal),
+      clampHeight: (drag, y) => this.clampHeight(drag, y),
+      release: (drag) => this.release(drag),
+    });
   }
 
   /** The «Move» toggle: the next press anywhere moves the selected object to it. */
@@ -269,31 +265,9 @@ export class AssetMoveTool {
 
   // ---------------------------------------------------------------- keys --
 
-  /** One key press; `true` when the tool used it. */
+  /** One key press; `true` when the tool used it (`asset-move-keys.ts`). */
   key(key: string, shiftKey: boolean): boolean {
-    const name = key.toLowerCase();
-    if (name === 'escape') return this.cancel();
-    if (!this.host.active()) return false;
-    const turn = TURN_KEYS[name] ?? 0;
-    const step = shiftKey ? NUDGE_FAR_M : NUDGE_M;
-    const arrows: Record<string, [number, number]> = {
-      arrowup: [step, 0],
-      arrowdown: [-step, 0],
-      arrowleft: [0, -step],
-      arrowright: [0, step],
-    };
-    const arrow = arrows[name];
-    if (turn === 0 && !arrow) return false;
-    if (this.moving) {
-      if (turn !== 0) this.turnDrag(this.moving, turn);
-      return true;
-    }
-    const drag = this.nudging ?? this.startNudge();
-    if (!drag) return false;
-    if (arrow) this.nudge(drag, arrow[0], arrow[1]);
-    else this.turnAtRest(drag, turn);
-    this.burst.touch();
-    return true;
+    return this.keys.key(key, shiftKey);
   }
 
   // -------------------------------------------------------- host commands --
@@ -313,7 +287,7 @@ export class AssetMoveTool {
     this.burst.flush();
     const drag = this.prepare(assetId, null);
     if (!drag || drag.surface === 'wall') return false;
-    const proposal = this.turned(drag, whole);
+    const proposal = this.keys.turned(drag, whole);
     if (!proposal) return false;
     if (!proposal.settled) {
       this.host.onRefused({ assetId, issues: proposal.judgement.issues });
@@ -563,95 +537,6 @@ export class AssetMoveTool {
     const field = mask(drag.drag, item, drag.surface);
     this.maskCells = field.count;
     this.host.drawMask(field);
-  }
-
-  /** The proposal for the object turned `steps` from where it stands now, at rest; `null` for a wall object. */
-  private turned(drag: Drag, steps: number): Proposal | null {
-    if (drag.surface === 'wall') return null;
-    const pose = this.pose(drag);
-    const rotationY = wrapAngle(pose.rotationY + steps * TURN_STEP_RAD);
-    // The turn is the person's yaw: no wall snap turns it back.
-    return proposePose(drag.drag, {
-      kind: 'plan',
-      point: { x: pose.position.x, z: pose.position.z },
-      rotationY,
-      y: pose.position.y,
-      snap: false,
-    });
-  }
-
-  /** Q/E during a drag: the request's yaw turns, the pointer pose and the field follow. */
-  private turnDrag(drag: Drag, steps: number): void {
-    if (drag.request.kind === 'face') return;
-    this.propose(drag, { ...drag.request, rotationY: wrapAngle(drag.request.rotationY + steps * TURN_STEP_RAD), snap: false });
-  }
-
-  /** Q/E at rest: turned and settled, or refused with the object as it was. */
-  private turnAtRest(drag: Drag, steps: number): void {
-    const proposal = this.turned(drag, steps);
-    if (!proposal) return;
-    if (!proposal.settled) {
-      this.host.onRefused({ assetId: drag.assetId, issues: proposal.judgement.issues });
-      return;
-    }
-    const pose = proposal.settled.pose;
-    drag.request = {
-      kind: 'plan',
-      point: { x: pose.position.x, z: pose.position.z },
-      rotationY: pose.rotationY,
-      y: pose.position.y,
-      snap: false,
-    };
-    this.apply(drag, proposal);
-  }
-
-  private nudge(drag: Drag, forward: number, right: number): void {
-    drag.nudged = true;
-    const request = drag.request;
-    if (request.kind === 'face') {
-      // Up and down lift the object; left and right slide it along its face.
-      if (forward !== 0) {
-        this.propose(drag, { ...request, y: this.clampHeight(drag, request.y + forward) });
-        return;
-      }
-      // «Right» on screen is along the face when the viewer looks at it; the face's own direction decides the sign.
-      const along = this.alongSign(request.face);
-      // Kept where the object can stand (its width on the face), so a nudge
-      // back from a corner moves at once instead of unwinding presses past it.
-      this.propose(drag, { ...request, t: wallAlong(drag.drag, request.face, request.t + along * right) });
-      return;
-    }
-    const yaw = this.host.viewYaw();
-    const ahead = { x: Math.sin(yaw), z: Math.cos(yaw) };
-    const side = { x: -ahead.z, z: ahead.x };
-    const point = { x: request.point.x + ahead.x * forward + side.x * right, z: request.point.z + ahead.z * forward + side.z * right };
-    this.propose(drag, { ...request, point, snap: true });
-  }
-
-  /** `+1` when the face runs to the viewer's right, `-1` when to the left. */
-  private alongSign(face: WallFace): number {
-    const a = face.polyline[0];
-    const b = face.polyline.at(-1);
-    if (!a || !b) return 1;
-    const yaw = this.host.viewYaw();
-    const right = { x: -Math.cos(yaw), z: Math.sin(yaw) };
-    return (b.x - a.x) * right.x + (b.z - a.z) * right.z >= 0 ? 1 : -1;
-  }
-
-  private startNudge(): Drag | null {
-    const selected = this.host.selected();
-    if (selected === null) return null;
-    const drag = this.prepare(selected, null);
-    if (!drag) return null;
-    this.nudging = drag;
-    this.host.onMoving(true);
-    return drag;
-  }
-
-  private finishNudge(): void {
-    const drag = this.nudging;
-    this.nudging = null;
-    if (drag) this.release(drag);
   }
 
   /** A drag or a burst ended: commit exactly what is drawn, or refuse. */

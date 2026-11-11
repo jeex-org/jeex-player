@@ -39,17 +39,16 @@
 
 import * as THREE from 'three';
 import { FAR_PLANE_M, NEAR_PLANE_M, fieldOfViewFor } from '../camera/camera-tuning.js';
-import { AUTHORING_MODES, type CheckpointOverlay } from '../camera/checkpoint-overlay.js';
+import { AUTHORING_MODES } from '../camera/authoring-modes.js';
+import type { CheckpointOverlay } from '../camera/checkpoint-overlay.js';
 import { wrapAngle } from '../camera/checkpoint-picking.js';
 import { listenerOptions } from '../shared/abort.js';
 import type { Messages } from './messages.js';
+import { CAMERA_PREVIEW_NAME } from './viewer-shell.js';
 import { TOUR_PITCH_LIMIT_RAD, type TourCheckpoint, type ViewerMode } from '../scene/types.js';
 
 /** Turn per pixel of drag inside the card: 0.25°. */
 export const LOOK_RAD_PER_PX = (0.25 / 180) * Math.PI;
-
-/** The `data-jeex` name this module stamps on the card it creates. */
-export const CAMERA_PREVIEW_NAME = 'camera-preview';
 
 /** The attribute this module flips on the shell root while the card is up. */
 export const PREVIEW_ACTIVE_ATTRIBUTE = 'data-jeex-preview';

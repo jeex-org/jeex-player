@@ -150,6 +150,28 @@ describe('the edit event', () => {
     expect(seen).toEqual([9]);
     expect(log.codes()).toEqual(['listener-failed']);
   });
+
+  test('an event is heard on its first emit, and `clear()` drops the subscribers of every event used so far', () => {
+    // The fan-out of an event is created when it is first named, by `on` or by `emit`.
+    const events = new ViewerEvents();
+    const seen: string[] = [];
+    events.emit('mode', 'walk');
+    events.on('assetMoveState', (state) => seen.push(`asset:${state.phase}`));
+    events.on('checkpointPlacing', (state) => seen.push(`placing:${String(state.active)}`));
+    events.emit('assetMoveState', { phase: 'dragging' });
+    events.on('mode', (mode) => seen.push(`mode:${mode}`));
+    expect(seen).toEqual(['asset:dragging']);
+
+    events.clear();
+    events.emit('assetMoveState', { phase: 'idle' });
+    events.emit('checkpointPlacing', { active: true });
+    events.emit('mode', 'orbit');
+    expect(seen).toEqual(['asset:dragging']);
+    // A subscriber added after the teardown is heard again: the registry is not closed, only emptied.
+    events.on('mode', (mode) => seen.push(`mode:${mode}`));
+    events.emit('mode', 'tour');
+    expect(seen).toEqual(['asset:dragging', 'mode:tour']);
+  });
 });
 
 describe('sceneErrorCode', () => {

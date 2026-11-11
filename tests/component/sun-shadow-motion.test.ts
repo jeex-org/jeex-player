@@ -12,7 +12,7 @@ import type { ViewerHandle } from '../../src/app/viewer-handle.js';
 import { DEMO } from '../../src/demo/demo-ids.js';
 import type { ShadowFit } from '../../src/lighting/shadow-fit.js';
 import type { SunShadowState } from '../../src/render/sun-shadow.js';
-import { ASSET_MOVE_CHUNK_TIMEOUT_MS, closeContainers, demoScene, nextFrame, openContainer, until } from './support.js';
+import { AUTHORING_CHUNK_TIMEOUT_MS, closeContainers, demoScene, nextFrame, openContainer, until } from './support.js';
 
 type Debug = {
   mode: () => string | undefined;
@@ -111,7 +111,7 @@ describe('the sun shadow follows motion', { timeout: DEMO_TIMEOUT_MS }, () => {
     const { handle, canvas } = await mountDemo('plan3d');
     handle.setSelection({ kind: 'furniture', id: DEMO.asset.bedroomBed });
     handle.setAssetMoveTool(true);
-    await until(() => debug().assetMove().loaded, 'the asset move chunk', ASSET_MOVE_CHUNK_TIMEOUT_MS);
+    await until(() => debug().assetMove().loaded, 'the authoring chunk', AUTHORING_CHUNK_TIMEOUT_MS);
     await settle();
     const home = demoScene().assets.find((asset) => asset.id === DEMO.asset.bedroomBed)!.position;
     return { handle, canvas, home };

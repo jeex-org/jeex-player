@@ -83,8 +83,12 @@ export const COMPONENT_FILE_COST_S: Readonly<Record<string, number>> = {
   'minimap.test.ts': 1,
   'no-webgl.test.ts': 1,
   'panorama.test.ts': 1,
+  // Measured on a local SwiftShader with one worker (2026-11-11), not on the hosted runner.
+  'plan-draft.test.ts': 7,
   'plan-modes.test.ts': 17,
   'plan-raster.test.ts': 1,
+  // Measured on a local SwiftShader with one worker (2026-11-11), not on the hosted runner.
+  'plan-tool.test.ts': 45,
   'project-finishes.test.ts': 1,
   'project-mark.test.ts': 37,
   'project-mount.test.ts': 28,

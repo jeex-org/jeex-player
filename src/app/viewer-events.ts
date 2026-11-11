@@ -2,7 +2,7 @@
  * The viewer's public event fan-out: `ready`, `error`, `scene`, `mode`, `assets` and the rest of `ViewerEventMap`.
  *
  * It is the `TourEvents` pattern applied to the viewer itself (`tour-controls.ts`):
- * one registry per event, and a subscriber that throws is reported and skipped
+ * one fan-out per event, created on first use, and a subscriber that throws is reported and skipped
  * so one bad callback on a host page cannot stop the frame or the other
  * subscribers.
  *
@@ -17,15 +17,15 @@ import { Fanout, type AnyFanout } from '../shared/fanout.js';
 import type { SceneOp, ViewerMode } from '../scene/types.js';
 import type { ViewerOptions } from './viewer-options.js';
 import type { ViewerSelection } from './selection.js';
-import type { CheckpointEdit, CheckpointSelect } from '../camera/checkpoint-overlay.js';
 import type { TourSpeed } from '../camera/tour-player.js';
-import type { AssetEdit, AssetEditRefused } from '../edit/asset-edit.js';
+import type { AuthoringEventMap } from './authoring-events.js';
 
 // The union itself lives in `shared/errors.ts`, one layer below everything that
 // raises it, and is re-exported here because `ViewerError` is what a host
 // subscribes to.
 import type { LightTemperatureChange } from './light-temperature-control.js';
 export type { ViewerErrorCode } from '../shared/errors.js';
+export type { CheckpointLookThrough, CheckpointPlacing } from './authoring-events.js';
 
 export type ViewerError = {
   code: ViewerErrorCode;
@@ -71,7 +71,8 @@ export type ViewerAssetsInfo = {
  */
 export type ViewerEditRequest = { ops: SceneOp[]; baseRev: number };
 
-export type ViewerEventMap = {
+/** The rows every viewer raises; the authoring tools' rows are in `authoring-events.ts`. */
+export type CoreEventMap = {
   ready: ViewerReadyInfo;
   error: ViewerError;
   scene: ViewerSceneInfo;
@@ -82,10 +83,6 @@ export type ViewerEventMap = {
   select: ViewerSelection;
   /** The built-in panel produced a batch the viewer did not commit; only with `edits: 'emit'`. */
   edit: ViewerEditRequest;
-  /** A tour-checkpoint marker was clicked (`id: null` — the focus was cleared); placement overlay only. */
-  checkpointSelect: CheckpointSelect;
-  /** A placement gesture (drag, add) finished; the HOST commits the list. */
-  checkpointEdit: CheckpointEdit;
   /**
    * The walk's current tour camera changed — the walker arrived on one (the
    * entry glide, a step) — or the number of cameras did (a new document).
@@ -95,24 +92,6 @@ export type ViewerEventMap = {
   walkCamera: ViewerWalkCamera;
   /** The tour's speed setting changed (`tour.setSpeed`, the tour bar's speed button). */
   tourSpeed: ViewerTourSpeed;
-  /** A look-through began (`id` — the camera piloted) or ended (`null`); tour-camera tool only. */
-  checkpointLookThrough: CheckpointLookThrough;
-  /** Click-to-place began (`active: true`) or ended — a drop, Esc, or a mode change; tour-camera tool only. */
-  checkpointPlacing: CheckpointPlacing;
-  /**
-   * The asset move tool released a legal move: `move_object` (+ `rotate_object`) for the HOST to commit as one
-   * batch on `baseRev`; the new pose stays on screen until the document
-   * answers, `handle.revertAssetEdit()` puts the start pose back.
-   */
-  assetEdit: AssetEdit;
-  /** A move ended illegal and reverted; `issues` are the hard layout issues of the final pose. */
-  assetEditRefused: AssetEditRefused;
-  /**
-   * A drag or an arrow/Q/E burst of the asset move tool began (`dragging`,
-   * `nudging`) or ended (`idle`): a host hides what it hangs over the object
-   * (a host editor's selection card) while it moves. Edges only, never per frame.
-   */
-  assetMoveState: AssetMoveStateEvent;
   /**
    * The colour temperature of the artificial light changed: `temperature` in
    * kelvin or `null` for «Original», `source` says whether the host or the
@@ -121,14 +100,8 @@ export type ViewerEventMap = {
   lightTemperature: LightTemperatureChange;
 };
 
-/** The `assetMoveState` payload. */
-export type AssetMoveStateEvent = { readonly phase: 'idle' | 'dragging' | 'nudging' };
-
-/** The `checkpointLookThrough` payload. */
-export type CheckpointLookThrough = { readonly id: string | null };
-
-/** The `checkpointPlacing` payload. */
-export type CheckpointPlacing = { readonly active: boolean };
+/** Every event a host can subscribe to. */
+export type ViewerEventMap = CoreEventMap & AuthoringEventMap;
 
 /** The `tourSpeed` payload: the factor of the tour's 1x pace. */
 export type ViewerTourSpeed = { readonly speed: TourSpeed };
@@ -138,51 +111,39 @@ export type ViewerWalkCamera = { readonly index: number | null; readonly count: 
 
 export type ViewerEventName = keyof ViewerEventMap;
 
-type Registry = { [K in ViewerEventName]: Fanout<[ViewerEventMap[K]]> };
-
 export class ViewerEvents {
   private readonly log: Logger;
-
-  private readonly listeners: Registry;
+  /**
+   * One `Fanout` per event, created when the event is first named by `on` or
+   * `emit`; each carries the same failure sink. The copy-before-iterate and the
+   * per-subscriber try/catch live there (`shared/fanout.ts`).
+   */
+  private readonly listeners = new Map<ViewerEventName, AnyFanout>();
 
   constructor(log: Logger = defaultLogger) {
     this.log = log;
-    // One `Fanout` per event, each with the same failure sink: the copy-before-
-    // iterate and the per-subscriber try/catch live there now (`shared/fanout.ts`).
-    const fanout = <K extends ViewerEventName>(event: K): Fanout<[ViewerEventMap[K]]> =>
-      new Fanout<[ViewerEventMap[K]]>((error) => this.log.error('listener-failed', `viewer ${event} listener failed`, error));
-    this.listeners = {
-      ready: fanout('ready'),
-      error: fanout('error'),
-      scene: fanout('scene'),
-      mode: fanout('mode'),
-      assets: fanout('assets'),
-      select: fanout('select'),
-      edit: fanout('edit'),
-      checkpointSelect: fanout('checkpointSelect'),
-      checkpointEdit: fanout('checkpointEdit'),
-      walkCamera: fanout('walkCamera'),
-      tourSpeed: fanout('tourSpeed'),
-      checkpointLookThrough: fanout('checkpointLookThrough'),
-      checkpointPlacing: fanout('checkpointPlacing'),
-      assetEdit: fanout('assetEdit'),
-      assetEditRefused: fanout('assetEditRefused'),
-      assetMoveState: fanout('assetMoveState'),
-      lightTemperature: fanout('lightTemperature'),
-    };
+  }
+
+  private fanout<K extends ViewerEventName>(event: K): Fanout<[ViewerEventMap[K]]> {
+    // The map holds each event's own fan-out under its own name, so the read is of that event's type.
+    const known = this.listeners.get(event) as Fanout<[ViewerEventMap[K]]> | undefined;
+    if (known) return known;
+    const fanout = new Fanout<[ViewerEventMap[K]]>((error) => this.log.error('listener-failed', `viewer ${event} listener failed`, error));
+    this.listeners.set(event, fanout);
+    return fanout;
   }
 
   on<K extends ViewerEventName>(event: K, callback: (payload: ViewerEventMap[K]) => void): () => void {
-    return (this.listeners[event] as Fanout<[ViewerEventMap[K]]>).add(callback);
+    return this.fanout(event).add(callback);
   }
 
   emit<K extends ViewerEventName>(event: K, payload: ViewerEventMap[K]): void {
-    (this.listeners[event] as Fanout<[ViewerEventMap[K]]>).emit(payload);
+    this.fanout(event).emit(payload);
   }
 
-  /** Drops every subscriber; part of viewer teardown. */
+  /** Drops every subscriber of every event named so far; part of viewer teardown. */
   clear(): void {
-    for (const listeners of Object.values(this.listeners) as AnyFanout[]) listeners.clear();
+    for (const listeners of this.listeners.values()) listeners.clear();
   }
 }
 

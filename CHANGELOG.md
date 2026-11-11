@@ -9,6 +9,18 @@ as described under [Versioning](#versioning).
 
 ### Added
 
+- **The plan tool.** `handle.setPlanTool(true)` arms handles on the wall or
+  opening `setSelection` highlighted in `plan2d`: drag an end node, move the
+  wall sideways, slide an opening or change its width with a jamb. The drag
+  previews on the 2D plan only, judged by the scene model as a commit would
+  be (`SceneModel.trial`); a legal release emits `planEdit` (`move_node` or
+  `set_opening` for the host to commit), an illegal one puts the drawing back
+  and emits `planEditRefused`, and `planToolState` reports each edge of a
+  drag. `handle.revertPlanEdit()` puts the committed drawing back after a
+  refusal. Module and element only; the iframe protocol does not carry it.
+- **`SceneModel.trial(batch)`** judges a batch exactly as `apply` would and
+  answers the candidate scene and plan, or the same failure, without
+  committing anything.
 - **`error.fatal`.** The failure that took the viewer down (its error card is
   on screen) carries `fatal: true`, on the module, the element and the wire;
   only a fatal `error` before the first `ready` rejects the iframe helper's
@@ -280,6 +292,15 @@ as described under [Versioning](#versioning).
 
 ### Changed
 
+- **The authoring tools load on demand, as one chunk.** The tour-camera
+  overlay with its preview card and look-through, the asset move tool and the
+  plan tool load with the first `setCheckpointOverlay(true)`,
+  `setAssetMoveTool(true)` or `setPlanTool(true)`; a page that never turns one
+  on downloads none of them, and the boot bundle is smaller. A switch turned
+  on before the first scene is in force at its first `scene` event; turned on
+  later, the tools' boolean commands answer `false` until the chunk is in
+  (`focusCheckpoint(null)`, a clear with nothing to clear, still answers
+  `true`).
 - **Openings keep their place when a wall end moves.** On `move_node` an
   opening keeps its distance in metres from the wall end that did not move,
   instead of its share of the wall, and openings that no longer fit slide

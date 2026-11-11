@@ -23,13 +23,19 @@ import type { TourCheckpoint, ViewerMode } from '../scene/types.js';
 const WIDTH = 800;
 const HEIGHT = 600;
 
-/** A listener registry with the canvas's box and pointer capture, no DOM behind it. */
+/**
+ * A listener registry with the canvas's box and pointer capture, no DOM behind
+ * it. It keeps the one ordering rule of the DOM the overlay relies on: at the
+ * target, the listeners added with `capture: true` run before the others,
+ * each group in registration order.
+ */
 class FakeTarget {
   readonly style: Record<string, string> = {};
-  private readonly listeners = new Map<string, Array<(event: unknown) => void>>();
+  private readonly listeners = new Map<string, Array<{ listener: (event: unknown) => void; capture: boolean }>>();
 
-  addEventListener(type: string, listener: (event: unknown) => void): void {
-    this.listeners.set(type, [...(this.listeners.get(type) ?? []), listener]);
+  addEventListener(type: string, listener: (event: unknown) => void, options?: boolean | AddEventListenerOptions): void {
+    const capture = typeof options === 'boolean' ? options : options?.capture === true;
+    this.listeners.set(type, [...(this.listeners.get(type) ?? []), { listener, capture }]);
   }
 
   removeEventListener(): void {}
@@ -43,7 +49,9 @@ class FakeTarget {
   /** Fires one synthetic event; answers whether a listener stopped it. */
   fire(type: string, event: Record<string, unknown>): { stopped: boolean } {
     const state = { stopped: false };
-    for (const listener of this.listeners.get(type) ?? []) {
+    const all = this.listeners.get(type) ?? [];
+    const ordered = [...all.filter((entry) => entry.capture), ...all.filter((entry) => !entry.capture)];
+    for (const { listener } of ordered) {
       if (state.stopped) break;
       listener({
         button: 0,
@@ -111,9 +119,11 @@ type Harness = {
   changes: { count: number };
 };
 
-function harness(checkpoints: TourCheckpoint[] = [CAM_A, CAM_B]): Harness {
+/** `early` binds listeners of the page's own before the overlay exists, as the selection controller and the camera input are, the overlay being loaded after them. */
+function harness(checkpoints: TourCheckpoint[] = [CAM_A, CAM_B], early?: (canvas: FakeTarget, keys: FakeTarget) => void): Harness {
   const canvas = new FakeTarget();
   const keys = new FakeTarget();
+  early?.(canvas, keys);
   const camera = new THREE.PerspectiveCamera(50, WIDTH / HEIGHT, 0.1, 160);
   // Straight down over the L-shape, north up, 16 x 12 m on the 800 x 600 canvas (`plan-modes.ts` fits it the same way).
   const top = new THREE.OrthographicCamera(-8, 8, 6, -6, 0.1, 100);
@@ -220,6 +230,19 @@ describe('selecting', () => {
     expect(h.canvas.fire('pointerdown', { clientX: at.clientX + 20, clientY: at.clientY }).stopped).toBe(true);
     h.canvas.fire('pointerup', { clientX: at.clientX + 20, clientY: at.clientY });
     expect(h.canvas.fire('pointerdown', { clientX: 20, clientY: 20 }).stopped).toBe(false);
+  });
+
+  test('a claimed press is not heard by a canvas listener bound before the overlay (the overlay loads late)', () => {
+    const heard: string[] = [];
+    const h = harness([CAM_A, CAM_B], (canvas) => canvas.addEventListener('pointerdown', () => heard.push('selection')));
+    SIDE(h);
+    const at = screen(h.camera, CAM_A.position);
+    expect(h.canvas.fire('pointerdown', at).stopped).toBe(true);
+    h.canvas.fire('pointerup', at);
+    expect(heard).toEqual([]);
+    // A press the overlay does not claim still reaches it.
+    h.canvas.fire('pointerdown', { clientX: 20, clientY: 20 });
+    expect(heard).toEqual(['selection']);
   });
 
   test('a far click deselects; a near miss between the grace and deselect radii does not', () => {

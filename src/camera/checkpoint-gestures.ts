@@ -7,10 +7,11 @@
  * `camera()` — the camera the MODE draws with, the plan's top view in
  * `plan3d` — and a gesture whose handle the mode no longer offers ends.
  *
- * Input order: the stage builds the overlay — and so these listeners — BEFORE
- * the camera input and the selection controller, so a claimed press answers
- * with `stopImmediatePropagation` and never orbits the scene or clears the
- * scene selection. A press within the grace radius of a handle is claimed even
+ * Input order: these listeners bind in the capture phase, so they run before
+ * the camera input and the selection controller on the same canvas although
+ * the tool loads after them, and a claimed press answers with
+ * `stopImmediatePropagation` and never orbits the scene or clears the scene
+ * selection. A press within the grace radius of a handle is claimed even
  * when it misses the drawn shape; a click deselects only when it lands more
  * than `DESELECT_PX` from every handle of the active camera.
  *
@@ -139,7 +140,10 @@ export class CheckpointGestures {
   ) {
     this.host = host;
     this.burst = new IdleCommit(() => this.host.commit(`Camera ${this.burstId ?? ''} nudged`, this.burstRev), options.schedule);
-    const listen = listenerOptions(options.signal);
+    // The capture phase: the overlay loads after the selection controller and
+    // the camera input have bound on the same canvas and the same key target,
+    // and a capture listener at the target runs before every other one there.
+    const listen: AddEventListenerOptions = { ...listenerOptions(options.signal), capture: true };
     const canvas = host.canvas;
     const pointer = {
       pointerdown: this.onPointerDown as EventListener,

@@ -139,6 +139,26 @@ export function parkForExport(handle: { setMode(mode: 'plan2d'): void }): void {
   handle.setMode('plan2d');
 }
 
+/**
+ * Gives `canvas` a 2D context backed by CPU memory before anything paints into
+ * it, for a test that compares its pixels read back at two moments.
+ *
+ * Chromium starts a 2D canvas on the GPU when it has one and moves it to the
+ * CPU after the page has read it back twice (the `willReadFrequently`
+ * heuristic). The two rasterisers anti-alias the same path differently, so a
+ * paint before that move and a repaint of the SAME drawing after it differ by
+ * a level or two along every edge: on the GPU path the third read of an
+ * unchanged plan differed from the second in 35 622 bytes, on SwiftShader in
+ * none. Asking for the CPU canvas up front keeps every paint the test compares
+ * on one rasteriser. It must be the first `getContext` call on the element,
+ * which is checked: a later call returns the existing context unchanged.
+ */
+export function readableCanvas(canvas: HTMLCanvasElement): void {
+  const ctx = canvas.getContext('2d', { willReadFrequently: true });
+  if (!ctx?.getContextAttributes().willReadFrequently)
+    throw new Error('the canvas already had a 2D context; call readableCanvas before its first paint');
+}
+
 /** One animation frame; the unit of time everything in the viewer is measured in. */
 export function nextFrame(): Promise<void> {
   return new Promise((resolve) => {
@@ -166,18 +186,19 @@ export async function until(predicate: () => boolean, what: string, timeoutMs = 
 }
 
 /**
- * What a wait for the lazily loaded asset move chunk (`app/asset-move-wiring.ts`)
- * gets instead of `until`'s 15 s.
+ * What a wait for the lazily loaded authoring chunk (`app/authoring-port.ts`:
+ * the tour-camera overlay, the asset move tool, the plan tool) gets instead of
+ * `until`'s 15 s.
  *
- * Arming the tool imports a module graph from the dev server and builds the
- * session once it lands. On four hardware threads with two Vitest workers
+ * Turning a tool on imports a module graph from the dev server and builds the
+ * tools once it lands. On four hardware threads with two Vitest workers
  * (the shape of a CI runner), in the shard that runs `asset-move`,
  * `asset-mirror` and `frame-bridge` side by side, that wait ran past 15 s in
  * two runs out of two (two tests each, cold and warm imports alike), while
  * the same tests passed on a 16-thread machine. 45 s is the budget
  * `frame-bridge.test.ts` gives work that competes for the shared rasteriser.
  */
-export const ASSET_MOVE_CHUNK_TIMEOUT_MS = 45_000;
+export const AUTHORING_CHUNK_TIMEOUT_MS = 45_000;
 
 /**
  * Waits until `predicate` holds within `frames` animation frames, or fails.

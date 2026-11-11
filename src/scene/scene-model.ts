@@ -147,6 +147,16 @@ export type ApplyResult = ApplyOk | ApplyFailure;
 /** Notified after a batch commits, in subscription order. */
 export type RevisionListener = (rev: number, touched: readonly TouchedEntity[], ops: readonly SceneOp[]) => void;
 
+/** What `apply` commits when a batch passes, and `trial` answers from. */
+type Candidate = {
+  draft: Draft<SceneData>;
+  plan: SolvedPlan;
+  applied: AppliedOp[];
+  touched: TouchedEntity[];
+  roomMerges: RoomMerge[];
+  linted: LayoutIssue[];
+};
+
 export function isApplyOk(result: ApplyResult): result is ApplyOk {
   return (result as ApplyFailure).error === undefined;
 }
@@ -193,6 +203,12 @@ function sealCollection(collection: Map<unknown, unknown> | Set<unknown>): void 
     Object.defineProperty(collection, name, { value: refuse(name), configurable: false, writable: false });
   }
 }
+
+/** The answer to a batch judged from inside a revision listener, while the commit in flight is still notifying. */
+const REENTRANT_APPLY: ApplyFailure = Object.freeze({
+  error: 'validation_failed',
+  message: 'A revision listener cannot apply another batch; the commit in flight has not finished notifying',
+});
 
 export class SceneModel {
   private readonly catalogues: SceneRegistries;
@@ -266,17 +282,57 @@ export class SceneModel {
   }
 
   /**
+   * Judges a batch as `apply` would, without committing it: the candidate
+   * scene and its solved plan, or the failure `apply` would answer. The
+   * revision, the committed state and the listeners are left alone, and the
+   * candidate is not kept. One judgement for a live preview and the commit:
+   * from inside a revision listener it refuses as `apply` does there.
+   */
+  trial(batch: ApplyBatch): { scene: SceneData; plan: SolvedPlan } | ApplyFailure {
+    if (this.applying) return REENTRANT_APPLY;
+    const candidate = this.candidate(batch);
+    return 'error' in candidate ? candidate : { scene: candidate.draft, plan: candidate.plan };
+  }
+
+  /**
    * Applies a batch atomically. On success the revision advances by exactly
    * one, whatever the batch size, and every listener sees the union of the
    * touched entities in operation order.
    */
   apply(batch: ApplyBatch): ApplyResult {
-    if (this.applying) {
-      return {
-        error: 'validation_failed',
-        message: 'A revision listener cannot apply another batch; the commit in flight has not finished notifying',
-      };
+    if (this.applying) return REENTRANT_APPLY;
+    const candidate = this.candidate(batch);
+    if ('error' in candidate) return candidate;
+    const { draft, plan: candidatePlan, applied, touched, roomMerges, linted } = candidate;
+
+    this.committed = deepFreeze(draft);
+    this.solved = deepFreeze(candidatePlan);
+    this.revision += 1;
+    // The batch is committed the moment the revision advances. Notification is
+    // a separate, best-effort phase: one broken listener must not swallow the
+    // others, and it must never turn a successful commit into a thrown call.
+    const result: ApplyOk = { rev: this.revision, applied, touched };
+    if (linted.length > 0) result.issues = linted;
+    if (roomMerges.length > 0) result.roomMerges = roomMerges;
+    this.pendingErrors = [];
+    this.applying = true;
+    try {
+      this.listeners.emit(result.rev, touched, batch.ops);
+    } finally {
+      this.applying = false;
     }
+    const listenerErrors = this.pendingErrors;
+    this.pendingErrors = [];
+    return listenerErrors.length > 0 ? { ...result, listenerErrors } : result;
+  }
+
+  /**
+   * The candidate phase of `apply`, shared with `trial`: the operations over a
+   * draft, the room merge, the shell settle, validation, the solve, the zone
+   * check, the placement rebind and the lint. Nothing here touches the
+   * committed state.
+   */
+  private candidate(batch: ApplyBatch): Candidate | ApplyFailure {
     if (batch.baseRev !== this.revision) {
       return {
         error: 'revision_conflict',
@@ -345,26 +401,7 @@ export class SceneModel {
 
     const linted = this.lint(batch.lint ?? 'off', candidate, candidatePlan, batch.ops, roomMerges);
     if (!Array.isArray(linted)) return linted;
-
-    this.committed = deepFreeze(draft);
-    this.solved = deepFreeze(candidatePlan);
-    this.revision += 1;
-    // The batch is committed the moment the revision advances. Notification is
-    // a separate, best-effort phase: one broken listener must not swallow the
-    // others, and it must never turn a successful commit into a thrown call.
-    const result: ApplyOk = { rev: this.revision, applied, touched };
-    if (linted.length > 0) result.issues = linted;
-    if (roomMerges.length > 0) result.roomMerges = roomMerges;
-    this.pendingErrors = [];
-    this.applying = true;
-    try {
-      this.listeners.emit(result.rev, touched, batch.ops);
-    } finally {
-      this.applying = false;
-    }
-    const listenerErrors = this.pendingErrors;
-    this.pendingErrors = [];
-    return listenerErrors.length > 0 ? { ...result, listenerErrors } : result;
+    return { draft, plan: candidatePlan, applied, touched, roomMerges, linted };
   }
 
   /**

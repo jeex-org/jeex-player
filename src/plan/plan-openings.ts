@@ -140,6 +140,11 @@ export const MIN_OPENING_HEIGHT = 0.3;
  */
 export const CEILING_OPENING_MARGIN = 0.05;
 
+/** The narrowest width `clampOpening` gives an opening on a wall of `wallLength` metres. */
+export function minOpeningWidth(wallLength: number): number {
+  return Math.min(MIN_OPENING_WIDTH, Math.max(0, wallLength - 2 * OPENING_EDGE_MARGIN));
+}
+
 /** Everything a clamp needs to know about the wall an opening lives on. */
 export type OpeningBounds = {
   /** Centreline length of the wall, metres. */
@@ -163,7 +168,7 @@ export type OpeningGeometry = { center: number; width: number; sill: number; hea
  */
 export function clampOpening(type: OpeningType, requested: OpeningGeometry, bounds: OpeningBounds): OpeningGeometry {
   const usable = Math.max(0, bounds.wallLength - 2 * OPENING_EDGE_MARGIN);
-  const width = clamp(requested.width, Math.min(MIN_OPENING_WIDTH, usable), usable);
+  const width = clamp(requested.width, minOpeningWidth(bounds.wallLength), usable);
   const half = width / 2;
   const center = clamp(requested.center, OPENING_EDGE_MARGIN + half, bounds.wallLength - OPENING_EDGE_MARGIN - half);
   const maxHead = Math.max(MIN_OPENING_HEIGHT, bounds.ceilingHeight - CEILING_OPENING_MARGIN);

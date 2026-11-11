@@ -11,7 +11,7 @@ import { InlineSceneRepository, mountViewer, optionsFromDataset } from '../../sr
 import type { ViewerHandle } from '../../src/app/viewer-handle.js';
 import type { ViewerError, ViewerReadyInfo, ViewerSceneInfo } from '../../src/app/viewer-events.js';
 import { OVERLAY_NAMES, VIEWER_ROOT_SELECTOR } from '../../src/ui/viewer-shell.js';
-import { canvasHasInk, closeContainers, demoScene, nextFrame, openContainer, until } from './support.js';
+import { AUTHORING_CHUNK_TIMEOUT_MS, canvasHasInk, closeContainers, demoScene, nextFrame, openContainer, until } from './support.js';
 
 /** Fill colour of the camera marker's dot (the `drawing` palette's `accent`, `#dfbd7d`). */
 function hasAccentPixel(canvas: HTMLCanvasElement): boolean {
@@ -240,6 +240,27 @@ describe('mounting', () => {
     expect(handle.element.matches(VIEWER_ROOT_SELECTOR)).toBe(true);
     // The container stays the host's: one child added, nothing above touched.
     expect(container.children.length).toBe(1);
+  });
+
+  test('a mount that turns no authoring tool on requests none of the authoring modules, and the first switch-on requests them', async () => {
+    // The page has loaded hundreds of modules: a full resource-timing buffer drops every later entry,
+    // and an entry dropped would let a boot that started the import pass unseen.
+    performance.setResourceTimingBufferSize(100_000);
+    performance.clearResourceTimings();
+    const { handle } = mount();
+    await handle.ready;
+    await nextFrame();
+    // The authoring chunk's entry and the tools it carries; the boot bundle names none of them.
+    const lazy = /\/src\/(app\/authoring|camera\/checkpoint-overlay|ui\/camera-preview|edit\/asset-move-session)\.ts(\?|$)/;
+    const requested = (): string[] =>
+      performance
+        .getEntriesByType('resource')
+        .map((entry) => new URL(entry.name).pathname)
+        .filter((path) => lazy.test(path));
+    expect(requested()).toEqual([]);
+    // The control: the same observation sees the chunk once a switch asks for it.
+    handle.setCheckpointOverlay(true);
+    await until(() => requested().includes('/src/app/authoring.ts'), 'the authoring chunk’s request', AUTHORING_CHUNK_TIMEOUT_MS);
   });
 
   test('the resolved options are readable and every default is filled in', async () => {
