@@ -137,8 +137,8 @@ function resolveString(path: string, value: unknown, spec: OptionSpec): string |
 /**
  * The telemetry endpoint override. An invalid value — a string the endpoint
  * check refuses, or no string at all — resolves to `''`, which telemetry reads
- * as OFF; it must never fall back to `undefined`, which means the DEFAULT
- * endpoint, or a typo would send where the host asked it not to.
+ * as OFF and the resolver warns about. `undefined` means no endpoint at all,
+ * so nothing is sent either: there is no default endpoint.
  */
 function resolveEndpoint(path: string, value: unknown, spec: OptionSpec): string | undefined {
   if (value === undefined) return spec.default as undefined;

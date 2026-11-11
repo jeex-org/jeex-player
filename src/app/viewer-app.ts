@@ -235,6 +235,7 @@ export class ViewerApp {
       events: this.events,
       tourEvents: this.tourEvents,
       project: () => this.project(),
+      manifestRead: () => this.documents.manifestRead(),
       plan: () => this.mount.model?.plan,
       fullscreen: () => this.shell.isFullscreen(),
     });

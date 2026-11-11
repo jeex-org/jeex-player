@@ -54,14 +54,14 @@ Each request belongs to one group (`group`) and carries the shared context. Ever
 
 | Field | Meaning | Example |
 |---|---|---|
-| `event` | `view` (the player mounted), `ready` (the first frame was drawn), `models_loaded` (the 3D models finished loading), `engaged` (the view ended: the page was hidden or the player removed) | `"ready"` |
+| `event` | `view` (the player mounted), `ready` (the first frame was drawn), `models_loaded` (the 3D models finished loading), `engaged` (the view ended: the page was hidden, the scene replaced or the player removed) | `"ready"` |
 | `load` | `ready` and `models_loaded`: time since the mount or the scene change: `<1s`, `1-3s`, `3-10s`, `10-30s`, `>30s` | `"1-3s"` |
 | `outcome` | `models_loaded`: `complete`, `partial` (some failed), `budget` (stopped by the size limit), `none` (nothing to load) | `"complete"` |
 | `failed` | `models_loaded`: models that could not load, at most 50 | `0` |
 | `assets` | `models_loaded`: UUIDs of the project's library assets, at most 50 | `["0192…"]` |
 | `engaged` | `engaged`: time the player was on screen and running since the view began or since the last `engaged`, in every view mode, without the time the page was hidden or the player was paused: `<10s`, `10-30s`, `30s-2m`, `2-5m`, `5-15m`, `>15m`; never sent for no time at all | `"2-5m"` |
 
-`view` is sent once per player, when its first scene has loaded or failed, at most 2 seconds after the mount, with the `subject` known then (a failed load names the project and bake when its manifest was read); `ready` is sent at once (the iframe page holds both up to 2 seconds for its host to name the page first); `engaged` is sent when the page is hidden or the player is removed; everything else is sent when the page is hidden or closed, every 5 minutes, and when the scene changes.
+`view` is sent once per player, when its first scene has loaded or failed, at most 2 seconds after the mount, with the `subject` known then (a failed load names the project and bake when its manifest was read); `ready` is sent at once (the iframe page holds both up to 2 seconds for its host to name the page first); `engaged` is sent when the page is hidden, the scene is replaced or the player is removed, for the scene the time was spent on; everything else is sent when the page is hidden or closed, every 5 minutes, and when the scene changes.
 
 ### `actions`
 

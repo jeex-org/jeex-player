@@ -145,11 +145,14 @@ describe('createTelemetry: off means nothing at all', () => {
     const telemetry = createTelemetry(config(host))!;
     telemetry.viewed();
     telemetry.documentSettled();
+    telemetry.engage(20_000);
     host.gpcValue = true;
     telemetry.count('mode');
     host.leave();
+    telemetry.engage(20_000);
     telemetry.dispose();
-    expect(requests.map((request) => request.body['event'])).toEqual(['view']);
+    expect(requests).toHaveLength(1);
+    expect(requests.map((request) => `${String(request.body['group'])}/${String(request.body['event'])}`)).toEqual(['lifecycle/view']);
   });
 
   test('the endpoint the host names is used', () => {
@@ -454,6 +457,21 @@ describe('the iframe hold', () => {
     ]);
     release();
     expect(requests).toHaveLength(2);
+    telemetry.dispose();
+  });
+
+  test('a view that ends inside the hold sends view, then engaged, with the same context', () => {
+    const host = fakeHost();
+    const telemetry = createTelemetry(config(host, { hold: () => undefined }))!;
+    telemetry.viewed();
+    telemetry.setSubject({ project: PROJECT, bake: BAKE, scene: SCENE });
+    telemetry.documentSettled();
+    telemetry.engage(500);
+    // Hidden at 500 ms: the host has not answered and the cap has not run out.
+    host.leave();
+    expect(requests.map((request) => request.body['event'])).toEqual(['view', 'engaged']);
+    const context = ({ group: _group, event: _event, engaged: _engaged, ...rest }: Record<string, unknown>) => rest;
+    expect(context(requests[1]!.body)).toEqual(context(requests[0]!.body));
     telemetry.dispose();
   });
 

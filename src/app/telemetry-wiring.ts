@@ -18,7 +18,10 @@
  * mode really changed from the one the viewer booted in or last switched to.
  *
  * View invariant: `view` names the first document: the one loaded, or the
- * manifest's project and bake when the first load failed.
+ * manifest's project and bake when the first load failed or the view ended
+ * before it loaded. Engaged time belongs to the scene it was gathered on: a
+ * replacement ends the view of the old one, and a tick that spans a hidden
+ * tab adds nothing.
  */
 
 import { createTelemetry, type Telemetry } from '../telemetry/telemetry.js';
@@ -64,6 +67,8 @@ export type TelemetryWiringDeps = {
   events: ViewerEvents;
   tourEvents: TourEvents;
   project: () => ProjectInfo | null;
+  /** The ids of the manifest the boot read, judged, even before or without its scene; `null` for a bare scene. */
+  manifestRead: () => { projectId: string; bakeId: string } | null;
   plan: () => SceneModel['plan'] | undefined;
   fullscreen: () => boolean;
 };
@@ -141,7 +146,12 @@ export function telemetryWiring(deps: TelemetryWiringDeps): TelemetryWiring {
 function live(telemetry: Telemetry, deps: TelemetryWiringDeps, win: Window): TelemetryWiring {
   const clock = (): number => win.performance.now();
   telemetry.setLang(deps.options.locale);
-  telemetry.viewed();
+  /** The subject a manifest names before its scene is known, or `null`. */
+  const manifestSubject = () => {
+    const read = deps.manifestRead();
+    return read === null ? null : { project: read.projectId, bake: read.bakeId, scene: null };
+  };
+  telemetry.viewed(manifestSubject);
 
   let loadOrigin = clock();
   let nextOrigin = loadOrigin;
@@ -165,10 +175,8 @@ function live(telemetry: Telemetry, deps: TelemetryWiringDeps, win: Window): Tel
   const documentSettled = (sceneId: string | null): void => {
     if (settled) return;
     settled = true;
-    if (sceneId === null) {
-      const manifest = deps.project()?.manifest;
-      telemetry.setSubject({ project: manifest?.projectId ?? null, bake: manifest?.bakeId ?? null, scene: null });
-    } else subjectFromDocument(sceneId);
+    if (sceneId === null) telemetry.setSubject(manifestSubject() ?? { project: null, bake: null, scene: null });
+    else subjectFromDocument(sceneId);
     telemetry.documentSettled();
   };
 
@@ -205,6 +213,16 @@ function live(telemetry: Telemetry, deps: TelemetryWiringDeps, win: Window): Tel
   let previousDrawn: number | null = null;
   let previousTick: number | null = null;
   let roomTime = 0;
+  // A hide or a show starts the tick measurement over: a tick that spans a
+  // hidden tab, however short, is no engaged time and no time in a room.
+  const lifetime = new AbortController();
+  deps.container.ownerDocument.addEventListener(
+    'visibilitychange',
+    () => {
+      previousTick = null;
+    },
+    { signal: lifetime.signal },
+  );
   /**
    * Every tick of the frame loop, drawn or not: every mode but `plan2d` draws
    * only on demand (`render/render-demand.ts`), so a visitor standing still makes
@@ -291,7 +309,8 @@ function live(telemetry: Telemetry, deps: TelemetryWiringDeps, win: Window): Tel
     },
     beforePresent(sceneId) {
       if (sceneId === shownScene) return;
-      telemetry.flush();
+      // The old scene's view ends here: its data and its engaged time keep its subject.
+      telemetry.endView();
       loadOrigin = nextOrigin;
       readyArmed = true;
     },
@@ -305,6 +324,7 @@ function live(telemetry: Telemetry, deps: TelemetryWiringDeps, win: Window): Tel
     dispose() {
       detach?.();
       for (const unsubscribe of subscriptions) unsubscribe();
+      lifetime.abort();
       telemetry.dispose();
     },
   };

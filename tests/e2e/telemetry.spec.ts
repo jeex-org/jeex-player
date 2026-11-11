@@ -12,6 +12,8 @@ import { expect, test, type BrowserContext, type Page, type Request } from '@pla
 import { waitForBoot } from './support.js';
 
 const TELEMETRY = /^https:\/\/telemetry\.example\//;
+/** A baked project the dev server serves. */
+const PROJECT = '/tests/fixtures/project-library/project.json';
 const CONTEXT_KEYS = ['embed', 'group', 'lang', 'page', 'player', 'schema', 'site', 'subject'];
 /** How long a switched-off visit is watched for a stray request after it ends, ms. */
 const QUIET_MS = 2500;
@@ -42,10 +44,17 @@ async function visit(page: Page, path: string): Promise<void> {
 }
 
 /** Opens the telemetry page in one form and waits until its viewer is on screen. */
-async function open(page: Page, form: 'element' | 'script' | 'iframe', analytics?: string, endpoint?: string): Promise<void> {
+async function open(
+  page: Page,
+  form: 'element' | 'script' | 'iframe',
+  analytics?: string,
+  endpoint?: string,
+  project?: string,
+): Promise<void> {
   const query = new URLSearchParams({ form });
   if (analytics !== undefined) query.set('analytics', analytics);
   if (endpoint !== undefined) query.set('endpoint', endpoint);
+  if (project !== undefined) query.set('project', project);
   await visit(page, `/dev/telemetry.html?${query.toString()}`);
   await waitForBoot(page, form === 'element' ? 'window.__appReady === true' : 'window.jeexTelemetryReady === true');
 }
@@ -139,9 +148,21 @@ for (const { form, analytics } of OFF) {
 for (const form of ['element', 'script', 'iframe'] as const) {
   test(`${form} with no endpoint named makes no telemetry request at all`, async ({ page, context }) => {
     const seen = await capture(context);
+    // Every request of every frame: with no endpoint there is no host to send to,
+    // so nothing may leave for another origin, and nothing is posted anywhere.
+    const requests: Request[] = [];
+    context.on('request', (request) => requests.push(request));
     await open(page, form, undefined, 'none');
     await finishVisit(page);
     expect(seen.map((entry) => entry.body)).toEqual([]);
+    const origin = new URL(page.url()).origin;
+    const stray = requests.filter((request) => {
+      const url = request.url();
+      const local = url.startsWith('blob:') || url.startsWith('data:') || new URL(url).origin === origin;
+      return !local || request.method() !== 'GET';
+    });
+    expect(stray.map((request) => `${request.method()} ${request.url()}`)).toEqual([]);
+    expect(requests.length).toBeGreaterThan(0);
   });
 }
 
@@ -151,6 +172,29 @@ test('positive control: the same visit with only an endpoint named does send, in
     await open(page, form);
     await expect.poll(() => seen.filter((entry) => entry.body['embed'] === form && entry.body['event'] === 'ready').length).toBe(1);
   }
+});
+
+test('a project mount names its project in view, and a locale set later is the lang of later sends', async ({ page, context }) => {
+  const seen = await capture(context);
+  const manifest = (await (await page.request.get(PROJECT)).json()) as { projectId: string; bakeId: string };
+  // The page's clock stands still from the start: no frame is drawn, no timer
+  // runs, so `ready` never comes and the 2 s ceiling never fires. `view` can
+  // only leave because the boot said its document loaded.
+  await page.clock.install();
+  await page.clock.pauseAt((await page.evaluate(() => Date.now()).catch(() => Date.now())) + 60_000);
+  await visit(page, `/dev/telemetry.html?form=script&project=${encodeURIComponent(PROJECT)}`);
+  await expect.poll(() => seen.map((entry) => entry.body['event'])).toEqual(['view']);
+  expect(seen[0]!.body['subject']).toMatchObject({ project: manifest.projectId, bake: manifest.bakeId });
+  await page.clock.resume();
+  await waitForBoot(page, 'window.jeexTelemetryReady === true');
+  await page.evaluate(() => {
+    window.jeexTelemetryHandle?.setLocale('de');
+    window.jeexTelemetryHandle?.setMode('walk');
+    window.dispatchEvent(new PageTransitionEvent('pagehide'));
+  });
+  await expect.poll(() => seen.find((entry) => entry.body['group'] === 'actions')?.body['lang']).toBe('de');
+  expect(seen.find((entry) => entry.body['event'] === 'view')?.body['lang']).toBe('en');
+  await page.evaluate(() => window.jeexTelemetryHandle?.dispose());
 });
 
 test('Global Privacy Control sends nothing through a whole visit', async ({ page, context }) => {

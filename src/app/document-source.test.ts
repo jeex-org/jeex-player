@@ -27,4 +27,28 @@ describe('DocumentSource', () => {
     expect(booted.model.rev).toBe(9);
     expect(documents.project()?.baseUrl).toBe(library.baseUrl);
   });
+
+  test('a manifest whose scene fails to load still names its project and bake; a bare scene names none', async () => {
+    const manifest: unknown = JSON.parse(readFileSync(join(LAMP_DIR, 'project.json'), 'utf8'));
+    const original = globalThis.fetch;
+    globalThis.fetch = ((url: string) =>
+      Promise.resolve(
+        url.endsWith('project.json')
+          ? new Response(JSON.stringify(manifest), { headers: { 'content-type': 'application/json' } })
+          : new Response(null, { status: 404 }),
+      )) as typeof fetch;
+    try {
+      const documents = new DocumentSource({ url: 'https://lamps.test/bake/project.json' }, QUIET);
+      expect(documents.manifestRead()).toBeNull();
+      await expect(documents.boot()).rejects.toThrow();
+      expect(documents.project()).toBeNull();
+      const { projectId, bakeId } = manifest as { projectId: string; bakeId: string };
+      expect(documents.manifestRead()).toEqual({ projectId, bakeId });
+    } finally {
+      globalThis.fetch = original;
+    }
+    const bare = new DocumentSource({ document: apartmentScene }, QUIET);
+    await bare.boot();
+    expect(bare.manifestRead()).toBeNull();
+  });
 });

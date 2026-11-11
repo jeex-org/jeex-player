@@ -57,16 +57,29 @@ function fakeWindow(gpc = false) {
     clearTimeout: (handle: number) => timers.delete(handle),
     matchMedia: () => ({ matches: false }),
   };
+  const visibility = new Set<Listener>();
   const doc = {
     visibilityState: 'visible',
-    addEventListener: (type: string, _callback: Listener, options?: { signal?: AbortSignal }) => bind(type, options),
+    addEventListener: (type: string, callback: Listener, options?: { signal?: AbortSignal }) => {
+      bind(type, options);
+      if (type !== 'visibilitychange') return;
+      visibility.add(callback);
+      options?.signal?.addEventListener('abort', () => visibility.delete(callback), { once: true });
+    },
     defaultView: win,
+  };
+  const setVisibility = (state: 'visible' | 'hidden') => {
+    doc.visibilityState = state;
+    for (const listener of [...visibility]) listener();
   };
   return {
     container: { ownerDocument: doc, clientWidth: 1200 } as unknown as HTMLElement,
     leave: () => {
       for (const listener of [...leave]) listener();
     },
+    /** The tab hidden, then shown again: `visibilitychange` both times. */
+    hide: () => setVisibility('hidden'),
+    show: () => setVisibility('visible'),
     advance: (ms: number) => {
       clock += ms;
     },
@@ -125,6 +138,7 @@ function rig(options: ViewerOptionsInput = {}, gpc = false, site?: TelemetryWiri
   const events = new ViewerEvents();
   const tourEvents = new TourEvents();
   let project: ProjectInfo | null = null;
+  let manifest: { projectId: string; bakeId: string } | null = null;
   const deps: TelemetryWiringDeps = {
     options: resolveViewerOptions({ scene: { url: 'scene.json' }, analytics: { endpoint: ENDPOINT }, ...options }),
     embed: site ? 'iframe' : 'element',
@@ -133,6 +147,7 @@ function rig(options: ViewerOptionsInput = {}, gpc = false, site?: TelemetryWiri
     events,
     tourEvents,
     project: () => project,
+    manifestRead: () => manifest,
     plan: () => plan,
     fullscreen: () => false,
   };
@@ -146,6 +161,10 @@ function rig(options: ViewerOptionsInput = {}, gpc = false, site?: TelemetryWiri
     stage,
     setProject: (next: ProjectInfo | null) => {
       project = next;
+    },
+    /** The boot read and judged a manifest; its scene may still be loading, or have failed. */
+    readManifest: () => {
+      manifest = { projectId: PROJECT, bakeId: BAKE };
     },
     ready: (sceneId: string) => events.emit('ready', { options: deps.options, sceneId }),
   };
@@ -323,7 +342,8 @@ describe('telemetry wiring: schema 1.1', () => {
 
   test('a failed first load sends one view with the subject the manifest gave, or nulls', () => {
     const withManifest = rig();
-    withManifest.setProject(projectInfo);
+    // The manifest was read, its scene was not: no document, so no project on screen.
+    withManifest.readManifest();
     withManifest.events.emit('error', { code: 'scene-load', message: 'Scene fetch failed: 404', cause: new TypeError('x'), fatal: true });
     expect(views().map((body) => body['subject'])).toEqual([{ project: PROJECT, bake: BAKE, scene: null }]);
     withManifest.page.leave();
@@ -334,6 +354,45 @@ describe('telemetry wiring: schema 1.1', () => {
     without.events.emit('error', { code: 'scene-load', message: 'Scene fetch failed: 404', cause: new TypeError('x'), fatal: true });
     without.wiring.dispose();
     expect(views().map((body) => body['subject'])).toEqual([{ project: null, bake: null, scene: null }]);
+  });
+
+  test('a tab hidden before the first document still names the manifest the boot read', () => {
+    const subject = rig();
+    subject.wiring.attach(subject.stage.stage);
+    subject.readManifest();
+    subject.page.hide();
+    expect(views().map((body) => body['subject'])).toEqual([{ project: PROJECT, bake: BAKE, scene: null }]);
+    subject.wiring.dispose();
+  });
+
+  test('engaged time stays with its scene: four minutes on A, then twenty seconds on B, are two sends', () => {
+    const subject = rig();
+    subject.wiring.attach(subject.stage.stage);
+    subject.ready(SCENE_A);
+    for (let index = 0; index < 480; index += 1) subject.stage.frame(500, false);
+    subject.wiring.loadStarted();
+    subject.wiring.beforePresent(SCENE_B);
+    subject.ready(SCENE_B);
+    for (let index = 0; index < 40; index += 1) subject.stage.frame(500, false);
+    subject.wiring.dispose();
+    const sends = bodies.filter((body) => body['event'] === 'engaged');
+    expect(sends.map((body) => [body['engaged'], (body['subject'] as { scene: string }).scene])).toEqual([
+      ['2-5m', SCENE_A],
+      ['10-30s', SCENE_B],
+    ]);
+  });
+
+  test('a hide shorter than a second is no engaged time', () => {
+    const subject = rig();
+    subject.wiring.attach(subject.stage.stage);
+    for (let index = 0; index < 59; index += 1) subject.stage.frame(500, false);
+    subject.page.hide();
+    subject.page.advance(800);
+    subject.page.show();
+    // The first tick after the show spans the hide.
+    subject.stage.frame(0, false);
+    subject.wiring.dispose();
+    expect(engaged()).toEqual(['10-30s']);
   });
 
   test('the first switch from the start view counts: 360 then Walk is one mode change', () => {

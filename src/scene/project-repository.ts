@@ -64,6 +64,8 @@ export class ProjectRepository implements SceneRepository {
   private readonly url: string;
   private readonly init?: RequestInit | undefined;
   private loaded: LoadedProject | null = null;
+  /** The manifest the last `load()` read, kept even when its scene then failed. */
+  private read: LoadedProject | null = null;
 
   constructor(url: string, init?: RequestInit) {
     this.url = url;
@@ -73,6 +75,7 @@ export class ProjectRepository implements SceneRepository {
   async load(ref?: string): Promise<unknown> {
     const target = ref ?? this.url;
     this.loaded = null;
+    this.read = null;
     // The first request rides `fetchJsonCapped`'s default, `credentials:
     // 'omit'`: this is the request every `scene.url` — `?scene=`, `src=`,
     // `loadScene({ url })` — actually makes, and the URL is the EMBEDDER's
@@ -98,14 +101,23 @@ export class ProjectRepository implements SceneRepository {
 
     const baseUrl = folderOf(target);
     const sceneUrl = insideFolder(scenePath, baseUrl, target);
+    this.read = { manifest: first.value, baseUrl: baseUrl.href };
     const scene = await fetchJsonCapped(sceneUrl, this.init, MAX_SCENE_BYTES);
-    this.loaded = { manifest: first.value, baseUrl: baseUrl.href };
+    this.loaded = this.read;
     return scene.value;
   }
 
   /** The project the last `load()` opened; `null` before it, and for a bare scene. */
   project(): LoadedProject | null {
     return this.loaded;
+  }
+
+  /**
+   * The manifest the last `load()` read, unjudged, as soon as it is read: also
+   * while its scene is loading and after that load failed. `null` for a bare scene.
+   */
+  manifestRead(): LoadedProject | null {
+    return this.read;
   }
 }
 

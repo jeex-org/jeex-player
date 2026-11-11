@@ -18,12 +18,13 @@ as described under [Versioning](#versioning).
 - **Telemetry schema 1.1.0.** A new `lifecycle` send, `engaged`, carries
   the time the player was on screen and running, in every view mode and
   without hidden or paused time, as a bucket (`<10s`, `10-30s`, `30s-2m`,
-  `2-5m`, `5-15m`, `>15m`), once each time the view ends (the page hidden or
-  the player disposed) and only for the time since the last one. `view` now
-  waits for the first scene, at most 2 seconds, in every embed form, and
-  names its project, bake and scene; a failed first load names the project
-  and bake its manifest gave, or nothing. Every 1.0.0 field and send is
-  unchanged.
+  `2-5m`, `5-15m`, `>15m`), once each time the view ends (the page hidden,
+  the scene replaced, or the player disposed), only for the time since the
+  last one and under the scene it was spent on. Every 1.0.0 field is
+  unchanged; `view` now waits for the first document (at most 2 seconds) and
+  names its subject, project, bake and scene, in every embed form (a failed
+  first load names the project and bake its manifest gave, or nothing), and
+  `actions.counts.mode` now counts the first switch.
 - **The plan tool.** `handle.setPlanTool(true)` arms handles on the wall or
   opening `setSelection` highlighted in `plan2d`: drag an end node, move the
   wall sideways, slide an opening or change its width with a jamb. The drag

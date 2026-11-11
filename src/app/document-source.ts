@@ -9,7 +9,7 @@
  * outlived, resolves to `null` and reports nothing.
  */
 
-import { loadDocument, type LoadedDocument, type LoadedProjectContext, type ProjectInfo } from './project-wiring.js';
+import { loadDocument, manifestIdsOf, type LoadedDocument, type LoadedProjectContext, type ProjectInfo } from './project-wiring.js';
 import { resolveSceneSource, type SceneRepository, type SceneSource } from '../scene/scene-repository.js';
 import type { Logger } from '../shared/logger.js';
 import type { OffersSource } from '../assets/offers.js';
@@ -37,6 +37,17 @@ export class DocumentSource {
   /** The manifest and folder of the project on screen, or `null`. */
   project(): ProjectInfo | null {
     return this.loaded?.info ?? null;
+  }
+
+  /**
+   * The project and bake ids of the manifest the boot's source read, as soon as
+   * it is read: also while its scene loads and after that load failed (when
+   * `project()` is still `null`). `null` for a bare scene.
+   */
+  manifestRead(): { projectId: string; bakeId: string } | null {
+    const info = this.project();
+    if (info !== null) return { projectId: info.manifest.projectId, bakeId: info.manifest.bakeId };
+    return manifestIdsOf(this.repository);
   }
 
   /** The document of a boot (the first one, or a Retry), from the latest source that loaded. */
