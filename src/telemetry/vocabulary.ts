@@ -11,14 +11,11 @@
  * Pure module: no `three`, no DOM.
  */
 
-import type { DwellBucket, FpsBucket, LoadBucket, WidthBucket } from './buckets.js';
+import type { DwellBucket, EngagedBucket, FpsBucket, LoadBucket, WidthBucket } from './buckets.js';
 import { SHIPPED_LOCALES } from '../ui/messages.js';
 
 /** Semver of the payload schema; every send carries it as `schema`. */
-export const TELEMETRY_SCHEMA_VERSION = '1.0.0';
-
-/** Where sends go when nothing overrides it. */
-export const DEFAULT_TELEMETRY_ENDPOINT = 'https://telemetry.jeex.org/v1/player';
+export const TELEMETRY_SCHEMA_VERSION = '1.1.0';
 
 export const EMBED_FORMS = ['element', 'iframe', 'script'] as const;
 export type EmbedForm = (typeof EMBED_FORMS)[number];
@@ -123,6 +120,7 @@ export type LifecycleSend = TelemetryContext &
   (
     | { group: 'lifecycle'; event: 'view' }
     | { group: 'lifecycle'; event: 'ready'; load: LoadBucket }
+    | { group: 'lifecycle'; event: 'engaged'; engaged: EngagedBucket }
     | { group: 'lifecycle'; event: 'models_loaded'; load: LoadBucket; outcome: ModelOutcome; failed: number; assets: string[] }
   );
 

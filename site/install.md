@@ -110,7 +110,7 @@ default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; c
 ```
 
 - `connect-src` must also cover wherever the scene is fetched from (for the demo: `https://player.jeex.org`).
-- `connect-src` must also allow `https://telemetry.jeex.org` for the player's anonymous telemetry, or the page sets `analytics="off"` on the player ([what it sends](https://player.jeex.org/telemetry.html)). Without either, the telemetry requests are refused silently and the player works as before.
+- `connect-src` must also allow the `analytics-endpoint` the page names for the player's anonymous telemetry ([what it sends](https://player.jeex.org/telemetry.html)); without it the telemetry requests are refused silently and the player works as before. A page that names no endpoint sends no telemetry at all.
 - `img-src data:` is required: the viewer renders swatches as `data:` URLs.
 - The iframe path needs `frame-src` for the origin that serves `embed.html`; that origin should send `Content-Security-Policy: frame-ancestors <the sites allowed to frame it>` as a response header (README: [iframe permissions and origin](https://github.com/jeex-org/jeex-player/blob/main/README.md#iframe-permissions-and-origin)).
 

@@ -3,8 +3,9 @@
  * accumulates, builds each send, judges it and hands it to the transport.
  *
  * Off invariant: `createTelemetry` returns `null` when the mount said
- * `analytics: off`, when the endpoint override is refused, or when the browser
- * reports Global Privacy Control. `null` means no collector, no listener, no
+ * `analytics: off`, when the host named no endpoint or one the check refuses,
+ * or when the browser reports Global Privacy Control. There is no default
+ * endpoint. `null` means no collector, no listener, no
  * timer and no request, ever; callers hold an optional and do nothing. GPC is
  * read again before every request.
  *
@@ -12,6 +13,11 @@
  * context of the moment it is built (or, for `models_loaded`, of the scene it
  * describes), judged by `isTelemetrySend`, and dropped when it fails. No
  * field links two sends beyond that shared context.
+ *
+ * View invariant: one `view` per mount, held until the first document settles
+ * (loaded, failed, or `ready`), at most `CONTEXT_HOLD_MS`, and built with the
+ * subject known then. One `engaged` per end of the view (the page hidden, or
+ * the mount disposed), for the engaged time since the last one; none for none.
  *
  * Page invariant: the page-wide error listeners exist once per page while any
  * telemetry is live, and route each error to the OLDEST live instance, so one
@@ -22,14 +28,13 @@
 
 import { reportOf } from './error-report.js';
 import { TelemetryCollector } from './collector.js';
-import { COUNTER_CAP, dwellBucket, loadBucket, shareBucket, type FpsBucket, type WidthBucket } from './buckets.js';
+import { COUNTER_CAP, dwellBucket, engagedBucket, loadBucket, shareBucket, type FpsBucket, type WidthBucket } from './buckets.js';
 import { sanitisePagePath } from './page-path.js';
 import { isOwnFile } from './own-files.js';
 import { sendTelemetry } from './transport.js';
 import { MAX_ASSETS, isTelemetryEndpoint, isTelemetrySend } from './telemetry.schema.js';
 import { UUID_V7_PATTERN } from '../scene/types.js';
 import {
-  DEFAULT_TELEMETRY_ENDPOINT,
   TELEMETRY_LANGS,
   TELEMETRY_SCHEMA_VERSION,
   type CounterKey,
@@ -49,9 +54,10 @@ import {
 export const FLUSH_INTERVAL_MS = 5 * 60 * 1000;
 
 /**
- * How long the iframe page holds `view` and `ready` for its host's `context`,
- * in ms: long enough for a host on the same connection to answer the frame's
- * load, short enough that a host which never sends it does not lose the view.
+ * How long `view` waits for the first document, and the iframe page holds
+ * `view` and `ready` for its host's `context`, in ms: long enough for a host on
+ * the same connection to answer the frame's load, short enough that a slow or
+ * silent one does not lose the view.
  */
 export const CONTEXT_HOLD_MS = 2000;
 
@@ -65,7 +71,7 @@ export type TelemetryHost = {
   page(): string | null;
   /** `browser`: family and bucketed major version. */
   browser(): string;
-  /** Calls `listener` when the document becomes hidden and on `pagehide`, until `signal` aborts. */
+  /** Calls `listener` when the document becomes hidden and on `pagehide`, until `signal` aborts: the end of a view. */
   onLeave(listener: () => void, signal: AbortSignal): void;
   /** Calls `listener` for every page-wide error and unhandled rejection, until `signal` aborts. */
   onPageError(listener: (code: 'exception' | 'rejection', error: unknown) => void, signal: AbortSignal): void;
@@ -78,7 +84,7 @@ export type TelemetryHost = {
 /** What a mount decided about telemetry. */
 export type TelemetryConfig = {
   mode: 'on' | 'off';
-  /** `undefined` is the default endpoint; anything the endpoint check refuses turns sending off. */
+  /** Where the sends go; `undefined`, or anything the endpoint check refuses, turns sending off. */
   endpoint: string | undefined;
   embed: EmbedForm;
   /** `package.json#version` of this build. */
@@ -127,13 +133,13 @@ function unregister(telemetry: Telemetry): void {
 }
 
 /**
- * The telemetry of one mount, or `null` when nothing may be sent. A refused
- * endpoint override is off; the options resolver has already said why.
+ * The telemetry of one mount, or `null` when nothing may be sent. No endpoint
+ * is off; a refused one too, and the options resolver has already said why.
  */
 export function createTelemetry(config: TelemetryConfig): Telemetry | null {
   if (config.mode === 'off' || config.host.gpc()) return null;
-  const endpoint = config.endpoint ?? DEFAULT_TELEMETRY_ENDPOINT;
-  if (!isTelemetryEndpoint(endpoint)) return null;
+  const endpoint = config.endpoint;
+  if (endpoint === undefined || !isTelemetryEndpoint(endpoint)) return null;
   return new Telemetry(config, endpoint);
 }
 
@@ -147,6 +153,9 @@ export class Telemetry {
   /** `models_loaded` waits for the next flush, with the context of its own scene. */
   private pendingLifecycle: TelemetrySend[] = [];
   private viewSent = false;
+  /** `view` was asked for and waits for the first document. */
+  private viewPending = false;
+  private stopViewHold: () => void = () => undefined;
   private disposed = false;
   /** `view`/`ready` waiting for the iframe host's context; `null` once released. */
   private held: Array<() => TelemetrySend> | null = null;
@@ -158,7 +167,7 @@ export class Telemetry {
   constructor(config: TelemetryConfig, endpoint: string) {
     this.config = config;
     this.endpoint = endpoint;
-    config.host.onLeave(() => this.flush(), this.lifetime.signal);
+    config.host.onLeave(() => this.end(), this.lifetime.signal);
     this.stopTimer = config.host.every(FLUSH_INTERVAL_MS, () => this.flush());
     register(this, config.host);
     if (config.hold) {
@@ -196,15 +205,31 @@ export class Telemetry {
     this.device = device;
   }
 
-  /** `view`, once per mount, sent now. */
+  /** `view`, once per mount: it leaves when the first document settles, or after `CONTEXT_HOLD_MS`. */
   viewed(): void {
     if (this.viewSent) return;
     this.viewSent = true;
-    this.soon(() => ({ ...this.context(), group: 'lifecycle', event: 'view' }));
+    this.viewPending = true;
+    this.stopViewHold = this.config.host.after(CONTEXT_HOLD_MS, () => this.sendView());
+  }
+
+  /** The first document settled, loaded or failed: `view` leaves with the subject set now. Idempotent. */
+  documentSettled(): void {
+    this.sendView();
+  }
+
+  private sendView(): void {
+    if (!this.viewPending) return;
+    this.viewPending = false;
+    this.stopViewHold();
+    const subject = { ...this.subject };
+    this.soon(() => ({ ...this.context(), subject, group: 'lifecycle', event: 'view' }));
   }
 
   /** `ready` for the scene on screen, sent now; `seconds` since the mount or the `loadScene` call. */
   ready(seconds: number): void {
+    // A scene on screen is a settled document, and `view` always goes first.
+    this.sendView();
     // The subject and the bucket are fixed now; only `site`/`page` may still be learnt.
     const subject = { ...this.subject };
     const load = loadBucket(seconds);
@@ -237,6 +262,11 @@ export class Telemetry {
     this.collector.dwell(room, ms);
   }
 
+  /** `ms` more of engaged time, in any mode; the caller leaves pauses out. */
+  engage(ms: number): void {
+    this.collector.engage(ms);
+  }
+
   /** An error at `stage`; reported only when `reportOf` allows it. */
   error(code: TelemetryErrorCode, stage: ErrorStage, error: unknown): void {
     if (this.disposed) return;
@@ -247,6 +277,7 @@ export class Telemetry {
   /** Sends everything gathered, one request per group and per error report. */
   flush(): void {
     if (this.disposed) return;
+    this.sendView();
     this.release();
     const lifecycle = this.pendingLifecycle;
     this.pendingLifecycle = [];
@@ -273,10 +304,18 @@ export class Telemetry {
     for (const { report, count } of snapshot.errors) this.dispatch({ ...context, group: 'error', ...report, browser, count });
   }
 
-  /** Flushes, then stops every listener and timer of this mount. Idempotent. */
-  dispose(): void {
+  /** The view ends (the page hidden, or the mount disposed): flush, then the engaged time since the last end. */
+  private end(): void {
     if (this.disposed) return;
     this.flush();
+    const ms = this.collector.takeEngaged();
+    if (ms > 0) this.dispatch({ ...this.context(), group: 'lifecycle', event: 'engaged', engaged: engagedBucket(ms / 1000) });
+  }
+
+  /** Ends the view, then stops every listener and timer of this mount. Idempotent. */
+  dispose(): void {
+    if (this.disposed) return;
+    this.end();
     this.disposed = true;
     this.stopTimer();
     this.lifetime.abort();

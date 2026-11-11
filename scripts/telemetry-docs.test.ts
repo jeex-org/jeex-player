@@ -84,7 +84,7 @@ describe('the telemetry documentation', () => {
   }
 
   test('the site page links the schema where the site build publishes it', () => {
-    expect(DOCUMENTS[1].text).toContain('href="schema/telemetry/1.0.0.json"');
+    expect(DOCUMENTS[1].text).toContain('href="schema/telemetry/1.1.0.json"');
     expect(DOCUMENTS[0].text).toContain('(telemetry.schema.json)');
   });
 });

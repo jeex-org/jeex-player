@@ -11,7 +11,7 @@
 import { expect, test, type BrowserContext, type Page, type Request } from '@playwright/test';
 import { waitForBoot } from './support.js';
 
-const TELEMETRY = /^https:\/\/telemetry\.jeex\.org\//;
+const TELEMETRY = /^https:\/\/telemetry\.example\//;
 const CONTEXT_KEYS = ['embed', 'group', 'lang', 'page', 'player', 'schema', 'site', 'subject'];
 /** How long a switched-off visit is watched for a stray request after it ends, ms. */
 const QUIET_MS = 2500;
@@ -42,9 +42,10 @@ async function visit(page: Page, path: string): Promise<void> {
 }
 
 /** Opens the telemetry page in one form and waits until its viewer is on screen. */
-async function open(page: Page, form: 'element' | 'script' | 'iframe', analytics?: string): Promise<void> {
+async function open(page: Page, form: 'element' | 'script' | 'iframe', analytics?: string, endpoint?: string): Promise<void> {
   const query = new URLSearchParams({ form });
   if (analytics !== undefined) query.set('analytics', analytics);
+  if (endpoint !== undefined) query.set('endpoint', endpoint);
   await visit(page, `/dev/telemetry.html?${query.toString()}`);
   await waitForBoot(page, form === 'element' ? 'window.__appReady === true' : 'window.jeexTelemetryReady === true');
 }
@@ -135,7 +136,16 @@ for (const { form, analytics } of OFF) {
   });
 }
 
-test('positive control: the same visit with nothing said does send, in all three forms', async ({ page, context }) => {
+for (const form of ['element', 'script', 'iframe'] as const) {
+  test(`${form} with no endpoint named makes no telemetry request at all`, async ({ page, context }) => {
+    const seen = await capture(context);
+    await open(page, form, undefined, 'none');
+    await finishVisit(page);
+    expect(seen.map((entry) => entry.body)).toEqual([]);
+  });
+}
+
+test('positive control: the same visit with only an endpoint named does send, in all three forms', async ({ page, context }) => {
   const seen = await capture(context);
   for (const form of ['element', 'script', 'iframe'] as const) {
     await open(page, form);

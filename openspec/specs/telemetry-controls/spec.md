@@ -5,14 +5,19 @@ Defines how a site and a visitor's browser control the player's telemetry, and h
 
 ## Requirements
 
-### Requirement: On by default
+### Requirement: On by default, to the host's endpoint only
 
-Telemetry SHALL be on when nothing turns it off, and SHALL send to `https://telemetry.jeex.org/v1/player`.
+Telemetry SHALL be on when nothing turns it off, and SHALL send only to the endpoint the host names. There is no default endpoint.
 
 #### Scenario: Default embed
 
 - **WHEN** a page embeds the player with no telemetry option
-- **THEN** a `view` send is made to the default endpoint
+- **THEN** no telemetry request is made and no telemetry listener or timer is started
+
+#### Scenario: Host endpoint
+
+- **WHEN** a page embeds the player with `analytics-endpoint` naming an `https:` URL
+- **THEN** a `view` send is made to that endpoint
 
 ### Requirement: Off switch
 
@@ -39,12 +44,12 @@ When `navigator.globalPrivacyControl === true` the player SHALL send nothing, as
 
 ### Requirement: Endpoint override
 
-`analytics-endpoint` (element), `?analyticsEndpoint=` (iframe page) and `analytics.endpoint` (`mountViewer`) SHALL replace the endpoint when the value is an absolute `https:` URL, or an `http:` URL on `localhost` or `127.0.0.1`. Any other value, including a value that is not a string, SHALL turn sending off and log one warning; it SHALL NOT fall back to the default endpoint.
+`analytics-endpoint` (element), `?analyticsEndpoint=` (iframe page) and `analytics.endpoint` (`mountViewer`) SHALL name the endpoint when the value is an absolute `https:` URL, or an `http:` URL on `localhost` or `127.0.0.1`. Any other value, including a value that is not a string, SHALL turn sending off and log one warning.
 
 #### Scenario: Valid override
 
 - **WHEN** `analytics-endpoint="https://stats.agency.example/player"` is set
-- **THEN** sends go to that URL and none to the default endpoint
+- **THEN** sends go to that URL and nowhere else
 
 #### Scenario: Invalid override
 
@@ -54,7 +59,7 @@ When `navigator.globalPrivacyControl === true` the player SHALL send nothing, as
 #### Scenario: A non-string override through the API
 
 - **WHEN** `mountViewer` is given `{ analytics: { endpoint: 42 } }`
-- **THEN** no telemetry request is made to any endpoint, the default included, and one warning is logged
+- **THEN** no telemetry request is made to any endpoint and one warning is logged
 
 ### Requirement: Off does not change the player
 

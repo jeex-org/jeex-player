@@ -19,6 +19,7 @@ const SCENE_B = '0192f5c4-7a1b-7c3d-8e9f-0a1b2c3d4e5b';
 const PROJECT = '0192f5c4-7a1b-7c3d-8e9f-0a1b2c3d4e51';
 const BAKE = '0192f5c4-7a1b-7c3d-8e9f-0a1b2c3d4e52';
 const ASSET = '0192f5c4-7a1b-7c3d-8e9f-0a1b2c3d4e53';
+const ENDPOINT = 'https://stats.agency.example/player';
 
 type Listener = () => void;
 
@@ -125,7 +126,7 @@ function rig(options: ViewerOptionsInput = {}, gpc = false, site?: TelemetryWiri
   const tourEvents = new TourEvents();
   let project: ProjectInfo | null = null;
   const deps: TelemetryWiringDeps = {
-    options: resolveViewerOptions({ scene: { url: 'scene.json' }, ...options }),
+    options: resolveViewerOptions({ scene: { url: 'scene.json' }, analytics: { endpoint: ENDPOINT }, ...options }),
     embed: site ? 'iframe' : 'element',
     site,
     container: page.container,
@@ -164,9 +165,10 @@ const result = (over: Partial<UpgradeResult> = {}): UpgradeResult => ({
 });
 
 describe('telemetry wiring', () => {
-  test('off and GPC: nothing is sent and nothing is listened to, through a whole session', () => {
+  test('off, GPC and no endpoint: nothing is sent and nothing is listened to, through a whole session', () => {
     for (const subject of [
       rig({ analytics: { mode: 'off' } }),
+      rig({ analytics: 'on' }),
       rig({}, true),
       rig({ analytics: { endpoint: '' }, onLog: () => undefined }),
     ]) {
@@ -182,15 +184,15 @@ describe('telemetry wiring', () => {
     expect(bodies).toEqual([]);
   });
 
-  test('view at once with a null subject; ready on the first DRAWN frame, with the ids', () => {
+  test('view waits for the first document and names it; ready on the first DRAWN frame, with the ids', () => {
     const subject = rig();
-    expect(bodies.map((body) => [body['event'], body['subject']])).toEqual([['view', { project: null, bake: null, scene: null }]]);
+    expect(bodies).toEqual([]);
     subject.wiring.attach(subject.stage.stage);
     subject.setProject(projectInfo);
     subject.page.advance(2400);
     subject.ready(SCENE_A);
     subject.stage.frame(16, false);
-    expect(bodies).toHaveLength(1);
+    expect(bodies.map((body) => [body['event'], body['subject']])).toEqual([['view', { project: PROJECT, bake: BAKE, scene: SCENE_A }]]);
     subject.stage.frame(16, true);
     expect(bodies[1]).toMatchObject({
       event: 'ready',
@@ -297,6 +299,98 @@ describe('telemetry wiring', () => {
     subject.page.leave();
     expect(bodies.find((body) => body['event'] === 'models_loaded')).toMatchObject({ outcome: 'none', assets: [ASSET] });
     subject.wiring.dispose();
+  });
+});
+
+describe('telemetry wiring: schema 1.1', () => {
+  const views = () => bodies.filter((body) => body['event'] === 'view');
+  const engaged = () => bodies.filter((body) => body['event'] === 'engaged').map((body) => body['engaged']);
+
+  test('a project mount sends one view carrying the project and the bake as soon as the document is loaded', () => {
+    const subject = rig({}, false);
+    subject.wiring.attach(subject.stage.stage);
+    subject.setProject(projectInfo);
+    subject.wiring.documentLoaded(SCENE_A);
+    expect(views().map((body) => [body['embed'], body['subject']])).toEqual([
+      ['element', { project: PROJECT, bake: BAKE, scene: SCENE_A }],
+    ]);
+    subject.ready(SCENE_A);
+    subject.stage.frame();
+    subject.page.leave();
+    subject.wiring.dispose();
+    expect(views()).toHaveLength(1);
+  });
+
+  test('a failed first load sends one view with the subject the manifest gave, or nulls', () => {
+    const withManifest = rig();
+    withManifest.setProject(projectInfo);
+    withManifest.events.emit('error', { code: 'scene-load', message: 'Scene fetch failed: 404', cause: new TypeError('x'), fatal: true });
+    expect(views().map((body) => body['subject'])).toEqual([{ project: PROJECT, bake: BAKE, scene: null }]);
+    withManifest.page.leave();
+    withManifest.wiring.dispose();
+    expect(views()).toHaveLength(1);
+    bodies = [];
+    const without = rig();
+    without.events.emit('error', { code: 'scene-load', message: 'Scene fetch failed: 404', cause: new TypeError('x'), fatal: true });
+    without.wiring.dispose();
+    expect(views().map((body) => body['subject'])).toEqual([{ project: null, bake: null, scene: null }]);
+  });
+
+  test('the first switch from the start view counts: 360 then Walk is one mode change', () => {
+    const subject = rig();
+    subject.wiring.attach(subject.stage.stage);
+    subject.ready(SCENE_A);
+    subject.events.emit('mode', 'walk');
+    subject.page.leave();
+    expect(bodies.find((body) => body['group'] === 'actions')?.['counts']).toMatchObject({ mode: 1 });
+    subject.wiring.dispose();
+  });
+
+  test('three minutes in orbit give one engaged send in 2-5m when the viewer is disposed', () => {
+    const subject = rig();
+    subject.wiring.attach(subject.stage.stage);
+    subject.ready(SCENE_A);
+    for (let index = 0; index < 360; index += 1) subject.stage.frame(500, false);
+    expect(engaged()).toEqual([]);
+    subject.wiring.dispose();
+    expect(engaged()).toEqual(['2-5m']);
+  });
+
+  test('engaged time counts every mode and leaves out a hidden tab', () => {
+    const subject = rig();
+    subject.wiring.attach(subject.stage.stage);
+    for (const mode of ['orbit', 'walk', 'plan2d', 'plan3d'] as const) {
+      subject.stage.setMode(mode);
+      for (let index = 0; index < 20; index += 1) subject.stage.frame(500, false);
+    }
+    // Ten minutes hidden: the loop stopped, the next tick comes that much later.
+    subject.stage.frame(600_000, false);
+    subject.wiring.dispose();
+    expect(engaged()).toEqual(['30s-2m']);
+  });
+
+  test('hide, show, more time, hide: a second engaged send for the new time only', () => {
+    const subject = rig();
+    subject.wiring.attach(subject.stage.stage);
+    for (let index = 0; index < 360; index += 1) subject.stage.frame(500, false);
+    subject.page.leave();
+    expect(engaged()).toEqual(['2-5m']);
+    subject.stage.frame(60_000, false);
+    for (let index = 0; index < 40; index += 1) subject.stage.frame(500, false);
+    subject.page.leave();
+    subject.wiring.dispose();
+    expect(engaged()).toEqual(['2-5m', '10-30s']);
+  });
+
+  test('a new locale changes lang in every later send', () => {
+    const subject = rig({ locale: 'en' });
+    subject.wiring.usage('door');
+    subject.page.leave();
+    subject.wiring.localeChanged('de');
+    subject.wiring.usage('door');
+    subject.page.leave();
+    subject.wiring.dispose();
+    expect(bodies.filter((body) => body['group'] === 'actions').map((body) => body['lang'])).toEqual(['en', 'de']);
   });
 });
 

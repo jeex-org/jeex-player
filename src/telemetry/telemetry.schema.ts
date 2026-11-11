@@ -15,7 +15,7 @@
 
 import { z } from 'zod/mini';
 import { UUID_V7_PATTERN } from '../scene/types.js';
-import { DWELL_BUCKETS, FPS_BUCKETS, LOAD_BUCKETS, WIDTH_BUCKETS, COUNTER_CAP } from './buckets.js';
+import { DWELL_BUCKETS, ENGAGED_BUCKETS, FPS_BUCKETS, LOAD_BUCKETS, WIDTH_BUCKETS, COUNTER_CAP } from './buckets.js';
 import { MAX_FRAMES } from './stack-frames.js';
 import { PAGE_PATH_LIMIT } from './page-path.js';
 import {
@@ -64,6 +64,7 @@ const contextShape = {
 const lifecycleSchema = z.discriminatedUnion('event', [
   z.strictObject({ ...contextShape, group: z.literal('lifecycle'), event: z.literal('view') }),
   z.strictObject({ ...contextShape, group: z.literal('lifecycle'), event: z.literal('ready'), load: z.enum(LOAD_BUCKETS) }),
+  z.strictObject({ ...contextShape, group: z.literal('lifecycle'), event: z.literal('engaged'), engaged: z.enum(ENGAGED_BUCKETS) }),
   z.strictObject({
     ...contextShape,
     group: z.literal('lifecycle'),
@@ -119,9 +120,8 @@ export function isTelemetrySend(send: unknown): send is TelemetrySend {
 const LOCAL_HOSTS: ReadonlySet<string> = new Set(['localhost', '127.0.0.1', '[::1]']);
 
 /**
- * Whether `raw` may replace the endpoint: an absolute `https:` URL, or `http:`
- * on the local machine, without credentials. Anything else turns sending off;
- * it never falls back to the default endpoint.
+ * Whether `raw` may be the endpoint: an absolute `https:` URL, or `http:` on
+ * the local machine, without credentials. Anything else turns sending off.
  */
 function isEndpointUrl(raw: string): boolean {
   let url: URL;
@@ -138,7 +138,7 @@ const endpointSchema = z
   .string()
   .check(z.maxLength(2048), z.refine(isEndpointUrl, { error: 'must be an https URL, or http on this machine' }));
 
-/** Whether an endpoint override may be used. */
+/** Whether the endpoint a host named may be used. */
 export function isTelemetryEndpoint(raw: unknown): raw is string {
   return z.safeParse(endpointSchema, raw).success;
 }

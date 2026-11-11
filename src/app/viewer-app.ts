@@ -254,6 +254,7 @@ export class ViewerApp {
       messages: () => this.messages,
       setMessages: (messages) => {
         this.messages = messages;
+        this.telemetry.localeChanged(messages.locale);
       },
     });
   }
@@ -284,6 +285,7 @@ export class ViewerApp {
       showBootStep(this.ui, this.messages, 'scene');
       const loaded = await loadWithNoiseTiles(preloaded ? Promise.resolve(preloaded) : this.documents.boot(), this.context.signal);
       const model = loaded.model;
+      this.telemetry.documentLoaded(model.scene.id);
       showBootStep(this.ui, this.messages, 'geometry');
       await nextFrame(this.context.signal);
       this.buildStage(model);
