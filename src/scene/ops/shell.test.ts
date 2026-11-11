@@ -21,13 +21,14 @@ import { resolveDoorSwing } from '../../plan/door-swing.js';
 import { OPENING_EDGE_MARGIN } from '../../plan/plan-openings.js';
 import { isApplyOk, SceneModel } from '../scene-model.js';
 import { validateScene } from '../scene-validator.js';
-import { WALL_LIMITS, faceKey } from '../types.js';
+import { TOUR_CHECKPOINT_HEIGHT_MARGIN_M, WALL_LIMITS, faceKey } from '../types.js';
 import { BAY, L_SHAPE } from '../../fixtures/plan-l-shape-ids.js';
 import { DEMO } from '../../demo/demo-ids.js';
 import { FINISH } from '../../materials/finish-ids.js';
 
 /** Ids of the nodes and walls these tests create (and of nothing at all), minted offline. */
 const NEW = {
+  checkpoint: '01a1f6c0-2b10-7a00-9e00-0000000000c1',
   nMid: '01a12ff3-0a51-7b61-9487-2ab39ac44052',
   wL: '01a12ff3-0a52-7c8e-b4be-e3d9291e4f4a',
   wR: '01a12ff3-0a53-7182-a933-16c5ed5c4db9',
@@ -68,6 +69,7 @@ const W = L_SHAPE.wall;
 const N = L_SHAPE.node;
 
 import type { SceneData, SceneOp, Wall } from '../types.js';
+import { TOUCHED_TOUR_CHECKPOINTS } from './context.js';
 import { MIN_SPLIT_HALF, WALL_THICKNESS } from './limits.js';
 import {
   MAX_CEILING_HEIGHT,
@@ -120,6 +122,26 @@ describe('set_ceiling', () => {
 
   test('rejects a height that is not a finite number', () => {
     expect(rejectsOp(opDraft(), { op: 'set_ceiling', height: Number.NaN })).toContain('finite');
+  });
+
+  test('lowering the ceiling brings a tour checkpoint under it, and the batch commits', () => {
+    const scene: SceneData = {
+      ...lShapePlan,
+      tourCheckpoints: [{ id: NEW.checkpoint, position: { x: 3, y: 2.9, z: 4 }, yaw: 0, pitch: 0 }],
+    };
+    const model = SceneModel.load(scene, CATALOGUE_REGISTRIES);
+    const result = model.apply({ baseRev: model.rev, ops: [{ op: 'set_ceiling', height: 2.6 }] });
+    expect(result).toMatchObject({ rev: 1 });
+    expect(model.scene.tourCheckpoints?.[0]?.position.y).toBeCloseTo(2.6 - TOUR_CHECKPOINT_HEIGHT_MARGIN_M, 9);
+    expect(isApplyOk(result) && result.touched).toContainEqual(TOUCHED_TOUR_CHECKPOINTS);
+  });
+
+  test('a checkpoint already under the new ceiling stays where it is, and is not reported', () => {
+    const scene = opDraft();
+    scene.tourCheckpoints = [{ id: NEW.checkpoint, position: { x: 3, y: 1.6, z: 4 }, yaw: 0, pitch: 0 }];
+    const outcome = applyOp(scene, { op: 'set_ceiling', height: 2.6 }, CATALOGUE_REGISTRIES);
+    expect(scene.tourCheckpoints[0]!.position.y).toBe(1.6);
+    expect(outcome.touched).toEqual([TOUCHED_SHELL]);
   });
 });
 
@@ -296,6 +318,28 @@ describe('add_wall', () => {
       op: 'add_wall',
     });
     expect(scene.walls).toHaveLength(lShapePlan.walls.length);
+  });
+});
+
+describe('a wall edit proves the centreline before it writes', () => {
+  test('add_wall refuses a straight wall shorter than the validator allows, and adds nothing', () => {
+    const scene = opDraft();
+    scene.nodes.push({ id: NEW.nMid, p: { x: 0.2, z: 0 } });
+    const walls = scene.walls.length;
+    expect(rejectsOp(scene, { op: 'add_wall', id: NEW.wL, a: L_SHAPE.node.n1, b: NEW.nMid, thickness: 0.1 })).toContain(
+      `below the minimum ${WALL_LIMITS.minCentrelineLength} m`,
+    );
+    expect(scene.walls.length).toBe(walls);
+  });
+
+  test('set_wall refuses an arc the chord cannot take before it writes the thickness or the role', () => {
+    const scene = opDraft();
+    const wall = scene.walls.find((candidate) => candidate.id === L_SHAPE.wall.wSB)!;
+    expect(rejectsOp(scene, { op: 'set_wall', wallId: L_SHAPE.wall.wSB, thickness: 0.2, role: 'partition', arc: { radius: 1, ccw: true } })).toContain(
+      'cannot span',
+    );
+    expect(wall.thickness).toBe(0.3);
+    expect(wall.role).toBe('facade');
   });
 });
 

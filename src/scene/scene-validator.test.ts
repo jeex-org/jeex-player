@@ -411,6 +411,14 @@ describe('scene validator — openings', () => {
     expect(() => validateScene(invalid, CATALOGUE_REGISTRIES)).toThrow(`Opening ${OPENING.doorEntry} does not fit inside wall ${WALL.wSA}`);
   });
 
+  test('judges an opening at the heights it is drawn at: a raised sill without a head is a window of no height', () => {
+    const invalid = draftOf(lShapePlan);
+    const window = wallById(invalid, WALL.wE).openings![0]!;
+    delete window.head;
+    window.sill = 2.3;
+    expect(() => validateScene(invalid, CATALOGUE_REGISTRIES)).toThrow(`Opening ${OPENING.windowBEast} has invalid sill/head heights`);
+  });
+
   test('rejects a door with a raised sill', () => {
     const invalid = draftOf(lShapePlan);
     wallById(invalid, WALL.wPart).openings![0]!.sill = 0.2;

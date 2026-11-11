@@ -49,10 +49,11 @@ import type {
   WallArc,
   WallSide,
 } from '../types.js';
-import { faceKey } from '../types.js';
+import { TOUR_CHECKPOINT_HEIGHT_MARGIN_M, faceKey } from '../types.js';
 import {
   OpError,
   TOUCHED_SHELL,
+  TOUCHED_TOUR_CHECKPOINTS,
   claimedIds,
   dropFaceFinishes,
   forgetReferencesInPresets,
@@ -78,7 +79,19 @@ export function applySetCeiling(scene: Draft<SceneData>, op: SetCeilingOp): OpOu
   }
   scene.ceilingHeight = op.height;
   reclampOpeningsUnder(scene, op.height);
-  return { summary: `Ceiling height set to ${round(op.height)} m`, touched: [TOUCHED_SHELL] };
+  // A checkpoint keeps the same headroom under the ceiling the validator
+  // demands, exactly as `set_tour_checkpoints` clamps it.
+  const heightMax = op.height - TOUR_CHECKPOINT_HEIGHT_MARGIN_M;
+  let lowered = false;
+  for (const checkpoint of scene.tourCheckpoints ?? []) {
+    if (checkpoint.position.y <= heightMax) continue;
+    checkpoint.position = { ...checkpoint.position, y: heightMax };
+    lowered = true;
+  }
+  return {
+    summary: `Ceiling height set to ${round(op.height)} m`,
+    touched: lowered ? [TOUCHED_SHELL, TOUCHED_TOUR_CHECKPOINTS] : [TOUCHED_SHELL],
+  };
 }
 
 /* -------------------------------------------------------------- nodes --- */
@@ -149,7 +162,7 @@ export function applyAddWall(scene: Draft<SceneData>, op: AddWallOp): OpOutcome 
   const duplicate = scene.walls.find((wall) => (wall.a === op.a && wall.b === op.b) || (wall.a === op.b && wall.b === op.a));
   if (duplicate) throw new OpError(`Nodes ${op.a} and ${op.b} are already joined by wall ${duplicate.id}`);
   const thickness = clampThickness(op.thickness, 'add_wall');
-  if (op.arc) centrelineLength(a, b, op.arc, id);
+  requireWallLength(centrelineLength(a, b, op.arc, id), 'add_wall', id);
 
   const wall: Draft<Wall> = { id, a: op.a, b: op.b, thickness };
   if (op.role !== undefined) wall.role = op.role;
@@ -171,6 +184,12 @@ export function applySetWall(scene: Draft<SceneData>, op: SetWallOp): OpOutcome 
   if (!wall) throw new OpError(`Unknown wall ${op.wallId}`);
   const before = wallCentrelineLength(scene, wall);
   const changes: string[] = [];
+  // The new centreline first, so a refusal leaves the wall as it was.
+  if (op.arc !== undefined) {
+    const a = pointOf(scene, wall.a, wall.id);
+    const b = pointOf(scene, wall.b, wall.id);
+    requireWallLength(centrelineLength(a, b, op.arc ?? undefined, wall.id), 'set_wall', wall.id);
+  }
 
   if (op.thickness !== undefined) {
     wall.thickness = clampThickness(op.thickness, 'set_wall');
@@ -184,9 +203,6 @@ export function applySetWall(scene: Draft<SceneData>, op: SetWallOp): OpOutcome 
     delete wall.arc;
     changes.push('arc removed');
   } else if (op.arc !== undefined) {
-    const a = pointOf(scene, wall.a, wall.id);
-    const b = pointOf(scene, wall.b, wall.id);
-    centrelineLength(a, b, op.arc, wall.id);
     wall.arc = { radius: op.arc.radius, ccw: op.arc.ccw };
     changes.push(`arc radius ${round(op.arc.radius)} m`);
   }
@@ -667,6 +683,13 @@ function clampThickness(value: number, op: string): number {
  * `arcFromChord` would otherwise take the square root of a negative number and
  * hand back a silent NaN.
  */
+/** Refuses a centreline the validator would refuse at commit (`WALL_LIMITS.minCentrelineLength`), as `move_node` does. */
+function requireWallLength(length: number, owner: string, wallId: string): void {
+  if (length < MIN_WALL_LENGTH) {
+    throw new OpError(`${owner} would leave wall ${wallId} ${length.toFixed(3)} m long, below the minimum ${MIN_WALL_LENGTH} m`);
+  }
+}
+
 function centrelineLength(a: Vec2, b: Vec2, arc: WallArc | undefined, wallId: string): number {
   const chord = dist(a, b);
   if (!arc) return chord;

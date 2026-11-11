@@ -14,7 +14,7 @@
  */
 
 import { EPS, arcFromChord, arcLength, dist } from '../../plan/plan-geometry.js';
-import { CEILING_OPENING_MARGIN, OPENING_EDGE_MARGIN } from '../../plan/plan-openings.js';
+import { CEILING_OPENING_MARGIN, MIN_OPENING_HEIGHT, OPENING_EDGE_MARGIN, effectiveOpening } from '../../plan/plan-openings.js';
 import { fail, type ValidationContext } from './context.js';
 import { OPENING_HINGES, OPENING_SHAPES, OPENING_SWINGS, WALL_ROLES, isMemberOf, isOpeningType } from '../schema-sets.js';
 import { WALL_LIMITS, isDoorLike, type Opening, type Vec2, type Wall, type WallArc } from '../types.js';
@@ -97,6 +97,15 @@ function checkOpening(ctx: ValidationContext, wall: Wall, opening: Opening, path
       `Opening ${openingId} head ${head} must stay ${CEILING_OPENING_MARGIN} m below the ceiling (${ceilingHeight} m)`,
       { head, maxHead, ceilingHeight },
     );
+  }
+  // The heights it is DRAWN at (`effectiveOpening`, the one projection): a
+  // raised sill under a defaulted head is a window of no height otherwise.
+  const drawn = effectiveOpening(opening, ceilingHeight);
+  if (drawn.head - drawn.sill < MIN_OPENING_HEIGHT - EPS) {
+    ctx.fail('opening-sill-head-order', `${path}.sill`, `Opening ${openingId} has invalid sill/head heights`, {
+      sill: drawn.sill,
+      head: drawn.head,
+    });
   }
   if (isDoorLike(opening.type) && sill !== 0) {
     ctx.fail('door-sill-not-floor', `${path}.sill`, `Door opening ${openingId} must start at the floor`, { sill });
