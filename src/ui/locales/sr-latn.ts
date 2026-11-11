@@ -17,6 +17,7 @@ export const SR_LATN: Record<MessageKey, string> = {
     'Prevucite da se osvrnete · kliknite na pod da odete tamo · točkić za korak napred ili nazad · razmak ili desni taster + prevlačenje za kretanje',
   'hint.scrollZoom': 'Koristite Ctrl + točkić za zum',
   'hint.scrollZoomApple': 'Koristite ⌘ + točkić za zum',
+  'hint.tapToLook': 'Dodirnite da biste razgledali',
   'mark.madeWith': 'Napravljeno pomoću JEEX-a',
   'hint.walkCameras': 'Šetajte slobodno ili pritisnite PageDown i PageUp da pređete s kamere na kameru',
   'walkCameras.label': 'Kamere ture',

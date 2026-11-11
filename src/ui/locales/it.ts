@@ -11,6 +11,7 @@ export const IT: Record<MessageKey, string> = {
     'Trascina per guardarti intorno · clic sul pavimento per andarci · scorri per avanzare o indietreggiare · Spazio o tasto destro + trascina per muoverti',
   'hint.scrollZoom': 'Usa Ctrl + scorrimento per lo zoom',
   'hint.scrollZoomApple': 'Usa ⌘ + scorrimento per lo zoom',
+  'hint.tapToLook': 'Tocca per guardarti intorno',
   'mark.madeWith': 'Realizzato con JEEX',
   'hint.walkCameras': 'Muoviti liberamente, oppure premi Pag giù e Pag su per passare da una telecamera all’altra',
   'walkCameras.label': 'Telecamere del tour',

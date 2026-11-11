@@ -1,7 +1,10 @@
 /**
  * The «Ctrl + scroll to zoom» plate: what an embedded viewer says when a plain
  * wheel went to the page because the viewer was not engaged (the
- * cooperative-gesture overlay of embedded maps and Photo Sphere Viewer).
+ * cooperative-gesture overlay of embedded maps and Photo Sphere Viewer). The
+ * same plate, built with `key: 'hint.tapToLook'` and `once`, is what a phone
+ * visitor sees after a vertical swipe over such a viewer went to the page
+ * (`onSwipeThrough`): «Tap to look around», once per view, gone on the tap.
  *
  * It appears on a plain wheel over the canvas (`CameraController`'s
  * `onScrollThrough`) and goes away `SCROLL_HINT_MS` after the LAST one, so a
@@ -19,6 +22,9 @@ import type { MessageKey } from '../shared/messages.js';
 /** The `data-jeex` name this module stamps on the plate it creates. */
 export const SCROLL_HINT_NAME = 'scroll-hint';
 
+/** The `data-jeex` name of the touch plate («Tap to look around»). */
+export const TAP_HINT_NAME = 'tap-hint';
+
 /** How long the plate stays after the last wheel, milliseconds. */
 export const SCROLL_HINT_MS = 1500;
 
@@ -29,6 +35,12 @@ export type ScrollHintDeps = {
   messages: Messages;
   /** Whether ⌘ is the zoom modifier here; defaults to sniffing an Apple platform. */
   apple?: boolean | undefined;
+  /** The sentence; defaults to the wheel's, Ctrl or ⌘ by platform. */
+  key?: MessageKey | undefined;
+  /** The `data-jeex` name and shadow part; defaults to `SCROLL_HINT_NAME`. */
+  name?: string | undefined;
+  /** Shown once per view: after it went, `show` raises nothing. */
+  once?: boolean | undefined;
 };
 
 /** Whether this browser runs on an Apple platform, where ⌘ is the modifier. */
@@ -41,13 +53,18 @@ function applePlatform(): boolean {
 export class ScrollHint {
   private readonly plate: HTMLDivElement;
   private timer: ReturnType<typeof setTimeout> | null = null;
+  private readonly once: boolean;
+  /** Whether a `once` plate has been raised already. */
+  private shown = false;
 
   constructor(deps: ScrollHintDeps) {
-    const key: MessageKey = (deps.apple ?? applePlatform()) ? 'hint.scrollZoomApple' : 'hint.scrollZoom';
+    const key: MessageKey = deps.key ?? ((deps.apple ?? applePlatform()) ? 'hint.scrollZoomApple' : 'hint.scrollZoom');
+    const name = deps.name ?? SCROLL_HINT_NAME;
+    this.once = deps.once === true;
     this.plate = deps.container.ownerDocument.createElement('div');
-    this.plate.dataset['jeex'] = SCROLL_HINT_NAME;
+    this.plate.dataset['jeex'] = name;
     this.plate.className = 'scroll-hint';
-    this.plate.setAttribute('part', 'scroll-hint');
+    this.plate.setAttribute('part', name);
     this.plate.setAttribute('aria-hidden', 'true');
     this.plate.dataset['i18n'] = key;
     this.plate.dataset['visible'] = 'false';
@@ -57,12 +74,21 @@ export class ScrollHint {
 
   /** Shows the plate, or keeps it up: it hides `SCROLL_HINT_MS` after the last call. */
   show(): void {
+    if (this.once && this.shown && !this.visible) return;
+    this.shown = true;
     this.plate.dataset['visible'] = 'true';
     if (this.timer !== null) clearTimeout(this.timer);
     this.timer = setTimeout(() => {
       this.timer = null;
       this.plate.dataset['visible'] = 'false';
     }, SCROLL_HINT_MS);
+  }
+
+  /** Takes the plate away now (the tap it asked for came). */
+  hide(): void {
+    if (this.timer !== null) clearTimeout(this.timer);
+    this.timer = null;
+    this.plate.dataset['visible'] = 'false';
   }
 
   get visible(): boolean {

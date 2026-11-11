@@ -125,6 +125,13 @@ describe('readCommand', () => {
     expect(refusal('focusRoom', {})).toEqual([{ path: 'params.roomId', message: 'must be a string' }]);
     expect(refusal('focusRoom', { roomId: 'kitchen' })).toEqual([{ path: 'params.roomId', message: 'must be a UUID v7' }]);
     expect(refusal('setFurnitureVisible', { visible: 'yes' })).toEqual([{ path: 'params.visible', message: 'must be a boolean' }]);
+    // A step is a word or a 0-based camera index; a tier is one of the three.
+    for (const to of ['sideways', -1, 1.5, '2']) {
+      expect(refusal('stepCamera', { to })).toEqual([
+        { path: 'params.to', message: 'must be next, previous, first, last or a camera index of 0 or more' },
+      ]);
+    }
+    expect(refusal('setQuality', { quality: 'ultra' })).toEqual([{ path: 'params.quality', message: 'must be one of auto, low, high' }]);
   });
 
   test('a missing params object is refused by the object, not by its first field', () => {

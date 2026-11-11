@@ -80,6 +80,14 @@ export type CommandMethod =
   | 'setLocale'
   /** The colour temperature of the artificial light, `{ temperature: number | null }`; the `lightTemperature` event carries it back. */
   | 'setLightTemperature'
+  /**
+   * Steps the walk to a tour camera, `{ to: 'next' | 'previous' | 'first' |
+   * 'last' | number }` (a number is a 0-based camera); answered with whether a
+   * step started.
+   */
+  | 'stepCamera'
+  /** The render quality tier, `{ quality: 'auto' | 'low' | 'high' }`. */
+  | 'setQuality'
   /** Re-measures the frame's container; the host calls it after its own layout change. */
   | 'resize'
   /** One still, answered as `{ png: ArrayBuffer; provenance }` — a structured clone, not a data URL. */
@@ -264,6 +272,8 @@ export const METHOD_LIST = [
   'setFurnitureVisible',
   'setLocale',
   'setLightTemperature',
+  'stepCamera',
+  'setQuality',
   'resize',
   'captureStill',
   'capturePanorama',

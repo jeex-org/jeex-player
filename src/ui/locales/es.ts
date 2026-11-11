@@ -11,6 +11,7 @@ export const ES: Record<MessageKey, string> = {
     'Arrastra para mirar · haz clic en el suelo para ir allí · rueda para avanzar o retroceder · Espacio o botón derecho + arrastrar para moverte',
   'hint.scrollZoom': 'Usa Ctrl + rueda para hacer zoom',
   'hint.scrollZoomApple': 'Usa ⌘ + rueda para hacer zoom',
+  'hint.tapToLook': 'Toca para mirar alrededor',
   'mark.madeWith': 'Hecho con JEEX',
   'hint.walkCameras': 'Camina libremente o pulsa Av Pág y Re Pág para pasar de una cámara a otra',
   'walkCameras.label': 'Cámaras del recorrido',

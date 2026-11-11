@@ -29,7 +29,7 @@ import { applyDomMessages, type Messages } from './messages.js';
 import viewerCss from './styles/viewer.css?inline';
 import { PLAN_CANVAS_NAME } from './plan-modes.js';
 import { MINIMAP_NAME } from './minimap.js';
-import { SCROLL_HINT_NAME } from './scroll-hint.js';
+import { SCROLL_HINT_NAME, TAP_HINT_NAME } from './scroll-hint.js';
 import { DOOR_HUD_NAME } from '../doors/door-hud.js';
 import { VIEWER_SHELL_TREE, type ShellName, type ShellNode } from './viewer-shell-tree.js';
 
@@ -107,6 +107,7 @@ export const OVERLAY_NAMES = {
   minimap: MINIMAP_NAME,
   doorHud: DOOR_HUD_NAME,
   scrollHint: SCROLL_HINT_NAME,
+  tapHint: TAP_HINT_NAME,
   cameraPreview: CAMERA_PREVIEW_NAME,
 } as const;
 

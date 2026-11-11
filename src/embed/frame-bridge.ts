@@ -244,6 +244,11 @@ export function installFrameBridge(handle: ViewerHandle, options: FrameBridgeOpt
       case 'setSelection':
         handle.setSelection(command.params.target);
         return undefined;
+      case 'stepCamera':
+        return handle.stepCamera(command.params.to);
+      case 'setQuality':
+        handle.setQuality(command.params.quality);
+        return undefined;
       case 'loadScene': {
         // `document` travels as a structured clone, so a host that already
         // holds the scene never serialises it. `url` is resolved against the

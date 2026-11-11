@@ -9,6 +9,12 @@ as described under [Versioning](#versioning).
 
 ### Added
 
+- **The iframe form steps cameras and sets the quality tier.** The wire
+  carries `stepCamera {to}` (answered with whether a step started) and
+  `setQuality {quality}`, both validated like every other command, and the
+  host helper has `embed.stepCamera(to)` and `embed.setQuality(quality)`, so
+  a host's own Previous/Next buttons and a phone tier switch work through a
+  frame as they do on the module and the element.
 - **The plan tool.** `handle.setPlanTool(true)` arms handles on the wall or
   opening `setSelection` highlighted in `plan2d`: drag an end node, move the
   wall sideways, slide an opening or change its width with a jamb. The drag
@@ -181,6 +187,18 @@ as described under [Versioning](#versioning).
 
 ### Fixed
 
+- **A swipe over an untouched viewer on a phone scrolls the page.** Touch
+  follows the wheel's engagement rule: until the viewer is engaged (a tap,
+  focus inside it, fullscreen, or a page that cannot scroll) its canvas takes
+  `touch-action: pan-y`, so a vertical swipe scrolls the page and turns
+  nothing, while a sideways drag still reaches the viewer (a pinch too, unless
+  its fingers travel up or down). Such a swipe neither pauses a playing tour
+  nor stops a camera step, and gives the focus back to whatever had it. After
+  a tap the viewer owns the finger as before.
+- **A phone visitor is told to tap.** The first vertical swipe over an
+  untouched viewer shows a short «Tap to look around» plate (key
+  `hint.tapToLook`, in every shipped locale), once per view; it goes on the
+  tap or 1.5 s after the swipe, and takes neither the gesture nor the focus.
 - **No WebGL is a failed boot.** Without a WebGL 2 context `ready` rejects
   with `webgl-unavailable`, as the handle documents, and so does a later
   `loadScene`; before, both resolved over the fallback card.

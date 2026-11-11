@@ -40,6 +40,7 @@ export const EN = {
   'hint.walk': 'Drag to look · Click the floor to go there · Scroll to step forward/back · Space or right button + drag to move',
   'hint.scrollZoom': 'Use Ctrl + scroll to zoom',
   'hint.scrollZoomApple': 'Use ⌘ + scroll to zoom',
+  'hint.tapToLook': 'Tap to look around',
   'mark.madeWith': 'Made with JEEX',
   'hint.walkCameras': 'Walk freely, or press PageDown and PageUp to step between cameras',
   'walkCameras.label': 'Tour cameras',

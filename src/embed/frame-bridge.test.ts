@@ -58,6 +58,9 @@ type Calls = {
   modes: string[];
   locales: string[];
   temperatures: Array<number | null>;
+  /** What each `stepCamera` was handed. */
+  steps: Array<string | number>;
+  qualities: string[];
   rooms: string[];
   furniture: boolean[];
   scenes: unknown[];
@@ -101,6 +104,8 @@ function fakeHandle(
     progress: TourProgress | null;
     mode: string;
     focusRoom: boolean;
+    /** What each `stepCamera` call answers, in order; `true` past the end. */
+    stepCamera: readonly boolean[];
     scene: unknown;
   }> = {},
 ): {
@@ -113,6 +118,8 @@ function fakeHandle(
     modes: [],
     locales: [],
     temperatures: [],
+    steps: [],
+    qualities: [],
     rooms: [],
     furniture: [],
     scenes: [],
@@ -165,6 +172,11 @@ function fakeHandle(
     setFurnitureVisible: (visible: boolean) => calls.furniture.push(visible),
     setLocale: (locale: string) => calls.locales.push(locale),
     setLightTemperature: (temperature: number | null) => calls.temperatures.push(temperature),
+    stepCamera: (to: string | number) => {
+      calls.steps.push(to);
+      return overrides.stepCamera?.[calls.steps.length - 1] ?? true;
+    },
+    setQuality: (quality: string) => calls.qualities.push(quality),
     resize: () => undefined,
     capture: {
       // No renderer here: a fake capture records the request it was handed and
@@ -489,6 +501,32 @@ describe('the methods', () => {
     expect(calls.furniture).toEqual([false]);
     expect(calls.locales).toEqual(['ru']);
     expect(calls.scenes).toEqual([{ url: '/scenes/b.json' }]);
+  });
+
+  test('`stepCamera` steps the walk and answers whether a step started; `setQuality` sets the tier', async () => {
+    const built = bridge({ stepCamera: [true, false] });
+    sendCommand('stepCamera', { to: 'next' });
+    sendCommand('stepCamera', { to: 2 });
+    sendCommand('setQuality', { quality: 'low' });
+    await settled();
+    expect(built.calls.steps).toEqual(['next', 2]);
+    expect(built.calls.qualities).toEqual(['low']);
+    expect(replies().map((reply) => [reply.ok, reply.result])).toEqual([
+      [true, true],
+      [true, false],
+      [true, undefined],
+    ]);
+  });
+
+  test('a camera that is no step and a tier that is no tier are refused before the handle hears them', async () => {
+    // One bad value per command: the full list of refusals is the schema's (`protocol.schema.test.ts`).
+    const { calls } = bridge();
+    sendCommand('stepCamera', { to: 'sideways' });
+    sendCommand('setQuality', { quality: 'ultra' });
+    await settled();
+    expect(replies().map((reply) => reply.error?.code)).toEqual(['bad-params', 'bad-params']);
+    expect(calls.steps).toEqual([]);
+    expect(calls.qualities).toEqual([]);
   });
 
   test('a query answers with its value', async () => {

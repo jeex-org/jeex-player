@@ -188,6 +188,12 @@
     block-size: 100%;
     touch-action: none;
   }
+  /* Not engaged yet (no focus, not fullscreen, a page that scrolls): a
+     vertical swipe is the page's, as the plain wheel is
+     (`camera/camera-input.ts` writes the attribute). */
+  .jeex-viewer[data-jeex-engaged='false'] .scene-canvas {
+    touch-action: pan-y;
+  }
 
   .jeex-viewer .is-hidden {
     display: none !important;
@@ -1820,7 +1826,8 @@
   /* «Ctrl + scroll to zoom» (`ui/scroll-hint.ts`): a plain wheel over an
    embedded viewer that is not engaged scrolls the page, and this plate says
    how to make the viewer take it. Centred, above the scene and below the
-   viewer's own panels, and never in the pointer's way. */
+   viewer's own panels, and never in the pointer's way. The touch plate
+   «Tap to look around» is the same plate. */
   .jeex-viewer .scroll-hint {
     position: absolute;
     inset: 50% auto auto 50%;

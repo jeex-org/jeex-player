@@ -107,6 +107,8 @@ const NAMED_CAMERAS = ['presentation', 'live'] as const;
 
 /** The modes a host may switch to, read from the one option schema rather than spelled again. */
 const VIEWER_MODES = OPTION_SCHEMA['view.mode'].values;
+/** The quality tiers, from the same table. */
+const QUALITY_MODES = OPTION_SCHEMA['quality'].values;
 const viewerModeSchema = z.enum(VIEWER_MODES, { error: `must be one of ${VIEWER_MODES.join(', ')}` });
 
 const TOUR_STATES = ['ready', 'playing', 'paused', 'ended'] as const satisfies readonly TourState[];
@@ -174,6 +176,18 @@ const setLocaleParamsSchema = z.object({ locale: localeSchema }, { error: 'must 
 const setLightTemperatureParamsSchema = z.object(
   { temperature: lightTemperatureSchema },
   { error: 'must be an object naming a `temperature`' },
+);
+/** Where a camera step goes: a word, or a 0-based camera index. */
+const STEP_WORDS = ['next', 'previous', 'first', 'last'] as const;
+const STEP_ERROR = 'must be next, previous, first, last or a camera index of 0 or more';
+const stepTargetSchema = z.union(
+  [z.enum(STEP_WORDS), z.number().check(z.refine((value: number) => Number.isSafeInteger(value) && value >= 0, { error: STEP_ERROR }))],
+  { error: STEP_ERROR },
+);
+const stepCameraParamsSchema = z.object({ to: stepTargetSchema }, { error: 'must be an object naming `to`' });
+const setQualityParamsSchema = z.object(
+  { quality: z.enum(QUALITY_MODES, { error: `must be one of ${QUALITY_MODES.join(', ')}` }) },
+  { error: 'must be an object naming a `quality`' },
 );
 const setSelectionParamsSchema = z.object(
   { target: z.union([selectionTargetSchema, z.null()], { error: 'must be a selection target or null' }) },
@@ -280,6 +294,8 @@ export const commandSchema = z.discriminatedUnion('method', [
   z.object({ method: z.literal('setFurnitureVisible'), params: setFurnitureVisibleParamsSchema }),
   z.object({ method: z.literal('setLocale'), params: setLocaleParamsSchema }),
   z.object({ method: z.literal('setLightTemperature'), params: setLightTemperatureParamsSchema }),
+  z.object({ method: z.literal('stepCamera'), params: stepCameraParamsSchema }),
+  z.object({ method: z.literal('setQuality'), params: setQualityParamsSchema }),
   z.object({ method: z.literal('setSelection'), params: setSelectionParamsSchema }),
   z.object({ method: z.literal('loadScene'), params: loadSceneParamsSchema }),
   z.object({ method: z.literal('captureStill'), params: captureStillParamsSchema }),

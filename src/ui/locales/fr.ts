@@ -12,6 +12,7 @@ export const FR: Record<MessageKey, string> = {
     'Faites glisser pour regarder · cliquez sur le sol pour y aller · molette pour avancer ou reculer · Espace ou clic droit + glisser pour se déplacer',
   'hint.scrollZoom': 'Utilisez Ctrl + molette pour zoomer',
   'hint.scrollZoomApple': 'Utilisez ⌘ + molette pour zoomer',
+  'hint.tapToLook': 'Touchez pour regarder autour',
   'mark.madeWith': 'Réalisé avec JEEX',
   'hint.walkCameras': 'Déplacez-vous librement, ou appuyez sur Page suivante et Page précédente pour passer d’une caméra à l’autre',
   'walkCameras.label': 'Caméras de la visite',
