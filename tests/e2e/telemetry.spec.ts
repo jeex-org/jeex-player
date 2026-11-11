@@ -167,9 +167,10 @@ test('the iframe page holds view and ready until the host context, then names th
   await expect.poll(() => seen.map((entry) => entry.body['event'])).toEqual(['view', 'ready']);
   const origin = new URL(page.url()).origin;
   for (const { body } of seen) expect(body).toMatchObject({ embed: 'iframe', site: origin, page: '/dev/telemetry.html' });
-  // The path travelled by postMessage only: the frame URL carries the bridge's parameters, no host path.
+  // The path travelled by postMessage only: the frame URL carries the bridge's parameters and the
+  // endpoint the dev page names, no host path.
   const src = (await page.locator('#stage iframe').getAttribute('src')) ?? '';
-  expect([...new URL(src, origin).searchParams.keys()].sort()).toEqual(['host', 'viewerId']);
+  expect([...new URL(src, origin).searchParams.keys()].sort()).toEqual(['analyticsEndpoint', 'host', 'viewerId']);
 });
 
 test('without location.ancestorOrigins the iframe site is the verified host origin', async ({ page, context }) => {
