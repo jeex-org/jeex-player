@@ -9,6 +9,15 @@ as described under [Versioning](#versioning).
 
 ### Added
 
+- **The `assets` event.** Once per document, when its first model pass
+  settles, the viewer says what its libraries delivered:
+  `{ models: { upgraded, failed, budget }, textures: { failed } }`, the
+  models swapped in, the ones left as procedural stand-ins, whether the byte
+  budget stopped the pass, and the textures whose surface stayed flat. A tour
+  that loads only in part still fires `ready`; this event is how a host
+  learns it. The element raises it as `jeex-assets`, and it crosses the
+  iframe boundary as the `assets` event.
+
 - **Quality tiers.** Walk and tour render on one of two tiers: `high` is the
   look every earlier release shipped, and `low` trades the drawing-buffer
   resolution for frame rate on a slow device (the ambient occlusion stays
@@ -140,6 +149,31 @@ as described under [Versioning](#versioning).
   batch.
 
 ### Fixed
+
+- **A scene after a failed first one is shown.** A `loadScene` after the
+  first scene failed (or a corrected `src` on the element) boots the new
+  scene: the error card goes, the scene is drawn and `ready` fires once.
+  Before, `ready` fired over an empty canvas. In the iframe form the frame
+  answers `loadScene` before its first `ready`, the helper sends it at once
+  after the frame reported an `error`, and `embed.ready` rejects with that
+  error's code instead of waiting for the life of the page.
+- **`embed.dispose()` rejects queued commands at once.** A command still
+  waiting for the frame's `ready` rejects with `disposed` and its 20-second
+  clock is stopped, instead of rejecting as `timeout` 20 seconds later.
+- **The same document handed back keeps a pending asset edit.** A
+  `loadScene` of the document on screen at the same revision no longer
+  answers the asset move tool's pending edit, so a later
+  `revertAssetEdit()` still puts the object back; only a later revision
+  answers it.
+- **Retry boots the latest scene with its own library and revision.** After
+  a `loadScene`, the error card's Retry validates the new document against
+  the library it came with and starts at its revision, not the first
+  mount's.
+- **`setMode` and tour commands before the first scene.** A `setMode` before
+  the first scene no longer fires `mode` while the viewer then opens in
+  `view.mode`: the viewer opens in the mode asked for. A tour command issued
+  before the first scene is replayed after the opening view instead of being
+  overwritten by `tour.start`.
 
 - **`<jeex-viewer src="">` shows the no-scene card.** An empty value means
   `true` only on an on/off attribute (`minimap`, `analytics`); on every other

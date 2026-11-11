@@ -15,8 +15,9 @@ import type { Logger } from '../shared/logger.js';
 import type { OffersSource } from '../assets/offers.js';
 
 export class DocumentSource {
+  /** The source a boot loads from and its repository, replaced together by a successful `replace`. */
   private repository: SceneRepository;
-  private readonly source: SceneSource;
+  private source: SceneSource;
   private readonly log: Logger;
   /** The host's offers, loaded with every document (`loadDocument`); absent when none were given. */
   private readonly offers: OffersSource | undefined;
@@ -38,7 +39,7 @@ export class DocumentSource {
     return this.loaded?.info ?? null;
   }
 
-  /** The document of a boot (the first one, or a Retry), from the mount's own source. */
+  /** The document of a boot (the first one, or a Retry), from the latest source that loaded. */
   async boot(): Promise<LoadedDocument> {
     const loaded = await loadDocument(this.repository, this.source, this.log, undefined, this.offers);
     this.loaded = loaded.project;
@@ -63,6 +64,7 @@ export class DocumentSource {
     }
     if (stale()) return null;
     this.repository = repository;
+    this.source = source;
     this.loaded = loaded.project;
     return loaded;
   }

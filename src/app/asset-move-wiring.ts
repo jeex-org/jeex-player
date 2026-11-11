@@ -211,7 +211,7 @@ export function assetMoveWiring(deps: AssetMoveWiringDeps): AssetMoveControl {
     return loading;
   };
 
-  // A new document answers a pending edit and voids a running move; the graph it built is new too.
+  // A revision past a pending edit answers it (the tool compares), a running move is void; the graph may be new too.
   const offScene = deps.events.on('scene', () => {
     bodies.clear();
     session?.tool.documentChanged();

@@ -80,9 +80,11 @@ type FrameBridgeOptions = {
  * Commands that are answered before the first scene exists. `getScene` joins
  * `dispose` here: a host may ask what is on screen before there is anything,
  * and `null` is the honest answer rather than `not-ready`. `context` joins
- * them because the host sends it as soon as the frame has loaded.
+ * them because the host sends it as soon as the frame has loaded. `loadScene`
+ * joins them because after a failed first scene it is the only way to a
+ * `ready` at all: the viewer boots the scene it is given.
  */
-const READY_EXEMPT: ReadonlySet<CommandMethod> = new Set<CommandMethod>(['dispose', 'getScene', 'context']);
+const READY_EXEMPT: ReadonlySet<CommandMethod> = new Set<CommandMethod>(['dispose', 'getScene', 'context', 'loadScene']);
 
 /** The reply one capture crosses the boundary as: the PNG bytes plus the sidecar. */
 async function captureReply(capture: Promise<CaptureResult>): Promise<{ png: ArrayBuffer; provenance: unknown }> {
@@ -173,6 +175,7 @@ export function installFrameBridge(handle: ViewerHandle, options: FrameBridgeOpt
     handle.on('mode', (mode) => emit('mode', mode)),
     handle.on('select', (selection) => emit('select', selection)),
     handle.on('lightTemperature', (change) => emit('lightTemperature', change)),
+    handle.on('assets', (info) => emit('assets', info)),
     handle.tour.on('progress', (progress) => emit('progress', progress)),
     handle.tour.on('state', (state) => emit('state', { state })),
     handle.tour.on('ended', () => emit('ended', {})),

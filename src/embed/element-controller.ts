@@ -273,6 +273,7 @@ export class ViewerElementController {
       handle.tour.on('state', (state: TourState) => this.host.emit(`${EVENT_PREFIX}tour-state`, { state })),
       handle.tour.on('ended', () => this.host.emit(`${EVENT_PREFIX}tour-ended`, {})),
       handle.on('lightTemperature', (change) => this.host.emit(`${EVENT_PREFIX}light-temperature`, change)),
+      handle.on('assets', (info) => this.host.emit(`${EVENT_PREFIX}assets`, info)),
     ];
   }
 

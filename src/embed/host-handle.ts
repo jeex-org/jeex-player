@@ -61,7 +61,7 @@ export type JeexEmbed = {
   readonly iframe: HTMLIFrameElement;
   /** The id this frame answers to; generated when the host named none. */
   readonly viewerId: string;
-  /** Resolves when the frame's first scene is on screen. */
+  /** Resolves when the frame's first scene is on screen; rejects with the code of an `error` the frame reports before that. */
   ready: Promise<EmbedReady>;
   play(): Promise<void>;
   pause(): Promise<void>;
@@ -74,6 +74,7 @@ export type JeexEmbed = {
   setTourSpeed(speed: TourSpeed): Promise<void>;
   /** The tour's position, or `null` while the scene carries no clip. */
   progress(): Promise<TourProgress | null>;
+  /** Sent at once after a failed first scene (an `error` before `ready`): the frame boots the scene it is given. */
   loadScene(source: EmbedSceneSource): Promise<void>;
   setMode(mode: ViewerMode): Promise<void>;
   getMode(): Promise<ViewerMode>;

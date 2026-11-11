@@ -385,6 +385,7 @@ describe('the events', () => {
     record.fireTour('state', 'playing');
     record.fireTour('ended', undefined);
     record.fire('lightTemperature', { temperature: 3000, source: 'panel' });
+    record.fire('assets', { models: { upgraded: 2, failed: 1, budget: false }, textures: { failed: 0 } });
     expect(record.emitted.map((event) => event.type)).toEqual([
       'jeex-ready',
       'jeex-error',
@@ -394,8 +395,10 @@ describe('the events', () => {
       'jeex-tour-state',
       'jeex-tour-ended',
       'jeex-light-temperature',
+      'jeex-assets',
     ]);
-    expect(record.emitted.at(-1)!.detail).toEqual({ temperature: 3000, source: 'panel' });
+    expect(record.emitted.at(-2)!.detail).toEqual({ temperature: 3000, source: 'panel' });
+    expect(record.emitted.at(-1)!.detail).toEqual({ models: { upgraded: 2, failed: 1, budget: false }, textures: { failed: 0 } });
   });
 
   test('the payloads are the documented shapes, not the internal ones', () => {
@@ -597,10 +600,10 @@ describe('disconnect', () => {
   test('disposes the viewer and drops every subscription', () => {
     const { controller, record } = harness();
     controller.connect();
-    // Five handle events (ready, error, scene, mode, select) plus `edit` and
-    // `lightTemperature`, three of the tour's, plus the handle's own wait for
+    // Five handle events (ready, error, scene, mode, select) plus `edit`,
+    // `lightTemperature` and `assets`, three of the tour's, plus the handle's own wait for
     // the first `scene` and `ready`. Every one of them has to come back on disconnect.
-    expect(record.open()).toBe(12);
+    expect(record.open()).toBe(13);
     controller.disconnect();
     expect(record.disposals).toBe(1);
     expect(record.open()).toBe(0);

@@ -6,8 +6,9 @@
  * person SEES: a second turn, mirror or move before the host answered the
  * first builds on the first one's result, not on the stored document, so two
  * quick turns are 30°, not 15° twice. `revertAssetEdit` puts back the state
- * before the FIRST pending edit. A new document (any committed revision)
- * answers them all.
+ * before the FIRST pending edit. A committed revision past the one they were
+ * made on answers them all; the same document handed back at the same revision
+ * answers nothing.
  *
  * Pure module: no `three`, no DOM.
  */
@@ -67,6 +68,12 @@ export class PendingEdits {
     const starts = new Map(this.starts);
     this.clear();
     return rev !== null && rev === currentRev && starts.size > 0 ? starts : null;
+  }
+
+  /** The document on screen is now at `rev`: a revision past the pending edits' answers them. */
+  answered(rev: number | undefined): void {
+    if (this.rev !== null && rev === this.rev) return;
+    this.clear();
   }
 
   clear(): void {

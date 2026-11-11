@@ -1,5 +1,5 @@
 /**
- * The viewer's public event fan-out: `ready`, `error`, `scene` and `mode`.
+ * The viewer's public event fan-out: `ready`, `error`, `scene`, `mode`, `assets` and the rest of `ViewerEventMap`.
  *
  * It is the `TourEvents` pattern applied to the viewer itself (`tour-controls.ts`):
  * one registry per event, and a subscriber that throws is reported and skipped
@@ -45,6 +45,17 @@ export type ViewerReadyInfo = { options: Readonly<ViewerOptions>; sceneId: strin
 export type ViewerSceneInfo = { sceneId: string; rev: number };
 
 /**
+ * What a document's libraries delivered, once its first model pass settled:
+ * the models swapped in (`upgraded`), the ones left as procedural stand-ins
+ * (`failed`), whether the byte budget stopped the pass (`budget`), and the
+ * textures whose surface stayed flat.
+ */
+export type ViewerAssetsInfo = {
+  models: { upgraded: number; failed: number; budget: boolean };
+  textures: { failed: number };
+};
+
+/**
  * An edit made in the viewer's OWN panel while `edits: 'emit'` is in force: the
  * viewer does NOT commit it and waits for the host's document instead.
  *
@@ -58,6 +69,8 @@ export type ViewerEventMap = {
   error: ViewerError;
   scene: ViewerSceneInfo;
   mode: ViewerMode;
+  /** Once per document, when its first model pass settled: what loaded and what fell back (`ViewerAssetsInfo`). */
+  assets: ViewerAssetsInfo;
   /** A click named something (or nothing) in the scene; only with `options.select`. */
   select: ViewerSelection;
   /** The built-in panel produced a batch the viewer did not commit; only with `edits: 'emit'`. */
@@ -136,6 +149,7 @@ export class ViewerEvents {
       error: fanout('error'),
       scene: fanout('scene'),
       mode: fanout('mode'),
+      assets: fanout('assets'),
       select: fanout('select'),
       edit: fanout('edit'),
       checkpointSelect: fanout('checkpointSelect'),
