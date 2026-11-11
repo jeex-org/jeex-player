@@ -353,8 +353,8 @@ describe('roomStandingPoint: where a walker jumped into a room stands', () => {
 describe('a zone of an open plan is floor to walk on, and a room to route to', () => {
   // The living room with the kitchen kept as a zone of it: the solver cuts the
   // kitchen out of the living room's floor, but nothing stands between them.
-  const scene = zonedLivingPlan([zone(ZONED.room.kitchen, 'Kitchen', ZONE_OUTLINES.kitchen)]);
-  const zonedPlan = solvePlan(scene);
+  const zoned = zonedLivingPlan([zone(ZONED.room.kitchen, 'Kitchen', ZONE_OUTLINES.kitchen)]);
+  const zonedPlan = solvePlan(zoned);
   const living = { x: 4, y: EYE_HEIGHT_M, z: 5 };
   const kitchen = { x: 8.5, y: EYE_HEIGHT_M, z: 3.5 };
 
@@ -366,7 +366,7 @@ describe('a zone of an open plan is floor to walk on, and a room to route to', (
   });
 
   test('the zone is reached from its room and its room from the zone', () => {
-    const zonedGraph = buildRoomGraph(zonedPlan, scene, []);
+    const zonedGraph = buildRoomGraph(zonedPlan, zoned, []);
     expect(routeToRoom(zonedGraph, zonedPlan, living, ZONED.room.kitchen)).not.toBeNull();
     expect(routeToRoom(zonedGraph, zonedPlan, kitchen, ZONED.room.living)).not.toBeNull();
   });
