@@ -81,6 +81,8 @@ export const RU: Record<MessageKey, string> = {
   'cameraPreview.lookThrough': 'Посмотреть через камеру',
   'hint.checkpointPlacing': 'Размещение камеры — щёлкните по полу (потяните, чтобы направить) · Esc — отмена',
   'hint.assetMove': 'Перетащите, чтобы переместить, Q/E — повернуть, Esc — отмена',
+  'hint.planTool': 'Перетащите маркер, чтобы сдвинуть, Esc — отмена',
+  'hint.planEditIllegal': 'Такое положение недопустимо',
   'hint.lookThrough': 'Вид через камеру — тяните, чтобы осмотреться · WASD — движение · Q/E — высота · Enter — сохранить · Esc — отмена',
   'lookThrough.label': 'Вид через камеру {n}',
   'lookThrough.done': 'Готово',

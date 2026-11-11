@@ -59,17 +59,8 @@ import type { SolvedPlan } from '../plan/plan-solver.js';
 import type { TourNavigation } from '../navigation/tour-legs.js';
 import { isUuidV7, type SceneData, type TourCheckpoint, type ViewerMode } from '../scene/types.js';
 
-/** A checkpoint was clicked (or the click landed off every marker: `null`). */
-export type CheckpointSelect = { readonly id: string | null };
-/**
- * A gesture finished and the working list is the answer. `baseRev` is the
- * revision the gesture started from, so a host can tell whether the document
- * moved underneath it, and `summary` is a one-line human reason.
- */
-export type CheckpointEdit = { readonly checkpoints: readonly TourCheckpoint[]; readonly baseRev: number; readonly summary: string };
-
-/** Where the authoring rig is drawn: hidden in `walk` and `tour`, where the visitor sees the flat. */
-export const AUTHORING_MODES: ReadonlySet<ViewerMode> = new Set<ViewerMode>(['orbit', 'plan3d']);
+import type { CheckpointEdit, CheckpointSelect } from './checkpoint-types.js';
+export type { CheckpointEdit, CheckpointSelect } from './checkpoint-types.js';
 
 /** The modes a press selects a camera in and a grab may start in; everywhere else the overlay is a picture. */
 export const SELECT_MODES: ReadonlySet<ViewerMode> = new Set<ViewerMode>(['orbit', 'plan3d']);

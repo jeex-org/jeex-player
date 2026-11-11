@@ -91,6 +91,9 @@ const TOP_VIEW_DEPTH_M = 60;
  */
 const FORWARD_SCRATCH = new THREE.Vector3();
 
+/** A painter over the 2D plan, in CSS pixels through the drawing's transform. */
+export type PlanDecoration = (ctx: CanvasRenderingContext2D, transform: PlanTransform) => void;
+
 export class PlanModes {
   private readonly deps: PlanModesDeps;
   private readonly canvas: HTMLCanvasElement;
@@ -126,6 +129,10 @@ export class PlanModes {
   /** The host's selection (`ViewerHandle.setSelection`) and what it marks on the current document. */
   private selection: PlanSelectionTarget | null = null;
   private mark: PlanSelectionMark | null = null;
+  /** A candidate document shown in place of the committed one (`setDraft`), with its own selection mark. */
+  private draft: { source: { plan: SolvedPlan; scene: SceneData }; drawing: PlanDrawing; mark: PlanSelectionMark | null } | null = null;
+  /** Painted last, over everything else (`setDecoration`). */
+  private decoration: PlanDecoration | null = null;
   private mode: ViewerMode = 'orbit';
 
   constructor(deps: PlanModesDeps) {
@@ -164,12 +171,7 @@ export class PlanModes {
    * a wall or an opening that moved is on the drawing from the next frame.
    */
   setDocument(plan: SolvedPlan, scene: SceneData): void {
-    const options = this.planOptions();
-    this.drawing = buildPlanDrawing(plan, scene, {
-      ...planDrawingInputs(scene, this.deps.assetFacts?.()),
-      labels: options.labels,
-      dimensions: options.dimensions,
-    });
+    this.drawing = this.buildDrawing(plan, scene);
     this.bounds = this.drawing.bounds;
     this.source = { plan, scene };
     this.mark = this.selection === null ? null : selectionMark(plan, scene, this.selection);
@@ -185,6 +187,7 @@ export class PlanModes {
   setSelection(target: PlanSelectionTarget | null): void {
     this.selection = target;
     this.mark = target === null || this.source === null ? null : selectionMark(this.source.plan, this.source.scene, target);
+    if (this.draft) this.draft.mark = target === null ? null : selectionMark(this.draft.source.plan, this.draft.source.scene, target);
     if (this.mode === 'plan2d') this.paint();
   }
 
@@ -197,6 +200,32 @@ export class PlanModes {
     this.source = { plan: this.source.plan, scene };
     if (this.selection === null) return;
     this.mark = selectionMark(this.source.plan, scene, this.selection);
+    if (this.mode === 'plan2d') this.paint();
+  }
+
+  /**
+   * Shows a candidate document on the 2D plan instead of the committed one
+   * (the plan tool's preview), built with the same inputs and options, its
+   * selection mark read from it, but fitted with the COMMITTED bounds, so the
+   * drawing does not slide under the pointer while a wall grows the plan.
+   * `null` shows the committed drawing again. A new committed document does
+   * not clear it: whoever set it decides when it is answered.
+   */
+  setDraft(source: { plan: SolvedPlan; scene: SceneData } | null): void {
+    this.draft =
+      source === null
+        ? null
+        : {
+            source,
+            drawing: this.buildDrawing(source.plan, source.scene),
+            mark: this.selection === null ? null : selectionMark(source.plan, source.scene, this.selection),
+          };
+    if (this.mode === 'plan2d') this.paint();
+  }
+
+  /** A painter run at the end of every 2D paint, after the selection and the camera marker; `null` removes it. */
+  setDecoration(paint: PlanDecoration | null): void {
+    this.decoration = paint;
     if (this.mode === 'plan2d') this.paint();
   }
 
@@ -293,17 +322,29 @@ export class PlanModes {
     if (this.mode === 'plan3d') this.fitTopView();
   }
 
-  /** Repaints the whole overlay: fit to the viewport with 6 % padding. */
+  /** The drawing of `plan` and `scene` with the host's options. */
+  private buildDrawing(plan: SolvedPlan, scene: SceneData): PlanDrawing {
+    const options = this.planOptions();
+    return buildPlanDrawing(plan, scene, {
+      ...planDrawingInputs(scene, this.deps.assetFacts?.()),
+      labels: options.labels,
+      dimensions: options.dimensions,
+    });
+  }
+
+  /** Repaints the whole overlay (the draft when one is set): fit to the viewport with 6 % padding, by the committed bounds. */
   private paint(): void {
     const drawing = this.drawing;
     if (!drawing) return;
     const fitted = fitCanvasToBox(this.canvas, this.deps.viewport);
     if (!fitted) return;
     const options = this.planOptions();
-    paintPlan(fitted.ctx, drawing, fitTransform(drawing.bounds, { w: fitted.w, h: fitted.h }, PLAN_PADDING), 'drawing', {
+    const transform = fitTransform(drawing.bounds, { w: fitted.w, h: fitted.h }, PLAN_PADDING);
+    paintPlan(fitted.ctx, this.draft?.drawing ?? drawing, transform, 'drawing', {
       camera: options.camera ? this.marker() : null,
-      selection: this.mark,
+      selection: this.draft ? this.draft.mark : this.mark,
     });
+    this.decoration?.(fitted.ctx, transform);
   }
 
   /** `deps.options`, or every option on when the caller never wired one. */

@@ -18,16 +18,8 @@ import * as THREE from 'three';
 import { createRenderRuntime, type FrameHook, type RenderRuntime } from '../render/render-runtime.js';
 import { DEFAULT_MINIMAP_ACCENT, resolveBackdrop, resolveThemeColour } from '../ui/theme-colour.js';
 import { mountCameraDirector, type CameraDirector, type CameraStackDeps } from '../camera/camera-director.js';
-import { AUTHORING_MODES, CheckpointOverlay } from '../camera/checkpoint-overlay.js';
-import { CheckpointPilot } from '../camera/checkpoint-pilot.js';
-import { LookThroughBar } from '../ui/look-through-bar.js';
 import { WalkCameraBar } from '../ui/walk-camera-bar.js';
-import type { CheckpointEdit, CheckpointSelect } from '../camera/checkpoint-overlay.js';
-import type { TourNavigation } from '../navigation/tour-legs.js';
-import type { Obstacle } from '../navigation/navigation.js';
-import type { SolvedPlan } from '../plan/plan-solver.js';
 import type { SceneData, TourCheckpoint } from '../scene/types.js';
-import { CameraPreview } from '../ui/camera-preview.js';
 import { PlanModes, type PlanModeOptions } from '../ui/plan-modes.js';
 import { Minimap } from '../ui/minimap.js';
 import { ScrollHint } from '../ui/scroll-hint.js';
@@ -43,7 +35,6 @@ import type { Dollhouse } from '../geometry/dollhouse.js';
 import type { ViewerMode } from '../scene/types.js';
 import { ViewerSelectionController, type ViewerSelection } from './selection.js';
 import type { Picker } from '../geometry/picker.js';
-import type { AssetMoveControl } from '../edit/asset-move-session.js';
 import { loadWalkPost, WalkPostController } from './walk-post-controller.js';
 import { hdriLoads, loadWalkLighting, WalkLightingController, type HdriDeps } from './walk-lighting-controller.js';
 import type { QualityControl } from './quality-control.js';
@@ -107,17 +98,8 @@ export type ViewerStageDeps = {
    * — the option gates the EVENT, not the host's own command.
    */
   selection: { listen: boolean; emit: (selection: ViewerSelection) => void };
-  /**
-   * The tour-camera placement overlay (`camera/checkpoint-overlay.ts`): the
-   * host's on/off switch, the two sinks for its events, and the two reads the
-   * overlay needs of the document — the committed scene and its revision —
-   * plus the committed plan's walkable space its trajectory walks through,
-   * the plan and furniture its placements stand on, and the host commands its
-   * own buttons raise (`checkpoints-wiring.ts`). The stage itself never reads
-   * the scene (its header invariant); it passes these through and hands the
-   * overlay a new document in `setDocument`.
-   */
-  checkpoints: StageCheckpoints;
+  /** The committed document's tour cameras, for the mini-map's dots; `undefined` before the first document. */
+  tourCameras: () => readonly TourCheckpoint[] | undefined;
   /**
    * The director's wiring, minus what the stage supplies (camera, canvas, keys,
    * ui). Carries `interaction` (`director-wiring.ts`): `'none'`
@@ -126,26 +108,6 @@ export type ViewerStageDeps = {
    * does the latter. Default `'full'`.
    */
   director: Omit<CameraStackDeps, 'camera' | 'canvas' | 'keys' | 'messages' | 'dollhouse' | 'planModes' | 'onScrollThrough'>;
-};
-
-/** The tour-camera tool's reads and sinks (`checkpoints-wiring.ts` assembles them). */
-export type StageCheckpoints = {
-  enabled: () => boolean;
-  scene: () => SceneData | null;
-  /** The committed plan's walkable space, for the trajectory the tube draws; `null` before the first document. */
-  navigation: () => TourNavigation | null;
-  /** The committed plan, for the floor rules of placement and moves. */
-  plan: () => SolvedPlan | null;
-  /** The committed furniture footprints a placement steps off. */
-  obstacles: () => readonly Obstacle[];
-  rev: () => number;
-  pose: () => { position: THREE.Vector3; target: THREE.Vector3 } | null;
-  onSelect: (selection: CheckpointSelect) => void;
-  onEdit: (edit: CheckpointEdit) => void;
-  onPlacing: (active: boolean) => void;
-  frame: (checkpoint: TourCheckpoint) => void;
-  lookThrough: (id: string) => void;
-  endLookThrough: (commit: boolean) => void;
 };
 
 /**
@@ -160,6 +122,46 @@ export type StageCheckpoints = {
  */
 export function orderFrameHooks(cameraHook: FrameHook, appHooks: readonly FrameHook[]): readonly FrameHook[] {
   return [cameraHook, ...appHooks];
+}
+
+/**
+ * What the authoring tools (loaded lazily, `authoring.ts`) run inside the
+ * stage's frame, at fixed places: `afterCamera` right after the camera rig
+ * moved (the look-through's height, the rig's visibility, the overlay's
+ * constant-size handles), `frameEnd` after every application hook and before
+ * the draw decision (the overlay's deferred tube, the preview card's sync),
+ * `postRender` after a drawn frame (the preview inset), and `document` where
+ * the stage adopts a committed document, so a host's first `scene` subscriber
+ * already finds the tools on it.
+ */
+export type StageAuthoringHooks = {
+  afterCamera(): void;
+  frameEnd(): void;
+  postRender(): void;
+  /** A committed document was adopted (`ViewerStage.setDocument`), before the `scene` event announces it. */
+  document(scene: SceneData): void;
+};
+
+/**
+ * Registers one mount's frame on `runtime`: the camera rig's update, the
+ * authoring tools' `afterCamera`, the tour, the application hooks in their
+ * order, the authoring `frameEnd`; and the authoring `postRender` after the
+ * draw. The authoring hooks are read per frame, so tools bound later run at
+ * exactly these places, whatever the order they registered in.
+ */
+export function bindStageFrame(
+  runtime: Pick<RenderRuntime, 'addFrameHook' | 'addPostRenderHook'>,
+  steps: { camera: FrameHook; tour: FrameHook; authoring: () => StageAuthoringHooks | null },
+  appHooks: readonly FrameHook[],
+): void {
+  const cameraHook: FrameHook = (delta, now) => {
+    steps.camera(delta, now);
+    steps.authoring()?.afterCamera();
+    steps.tour(delta, now);
+  };
+  const frameEnd: FrameHook = () => steps.authoring()?.frameEnd();
+  for (const hook of [...orderFrameHooks(cameraHook, appHooks), frameEnd]) runtime.addFrameHook(hook);
+  runtime.addPostRenderHook(() => steps.authoring()?.postRender());
 }
 
 /** Whether `object` still hangs under `root` (a rebuild takes the old root off the scene). */
@@ -189,25 +191,6 @@ export class ViewerStage {
   readonly camera: THREE.PerspectiveCamera;
   readonly planModes: PlanModes;
   readonly minimap: Minimap;
-  /**
-   * The tour-camera overlay. Built BEFORE the selection controller on purpose:
-   * both listen on the same canvas, and a grab the overlay claims answers with
-   * `stopImmediatePropagation`, which only reaches listeners registered after
-   * it — the camera input included (the director is built per document).
-   */
-  readonly overlay: CheckpointOverlay;
-  /**
-   * The overlay's parent in the render scene: the host's switch lives on the
-   * overlay's own group, the MODE's on this one (the authoring
-   * rig is hidden in `walk` and `tour`), so leaving `walk` restores exactly
-   * what the switch says without either side remembering the other.
-   */
-  private readonly authoring = new THREE.Group();
-  readonly preview: CameraPreview;
-  /** «Look through»: holds the piloted camera's height over the walk rig (`camera/checkpoint-pilot.ts`). */
-  readonly pilot: CheckpointPilot;
-  /** The look-through's own «Done»/«Cancel» (`ui/look-through-bar.ts`). */
-  readonly lookThrough: LookThroughBar;
   /** The walk's Previous/Next camera buttons and index (`ui/walk-camera-bar.ts`). */
   readonly walkCameras: WalkCameraBar;
   /** The mini-map's camera dots and the list they were derived from (`cameraDots`). */
@@ -230,8 +213,8 @@ export class ViewerStage {
   private daylightCaptures = 0;
   /** The live scene's site ground, kept between frames; `null` before the first build or when a rebuild dropped it. */
   private siteGround: THREE.Mesh | null = null;
-  /** The asset move tool's switch, once `handle.setAssetMoveTool` was first called (`asset-move-wiring.ts`). */
-  assetMove: AssetMoveControl | null = null;
+  /** The authoring tools' frame hooks (`setAuthoring`); `null` while none is bound. */
+  private authoringHooks: StageAuthoringHooks | null = null;
 
   /**
    * Builds the renderer and everything that hangs off it. `start` is the pose
@@ -347,65 +330,6 @@ export class ViewerStage {
       },
       signal: deps.signal,
     });
-    const checkpoints = deps.checkpoints;
-    this.overlay = new CheckpointOverlay({
-      canvas: deps.roots.canvas,
-      camera: () => this.camera,
-      drawCamera: () => this.planModes.activeCamera(),
-      // Rays through the camera object selection casts with: the top view in plan3d.
-      rayCamera: () => this.rayCamera(),
-      mode: () => this.mode ?? 'plan2d',
-      scene: checkpoints.scene,
-      navigation: checkpoints.navigation,
-      plan: checkpoints.plan,
-      obstacles: checkpoints.obstacles,
-      floorPoint: (clientX, clientY) => deps.director.picker.floorPoint(clientX, clientY, this.rayCamera() ?? this.camera),
-      keys: deps.roots.root,
-      container: deps.roots.viewport,
-      frame: checkpoints.frame,
-      rev: checkpoints.rev,
-      enabled: checkpoints.enabled,
-      pose: checkpoints.pose,
-      onSelect: checkpoints.onSelect,
-      onEdit: checkpoints.onEdit,
-      onPlacing: checkpoints.onPlacing,
-      // The editing modes draw on demand: every change of the rig is a new picture.
-      onChange: () => this.runtime.demand.invalidate(),
-      signal: deps.signal,
-    });
-    this.pilot = new CheckpointPilot({
-      camera: this.camera,
-      keys: deps.roots.root,
-      onKeyEnd: checkpoints.endLookThrough,
-      signal: deps.signal,
-    });
-    this.lookThrough = new LookThroughBar({
-      container: deps.roots.viewport,
-      messages: deps.messages,
-      onEnd: checkpoints.endLookThrough,
-      signal: deps.signal,
-    });
-    this.authoring.name = 'tourAuthoring';
-    this.authoring.visible = false;
-    this.authoring.add(this.overlay.group);
-    this.runtime.scene.add(this.authoring);
-    this.overlay.setEnabled(deps.checkpoints.enabled());
-    this.preview = new CameraPreview({
-      container: deps.roots.viewport,
-      root: deps.roots.root,
-      scene: () => this.runtime.scene,
-      renderer: () => this.runtime.renderer,
-      overlay: () => this.overlay,
-      mode: () => this.mode,
-      messages: deps.messages,
-      onLookThrough: checkpoints.lookThrough,
-      onChange: () => this.runtime.demand.invalidate(),
-      onInsetDrawn: () => this.runtime.demand.insetDrawn(),
-      signal: deps.signal,
-    });
-    // The inset is drawn over the main picture, and only over one that was
-    // just drawn: a skipped tick presents the last picture, inset included.
-    this.runtime.addPostRenderHook(() => this.preview.drawAfter(this.runtime.demand.counters().draws));
     this.selection = new ViewerSelectionController({
       canvas: deps.roots.canvas,
       picker: deps.director.picker,
@@ -466,8 +390,8 @@ export class ViewerStage {
 
   /**
    * Adopts a committed document: builds the camera stack on the first one and
-   * re-seeds it on every later one, and hands the plan to the overlay and the
-   * map.
+   * re-seeds it on every later one, and hands the plan to the map and the
+   * authoring tools.
    */
   setDocument(model: SceneModel, root: () => THREE.Object3D | undefined = () => undefined): void {
     this.planModes.setDocument(model.plan, model.scene);
@@ -475,9 +399,7 @@ export class ViewerStage {
     this.lightingDocument?.off();
     this.lightingDocument = wireWalkLighting(this.walkLighting, model, root);
     this.minimap.setDocument();
-    // The overlay rebuilds from the committed list; an active focus survives
-    // when the document still carries its checkpoint.
-    this.overlay.setScene(model.scene);
+    this.authoringHooks?.document(model.scene);
     // A rebuild handed out new meshes; the host's highlight follows the target
     // it named, or goes quietly when the target is gone (`selection.ts`).
     this.selection.reapply();
@@ -526,36 +448,27 @@ export class ViewerStage {
 
   /** Starts the frame loop, with the camera and the tour on the first hook. */
   start(hooks: readonly FrameHook[]): void {
-    const cameraHook: FrameHook = (delta) => {
-      this.cameraDirector?.controller.update(delta);
-      // A look-through holds the camera's own height over the walk rig's eye.
-      this.pilot.update();
-      // The clip in `tour`, the entry glide and the camera steps in `walk` (`CameraDirector.updateTour`).
-      this.cameraDirector?.updateTour(delta);
-      this.walkCameras.setMode(this.mode);
-      // Read per frame, like the mini-map's mode: a mode reached by any route
-      // (a button, a manual grab mid-tour) hides or restores the rig.
-      const mode = this.mode;
-      this.authoring.visible = mode !== undefined && AUTHORING_MODES.has(mode);
-      // Size floor, constant-size handles and badges, for the pose just set.
-      this.overlay.frame();
-      // Walk and tour render through the chain, once it has loaded.
-      this.walkPost.update(mode);
-      // Walk and tour see and are lit by the daylight sky and the lit ground, never the host's backdrop: before the bake below.
-      this.syncDaylight();
-      // The room lighting bakes after the chain is attached and shows once baked;
-      // a change of its look is a new picture in walk and tour.
-      if (this.walkLighting.update(mode)) this.runtime.demand.invalidate();
-    };
-    // Last, before the draw decision: the overlay's cheap transforms are applied
-    // live during a drag, the expensive tube rebuild is deferred to here, once
-    // per tick, so the frame drawn now shows the finished trajectory; then the
-    // preview card syncs and asks for a frame if its picture changed.
-    const frameEnd: FrameHook = () => {
-      this.overlay.flush();
-      this.preview.sync();
-    };
-    for (const hook of [...orderFrameHooks(cameraHook, hooks), frameEnd]) this.runtime.addFrameHook(hook);
+    bindStageFrame(
+      this.runtime,
+      {
+        camera: (delta) => this.cameraDirector?.controller.update(delta),
+        tour: (delta) => {
+          // The clip in `tour`, the entry glide and the camera steps in `walk` (`CameraDirector.updateTour`).
+          this.cameraDirector?.updateTour(delta);
+          this.walkCameras.setMode(this.mode);
+          const mode = this.mode;
+          // Walk and tour render through the chain, once it has loaded.
+          this.walkPost.update(mode);
+          // Walk and tour see and are lit by the daylight sky and the lit ground, never the host's backdrop: before the bake below.
+          this.syncDaylight();
+          // The room lighting bakes after the chain is attached and shows once baked;
+          // a change of its look is a new picture in walk and tour.
+          if (this.walkLighting.update(mode)) this.runtime.demand.invalidate();
+        },
+        authoring: () => this.authoringHooks,
+      },
+      hooks,
+    );
     // The quality machine feeds on drawn frames: a POST-render hook knows the
     // tick drew (`lastDrawnAt` is this tick's own reading) and runs after the
     // draw, outside the frame's GL state. A skipped tick breaks the interval
@@ -566,6 +479,11 @@ export class ViewerStage {
       else this.quality.skipped();
     });
     this.runtime.start();
+  }
+
+  /** Binds (or, with `null`, unbinds) the authoring tools' frame hooks (`bindStageFrame` runs them). */
+  setAuthoring(hooks: StageAuthoringHooks | null): void {
+    this.authoringHooks = hooks;
   }
 
   /** The chain a still or video frame taken now renders through (`capture-commands.ts`). */
@@ -621,18 +539,12 @@ export class ViewerStage {
 
   /** The tour cameras' plan points for the mini-map, derived once per committed camera list (it asks every frame). */
   private cameraDots(): readonly { x: number; z: number }[] {
-    const cameras = this.deps.checkpoints.scene()?.tourCheckpoints;
+    const cameras = this.deps.tourCameras();
     if (cameras !== this.dotsFor) {
       this.dotsFor = cameras;
       this.dots = (cameras ?? []).map((camera) => ({ x: camera.position.x, z: camera.position.z }));
     }
     return this.dots;
-  }
-
-  /** The camera a pointer ray is cast through right now (`PlanModes.pickCamera`), as the overlay's camera type. */
-  private rayCamera(): THREE.PerspectiveCamera | THREE.OrthographicCamera | undefined {
-    const camera = this.planModes.pickCamera();
-    return camera instanceof THREE.PerspectiveCamera || camera instanceof THREE.OrthographicCamera ? camera : undefined;
   }
 
   /** Where the camera stands and looks, as the mini-map's marker. */
@@ -658,13 +570,7 @@ export class ViewerStage {
     this.cameraDirector?.controller.dispose();
     this.planModes.dispose();
     this.minimap.dispose();
-    this.preview.dispose();
-    this.pilot.dispose();
-    this.lookThrough.dispose();
     this.walkCameras.dispose();
-    this.runtime.scene.remove(this.authoring);
-    this.assetMove?.dispose();
-    this.overlay.dispose();
     this.selection.dispose();
     this.scrollHint.dispose();
     this.lightingDocument?.off();

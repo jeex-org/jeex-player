@@ -46,7 +46,7 @@ import type { FaceKey, SceneData, Vec2 } from '../scene/types.js';
 import type { SceneReport } from '../scene/scene-report.js';
 import type { ViewerSelection, ViewerSelectionTarget } from './selection.js';
 import type { SelectionDescription } from '../ui/selection-options.js';
-import type { AssetMoveDebug } from '../edit/asset-move-session.js';
+import type { AssetMoveDebug } from '../edit/asset-edit.js';
 import type { WalkPostState } from './walk-post-controller.js';
 import type { HdriDebug, WalkLightingState } from './walk-lighting-controller.js';
 import type { WalkLightingStats } from '../render/walk-lighting/walk-lighting.js';

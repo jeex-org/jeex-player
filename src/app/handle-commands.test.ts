@@ -30,8 +30,6 @@ function beforeTheStage() {
     options: DEFAULT_VIEWER_OPTIONS,
     furnitureVisible: () => true,
     setFurnitureVisible: () => undefined,
-    checkpointsVisible: () => false,
-    setCheckpointsVisible: () => undefined,
     messages: () => ({}) as never,
     setMessages: () => undefined,
   });

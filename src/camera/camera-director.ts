@@ -26,11 +26,9 @@
 import type { UsageSink } from '../shared/usage.js';
 import * as THREE from 'three';
 import { CameraController } from './camera-controller.js';
-import { buildRoomGraph, routeToRoom as planRouteToRoom, type RoomGraph, type RouteWaypoint } from '../navigation/room-graph.js';
-import { obstaclesFor } from '../assets/asset-footprint.js';
-import { roomJumpPose } from './room-jump.js';
+import type { RouteWaypoint } from '../navigation/room-graph.js';
+import { RoomTravel } from './room-travel.js';
 import type { AssetFactsSource } from '../assets/asset-facts.js';
-import { pointInPolygon } from '../plan/plan-geometry.js';
 import { TourPlayer } from './tour-player.js';
 import { TourCameraReach } from './tour-camera-reach.js';
 import { WalkStepper, type StepTarget, type WalkCamera } from './walk-stepper.js';
@@ -241,17 +239,8 @@ export class CameraDirector {
     return this.catalogue;
   }
   private pauseOnInput: boolean;
-  /** The room graph of the document it was built from; rebuilt when that changes. */
-  private graph: { plan: SolvedPlan; scene: SceneData; value: RoomGraph } | null = null;
-  /**
-   * The room a scripted travel is currently headed to, `null` when none is
-   * running. Set when `travelToRoom` starts a walk, cleared when that route's
-   * `onDone` fires — arrival, cancellation or replacement all count. A second
-   * `travelToRoom` call naming the SAME room while this is still set is the
-   * "instant transfer" gesture; naming a different one replaces the route as
-   * it always has.
-   */
-  private travellingTo: string | null = null;
+  /** Flights, walks and jumps to a named room, with the room graph they route over (`room-travel.ts`). */
+  private readonly rooms: RoomTravel;
   /** The walk entry glide and the camera steps. */
   private readonly stepper: WalkStepper;
   private readonly tourReach = new TourCameraReach();
@@ -273,6 +262,23 @@ export class CameraDirector {
       setPose: (position, target) => deps.controller.setPose(position, target),
       syncWalkLook: () => deps.controller.syncWalkLook(),
       onCamera: deps.onWalkCamera,
+    });
+    this.rooms = new RoomTravel({
+      controller: deps.controller,
+      ui: deps.ui,
+      scene: deps.scene,
+      plan: deps.plan,
+      hint: (key, params) => this.hint(key, params),
+      cancelStep: () => this.stepper.cancel(),
+      leavePlanMode: () => this.applyPlanMode('orbit'),
+      stopTour: () => deps.tour.stop(),
+      dollhouse: () => this.setShell('dollhouse'),
+      walkFromTour: () => {
+        this.walkFromTour();
+        // The room travel speaks for itself: the camera-keys hint would replace
+        // «walking to …» on the next frame.
+        this.walkHintPending = false;
+      },
     });
   }
 
@@ -509,148 +515,24 @@ export class CameraDirector {
     this.setShell('dollhouse');
   }
 
-  /**
-   * Fly the orbit camera into a room and put its name in the hint. `false` when
-   * the scene has no camera for that room, so callers (and the debug API) can
-   * report the miss instead of claiming success.
-   */
+  /** Flies the orbit camera into a room (`room-travel.ts`); `false` when the scene has no camera for it. */
   focusRoom(roomId: string): boolean {
-    this.stepper.cancel();
-    this.applyPlanMode('orbit');
-    if (!this.deps.controller.flyToRoom(roomId)) return false;
-    this.deps.tour.stop();
-    this.setShell('dollhouse');
-    this.deps.ui.setModeButtons('orbit');
-    const roomName = this.deps.scene().rooms.find((room) => room.id === roomId)?.name ?? roomId;
-    this.hint('hint.room', { name: roomName });
-    this.deps.ui.wakeControls();
-    return true;
+    return this.rooms.focusRoom(roomId);
   }
 
-  /**
-   * Waypoints from where the camera stands to the centre of `roomId`, over the
-   * doors of the flat (`room-graph.ts`). `null` when nothing gets there — no
-   * such room, or every way through is blocked.
-   *
-   * The graph is cached per document: a mini-map hover must not rebuild it, and
-   * a plan-level commit hands out new objects, which is exactly the signal to.
-   */
+  /** Waypoints over the doors to the centre of `roomId`, `null` when nothing gets there (`room-travel.ts`). */
   routeToRoom(roomId: string): RouteWaypoint[] | null {
-    const scene = this.deps.scene();
-    const plan = this.deps.plan();
-    if (!scene.rooms.some((room) => room.id === roomId)) return null;
-    if (!this.graph || this.graph.plan !== plan || this.graph.scene !== scene) {
-      this.graph = { plan, scene, value: buildRoomGraph(plan, scene, obstaclesFor(scene, this.deps.controller.assetFacts())) };
-    }
-    const from = this.deps.controller.getPose().position;
-    // Hidden furniture is not collided with, so it must not route around either.
-    const obstacles = this.deps.controller.hasFurnitureCollision() ? obstaclesFor(scene, this.deps.controller.assetFacts()) : [];
-    return planRouteToRoom(this.graph.value, plan, { x: from.x, z: from.z }, roomId, obstacles);
+    return this.rooms.routeToRoom(roomId);
   }
 
-  /**
-   * The CURVE a travel to `roomId` would follow from where the camera stands —
-   * the route smoothed the way `walkAlong` smooths it (`travel-path.ts`) — with
-   * its length in metres. `null` when no route gets there.
-   *
-   * A pure query, for the debug surface and the browser check: it inspects the
-   * track without moving anything.
-   */
+  /** The curve a travel to `roomId` would follow, without moving anything (`room-travel.ts`). */
   travelPath(roomId: string): { length: number; points: Vec2[] } | null {
-    const route = this.routeToRoom(roomId);
-    if (!route) return null;
-    const path = this.deps.controller.travelPathFor(route.map((point) => ({ x: point.x, y: 0, z: point.z, door: point.door })));
-    return path ? { length: path.length, points: path.points.map((point) => ({ x: point.x, z: point.z })) } : null;
+    return this.rooms.travelPath(roomId);
   }
 
-  /**
-   * Takes the viewer to a room the way the mode it is in allows.
-   *
-   * In `walk` the camera WALKS there through the doors; a tour is paused and
-   * handed over to walk first, because a click on the mini-map is the user
-   * taking the wheel. Every other mode has no walker to send, so the room is
-   * flown to as a room focus. When no clear path exists the walker jumps into
-   * the room (`roomStandingPoint`, facing the room camera's aim)
-   * and stays in walk (`hint.arrivedInstantly`).
-   *
-   * A second call naming the SAME room while it is still the one being
-   * travelled to is an "instant transfer": the walk ends on the spot
-   * (`CameraController.finishTravel`) and the hint says a jump happened
-   * instead of a walk. A call naming a different room replaces the route as
-   * it always has — nothing here changes for that case.
-   *
-   * `false` only when the scene knows nothing about the room at all.
-   */
+  /** Takes the viewer to a room the way the mode it is in allows; `false` for an unknown room (`room-travel.ts`). */
   travelToRoom(roomId: string): boolean {
-    const { controller, ui } = this.deps;
-    // A mini-map click is the visitor taking the wheel: a step in flight stops first.
-    this.stepper.cancel();
-    if (isPlanMode(controller.getMode()) || controller.getMode() === 'orbit') return this.focusRoom(roomId);
-    if (controller.getMode() === 'tour') {
-      this.walkFromTour();
-      // The room travel speaks for itself: the camera-keys hint would replace
-      // «walking to …» on the next frame.
-      this.walkHintPending = false;
-    }
-
-    const room = this.deps.scene().rooms.find((candidate) => candidate.id === roomId);
-    if (!room) return false;
-    const name = room.name;
-
-    if (controller.isTravelling() && this.travellingTo === roomId) {
-      controller.finishTravel();
-      this.hint('hint.arrivedInstantly', { name });
-      ui.wakeControls();
-      return true;
-    }
-
-    // Clicking the room the walker already stands in: routing degenerates to a
-    // zero-length route (start = goal), which would otherwise fall through to
-    // the no-clear-path fly-in, the wrong story for "you are already
-    // here". No route, no mode change — just say so.
-    if (this.isInsideRoom(roomId)) {
-      this.hint('hint.alreadyHere', { name });
-      ui.wakeControls();
-      return true;
-    }
-
-    const route = this.routeToRoom(roomId);
-    if (
-      route &&
-      controller.walkAlong(
-        route.map((point) => ({ x: point.x, y: 0, z: point.z, door: point.door })),
-        () => {
-          this.travellingTo = null;
-        },
-      )
-    ) {
-      this.travellingTo = roomId;
-      this.hint('hint.travelling', { name });
-      ui.wakeControls();
-      return true;
-    }
-    // No clear way through the doors: the walker JUMPS into the room and stays
-    // on foot. Flying to the room camera would drop the visitor into 360.
-    controller.cancelTravel();
-    const obstacles = controller.hasFurnitureCollision() ? obstaclesFor(this.deps.scene(), controller.assetFacts()) : [];
-    const jump = roomJumpPose(this.deps.plan(), this.deps.scene(), roomId, obstacles, controller.getPose());
-    controller.setPose(jump.position, jump.target);
-    controller.syncWalkLook();
-    this.hint('hint.arrivedInstantly', { name });
-    ui.wakeControls();
-    return true;
-  }
-
-  /**
-   * Whether the walker's current plan point already lies inside `roomId`'s
-   * polygon — the "already here" case a mini-map click on the room the walker
-   * stands in must not route or change mode for.
-   */
-  private isInsideRoom(roomId: string): boolean {
-    const room = this.deps.plan().rooms.find((candidate) => candidate.roomId === roomId);
-    if (!room) return false;
-    const position = this.deps.controller.getPose().position;
-    return pointInPolygon({ x: position.x, z: position.z }, room.polygon);
+    return this.rooms.travelToRoom(roomId);
   }
 
   /** Scene input during playback: pause the tour and hand control back smoothly. */

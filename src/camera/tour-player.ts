@@ -56,10 +56,7 @@ import {
   samplePolyline,
   turnAim,
   turnOnTrack,
-  turnTrack,
   vec3,
-  yawDelta,
-  type Aim,
   type Look,
   type SampledPath,
 } from './tour-path.js';
@@ -69,6 +66,7 @@ import { playbackTimeAt, rampFor, routeTimeAt, warpStep, TRACK_RAMP_SECONDS } fr
 import { cellDistance, cellTime, trackMotion, type TimeEntry, type TrackMotion } from './tour-motion.js';
 import { glideStep, glideTo, type Glide } from './pose-glide.js';
 import { approachPose, approachTo, START_RAMP, type Approach } from './tour-approach.js';
+import { aimAt, buildTimeTable, END_HOLD, GAZE_MIN_WINDOW, GAZE_REACH_M, gazeWindow, speedAt, turnsOf } from './tour-timing.js';
 
 export type TourState = 'ready' | 'playing' | 'paused' | 'ended';
 
@@ -127,21 +125,7 @@ type TourCallbacks = {
 
 export type TourPose = { position: THREE.Vector3; target: THREE.Vector3 };
 
-const GAZE_TURN_RATE = 30; // deg/s of gaze panning; transition length follows the turn angle
-const GAZE_MIN_WINDOW = 2.0; // metres of path per gaze transition
-const GAZE_MAX_WINDOW = 7.0;
-const ZONE_BLEND = 2.0; // metres over which adjacent speed zones blend
-const END_RAMP = 1.4; // seconds of ease-out
-const END_RAMP_FLOOR = 0.45; // slowest fraction of cruise speed at the very end
-const END_HOLD = 0.4; // seconds held on the final view
 const APPROACH_MIN = 0.4; // metres: closer than this a checkpoint run needs no glide to camera 1
-const TABLE_STEP = 0.05;
-/** Path metres between two samples of a gaze transition's way round (`turnsOf`). */
-const TURN_GRID_M = 0.02;
-/** How far a direction or travel look reaches ahead of the eye, metres (the floor guard may shorten it). */
-const GAZE_REACH_M = 3;
-/** Path metres ahead a `travel` key of a non-checkpoint route aims at. */
-const TRAVEL_LOOKAHEAD_M = 1;
 
 export class TourPlayer {
   private readonly setPose: (position: THREE.Vector3, target: THREE.Vector3) => void;
@@ -474,14 +458,14 @@ export class TourPlayer {
       // Never longer than the gap to the next key: a transition that started
       // before THIS key was reached would jump the gaze the moment the key is
       // passed (checkpoint routes put keys a few metres apart).
-      const window = next ? Math.max(1e-3, Math.min(this.gazeWindow(key, next), next.d - key.d)) : GAZE_MIN_WINDOW;
-      return { d: key.d, look: key.look, window, turns: next ? this.turnsOf(key.look, next, window) : [] };
+      const window = next ? Math.max(1e-3, Math.min(gazeWindow(this.route, key, next), next.d - key.d)) : GAZE_MIN_WINDOW;
+      return { d: key.d, look: key.look, window, turns: next ? turnsOf(this.route, key.look, next, window) : [] };
     });
 
     this.motion = this.kind === 'checkpoints' ? this.buildMotion() : null;
     this.timeTable = this.motion
       ? [...this.motion.table, { t: this.motion.table.at(-1)!.t + END_HOLD, d: this.route.length }]
-      : this.buildTimeTable();
+      : buildTimeTable(this.route.length, (dist) => speedAt(this.zoneStarts, this.baseSpeed, dist));
     // `buildTimeTable` always pushes the end hold, so the table is never empty.
     this.totalDuration = this.timeTable.at(-1)!.t;
     this.motionEnd = this.timeAt(this.route.length);
@@ -512,70 +496,6 @@ export class TourPlayer {
       ),
       cruise: this.baseSpeed * TOUR_TRACK_SPEED_FACTOR,
     });
-  }
-
-  /** The way round of the transition from `from` into `next` over its window (`turnTrack`). */
-  private turnsOf(from: Look, next: { d: number; look: Look }, window: number): number[] {
-    return turnTrack(Math.max(1, Math.ceil(window / TURN_GRID_M)), (u) => {
-      const d = next.d - window + window * u;
-      return this.aim(next.look, d).yaw - this.aim(from, d).yaw;
-    });
-  }
-
-  /** Gaze transition length in path metres, scaled by the turn angle at the next key. */
-  private gazeWindow(current: { d: number; look: Look }, next: { d: number; look: Look }): number {
-    const a = this.aim(current.look, current.d);
-    const b = this.aim(next.look, next.d);
-    if (a.reach < 1e-3 || b.reach < 1e-3) return GAZE_MIN_WINDOW;
-    const angle = Math.abs(yawDelta(a.yaw, b.yaw)) * (180 / Math.PI);
-    return THREE.MathUtils.clamp(angle / GAZE_TURN_RATE, GAZE_MIN_WINDOW, GAZE_MAX_WINDOW);
-  }
-
-  /**
-   * Integrates the authored route's speed profile (ease-in and ease-out
-   * included) into a time→distance table; a checkpoint run's comes from
-   * `tour-motion.ts`.
-   *
-   * The ease-out is measured in metres left, not against a guessed total run
-   * time: the time estimate needs a fixed point that does not converge once the
-   * speed zones are slower than the base speed, and the diverging pass leaves
-   * the camera crawling at the ramp floor over the whole last leg.
-   */
-  private buildTimeTable(): Array<{ t: number; d: number }> {
-    const samples: Array<{ t: number; d: number }> = [{ t: 0, d: 0 }];
-    let time = 0;
-    let dist = 0;
-    let guard = 0;
-    while (dist < this.route.length && guard < 60000) {
-      time += TABLE_STEP;
-      guard += 1;
-      const cruise = this.speedAt(dist);
-      const tail = (this.route.length - dist) / Math.max(cruise * END_RAMP, 1e-6);
-      const ramp = Math.min(1, time / START_RAMP, Math.max(END_RAMP_FLOOR, tail));
-      const step = cruise * ramp * TABLE_STEP;
-      dist = Math.min(this.route.length, dist + step);
-      samples.push({ t: time, d: dist });
-    }
-    // Brief hold on the final view so the run lands softly instead of cutting off.
-    samples.push({ t: time + END_HOLD, d: this.route.length });
-    return samples;
-  }
-
-  private speedAt(dist: number): number {
-    let speed = this.zoneStarts[0]?.speed ?? this.baseSpeed;
-    for (let index = 1; index < this.zoneStarts.length; index += 1) {
-      // `index` is bounded by the loop condition.
-      const zone = this.zoneStarts[index]!;
-      if (dist >= zone.d) {
-        speed = zone.speed;
-      } else if (dist >= zone.d - ZONE_BLEND) {
-        speed = THREE.MathUtils.lerp(speed, zone.speed, smoothstep((dist - (zone.d - ZONE_BLEND)) / ZONE_BLEND));
-        break;
-      } else {
-        break;
-      }
-    }
-    return speed;
   }
 
   // ---- Glide (checkpoint runs) --------------------------------------------
@@ -661,40 +581,14 @@ export class TourPlayer {
       else {
         const window = current.window || GAZE_MIN_WINDOW;
         const progress = smoothstep((distance - (key.d - window)) / window);
-        const from = this.aim(current.look, distance, eye);
+        const from = aimAt(this.route, current.look, distance, eye);
         // Before the first key there is no transition yet: the first look holds.
         if (progress <= 0 || key === current) return lookPoint(eye, from);
-        const to = this.aim(key.look, distance, eye);
+        const to = aimAt(this.route, key.look, distance, eye);
         const turn = turnOnTrack(current.turns, (distance - (key.d - window)) / window, to.yaw - from.yaw);
         return lookPoint(eye, turnAim(from, to, progress, turn));
       }
     }
-    return lookPoint(eye, this.aim(current.look, distance, eye));
-  }
-
-  /**
-   * A look resolved at `distance` along the route, seen from `eye` (the route
-   * position there unless given): a target's direction and distance, a
-   * camera's own direction, or the level direction of travel.
-   */
-  private aim(look: Look, distance: number, eye = positionOnPath(this.route, distance)): Aim {
-    if ('target' in look) {
-      const offset = look.target.clone().sub(eye);
-      const reach = offset.length();
-      if (reach < 1e-6) return { ...this.travelAim(distance), reach: 0 };
-      return { yaw: Math.atan2(offset.x, offset.z), pitch: Math.asin(clamp(offset.y / reach, -1, 1)), reach };
-    }
-    if ('direction' in look) return { yaw: look.direction.yaw, pitch: look.direction.pitch, reach: GAZE_REACH_M };
-    return { ...this.travelAim(distance), reach: GAZE_REACH_M };
-  }
-
-  /** The level direction of travel at `distance`: a chord one stride ahead, the route's last stride over its last metre. */
-  private travelAim(distance: number): { yaw: number; pitch: number } {
-    const start = Math.max(0, Math.min(distance, this.route.length - TRAVEL_LOOKAHEAD_M));
-    const from = positionOnPath(this.route, start);
-    const to = positionOnPath(this.route, start + TRAVEL_LOOKAHEAD_M);
-    const dx = to.x - from.x;
-    const dz = to.z - from.z;
-    return { yaw: Math.hypot(dx, dz) < 1e-6 ? 0 : Math.atan2(dx, dz), pitch: 0 };
+    return lookPoint(eye, aimAt(this.route, current.look, distance, eye));
   }
 }

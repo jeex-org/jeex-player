@@ -224,6 +224,13 @@ export const LAZY_LIMITS: Readonly<Record<string, number>> = {
   // The Basis transcoder's JS wrapper (`scripts/basis-transcoder-plugin.ts`),
   // three's file byte for byte: 15,259 gzip bytes, plus 1 KB.
   'lazy-jeex-viewer-basis-transcoder-': 15_259 + 1024,
+  // The authoring tools (`src/app/authoring.ts`, behind `authoring-port.ts`):
+  // the tour-camera overlay with its gestures, gizmo and badges, the
+  // look-through pilot and bar, the camera-preview card, and the asset move
+  // tool with its legality mask, loaded on the first tool a host turns on.
+  // 28,795 gzip bytes in the ES build (25,488 in the demo build) from
+  // `measureBundle` after the builds, plus 1 KB.
+  'lazy-jeex-viewer-authoring-': 28_795 + 1024,
 };
 
 /**

@@ -1808,6 +1808,14 @@
   .jeex-viewer .scene-canvas[data-jeex-drag='true'] {
     cursor: grabbing;
   }
+  /* The plan tool's handles in plan2d (`edit/plan-tool-session.ts` writes the
+   two attributes): a grab hand over a handle, a closed one while it drags. */
+  .jeex-viewer .scene-canvas[data-plan-handle] {
+    cursor: grab;
+  }
+  .jeex-viewer .scene-canvas[data-plan-handle][data-plan-drag='true'] {
+    cursor: grabbing;
+  }
 
   /* «Ctrl + scroll to zoom» (`ui/scroll-hint.ts`): a plain wheel over an
    embedded viewer that is not engaged scrolls the page, and this plate says

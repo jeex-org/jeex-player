@@ -9,7 +9,10 @@
 
 import { afterEach, beforeEach, describe, expect, test } from 'bun:test';
 import type * as THREE from 'three';
-import { applyStartView, firstPicture, loadWithNoiseTiles, nextFrame } from './viewer-boot.js';
+import { applyStartView, firstPicture, loadWithNoiseTiles, mountAfterAuthoring, nextFrame } from './viewer-boot.js';
+import { authoringPort, type Authoring } from './authoring-port.js';
+import { ViewerEvents } from './viewer-events.js';
+import { collectLogger } from '../fixtures/stubs.js';
 import { TextureCache } from '../materials/texture-cache.js';
 import { ViewerDisposedError } from './viewer-context.js';
 import { DEFAULT_VIEWER_OPTIONS, type ViewerOptions } from './viewer-options.js';
@@ -288,5 +291,46 @@ describe('loadWithNoiseTiles', () => {
     const { beforeDispose, afterDispose } = await holdAcross(Promise.reject(new Error('scene-load')));
     expect(beforeDispose).not.toBeNull();
     expect(afterDispose).toBeNull();
+  });
+});
+
+describe('mountAfterAuthoring', () => {
+  /** The camera the host focuses on the first `scene`, as its reload path does. */
+  const CAM = '01a13a41-0b7c-7d52-8e3a-6c1f2b9d4e07';
+
+  test('a tool switched on before the boot is bound before the first document, so the first `scene` subscriber can focus a checkpoint', async () => {
+    const events = new ViewerEvents();
+    /** The checkpoints of the documents the tools were handed, as the stage's `document` hook hands them. */
+    const known = new Set<string>();
+    let bound = false;
+    const tools = { focusCheckpoint: (id: string | null) => id !== null && known.has(id) } as Partial<Authoring>;
+    const port = authoringPort({
+      stage: () => 'stage',
+      // The chunk arrives a task later than the boot reaches the mount.
+      load: () =>
+        new Promise<'module'>((resolve) => {
+          setTimeout(() => resolve('module'), 0);
+        }),
+      start: () => {
+        bound = true;
+        return {
+          ...tools,
+          setCheckpointOverlay: () => undefined,
+          setAssetMoveTool: () => undefined,
+          dispose: () => undefined,
+        } as Authoring;
+      },
+      log: collectLogger().log,
+    });
+    port.setCheckpointOverlay(true);
+    const focused: boolean[] = [];
+    events.on('scene', () => focused.push(port.focusCheckpoint(CAM)));
+
+    await mountAfterAuthoring(port, () => {
+      // `SceneMount.mountDocument`: the stage adopts the document (the tools hear it), then `scene` announces it.
+      if (bound) known.add(CAM);
+      events.emit('scene', { sceneId: 'scene', rev: 1 });
+    });
+    expect(focused).toEqual([true]);
   });
 });

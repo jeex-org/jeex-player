@@ -79,6 +79,8 @@ export const SR_LATN: Record<MessageKey, string> = {
   'cameraPreview.lookThrough': 'Pogledaj kroz kameru',
   'hint.checkpointPlacing': 'Postavljanje kamere — kliknite na pod (prevucite da usmerite) · Esc za otkazivanje',
   'hint.assetMove': 'Prevucite za pomeranje, Q/E za okretanje, Esc za otkazivanje',
+  'hint.planTool': 'Prevucite ručicu za pomeranje, Esc za otkazivanje',
+  'hint.planEditIllegal': 'Ovaj položaj nije dozvoljen',
   'hint.lookThrough':
     'Pogled kroz kameru — prevucite da gledate · WASD za kretanje · Q/E za visinu · Enter za čuvanje · Esc za otkazivanje',
   'lookThrough.label': 'Pogled kroz kameru {n}',

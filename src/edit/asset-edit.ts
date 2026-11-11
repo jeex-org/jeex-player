@@ -1,11 +1,14 @@
 /**
  * What the asset move tool hands its host: an edit to commit, or the reason
- * a gesture was refused. Types only, apart from the tool so the public event
- * map (`app/viewer-events.ts`) reads them without the tool's code.
+ * a gesture was refused, and the state the debug surface reports. Types only,
+ * apart from the tool so the public event map (`app/viewer-events.ts`) and the
+ * eager debug surface read them without the tool's code, which loads lazily.
  */
 
 import type { LayoutIssue } from '../layout/layout-issue.js';
 import type { SceneOp } from '../scene/types.js';
+import type { DragPose } from '../layout/asset-legality.js';
+import type { MaskSurface } from '../layout/asset-mask.js';
 
 /** What the tool hands the host to commit. */
 export type AssetEdit = {
@@ -33,3 +36,21 @@ export type AssetEdit = {
 
 /** Why a release or a turn was refused: the hard issues of the pose it asked for. */
 export type AssetEditRefused = { readonly assetId: string; readonly issues: readonly LayoutIssue[] };
+
+/** The tool's state as `__viewerDebug.assetMove()` reports it. */
+export type AssetMoveState = {
+  readonly phase: 'idle' | 'pressed' | 'dragging' | 'nudging';
+  readonly assetId: string | null;
+  readonly surface: MaskSurface | null;
+  /** The pose drawn: the settled one, else the pointer's. */
+  readonly pose: DragPose | null;
+  /** Whether a release would commit (a settled pose exists); `null` when nothing moves. */
+  readonly legal: boolean | null;
+  /** Cells of the legality field on screen. */
+  readonly maskCells: number;
+  /** An emitted edit the host may still refuse (`revertAssetEdit`). */
+  readonly pending: string | null;
+};
+
+/** `__viewerDebug.assetMove()`: the switch, whether the tool is built, and its state. */
+export type AssetMoveDebug = { readonly enabled: boolean; readonly loaded: boolean; readonly state: AssetMoveState | null };

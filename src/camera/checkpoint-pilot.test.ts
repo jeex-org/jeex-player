@@ -8,18 +8,21 @@ import { describe, expect, test } from 'bun:test';
 import * as THREE from 'three';
 import { CheckpointPilot } from './checkpoint-pilot.js';
 
+/** A key target that runs `capture: true` listeners first, as the DOM does at the target, and stops on `stopImmediatePropagation`. */
 class FakeKeys {
-  private readonly listeners: Array<(event: unknown) => void> = [];
-  addEventListener(_type: string, listener: (event: unknown) => void): void {
-    this.listeners.push(listener);
+  private readonly listeners: Array<{ listener: (event: unknown) => void; capture: boolean }> = [];
+  addEventListener(_type: string, listener: (event: unknown) => void, options?: boolean | AddEventListenerOptions): void {
+    this.listeners.push({ listener, capture: typeof options === 'boolean' ? options : options?.capture === true });
   }
   removeEventListener(_type: string, listener: (event: unknown) => void): void {
-    const index = this.listeners.indexOf(listener);
+    const index = this.listeners.findIndex((entry) => entry.listener === listener);
     if (index >= 0) this.listeners.splice(index, 1);
   }
   press(key: string): boolean {
     let claimed = false;
-    for (const listener of this.listeners) {
+    const ordered = [...this.listeners.filter((entry) => entry.capture), ...this.listeners.filter((entry) => !entry.capture)];
+    for (const { listener } of ordered) {
+      if (claimed) break;
       listener({
         key,
         preventDefault: () => {},
@@ -75,6 +78,25 @@ describe('CheckpointPilot', () => {
     keys.press('Escape');
     expect(ends).toEqual([true, false]);
     expect(keys.press('w')).toBe(false);
+  });
+
+  test('Enter and Esc of a look-through are not heard by a key listener bound before the pilot (the pilot loads late)', () => {
+    const keys = new FakeKeys();
+    const heard: string[] = [];
+    keys.addEventListener('keydown', (event) => heard.push((event as { key: string }).key));
+    const ends: boolean[] = [];
+    const p = new CheckpointPilot({
+      camera: new THREE.PerspectiveCamera(),
+      keys: keys as unknown as HTMLElement,
+      onKeyEnd: (commit) => ends.push(commit),
+    });
+    p.begin(CAM_ID, 1.5, 3, 0);
+    expect(keys.press('Enter')).toBe(true);
+    expect(keys.press('Escape')).toBe(true);
+    expect(ends).toEqual([true, false]);
+    expect(heard).toEqual([]);
+    keys.press('w');
+    expect(heard).toEqual(['w']);
   });
 
   test('dispose lets go of the keys, even mid look-through: a Retry rebuilds on the same root', () => {

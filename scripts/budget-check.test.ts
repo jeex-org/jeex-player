@@ -59,6 +59,8 @@ describe('constants', () => {
       // The KTX2 loader chunk and the transcoder's JS wrapper: measured plus 1 KB.
       'lazy-jeex-viewer-KTX2Loader': 25_052 + 1024,
       'lazy-jeex-viewer-basis-transcoder-': 15_259 + 1024,
+      // The authoring tools: the tour-camera overlay, its preview and look-through, the asset move tool.
+      'lazy-jeex-viewer-authoring-': 28_795 + 1024,
     });
     expect(LAZY_WASM_LIMITS).toEqual({ 'lazy-jeex-viewer-basis-transcoder-': 248_951 + 1024 });
     expect(formatBytes(700 * 1024)).toBe('700.0 KB');

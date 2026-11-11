@@ -242,6 +242,19 @@ describe('mounting', () => {
     expect(container.children.length).toBe(1);
   });
 
+  test('a mount that turns no authoring tool on requests none of the authoring modules', async () => {
+    const { handle } = mount();
+    await handle.ready;
+    await nextFrame();
+    // The authoring chunk's entry and the tools it carries; the boot bundle names none of them.
+    const lazy = /\/src\/(app\/authoring|camera\/checkpoint-overlay|ui\/camera-preview|edit\/asset-move-session)\.ts(\?|$)/;
+    const requested = performance
+      .getEntriesByType('resource')
+      .map((entry) => new URL(entry.name).pathname)
+      .filter((path) => lazy.test(path));
+    expect(requested).toEqual([]);
+  });
+
   test('the resolved options are readable and every default is filled in', async () => {
     const { handle } = mount({ view: { mode: 'walk' } });
     await handle.ready;

@@ -1,7 +1,7 @@
 /**
  * The stage's dependency bag minus its `director` half (`director-wiring.ts`
  * owns that): which collaborator answers what the renderer, the plan modes,
- * the mini-map, the selection and the tour-camera overlay raise.
+ * the mini-map and the selection raise.
  *
  * It is a table, not behaviour, like every other wiring module on this layer —
  * the composition root keeps the object graph, this keeps the map from it to
@@ -27,7 +27,6 @@ import type { ViewerUI } from '../ui/viewer-ui.js';
 import type { Messages } from '../ui/messages.js';
 import { toViewerError } from './viewer-events.js';
 import { directorWiring } from './director-wiring.js';
-import { checkpointsWiring } from './checkpoints-wiring.js';
 import { hdriTarget } from './hdri-wiring.js';
 import { instanceLogger } from './viewer-failure.js';
 
@@ -51,8 +50,7 @@ type StageWiringDeps = {
   onContextRestored: () => void;
   /** The late-bound stage, for the wiring bags that read the camera stack. */
   stage: () => import('./viewer-stage.js').ViewerStage | undefined;
-  checkpointsVisible: () => boolean;
-  /** The host commands, for the tour-camera tool's own buttons (frame, look through, done). */
+  /** The host commands: the quality and light temperature controls they own. */
   handle: () => import('./handle-commands.js').HandleCommands;
 };
 
@@ -92,14 +90,7 @@ export function stageWiring(deps: StageWiringDeps): ViewerStageDeps {
     signal: deps.signal,
     onFrameError: (error) => deps.events.emit('error', toViewerError('internal', error, deps.messages.t('error.unknown'))),
     selection: { listen: deps.options.select, emit: (selection) => deps.events.emit('select', selection) },
-    checkpoints: checkpointsWiring({
-      visible: deps.checkpointsVisible,
-      events: deps.events,
-      mount: () => deps.mount,
-      stage: deps.stage,
-      handle: deps.handle,
-      ui: deps.ui,
-    }),
+    tourCameras: () => deps.mount.model?.scene.tourCheckpoints,
     director: directorWiring({
       options: deps.options,
       picker: deps.picker,

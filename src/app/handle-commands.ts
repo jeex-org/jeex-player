@@ -12,9 +12,7 @@
  * and the command bags above read the very same source of truth.
  */
 
-import * as THREE from 'three';
 import { isUuidV7, type MirrorAxis, type SceneData, type ViewerMode } from '../scene/types.js';
-import { framePose, poseFromEye } from '../camera/checkpoint-placement.js';
 import type { Locale, Messages } from '../ui/messages.js';
 import type { NewCheckpoint, PlanView, ViewerSlots, ViewerState } from './viewer-handle.js';
 import { readViewerState } from './viewer-state.js';
@@ -29,10 +27,10 @@ import type { ViewerContext } from './viewer-context.js';
 import type { ViewerOptions } from './viewer-options.js';
 import type { ViewerSelection, ViewerSelectionTarget } from './selection.js';
 import type { SelectionDescription } from '../ui/selection-options.js';
-import { assetMoveWiring } from './asset-move-wiring.js';
+import { authoringPort, type AuthoringPort } from './authoring-port.js';
+import { defaultLogger } from '../shared/logger.js';
 import { LightTemperatureControl } from './light-temperature-control.js';
 import { QualityControl } from './quality-control.js';
-import type { AssetMoveControl } from '../edit/asset-move-session.js';
 
 type HandleCommandsDeps = {
   stage: () => ViewerStage | undefined;
@@ -46,9 +44,6 @@ type HandleCommandsDeps = {
   options: ViewerOptions;
   furnitureVisible: () => boolean;
   setFurnitureVisible: (visible: boolean) => void;
-  /** The placement overlay's switch; the field itself lives on `ViewerApp`. */
-  checkpointsVisible: () => boolean;
-  setCheckpointsVisible: (visible: boolean) => void;
   messages: () => Messages;
   setMessages: (messages: Messages) => void;
 };
@@ -60,6 +55,8 @@ export type HandleCommands = {
   readonly lightTemperature: LightTemperatureControl;
   /** The render quality tier: the host's `setQuality`, the element's live attribute, the auto machine (`quality-control.ts`). */
   readonly quality: QualityControl;
+  /** The authoring tools' switches and their lazy chunk (`authoring-port.ts`); the boot binds them, the teardown unbinds them. */
+  readonly authoring: AuthoringPort;
   setMode(mode: ViewerMode): void;
   getMode(): ViewerMode;
   /** The mode a host set before the camera existed, once (the start view applies it); internal, never on the public handle. */
@@ -80,10 +77,10 @@ export type HandleCommands = {
   describeSelection(target: ViewerSelection): SelectionDescription | null;
   resize(): void;
   setFurnitureVisible(visible: boolean, reapply?: boolean): void;
-  /** Shows or hides the tour-camera placement overlay (default OFF). */
+  /** Shows or hides the tour-camera placement overlay (default OFF); the first switch-on loads the authoring tools. */
   setCheckpointOverlay(visible: boolean): void;
   isCheckpointOverlayVisible(): boolean;
-  /** «Add from current view» (`viewer-handle.ts`); `false` before the stack exists. */
+  /** «Add from current view» (`viewer-handle.ts`); `false` before the stack exists or the tools are in. */
   addCheckpoint(request: NewCheckpoint): boolean;
   startCheckpointPlacement(request: NewCheckpoint): boolean;
   cancelCheckpointPlacement(): void;
@@ -105,62 +102,37 @@ export type HandleCommands = {
   mirrorAsset(assetId: string, axis: MirrorAxis): boolean;
   /** Turns a placement `steps` × 15°; `false` when it cannot. */
   turnAsset(assetId: string, steps: number): boolean;
+  /** Arms or disarms the plan tool; the first arming loads it with the other authoring tools. */
+  setPlanTool(enabled: boolean): void;
+  /** Puts the committed drawing back after the host refused the last `planEdit`. */
+  revertPlanEdit(): void;
 };
 
 /** The read/write surface `viewer-api.ts` projects onto `ViewerHandle`. */
 export function handleCommands(deps: HandleCommandsDeps): HandleCommands {
-  /** The stage's asset move switch, built on first use: the tool itself loads lazily behind it. */
-  const assetMove = (): AssetMoveControl | null => {
-    const stage = deps.stage();
-    if (!stage) return null;
-    stage.assetMove ??= assetMoveWiring({
-      stage: deps.stage,
-      mount: deps.mount,
-      events: deps.events,
-      ui: deps.ui,
-      roots: deps.context.roots,
-      signal: deps.context.signal,
-    });
-    return stage.assetMove;
-  };
-  // A host may arm the tool before the first document built the stage; the
-  // switch is remembered and applied as soon as a stage is there.
-  let assetMoveWanted = false;
-  deps.events.on('scene', () => {
-    if (assetMoveWanted) assetMove()?.setEnabled(true);
-  });
   /**
-   * Ends a running look-through: reads the eye, returns the camera to where
-   * the orbit stood, and — when `commit` — reports the new pose as one edit.
-   * The mode switch back goes through `switchMode`, so the chrome and the
-   * `mode` event follow exactly as for a button press — but as an implicit
-   * switch, which keeps the restored pose instead of resetting it.
+   * The authoring tools behind one lazy boundary: the overlay, the
+   * look-through, the asset move tool. The chunk loads on the first switch
+   * turned on, and the commands below answer «not loaded» until it is in.
    */
-  const endPilot = (commit: boolean): boolean => {
-    const stage = deps.stage();
-    const result = stage?.pilot.end();
-    const director = stage?.director;
-    if (!stage || !result || !director) return false;
-    stage.lookThrough.hide();
-    const back = pilotReturn;
-    pilotReturn = null;
-    if (back) director.controller.setPose(back.position, back.target);
-    switchMode(back?.mode ?? 'orbit', false);
-    const scene = deps.mount().model?.scene;
-    if (commit && scene) {
-      stage.overlay.applyPose(
-        result.id,
-        poseFromEye(scene.ceilingHeight, result.eye),
-        `Camera ${result.id} looked through`,
-        result.baseRev,
-      );
-    }
-    stage.overlay.focusCheckpoint(result.id);
-    deps.events.emit('checkpointLookThrough', { id: null });
-    return true;
-  };
-  /** Where the orbit stood when a look-through began, to return to. */
-  let pilotReturn: { position: THREE.Vector3; target: THREE.Vector3; mode: ViewerMode } | null = null;
+  const authoring: AuthoringPort = authoringPort({
+    stage: deps.stage,
+    load: () => import('./authoring.js'),
+    start: (module, stage) =>
+      module.startAuthoring({
+        stage,
+        mount: deps.mount,
+        events: deps.events,
+        ui: deps.ui,
+        roots: deps.context.roots,
+        signal: deps.context.signal,
+        messages: deps.messages(),
+        handle: () => commands,
+        visible: () => authoring.checkpointOverlay(),
+        switchMode,
+      }),
+    log: defaultLogger,
+  });
   /** A host's `setMode` before there was a camera to switch: the start view opens in it. */
   let requestedMode: ViewerMode | null = null;
 
@@ -169,7 +141,7 @@ export function handleCommands(deps: HandleCommandsDeps): HandleCommands {
    * visitor's own choice (`setMode`: a mode button, the API, the embed
    * protocol) and goes through `director.selectMode`, which ends a choice of
    * 360 in the Reset camera pose. The handle's own internal
-   * returns to 360 (`endPilot`, `frameCheckpoint`) are implicit: they set or
+   * returns to 360 (the end of a look-through, `frameCheckpoint`) are implicit: they set or
    * fly the pose themselves, and a reset would undo it.
    */
   function switchMode(mode: ViewerMode, explicit: boolean): void {
@@ -179,14 +151,12 @@ export function handleCommands(deps: HandleCommandsDeps): HandleCommands {
       requestedMode = mode;
       return;
     }
-    // Any other mode ends a look-through without keeping it: the pilot's
-    // walk is not the visitor's walk.
-    if ((deps.stage()?.pilot.id ?? null) !== null) endPilot(false);
+    // Any other mode ends a look-through without keeping it, and a checkpoint
+    // gesture cannot survive leaving the mode it could start in.
+    authoring.modeChanged(mode);
     const director = deps.stage()?.director;
     if (explicit) director?.selectMode(mode);
     else director?.setMode(mode);
-    // A gesture cannot survive leaving the mode it could start in (`orbit`).
-    deps.stage()?.overlay.setMode(mode);
     deps.ui.setModeButtons(mode);
     deps.ui.setHintForMode(mode);
     deps.events.emit('mode', mode);
@@ -236,6 +206,7 @@ export function handleCommands(deps: HandleCommandsDeps): HandleCommands {
     slots: deps.context.slots,
     lightTemperature,
     quality,
+    authoring,
 
     setMode(mode) {
       switchMode(mode, true);
@@ -272,7 +243,7 @@ export function handleCommands(deps: HandleCommandsDeps): HandleCommands {
         locale: () => deps.messages().locale,
         model: () => deps.mount().model,
         walkCamera: () => deps.stage()?.director?.walkCamera() ?? { index: null, count: 0 },
-        checkpoints: () => ({ lookThrough: deps.stage()?.pilot.id ?? null, placing: deps.stage()?.overlay.placing() ?? false }),
+        checkpoints: () => ({ lookThrough: authoring.lookThroughId(), placing: authoring.placing() }),
         lightTemperature: () => lightTemperature.value,
       });
     },
@@ -304,9 +275,8 @@ export function handleCommands(deps: HandleCommandsDeps): HandleCommands {
       // The camera stack keeps a catalogue of its own — it is where every hint
       // the rigs raise by key is turned into words (`camera-director.ts`).
       deps.stage()?.director?.retranslate(messages);
-      // And the camera-preview card's label (`ui/camera-preview.ts`) and the look-through bar.
-      deps.stage()?.preview.retranslate(messages);
-      deps.stage()?.lookThrough.retranslate(messages);
+      // And the authoring tools' own chrome, when they are in.
+      authoring.retranslate(messages);
       deps.stage()?.walkCameras.retranslate(messages);
     },
 
@@ -350,108 +320,24 @@ export function handleCommands(deps: HandleCommandsDeps): HandleCommands {
       if (!reapply || !visible) deps.animator.setVisible(visible);
     },
 
-    setCheckpointOverlay(visible) {
-      deps.setCheckpointsVisible(visible);
-      deps.stage()?.overlay.setEnabled(visible);
-    },
-
-    isCheckpointOverlayVisible() {
-      return deps.checkpointsVisible();
-    },
-
-    addCheckpoint(request) {
-      return deps.stage()?.overlay.addCheckpoint(request.id) ?? false;
-    },
-
-    startCheckpointPlacement(request) {
-      return deps.stage()?.overlay.startPlacing(request.id) ?? false;
-    },
-
-    cancelCheckpointPlacement() {
-      deps.stage()?.overlay.cancelPlacing();
-    },
-
-    setCheckpointFromView(id) {
-      return deps.stage()?.overlay.setCheckpointFromView(id) ?? false;
-    },
-
-    frameCheckpoint(id) {
-      const stage = deps.stage();
-      const checkpoint = stage?.overlay.checkpoint(id);
-      const director = stage?.director;
-      if (!stage || !checkpoint || !director || !deps.checkpointsVisible()) return false;
-      if (stage.pilot.id !== null) endPilot(false);
-      if (director.controller.getMode() !== 'orbit') switchMode('orbit', false);
-      const frame = framePose(checkpoint);
-      director.controller.flyTo(toVector(frame.position), toVector(frame.target));
-      stage.overlay.focusCheckpoint(id);
-      return true;
-    },
-
-    lookThroughCheckpoint(id) {
-      const stage = deps.stage();
-      const director = stage?.director;
-      const checkpoint = stage?.overlay.checkpoint(id);
-      const scene = deps.mount().model?.scene;
-      if (!stage || !director || !checkpoint || !scene || !deps.checkpointsVisible()) return false;
-      if (stage.pilot.id !== null) endPilot(false);
-      stage.overlay.focusCheckpoint(id);
-      const mode = director.controller.getMode();
-      const pose = director.controller.getPose();
-      pilotReturn = { position: pose.position, target: pose.target, mode: mode === 'plan3d' ? 'plan3d' : 'orbit' };
-      const { position, yaw, pitch } = checkpoint;
-      const eye = toVector(position);
-      director.enterWalkAt({
-        position: eye,
-        target: eye.clone().add(new THREE.Vector3(Math.sin(yaw) * Math.cos(pitch), Math.sin(pitch), Math.cos(yaw) * Math.cos(pitch))),
-      });
-      stage.overlay.setMode('walk');
-      stage.pilot.begin(id, position.y, scene.ceilingHeight, deps.mount().model?.rev ?? 0);
-      const order = (scene.tourCheckpoints ?? []).findIndex((candidate) => candidate.id === id) + 1;
-      stage.lookThrough.show(order > 0 ? order : 1);
-      deps.ui.setModeButtons('walk');
-      director.hint('hint.lookThrough');
-      deps.events.emit('mode', 'walk');
-      deps.events.emit('checkpointLookThrough', { id });
-      return true;
-    },
-
-    endLookThrough(commit) {
-      return endPilot(commit);
-    },
-
-    focusCheckpoint(id) {
-      return deps.stage()?.overlay.focusCheckpoint(id) ?? false;
-    },
-
-    revertCheckpointEdit() {
-      deps.stage()?.overlay.revert();
-    },
-
-    setAssetMoveTool(enabled) {
-      assetMoveWanted = enabled;
-      assetMove()?.setEnabled(enabled);
-    },
-
-    armAssetMove() {
-      assetMove()?.arm();
-    },
-
-    revertAssetEdit() {
-      deps.stage()?.assetMove?.revert();
-    },
-
-    mirrorAsset(assetId, axis) {
-      return deps.stage()?.assetMove?.mirror(assetId, axis) ?? false;
-    },
-
-    turnAsset(assetId, steps) {
-      return deps.stage()?.assetMove?.turnAsset(assetId, steps) ?? false;
-    },
+    setCheckpointOverlay: (visible) => authoring.setCheckpointOverlay(visible),
+    isCheckpointOverlayVisible: () => authoring.checkpointOverlay(),
+    addCheckpoint: (request) => authoring.addCheckpoint(request.id),
+    startCheckpointPlacement: (request) => authoring.startCheckpointPlacement(request.id),
+    cancelCheckpointPlacement: () => authoring.cancelCheckpointPlacement(),
+    setCheckpointFromView: (id) => authoring.setCheckpointFromView(id),
+    frameCheckpoint: (id) => authoring.frameCheckpoint(id),
+    lookThroughCheckpoint: (id) => authoring.lookThroughCheckpoint(id),
+    endLookThrough: (commit) => authoring.endLookThrough(commit),
+    focusCheckpoint: (id) => authoring.focusCheckpoint(id),
+    revertCheckpointEdit: () => authoring.revertCheckpointEdit(),
+    setAssetMoveTool: (enabled) => authoring.setAssetMoveTool(enabled),
+    armAssetMove: () => authoring.armAssetMove(),
+    revertAssetEdit: () => authoring.revertAssetEdit(),
+    mirrorAsset: (assetId, axis) => authoring.mirrorAsset(assetId, axis),
+    turnAsset: (assetId, steps) => authoring.turnAsset(assetId, steps),
+    setPlanTool: (enabled) => authoring.setPlanTool(enabled),
+    revertPlanEdit: () => authoring.revertPlanEdit(),
   };
   return commands;
-}
-
-function toVector(point: { x: number; y: number; z: number }): THREE.Vector3 {
-  return new THREE.Vector3(point.x, point.y, point.z);
 }

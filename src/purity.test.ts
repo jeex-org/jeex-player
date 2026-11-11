@@ -145,6 +145,7 @@ const PURE_MODULES = [
   'app/option-resolvers',
   'app/option-paths',
   'app/option-sets',
+  'app/option-overlays',
   'lighting/index',
   'lighting/lighting-context',
   'lighting/lighting-error',

@@ -9,7 +9,7 @@ import { afterEach, describe, expect, test } from 'vitest';
 import { InlineSceneRepository, mountViewer } from '../../src/app/viewer-api.js';
 import type { ViewerHandle } from '../../src/app/viewer-handle.js';
 import type { AssetEdit } from '../../src/edit/asset-move-tool.js';
-import type { AssetMoveDebug } from '../../src/edit/asset-move-session.js';
+import type { AssetMoveDebug } from '../../src/edit/asset-edit.js';
 import { DEMO } from '../../src/demo/demo-ids.js';
 import type { SceneData, SceneOp } from '../../src/scene/types.js';
 import { ASSET_MOVE_CHUNK_TIMEOUT_MS, closeContainers, demoScene, nextFrame, openContainer, parkForExport, until } from './support.js';

@@ -15,6 +15,7 @@ import type { ViewerOptions } from './viewer-options.js';
 import type { FullscreenController } from '../ui/fullscreen-controller.js';
 import type { TourControls } from '../camera/tour-controls.js';
 import type { ViewerStage } from './viewer-stage.js';
+import type { AuthoringPort } from './authoring-port.js';
 
 describe('debugHostFor', () => {
   test('quality reads the application-level control where no stage exists', () => {
@@ -34,6 +35,7 @@ describe('debugHostFor', () => {
       furnitureVisible: () => true,
       quality: () => ({ debug: () => ({ mode: 'fixed', tier: 'low' }) }) as QualityControl,
       projectLibrary: () => undefined,
+      authoring: () => ({}) as AuthoringPort,
     });
     expect(host.quality()).toEqual({ mode: 'fixed', tier: 'low' });
   });
@@ -56,6 +58,7 @@ describe('debugHostFor', () => {
         furnitureVisible: () => true,
         quality: () => ({ debug: () => ({ mode: 'fixed', tier: 'high' }) }) as QualityControl,
         projectLibrary: () => undefined,
+        authoring: () => ({}) as AuthoringPort,
       });
     for (const kind of ['live', 'fixed', 'neutral'] as const) {
       expect(hostWith(kind).walkLighting()).toEqual({ state: 'live', stats: null, roomBalance: kind });

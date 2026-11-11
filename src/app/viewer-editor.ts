@@ -14,7 +14,7 @@ import type { UsageSink } from '../shared/usage.js';
 import * as THREE from 'three';
 import { effectiveAsset } from '../scene/types.js';
 import { mirrorFactsOf } from '../geometry/asset-mirror.js';
-import { isApplyOk, type ApplyResult, type SceneModel } from '../scene/scene-model.js';
+import type { ApplyResult, SceneModel } from '../scene/scene-model.js';
 import { SceneBuilder, FURNITURE_GROUP_NAME, type BuildResult } from '../geometry/scene-builder.js';
 import type { EditsWiring } from './edits-wiring.js';
 import type { Picker, SurfacePick } from '../geometry/picker.js';
@@ -25,7 +25,8 @@ import type { SceneOp, TouchedEntity } from '../scene/scene-ops.js';
 import { dispatchTouched, type TouchedHandlers } from '../geometry/touched-kind.js';
 import type { DemoAsset, SceneData } from '../scene/types.js';
 import { adoptPlacements, assetIdOf, followPlacement, type PlacementFollowDeps } from './placement-follow.js';
-import { finishPanelRequest, furniturePanelRequest, interiorPanelRequest, openingPanelRequest } from '../ui/panel-requests.js';
+import { EditorPanels } from '../ui/editor-panels.js';
+import { EditorPresets } from './editor-presets.js';
 import {
   assetLabel,
   describeSelection as describeSelectionCore,
@@ -34,10 +35,8 @@ import {
   libraryChoiceOf,
   openingLabel,
   type DescribeTarget,
-  type FinishTarget,
   type SelectionDescription,
 } from '../ui/selection-options.js';
-import { applyPresetBatch, findPreset, presetBatchOps } from '../scene/interior-presets.js';
 import type { Messages } from '../ui/messages.js';
 import type { VariantBank } from '../assets/asset-variants.js';
 import {
@@ -85,21 +84,12 @@ export type EditorDeps = {
   usage?: UsageSink | undefined;
 };
 
-/** What the open panel is editing. */
-type PanelTarget =
-  | ({ kind: 'surface' } & FinishTarget)
-  | { kind: 'furniture'; assetId: string }
-  | { kind: 'opening'; openingId: string }
-  | { kind: 'interior' }
-  | null;
-
 export class ViewerEditor {
   private readonly deps: EditorDeps;
   /** Shorthand for `deps.messages`: this module writes a lot of copy. */
   private get messages(): Messages {
     return this.deps.messages;
   }
-  private panelTarget: PanelTarget = null;
   private furnitureGroup: THREE.Group | null = null;
   private readonly furnitureAssets = new Map<string, THREE.Group>();
   /** Each placement as its body was last built or stood for it (`placement-follow.ts`). */
@@ -109,12 +99,10 @@ export class ViewerEditor {
   private readonly fadingGlows: SelectionGlow[] = [];
   private selectedAssetId: string | null = null;
   private selectedOpeningId: string | null = null;
-  /** Preset applied last; any hand edit through `dispatch` clears it. */
-  private activePresetId: string | null = null;
-  /** Where the interior panel last opened, so a commit does not move it. */
-  private interiorAnchor = { x: 0, y: 0 };
-  /** Rendered previews of the popup's offers, per archetype: rendering one is the expensive part of opening it. */
-  private readonly offerPreviews = new Map<string, string | null>();
+  /** The four panels and what the open one edits (`ui/editor-panels.ts`). */
+  private readonly panels: EditorPanels;
+  /** The interior presets and the one in force (`editor-presets.ts`). */
+  private readonly interiorPresets: EditorPresets;
 
   /**
    * The touched-entity dispatch table `applyRevision` folds over — shared in
@@ -169,10 +157,39 @@ export class ViewerEditor {
       animator: deps.animator,
       release: (assetId) => {
         if (this.selectedAssetId === assetId) this.clearSelection();
-        if (this.panelTarget?.kind === 'furniture' && this.panelTarget.assetId === assetId) this.closePanel();
+        const target = this.panels.target();
+        if (target?.kind === 'furniture' && target.assetId === assetId) this.closePanel();
       },
       swap: (assetId, variantId) => this.swapFurniture(assetId, variantId),
     };
+    this.interiorPresets = new EditorPresets({
+      model: deps.model,
+      ui: deps.ui,
+      messages: deps.messages,
+      edits: deps.edits,
+      usage: deps.usage,
+      reopenPanel: () => {
+        if (this.panels.target()?.kind === 'interior') this.openInteriorPanel();
+      },
+    });
+    this.panels = new EditorPanels({
+      ui: deps.ui,
+      messages: deps.messages,
+      scene: () => deps.model.scene,
+      variants: () => deps.variants,
+      openings: () => deps.builder.openingsList(),
+      editsMode: () => deps.edits.mode,
+      openingVariantOf: (openingId) => this.openingVariantOf(openingId),
+      furniturePreview: (placement, variantId) => this.furniturePreview(placement, variantId),
+      activePresetId: () => this.interiorPresets.activeId(),
+      clearSelection: () => this.clearSelection(),
+      applyFinish: (finishId, scopeChecked) => this.applyFinish(finishId, scopeChecked),
+      applyFinishToAll: (finishId, scopeChecked) => this.applyFinishToAll(finishId, scopeChecked),
+      requestFurnitureVariant: (assetId, variantId) => this.requestFurnitureVariant(assetId, variantId),
+      requestOpeningVariant: (openingId, variantId) => this.requestOpeningVariant(openingId, variantId),
+      commitReplace: (op) => this.dispatch(op),
+      commitPreset: (presetId) => this.interiorPresets.commitPreset(presetId),
+    });
   }
 
   /**
@@ -230,11 +247,11 @@ export class ViewerEditor {
         return;
       }
       this.selectOpening(pick.openingId);
-      this.openOpeningPanel(pick.openingId, clientX, clientY);
+      this.panels.openOpeningPanel(pick.openingId, clientX, clientY);
       return;
     }
     if (pick && (pick.surface === 'floor' || pick.surface === 'wall')) {
-      this.openFinishPanel({ surface: pick.surface, roomId: pick.roomId, face: pick.face }, clientX, clientY);
+      this.panels.openFinishPanel({ surface: pick.surface, roomId: pick.roomId, face: pick.face }, clientX, clientY);
       return;
     }
     this.closePanel();
@@ -248,177 +265,33 @@ export class ViewerEditor {
       return;
     }
     this.selectFurniture(assetId);
-    this.openReplacePanel(assetId);
+    this.panels.openReplacePanel(assetId);
   }
 
   // -------------------------------------------------------------- panels ----
 
-  private openFinishPanel(target: FinishTarget, clientX: number, clientY: number): void {
-    const request = finishPanelRequest({
-      messages: this.messages,
-      scene: this.deps.model.scene,
-      target,
-      variants: this.deps.variants,
-      anchor: { x: clientX, y: clientY },
-      onPick: (finishId, scopeChecked) => this.applyFinish(finishId, scopeChecked),
-      onApplyToAll: (finishId, scopeChecked) => this.applyFinishToAll(finishId, scopeChecked),
-    });
-    // A surface the paint vocabulary cannot address (a floor click that carried
-    // no room) opens nothing, which is also what `describeSelection` answers
-    // for it: one rule, in `selection-options.ts`.
-    if (!request) return;
-    this.panelTarget = { kind: 'surface', ...target };
-    this.deps.ui.openPanel(request);
-  }
-
-  private openReplacePanel(assetId: string): void {
-    const placement = this.deps.model.scene.assets.find((asset) => asset.id === assetId);
-    if (!placement) return;
-    this.panelTarget = { kind: 'furniture', assetId };
-    this.deps.ui.openPanel(
-      furniturePanelRequest({
-        messages: this.messages,
-        placement,
-        renderPreview: (definition, variantId) => this.furniturePreview(definition, variantId),
-        variants: this.deps.variants,
-        onPick: (variantId) => {
-          if (this.panelTarget?.kind !== 'furniture') return;
-          this.requestFurnitureVariant(this.panelTarget.assetId, variantId);
-        },
-        onStandard: (variantId) => {
-          this.closePanel();
-          this.requestFurnitureVariant(assetId, variantId);
-        },
-        replace:
-          this.deps.edits.mode === 'off'
-            ? undefined
-            : { previews: this.offerPreviews, open: (popup) => this.deps.ui.openReplacePopup(popup), commit: (op) => this.dispatch(op) },
-      }),
-    );
-    this.deps.ui.wakeControls();
-  }
-
-  private openOpeningPanel(openingId: string, clientX: number, clientY: number): void {
-    const entry = this.deps.builder.openingsList().find((item) => item.id === openingId);
-    if (!entry) return;
-    this.panelTarget = { kind: 'opening', openingId };
-    this.deps.ui.openPanel(
-      openingPanelRequest({
-        messages: this.messages,
-        entry,
-        current: this.openingVariantOf(openingId),
-        anchor: { x: clientX, y: clientY },
-        onPick: (variantId) => {
-          if (this.panelTarget?.kind !== 'opening') return;
-          this.requestOpeningVariant(this.panelTarget.openingId, variantId);
-        },
-        onStandard: (variantId) => {
-          this.closePanel();
-          this.requestOpeningVariant(openingId, variantId);
-        },
-      }),
-    );
-    this.deps.ui.wakeControls();
-  }
-
-  /**
-   * The interior-preset panel. Unlike the other three it is opened from the
-   * control bar rather than from a pick, so it anchors to the shell and clears
-   * whatever was selected: a preset is about the whole flat.
-   */
+  /** The interior-preset panel, opened from the control bar (`ui/editor-panels.ts`). */
   openInteriorPanel(anchor?: { x: number; y: number }): void {
-    // `'off'` opens no panel. The interiors button reaches this through `ui-commands`,
-    // outside the `director-wiring` pick gate, so the panel refuses on its own.
-    if (this.deps.edits.mode === 'off') return;
-    const presets = this.deps.model.scene.interiors ?? [];
-    if (presets.length === 0) return;
-    // Remembered, so re-opening after a commit keeps the panel where it was.
-    if (anchor) this.interiorAnchor = anchor;
-    this.clearSelection();
-    this.panelTarget = { kind: 'interior' };
-    this.deps.ui.openPanel(
-      interiorPanelRequest({
-        messages: this.messages,
-        presets,
-        activeId: this.activePresetId,
-        anchor: this.interiorAnchor,
-        onPick: (presetId) => this.commitPreset(presetId),
-      }),
-    );
-    this.deps.ui.wakeControls();
+    this.panels.openInteriorPanel(anchor);
   }
 
-  /**
-   * Seam 2 of 2: what a click in the interiors PANEL does.
-   *
-   * It exists because a preset does not go through `dispatch` — `applyPreset`
-   * commits its batch itself (`applyPresetBatch`, `interior-presets.ts`), so
-   * gating `dispatch` alone would have let the one panel that commits the most
-   * slip straight past `edits: 'emit'`.
-   *
-   * `applyPreset` itself stays UNGATED on purpose: it is also
-   * `__viewerDebug.applyPreset`, an authoring surface behind `options.debug`
-   * that `scripts/browser-check/presets.ts` drives and a host never sees.
-   */
-  private commitPreset(presetId: string): void {
-    // `'off'` is not `'local'`: a pick that reaches this seam anyway must
-    // commit and emit nothing. The debug `applyPreset` stays
-    // ungated — this seam is the panel's, not the authoring surface's.
-    if (this.deps.edits.mode === 'off') return;
-    const model = this.deps.model;
-    const preset = findPreset(model.scene, presetId);
-    if (!preset) return;
-    if (this.deps.edits.mode !== 'emit') {
-      // Counted once the batch is accepted: a refused preset is not an applied one.
-      if (isApplyOk(this.applyPreset(presetId))) this.deps.usage?.('interior');
-      return;
-    }
-    this.deps.usage?.('interior');
-    this.deps.edits.onEdit({ ops: presetBatchOps(model.scene, preset, model.registries), baseRev: model.rev });
-  }
-
-  /**
-   * Applies a whole interior in one revision. Public, because it is also the
-   * debug hook; a refused batch reports through the same hint sink as any other
-   * refusal and leaves the active preset alone.
-   */
+  /** Applies a whole interior in one revision; also the debug hook (`editor-presets.ts`). */
   applyPreset(presetId: string): ApplyResult {
-    const model = this.deps.model;
-    const preset = findPreset(model.scene, presetId);
-    this.deps.ui.setPanelBusy(true);
-    let result: ApplyResult;
-    try {
-      result = applyPresetBatch(model, presetId, 'preset');
-    } finally {
-      this.deps.ui.setPanelBusy(false);
-    }
-    if (!isApplyOk(result)) {
-      this.deps.ui.setHint(this.messages.t('hint.changeRefused', { message: result.message }));
-      return result;
-    }
-    this.activePresetId = presetId;
-    if (preset) this.deps.ui.setHint(this.messages.t('interiors.applied', { name: preset.name }));
-    // Re-open so the active ring, and the swatches themselves, match the commit.
-    if (this.panelTarget?.kind === 'interior') this.openInteriorPanel();
-    return result;
+    return this.interiorPresets.applyPreset(presetId);
   }
 
   /** Presets the scene offers, with the one in force marked. */
   presets(): Array<{ id: string; name: string; active: boolean }> {
-    return (this.deps.model.scene.interiors ?? []).map((preset) => ({
-      id: preset.id,
-      name: preset.name,
-      active: preset.id === this.activePresetId,
-    }));
+    return this.interiorPresets.presets();
   }
 
   closePanel(): void {
-    this.deps.ui.closePanel();
+    this.panels.closePanel();
   }
 
   /** Drops the panel target when the UI closes the panel for any other reason. */
   forgetPanelTarget(): void {
-    this.panelTarget = null;
+    this.panels.forgetPanelTarget();
   }
 
   // ---------------------------------------------------------- dispatching ---
@@ -445,7 +318,7 @@ export class ViewerEditor {
     }
     // Any hand edit makes the document something no preset describes any more.
     // `applyPreset` commits its batch itself, so it never passes through here.
-    this.activePresetId = null;
+    this.interiorPresets.clear();
   }
 
   /**
@@ -456,7 +329,7 @@ export class ViewerEditor {
    * and the host card can never commit two different things.
    */
   private applyFinish(finishId: string, scopeChecked: boolean): void {
-    const target = this.panelTarget;
+    const target = this.panels.target();
     if (!target || target.kind !== 'surface') return;
     const action = finishPickAction(target, finishId, scopeChecked, libraryChoiceOf(this.deps.variants?.materials, finishId));
     if (!action) return;
@@ -466,7 +339,7 @@ export class ViewerEditor {
 
   /** Footer button of the finish panel: the active swatch, applied broadly. */
   private applyFinishToAll(finishId: string | null, scopeChecked: boolean): void {
-    const target = this.panelTarget;
+    const target = this.panels.target();
     if (!finishId || !target || target.kind !== 'surface') return;
     const action = finishApplyAllAction(target, finishId, scopeChecked, libraryChoiceOf(this.deps.variants?.materials, finishId));
     if (action) this.dispatch(action.op);

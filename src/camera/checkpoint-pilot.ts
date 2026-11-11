@@ -46,7 +46,9 @@ export class CheckpointPilot {
 
   constructor(deps: PilotDeps) {
     this.deps = deps;
-    deps.keys?.addEventListener('keydown', this.onKeyDown as EventListener, listenerOptions(deps.signal));
+    // The capture phase: the pilot loads after the walk rig's keys bound on the
+    // same root, and its Enter and Esc must still be heard first.
+    deps.keys?.addEventListener('keydown', this.onKeyDown as EventListener, { ...listenerOptions(deps.signal), capture: true });
   }
 
   /** The camera being looked through, or `null`. */
@@ -87,7 +89,7 @@ export class CheckpointPilot {
    * there (the reason `CheckpointGestures` unbinds on dispose too).
    */
   dispose(): void {
-    this.deps.keys?.removeEventListener('keydown', this.onKeyDown as EventListener);
+    this.deps.keys?.removeEventListener('keydown', this.onKeyDown as EventListener, { capture: true });
     this.state = null;
   }
 

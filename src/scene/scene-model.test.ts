@@ -1000,3 +1000,40 @@ describe('room merges on commit', () => {
     expect(subject.plan.rooms).toHaveLength(1);
   });
 });
+
+describe('trial', () => {
+  const MOVE: SceneOp[] = [{ op: 'move_node', nodeId: L_SHAPE.node.n3, p: { x: 10.5, z: 0 } }];
+  /** An opening wider than its wall: the validator refuses it. */
+  const TOO_WIDE: SceneOp[] = [{ op: 'set_opening', openingId: L_SHAPE.opening.doorEntry, width: 40 }];
+
+  test('judges a legal batch without committing it: the candidate moved, the model did not', () => {
+    const subject = model();
+    const heard: number[] = [];
+    subject.onRevision((rev) => heard.push(rev));
+    const before = subject.scene;
+    const result = subject.trial({ baseRev: subject.rev, ops: MOVE });
+    if ('error' in result) throw new Error(result.message);
+    expect(result.scene.nodes.find((node) => node.id === L_SHAPE.node.n3)?.p).toEqual({ x: 10.5, z: 0 });
+    expect(result.plan).toBeDefined();
+    expect(subject.rev).toBe(0);
+    expect(subject.scene).toBe(before);
+    expect(subject.scene.nodes.find((node) => node.id === L_SHAPE.node.n3)?.p).toEqual({ x: 10, z: 0 });
+    expect(heard).toEqual([]);
+  });
+
+  test('refuses an illegal batch exactly as apply does', () => {
+    const subject = model();
+    const tried = subject.trial({ baseRev: subject.rev, ops: TOO_WIDE });
+    const applied = subject.apply({ baseRev: subject.rev, ops: TOO_WIDE });
+    expect(tried).toEqual(applied as never);
+    expect('error' in tried && tried.error).toBe('validation_failed');
+  });
+
+  test('the candidate is the scene apply then commits', () => {
+    const subject = model();
+    const tried = subject.trial({ baseRev: subject.rev, ops: MOVE });
+    if ('error' in tried) throw new Error(tried.message);
+    expect(isApplyOk(subject.apply({ baseRev: subject.rev, ops: MOVE }))).toBe(true);
+    expect(draftOf(subject.scene)).toEqual(draftOf(tried.scene));
+  });
+});

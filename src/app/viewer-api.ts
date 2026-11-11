@@ -139,6 +139,8 @@ export function mountViewerAs(embedding: Embedding, container: HTMLElement, opti
     setAssetMoveTool: (enabled) => app.handle.setAssetMoveTool(enabled),
     armAssetMove: () => app.handle.armAssetMove(),
     revertAssetEdit: () => app.handle.revertAssetEdit(),
+    setPlanTool: (enabled) => app.handle.setPlanTool(enabled),
+    revertPlanEdit: () => app.handle.revertPlanEdit(),
     mirrorAsset: (assetId, axis) => app.handle.mirrorAsset(assetId, axis),
     turnAsset: (assetId, steps) => app.handle.turnAsset(assetId, steps),
     resize: () => app.handle.resize(),

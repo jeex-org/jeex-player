@@ -68,6 +68,8 @@ export const IT: Record<MessageKey, string> = {
   'cameraPreview.lookThrough': 'Guarda attraverso',
   'hint.checkpointPlacing': 'Posizionamento di una telecamera — fai clic sul pavimento (trascina per orientare) · Esc per annullare',
   'hint.assetMove': 'Trascina per spostare, Q/E per ruotare, Esc per annullare',
+  'hint.planTool': 'Trascina una maniglia per spostarla, Esc per annullare',
+  'hint.planEditIllegal': 'Questa posizione non è consentita',
   'hint.lookThrough':
     'Vista dalla telecamera — trascina per guardare · WASD per muoverti · Q/E per l’altezza · Invio per confermare · Esc per annullare',
   'lookThrough.label': 'Vista dalla telecamera {n}',

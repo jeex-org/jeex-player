@@ -99,6 +99,8 @@ export const EN = {
   'cameraPreview.lookThrough': 'Look through',
   'hint.checkpointPlacing': 'Placing a camera — click the floor (drag to aim) · Esc to cancel',
   'hint.assetMove': 'Drag to move, Q/E to turn, Esc to cancel',
+  'hint.planTool': 'Drag a handle to move it, Esc to cancel',
+  'hint.planEditIllegal': 'This position is not allowed',
   'hint.lookThrough': 'Looking through the camera — drag to look · WASD to move · Q/E for height · Enter to keep · Esc to cancel',
   'lookThrough.label': 'Looking through camera {n}',
   'lookThrough.done': 'Done',
