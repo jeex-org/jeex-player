@@ -119,7 +119,7 @@ type Harness = {
   changes: { count: number };
 };
 
-/** `early` binds listeners of the page's own before the overlay exists, as the selection controller and the camera input now are. */
+/** `early` binds listeners of the page's own before the overlay exists, as the selection controller and the camera input are, the overlay being loaded after them. */
 function harness(checkpoints: TourCheckpoint[] = [CAM_A, CAM_B], early?: (canvas: FakeTarget, keys: FakeTarget) => void): Harness {
   const canvas = new FakeTarget();
   const keys = new FakeTarget();
