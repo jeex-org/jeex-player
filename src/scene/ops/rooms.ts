@@ -114,6 +114,11 @@ export function applySetRoom(scene: Draft<SceneData>, op: SetRoomOp): OpOutcome 
     changes.push(`accent → ${op.accent}`);
     room.accent = op.accent;
   }
+  if (op.polygon === null) {
+    if (room.polygon === undefined) throw new OpError(`set_room: room ${op.roomId} has no outline of its own; it is already attached to its walls`);
+    changes.push('attached to its walls');
+    delete room.polygon;
+  }
   if (changes.length === 0) throw new OpError('set_room needs at least one field to change');
 
   // Every one of the four reaches the drawing: the 2D plan letters the room

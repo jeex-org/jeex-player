@@ -23,14 +23,15 @@
  * Pure module: no `three`, no DOM.
  */
 
-import { dot } from '../plan/plan-geometry.js';
+import { dot, pointInPolygon } from '../plan/plan-geometry.js';
+import { anchorsPerFace, buildGraph, type PlanGraph } from '../plan/plan-graph.js';
 import { interiorSideOf, pointAt } from '../plan/door-swing.js';
 import { solvePlan, type SolvedPlan } from '../plan/plan-solver.js';
 import type { Draft } from '../shared/committed.js';
 import { finishMaterialOf } from './finish-value.js';
-import { touchedFace, touchedOpening, type TouchedEntity } from './ops/context.js';
+import { TOUCHED_SHELL, touchedFace, touchedOpening, type TouchedEntity } from './ops/context.js';
 import { surfacesIn, type SceneRegistries } from './registries.js';
-import { FaceMap, type FaceKey, type FinishRef, type SceneData, type SceneOp } from './types.js';
+import { FaceMap, type FaceKey, type FinishRef, type Room, type SceneData, type SceneOp } from './types.js';
 
 /** Who owns each wall side on a plan: a room id, `null` for the facade. */
 function ownersOf(plan: SolvedPlan): Map<string, string | null> {
@@ -118,6 +119,32 @@ function keepSwingSides(draft: Draft<SceneData>, committed: SceneData, before: S
 }
 
 /**
+ * Attaches a zone to the walls again when a wall closes round its anchor: a
+ * face of the new graph that no attached room claims, and exactly one zone's
+ * anchor in it. That face would otherwise be refused as having no room.
+ */
+function reattachZones(draft: Draft<SceneData>): TouchedEntity[] {
+  const zones = draft.rooms.filter((room) => room.polygon !== undefined);
+  if (zones.length === 0) return [];
+  let graph: PlanGraph;
+  try {
+    graph = buildGraph(draft.nodes, draft.walls);
+  } catch {
+    return [];
+  }
+  const attached = anchorsPerFace(graph, draft.rooms as Room[]);
+  const zoned = graph.faces.map((face) => zones.filter((zone) => pointInPolygon(zone.anchor, face.polygon)));
+  const touched: TouchedEntity[] = [];
+  for (const [index, inFace] of zoned.entries()) {
+    if (attached[index]!.length > 0 || inFace.length !== 1) continue;
+    const room = draft.rooms.find((candidate) => candidate.id === inFace[0]!.id)!;
+    delete room.polygon;
+    touched.push(TOUCHED_SHELL);
+  }
+  return touched;
+}
+
+/**
  * Re-reads, on the plan the draft solves to, the painted faces (document and
  * presets) and the explicit door swings of a batch that edited the shell or
  * the rooms. A draft that does not solve is left alone: validation names why.
@@ -128,14 +155,15 @@ export function settleShellEdit(
   committedPlan: SolvedPlan,
   registries: SceneRegistries,
 ): TouchedEntity[] {
+  const reattached = reattachZones(draft);
   let plan: SolvedPlan;
   try {
     plan = solvePlan(draft as SceneData);
   } catch {
-    return [];
+    return reattached;
   }
   const owners = ownersOf(plan);
-  const touched = rekeyFaceFinishes(draft, plan, owners, registries);
+  const touched = [...reattached, ...rekeyFaceFinishes(draft, plan, owners, registries)];
   if (draft.interiors) {
     draft.interiors = draft.interiors.map((preset) => {
       const ops = preset.ops.map((op) => rekeyPresetOp(op, plan, owners));

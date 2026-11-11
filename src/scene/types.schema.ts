@@ -473,6 +473,7 @@ export const sceneOpSchema = z.discriminatedUnion('op', [
     kind: z.optional(z.enum(['room', 'loggia'])),
     anchor: z.optional(vec2Schema),
     accent: z.optional(z.string()),
+    polygon: z.optional(z.null()),
   }),
   z.object({ op: z.literal('remove_room'), roomId: uuidSchema }),
   // The purpose is a vocabulary value or `null`, and the key is REQUIRED: an

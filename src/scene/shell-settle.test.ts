@@ -10,6 +10,8 @@
 
 import { describe, expect, test } from 'bun:test';
 import { CATALOGUE_REGISTRIES } from '../assets/catalogue-registries.js';
+import { lShapePlan } from '../fixtures/plan-l-shape.js';
+import { L_SHAPE } from '../fixtures/plan-l-shape-ids.js';
 import { ZONED, zonedLivingPlan } from '../fixtures/plan-zoned-living.js';
 import { FINISH } from '../materials/finish-ids.js';
 import { resolveDoorSwing } from '../plan/door-swing.js';
@@ -129,5 +131,36 @@ describe('a door with an authored swing keeps the side its leaf opens to', () =>
     const after = model.scene;
     const door = wallOf(after).openings![0]!;
     expect(resolveDoorSwing(after, model.plan, wallOf(after), door, () => 0).roomId).toBe(LIVING);
+  });
+});
+
+describe('a zone kept by a merge is a room again once a wall closes round it', () => {
+  /** The L-shape at schema 2.4, room A the living room and room B the kitchen: removing the partition keeps B as a zone. */
+  function openPlan(): SceneModel {
+    const scene: SceneData = {
+      ...lShapePlan,
+      schemaVersion: '2.4',
+      rooms: lShapePlan.rooms.map((room) => ({ ...room, purpose: room.id === L_SHAPE.room.a ? 'living' : 'kitchen' })),
+    };
+    const model = SceneModel.load(scene, CATALOGUE_REGISTRIES);
+    const merged = model.apply({ baseRev: 0, ops: [{ op: 'remove_wall', wallId: L_SHAPE.wall.wPart }] });
+    expect(merged).toMatchObject({ rev: 1, roomMerges: [{ kept: 'zone' }] });
+    expect(model.scene.rooms.find((room) => room.id === L_SHAPE.room.b)?.polygon).toBeDefined();
+    return model;
+  }
+  const REBUILD: SceneOp = { op: 'add_wall', id: NEW.partition, a: L_SHAPE.node.n2, b: L_SHAPE.node.n5, thickness: 0.1, role: 'partition' };
+
+  test('building the partition back commits, and the kitchen is an attached room under the same id', () => {
+    const model = openPlan();
+    expect(model.apply({ baseRev: 1, ops: [REBUILD] })).toMatchObject({ rev: 2 });
+    const kitchen = model.scene.rooms.find((room) => room.id === L_SHAPE.room.b)!;
+    expect(kitchen.polygon).toBeUndefined();
+    expect(model.plan.rooms.find((room) => room.roomId === L_SHAPE.room.b)?.loop.length).toBeGreaterThan(0);
+  });
+
+  test('set_room with polygon: null re-attaches a zone explicitly', () => {
+    const model = openPlan();
+    expect(model.apply({ baseRev: 1, ops: [REBUILD, { op: 'set_room', roomId: L_SHAPE.room.b, polygon: null }] })).toMatchObject({ rev: 2 });
+    expect(model.scene.rooms.find((room) => room.id === L_SHAPE.room.b)!.polygon).toBeUndefined();
   });
 });
