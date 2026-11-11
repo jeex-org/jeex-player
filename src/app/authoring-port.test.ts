@@ -130,18 +130,20 @@ describe('the authoring port', () => {
     const h = harness();
     h.port.setCheckpointOverlay(true);
     h.port.setCheckpointOverlay(false);
-    h.port.setCheckpointOverlay(true);
     h.port.setAssetMoveTool(true);
     h.port.setAssetMoveTool(false);
+    h.port.setAssetMoveTool(true);
+    h.port.setPlanTool(true);
+    h.port.setPlanTool(false);
     h.loads[0]!.resolve('module');
     await settle();
     // The chunk is in, the stage is not: nothing is built yet.
     expect(h.started).toEqual([]);
-    expect(h.port.checkpointOverlay()).toBe(true);
+    expect(h.port.checkpointOverlay()).toBe(false);
     h.setStage({ name: 'stage' });
     await h.port.ready();
     expect(h.started).toEqual(['stage']);
-    expect(h.calls).toEqual(['overlay:true', 'asset:false', 'plan:false']);
+    expect(h.calls).toEqual(['overlay:false', 'asset:true', 'plan:false']);
     expect(h.port.focusCheckpoint(CAM)).toBe(true);
     expect(h.port.lookThroughId()).toBe(CAM);
   });

@@ -12,7 +12,7 @@ import type { AssetEdit } from '../../src/edit/asset-move-tool.js';
 import type { AssetMoveDebug } from '../../src/edit/asset-edit.js';
 import { DEMO } from '../../src/demo/demo-ids.js';
 import type { SceneData, SceneOp } from '../../src/scene/types.js';
-import { ASSET_MOVE_CHUNK_TIMEOUT_MS, closeContainers, demoScene, nextFrame, openContainer, parkForExport, until } from './support.js';
+import { AUTHORING_CHUNK_TIMEOUT_MS, closeContainers, demoScene, nextFrame, openContainer, parkForExport, until } from './support.js';
 
 type Debug = {
   mode: () => string | undefined;
@@ -91,7 +91,7 @@ describe('mirrorAsset', { timeout: MOUNT_PLUS_TWO_EXPORTS_TIMEOUT_MS }, () => {
     // Not armed yet: nothing happens.
     expect(handle.mirrorAsset(sofa, 'x')).toBe(false);
     handle.setAssetMoveTool(true);
-    await until(() => debug().assetMove().loaded, 'the asset move chunk', ASSET_MOVE_CHUNK_TIMEOUT_MS);
+    await until(() => debug().assetMove().loaded, 'the authoring chunk', AUTHORING_CHUNK_TIMEOUT_MS);
     await nextFrame();
 
     expect(handle.describeSelection({ kind: 'furniture', id: sofa, mode: 'orbit' })?.mirror).toEqual({

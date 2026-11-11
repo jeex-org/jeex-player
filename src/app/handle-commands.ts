@@ -112,7 +112,7 @@ export type HandleCommands = {
 export function handleCommands(deps: HandleCommandsDeps): HandleCommands {
   /**
    * The authoring tools behind one lazy boundary: the overlay, the
-   * look-through, the asset move tool. The chunk loads on the first switch
+   * look-through, the asset move tool and the plan tool. The chunk loads on the first switch
    * turned on, and the commands below answer «not loaded» until it is in.
    */
   const authoring: AuthoringPort = authoringPort({

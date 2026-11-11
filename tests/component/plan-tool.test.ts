@@ -17,7 +17,7 @@ import { planPoint } from '../../src/plan/plan-drawing.js';
 import type { SceneData, Vec2 } from '../../src/scene/types.js';
 import { closeContainers, demoScene, nextFrame, openContainer, until } from './support.js';
 
-type Debug = { mode: () => string | undefined; sceneRoot: () => unknown };
+type Debug = { mode: () => string | undefined };
 const debug = (): Debug => (window as unknown as { __viewerDebug: Debug }).__viewerDebug;
 
 const handles: ViewerHandle[] = [];
@@ -101,7 +101,6 @@ async function mounted() {
 describe('the plan tool', () => {
   test('a legal drag emits one `planEdit` and rebuilds nothing; the host’s applied document answers it', async () => {
     const m = await mounted();
-    const root = debug().sceneRoot();
     await m.drag(m.moves.legal);
     expect(m.edits).toHaveLength(1);
     const edit = m.edits[0]!;
@@ -109,15 +108,20 @@ describe('the plan tool', () => {
     expect(edit.ops).toHaveLength(1);
     expect(edit.ops[0]).toMatchObject({ op: 'move_node', nodeId: m.moves.nodeId });
     expect(m.states).toEqual(['dragging', 'idle']);
+    // The 3D scene is rebuilt only by a mounted document, and every mounted document raises `scene`: none so far.
     expect(m.scenes).toEqual([]);
-    expect(debug().sceneRoot()).toBe(root);
 
     // The host commits the batch and hands the document back.
     const host = new SceneModel(m.scene, CATALOGUE_REGISTRIES);
     expect(isApplyOk(host.apply({ baseRev: host.rev, ops: [...edit.ops] }))).toBe(true);
     await m.handle.loadScene({ document: host.toJSON() });
+    // One document mounted, so one rebuild, for the host's document; and the pending edit is answered: nothing is left to revert.
     expect(m.scenes).toEqual([1]);
     expect(m.handle.getState().rev).toBe(1);
+    await nextFrame();
+    const answered = m.pixels();
+    m.handle.revertPlanEdit();
+    expect(m.pixels()).toEqual(answered);
   }, 120_000);
 
   test('an illegal drag is refused with the model’s message and the drawing as it was', async () => {

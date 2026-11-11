@@ -238,7 +238,6 @@ export function assetMoveWiring(deps: AssetMoveWiringDeps): AssetMoveControl {
     },
     mirror: (assetId, axis) => session?.tool.mirror(assetId, axis) ?? false,
     turnAsset: (assetId, steps) => session?.tool.turnAsset(assetId, steps) ?? false,
-    loaded: () => Promise.resolve(),
     debug: () => ({ enabled, loaded: session !== null, state: session?.tool.state() ?? null }),
     dispose() {
       offScene();

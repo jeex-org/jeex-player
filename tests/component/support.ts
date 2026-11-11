@@ -166,18 +166,19 @@ export async function until(predicate: () => boolean, what: string, timeoutMs = 
 }
 
 /**
- * What a wait for the lazily loaded asset move chunk (`app/asset-move-wiring.ts`)
- * gets instead of `until`'s 15 s.
+ * What a wait for the lazily loaded authoring chunk (`app/authoring-port.ts`:
+ * the tour-camera overlay, the asset move tool, the plan tool) gets instead of
+ * `until`'s 15 s.
  *
- * Arming the tool imports a module graph from the dev server and builds the
- * session once it lands. On four hardware threads with two Vitest workers
+ * Turning a tool on imports a module graph from the dev server and builds the
+ * tools once it lands. On four hardware threads with two Vitest workers
  * (the shape of a CI runner), in the shard that runs `asset-move`,
  * `asset-mirror` and `frame-bridge` side by side, that wait ran past 15 s in
  * two runs out of two (two tests each, cold and warm imports alike), while
  * the same tests passed on a 16-thread machine. 45 s is the budget
  * `frame-bridge.test.ts` gives work that competes for the shared rasteriser.
  */
-export const ASSET_MOVE_CHUNK_TIMEOUT_MS = 45_000;
+export const AUTHORING_CHUNK_TIMEOUT_MS = 45_000;
 
 /**
  * Waits until `predicate` holds within `frames` animation frames, or fails.

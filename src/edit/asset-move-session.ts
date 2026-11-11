@@ -24,18 +24,16 @@ import { shippedFacts } from '../layout/layout-lint.js';
 
 /** The switch `handle-commands.ts` drives and the stage keeps (`app/asset-move-wiring.ts` builds it). */
 export type AssetMoveControl = {
-  /** `handle.setAssetMoveTool`: arms or disarms the tool; the first arming loads it. */
+  /** `handle.setAssetMoveTool`: arms or disarms the tool; the first arming builds it. */
   setEnabled(enabled: boolean): void;
   /** The next press moves the selected object to it (a host card's «Move» toggle). */
   arm(): void;
   /** `handle.revertAssetEdit`: the host refused the last edit. */
   revert(): void;
-  /** `handle.mirrorAsset`: toggles one axis; `false` with no event while the chunk is not in. */
+  /** `handle.mirrorAsset`: toggles one axis; `false` with no event before the first arming. */
   mirror(assetId: string, axis: MirrorAxis): boolean;
-  /** `handle.turnAsset`: `false` until the chunk is in, or when the tool refuses to judge it. */
+  /** `handle.turnAsset`: `false` before the first arming, or when the tool refuses to judge it. */
   turnAsset(assetId: string, steps: number): boolean;
-  /** Resolves once the lazy chunk is in (immediately when it already is, or never armed). */
-  loaded(): Promise<void>;
   debug(): AssetMoveDebug;
   dispose(): void;
 };

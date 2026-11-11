@@ -16,7 +16,16 @@ import type { ViewerHandle } from '../../src/app/viewer-handle.js';
 import type { SceneData, TourCheckpoint } from '../../src/scene/types.js';
 import { GLIDE_SECONDS } from '../../src/camera/pose-glide.js';
 import { MAX_FRAME_DELTA } from '../../src/render/render-runtime.js';
-import { closeContainers, demoScene, nextFrame, openContainer, SETTLE_FRAMES, until, untilFrames } from './support.js';
+import {
+  AUTHORING_CHUNK_TIMEOUT_MS,
+  closeContainers,
+  demoScene,
+  nextFrame,
+  openContainer,
+  SETTLE_FRAMES,
+  until,
+  untilFrames,
+} from './support.js';
 
 /** The cameras' ids, fixed UUID v7: three seeded below, one the click-to-place test drops. */
 const CAM = {
@@ -60,6 +69,16 @@ async function mount(options: Record<string, unknown> = {}): Promise<ViewerHandl
   return handle;
 }
 
+/**
+ * Switches the overlay on and waits for the authoring tools: they load lazily
+ * on the first switch (`app/authoring-port.ts`), and until they are in the
+ * overlay is not drawn and the checkpoint commands answer `false`.
+ */
+async function overlayOn(handle: ViewerHandle): Promise<void> {
+  handle.setCheckpointOverlay(true);
+  await until(() => debug().tourCameras().visible, 'the authoring chunk', AUTHORING_CHUNK_TIMEOUT_MS);
+}
+
 function angleGap(a: number, b: number): number {
   return Math.abs(Math.atan2(Math.sin(a - b), Math.cos(a - b)));
 }
@@ -73,7 +92,7 @@ describe('the tour-camera overlay', () => {
   test('is drawn in plan3d as well as orbit, and only the 2D plan (renderer off) hides it', async () => {
     const handle = await mount();
     expect(debug().tourCameras().visible).toBe(false);
-    handle.setCheckpointOverlay(true);
+    await overlayOn(handle);
     handle.setMode('plan3d');
     await until(() => debug().mode() === 'plan3d', 'the top view');
     await nextFrame();
@@ -102,7 +121,7 @@ describe('the authoring rig in walk and tour', () => {
     'markers, tube and the preview card hide in walk and tour and come back on leaving, the switch untouched',
     async () => {
       const handle = await mount();
-      handle.setCheckpointOverlay(true);
+      await overlayOn(handle);
       handle.setMode('orbit');
       await untilFrames(() => debug().mode() === 'orbit', 'orbit', SETTLE_FRAMES);
       expect(handle.focusCheckpoint(CAMERAS[1]!.id)).toBe(true);

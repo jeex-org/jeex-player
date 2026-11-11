@@ -27,7 +27,7 @@ import { BOTTOM_RIGHT_CLAIMED_ATTRIBUTE } from '../../src/ui/host-slots.js';
 import { DEMO } from '../../src/demo/demo-ids.js';
 import { VARIANT } from '../../src/assets/catalogue-ids.js';
 import type { SceneData, TourCheckpoint } from '../../src/scene/types.js';
-import { ASSET_MOVE_CHUNK_TIMEOUT_MS, closeContainers, delay, demoScene, nextFrame, openContainer, until } from './support.js';
+import { AUTHORING_CHUNK_TIMEOUT_MS, closeContainers, delay, demoScene, nextFrame, openContainer, until } from './support.js';
 
 const MOUNT_TIMEOUT_MS = 300_000;
 /** Ceiling of one wait on the tick counter: a hundred ticks at one frame a second, with room. */
@@ -726,6 +726,11 @@ describe('the editing modes draw on demand', { timeout: MOUNT_TIMEOUT_MS }, () =
   });
 
   test('the tour-camera rig: switched on and off, hover, focus, a marker drag and its cancel', async () => {
+    // The tools load lazily on the first switch (`app/authoring-port.ts`): load them once and switch
+    // the overlay off again, so every switch below is a change of a resting view, not a download.
+    handle.setCheckpointOverlay(true);
+    await until(() => debug().tourCameras().visible, 'the authoring chunk', AUTHORING_CHUNK_TIMEOUT_MS);
+    handle.setCheckpointOverlay(false);
     const without = await canvasShot();
     await draws('overlay on', () => handle.setCheckpointOverlay(true));
     expect(await differingShare(without, await canvasShot())).toBeGreaterThan(0);
@@ -839,7 +844,7 @@ describe('the editing modes draw on demand', { timeout: MOUNT_TIMEOUT_MS }, () =
   test('the asset move tool: a drag with its legality field, a nudge, a mirror and a revert each draw; the field goes', async () => {
     handle.setSelection({ kind: 'furniture', id: DEMO.asset.livingCoffeeTable });
     handle.setAssetMoveTool(true);
-    await until(() => debug().assetMove().loaded, 'the asset move chunk', ASSET_MOVE_CHUNK_TIMEOUT_MS);
+    await until(() => debug().assetMove().loaded, 'the authoring chunk', AUTHORING_CHUNK_TIMEOUT_MS);
     await rest('the tool armed');
     const without = await canvasShot();
     const table = handle.getScene()!.assets.find((asset) => asset.id === DEMO.asset.livingCoffeeTable)!;

@@ -58,10 +58,9 @@ function wired() {
 }
 
 describe('the same document handed back at the same revision answers no pending edit', () => {
-  test('an asset edit, the `scene` event for that document again, then revert: the body is back where it stood', async () => {
+  test('an asset edit, the `scene` event for that document again, then revert: the body is back where it stood', () => {
     const { model, body, events, wiring, start } = wired();
     wiring.setEnabled(true);
-    await wiring.loaded();
     const edits: unknown[] = [];
     events.on('assetEdit', (edit) => edits.push(edit));
     expect(wiring.turnAsset(SOFA, 2)).toBe(true);
