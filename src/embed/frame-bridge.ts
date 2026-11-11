@@ -33,6 +33,7 @@
 
 import {
   DEFAULT_VIEWER_ID,
+  METHOD_LIST,
   commandReply,
   eventMessage,
   resolveMethod,
@@ -47,7 +48,9 @@ import { isJeexEnvelope, readCommand, type Command, type ParamsOf } from './prot
 import { badParams } from '../shared/schema-issues.js';
 import { MAX_SCENE_BYTES, inlineDocumentBytes } from '../shared/limits.js';
 import type { CaptureResult, CaptureStillRequest, CapturePanoramaRequest } from '../app/capture-commands.js';
-import type { ViewerError } from '../app/viewer-events.js';
+import type { ViewerError, ViewerReadyInfo } from '../app/viewer-events.js';
+import { VIEWER_VERSION } from '../shared/version.js';
+import { TOUR_EVENT_NAMES, WIRE_EVENTS, tourEventPayload, type TourEventName, type WireViewerEvent } from './delivery-contract.js';
 import type { ViewerHandle } from '../app/viewer-handle.js';
 import type { ExportGlbOptions } from '../app/export-gltf.js';
 import type { ExportUsdzOptions } from '../app/export-usdz.js';
@@ -167,23 +170,30 @@ export function installFrameBridge(handle: ViewerHandle, options: FrameBridgeOpt
     post(eventMessage(viewerId, event, payload));
   };
 
-  const subscriptions: Array<() => void> = [
-    handle.on('ready', (info) => {
+  /** What the frame announces with every `ready`, so a host can feature-detect. */
+  const announcement = { player: VIEWER_VERSION, methods: [...METHOD_LIST] };
+  /** The one place a handle event becomes a message; the wire's shape where it differs from the handle's. */
+  const forward = (name: WireViewerEvent, payload: unknown): void => {
+    if (name === 'ready') {
       ready = true;
-      emit('ready', info);
-    }),
-    handle.on('error', (error) => {
+      emit('ready', { ...(payload as ViewerReadyInfo), ...announcement });
+      return;
+    }
+    if (name === 'error') {
+      const error = payload as ViewerError;
       lastError = error;
+      // The code and the message, never the cause: a stack is the frame's business.
       emit('error', { code: error.code, message: error.message, ...(error.fatal === true ? { fatal: true as const } : {}) });
-    }),
-    handle.on('scene', (info) => emit('scene', info)),
-    handle.on('mode', (mode) => emit('mode', mode)),
-    handle.on('select', (selection) => emit('select', selection)),
-    handle.on('lightTemperature', (change) => emit('lightTemperature', change)),
-    handle.on('assets', (info) => emit('assets', info)),
-    handle.tour.on('progress', (progress) => emit('progress', progress)),
-    handle.tour.on('state', (state) => emit('state', { state })),
-    handle.tour.on('ended', () => emit('ended', {})),
+      return;
+    }
+    emit(name, payload);
+  };
+  const tourOn = handle.tour.on as (event: TourEventName, callback: (value: unknown) => void) => () => void;
+
+  // Every event the delivery table puts on the wire (`delivery-contract.ts`), and no other.
+  const subscriptions: Array<() => void> = [
+    ...WIRE_EVENTS.map((name) => handle.on(name, (payload) => forward(name, payload))),
+    ...TOUR_EVENT_NAMES.map((name) => tourOn(name, (value) => emit(name, tourEventPayload(name, value)))),
     ...(options.sizes ? [options.sizes((size) => emit('size', size))] : []),
   ];
 

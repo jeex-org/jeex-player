@@ -152,8 +152,9 @@ export const VIEWER_EVENTS = {
   select: BOTH,
   // The batch the viewer did not commit: editing, so not across a frame.
   edit: ELEMENT_ONLY,
-  walkCamera: ELEMENT_ONLY,
-  tourSpeed: ELEMENT_ONLY,
+  // A host that draws its own tour bar follows the camera index and the speed button.
+  walkCamera: BOTH,
+  tourSpeed: BOTH,
   lightTemperature: BOTH,
   checkpointSelect: ELEMENT_ONLY,
   checkpointEdit: ELEMENT_ONLY,

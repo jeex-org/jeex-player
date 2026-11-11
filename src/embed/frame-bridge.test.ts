@@ -11,7 +11,8 @@
 
 import { afterEach, beforeEach, describe, expect, test } from 'bun:test';
 import { installFrameBridge } from './frame-bridge.js';
-import { CHANNEL, PROTOCOL_VERSION, type JeexMessage } from './protocol.js';
+import { CHANNEL, METHOD_LIST, PROTOCOL_VERSION, type JeexMessage } from './protocol.js';
+import { VIEWER_VERSION } from '../shared/version.js';
 import { MAX_SCENE_BYTES } from '../shared/limits.js';
 import type { TourProgress } from '../camera/tour-player.js';
 import type { ViewerError } from '../app/viewer-events.js';
@@ -81,6 +82,8 @@ type Fired = {
   ended: () => void;
   lightTemperature: (change: { temperature: number | null; source: 'host' | 'panel' }) => void;
   assets: (info: unknown) => void;
+  walkCamera: (camera: { index: number | null; count: number }) => void;
+  tourSpeed: (speed: { speed: number }) => void;
 };
 
 /** The viewer window the bridge installs itself on. */
@@ -219,6 +222,8 @@ function fakeHandle(
       ended: fireOne('tour:ended'),
       lightTemperature: fireOne('lightTemperature'),
       assets: fireOne('assets'),
+      walkCamera: fireOne('walkCamera'),
+      tourSpeed: fireOne('tourSpeed'),
     },
   };
 }
@@ -776,6 +781,27 @@ describe('the events', () => {
     ]);
     expect(events().at(-2)!.payload).toEqual({ temperature: 6500, source: 'host' });
     expect(events().at(-1)!.payload).toEqual({ models: { upgraded: 2, failed: 1, budget: false }, textures: { failed: 0, budget: false } });
+  });
+
+  test('the walk camera and the tour speed cross the wire, for a host that draws its own tour bar', () => {
+    const { fire } = bridge();
+    fire.walkCamera({ index: 1, count: 4 });
+    fire.tourSpeed({ speed: 2 });
+    expect(events().map(({ event, payload }) => ({ event, payload }))).toEqual([
+      { event: 'walkCamera', payload: { index: 1, count: 4 } },
+      { event: 'tourSpeed', payload: { speed: 2 } },
+    ]);
+  });
+
+  test('`ready` announces the player version and the wire methods it answers', () => {
+    const { fire } = bridge();
+    fire.ready({ options: { locale: 'en' }, sceneId: DEMO.scene });
+    expect(events()[0]!.payload).toEqual({
+      options: { locale: 'en' },
+      sceneId: DEMO.scene,
+      player: VIEWER_VERSION,
+      methods: [...METHOD_LIST],
+    });
   });
 
   test('a boot failure is marked fatal on the wire; any other error is not', () => {

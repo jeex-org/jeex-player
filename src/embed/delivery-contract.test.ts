@@ -57,8 +57,10 @@ describe('the wire', () => {
     }
   });
 
-  test('carries the events a published tour raises, and no authoring event', () => {
-    expect<string[]>([...WIRE_EVENTS].sort()).toEqual(['assets', 'error', 'lightTemperature', 'mode', 'ready', 'scene', 'select'].sort());
+  test('carries every event a published tour raises, the walk camera and the tour speed included, and no authoring event', () => {
+    expect<string[]>([...WIRE_EVENTS].sort()).toEqual(
+      ['assets', 'error', 'lightTemperature', 'mode', 'ready', 'scene', 'select', 'tourSpeed', 'walkCamera'].sort(),
+    );
     expect(Object.keys(TOUR_EVENTS)).toEqual(['progress', 'state', 'ended']);
   });
 });

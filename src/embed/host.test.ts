@@ -430,12 +430,39 @@ describe('a ready the frame cannot back up', () => {
       { payload: null, valid: false },
       { payload: { sceneId: 7 }, valid: false },
       { payload: 'ready', valid: false },
+      { payload: { sceneId: DEMO.scene, player: '1.2.3', methods: ['play'] }, valid: true },
+      { payload: { sceneId: DEMO.scene, player: 7 }, valid: false },
+      { payload: { sceneId: DEMO.scene, methods: 'play' }, valid: false },
+      { payload: { sceneId: DEMO.scene, methods: ['play', 7] }, valid: false },
     ];
     for (const { payload, valid } of FIXTURES) {
       const byHand = await offer(payload);
       expect({ payload, byHand: byHand.ready }).toEqual({ payload, byHand: valid });
       expect({ payload, bySchema: z.safeParse(readyPayloadSchema, payload).success }).toEqual({ payload, bySchema: valid });
     }
+  });
+});
+
+describe('what the frame announces', () => {
+  test('`player` and `methods` are null until `ready`, then the frame’s own, read-only', async () => {
+    const embed = make();
+    expect([embed.player, embed.methods]).toEqual([null, null]);
+    fromFrame(frameEvent('ready', { sceneId: DEMO.scene, player: '1.2.3', methods: ['play', 'stepCamera'] }));
+    await embed.ready;
+    expect(embed.player).toBe('1.2.3');
+    expect(embed.methods).toEqual(['play', 'stepCamera']);
+    expect(() => {
+      // @ts-expect-error the announcement is read-only
+      embed.player = '9.9.9';
+    }).toThrow(TypeError);
+    expect(embed.player).toBe('1.2.3');
+  });
+
+  test('a frame that announces nothing (an older one of this protocol) leaves both null', async () => {
+    const embed = make();
+    fromFrame(frameEvent('ready', { sceneId: DEMO.scene }));
+    await embed.ready;
+    expect([embed.player, embed.methods]).toEqual([null, null]);
   });
 });
 

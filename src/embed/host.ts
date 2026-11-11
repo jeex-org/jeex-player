@@ -180,15 +180,21 @@ type EmbedOptions = {
  * `host.test.ts` runs the two over one set of fixtures so they cannot drift;
  * `src/purity.test.ts` proves this module reaches no Zod at all.
  *
- * `sceneId` is the whole of it: `options` is `unknown` on the wire, so there is
- * nothing about it a check could prove, and a `ready` that names only its
- * `sceneId` has always been accepted here.
+ * `sceneId` is what it needs, and `player` and `methods` are proved only when
+ * present: `options` is `unknown` on the wire, so there is nothing about it a
+ * check could prove, and a `ready` that names only its `sceneId` (a frame
+ * older than the announcement) has always been accepted here.
  */
 function readyPayload(payload: unknown): EmbedReady | null {
   if (typeof payload !== 'object' || payload === null) return null;
+  const { sceneId, player, methods } = payload as Record<string, unknown>;
   // The value that travels on is the one the frame sent, not a copy: a host
   // reading `options` must see the object the viewer actually mounted with.
-  return typeof (payload as { sceneId?: unknown }).sceneId === 'string' ? (payload as EmbedReady) : null;
+  return typeof sceneId === 'string' &&
+    (player === undefined || typeof player === 'string') &&
+    (methods === undefined || (Array.isArray(methods) && methods.every((method) => typeof method === 'string')))
+    ? (payload as EmbedReady)
+    : null;
 }
 
 /**
@@ -343,6 +349,8 @@ export function embedViewer(container: HTMLElement, options: EmbedOptions): Jeex
   let queue: Array<{ method: CommandMethod; post: () => void; reject: (error: Error) => void; booting: ReturnType<typeof setTimeout> }> =
     [];
   let ready = false;
+  /** The first `ready`'s payload: what `player` and `methods` read. */
+  let announced: EmbedReady | undefined;
   /** The frame reported an `error` before its first `ready`: it is up, and another scene is what it can take. */
   let failed = false;
   let disposed = false;
@@ -407,6 +415,7 @@ export function embedViewer(container: HTMLElement, options: EmbedOptions): Jeex
       }
       if (!ready) {
         ready = true;
+        announced = info;
         announceReady(info);
         const held = queue;
         queue = [];
@@ -539,6 +548,12 @@ export function embedViewer(container: HTMLElement, options: EmbedOptions): Jeex
     iframe,
     viewerId,
     ready: readyPromise,
+    get player() {
+      return announced?.player ?? null;
+    },
+    get methods() {
+      return announced?.methods ?? null;
+    },
     play: () => nothing('play'),
     pause: () => nothing('pause'),
     toggle: () => nothing('toggle'),

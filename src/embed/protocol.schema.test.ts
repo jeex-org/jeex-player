@@ -67,6 +67,8 @@ const _eventPayloadsCovered: _EventPayloadsCovered = {
   ended: true,
   size: true,
   disposed: true,
+  walkCamera: true,
+  tourSpeed: true,
 };
 void _eventPayloadsCovered;
 
@@ -316,7 +318,7 @@ describe('the error vocabulary is composed, never merged', () => {
 describe('the event union', () => {
   /** One legal payload per event name, spelled the way the frame emits it. */
   const PAYLOADS: { [E in EventName]: EmbedEventMap[E] } = {
-    ready: { options: { locale: 'en' }, sceneId: DEMO.scene },
+    ready: { options: { locale: 'en' }, sceneId: DEMO.scene, player: '1.2.3', methods: ['play', 'stepCamera'] },
     error: { code: 'scene-invalid', message: 'the document is not a scene' },
     scene: { sceneId: DEMO.scene, rev: 3 },
     mode: 'walk',
@@ -335,6 +337,8 @@ describe('the event union', () => {
     state: { state: 'paused' },
     ended: {},
     size: { width: 800, height: 450 },
+    walkCamera: { index: 2, count: 5 },
+    tourSpeed: { speed: 0.5 },
     disposed: undefined,
   };
 
@@ -378,6 +382,24 @@ describe('readyPayloadSchema', () => {
     expect(z.safeParse(readyPayloadSchema, {}).success).toBe(false);
     expect(z.safeParse(readyPayloadSchema, null).success).toBe(false);
     expect(z.safeParse(readyPayloadSchema, 'ready').success).toBe(false);
+  });
+
+  test('names the player and its methods when the frame announces them, and refuses either of the wrong type', () => {
+    const ready = { sceneId: DEMO.scene, player: '1.2.3', methods: ['play', 'stepCamera'] };
+    expect(z.safeParse(readyPayloadSchema, ready).success).toBe(true);
+    expect(z.safeParse(readyPayloadSchema, { ...ready, player: 7 }).success).toBe(false);
+    expect(z.safeParse(readyPayloadSchema, { ...ready, methods: 'play' }).success).toBe(false);
+    expect(z.safeParse(readyPayloadSchema, { ...ready, methods: [7] }).success).toBe(false);
+  });
+});
+
+describe('the walk camera and the tour speed on the wire', () => {
+  test('a camera index of null (none stood on yet) is legal; a negative count or a speed off the list is not', () => {
+    const event = (name: string, payload: unknown): boolean => z.safeParse(eventSchema, { event: name, payload }).success;
+    expect(event('walkCamera', { index: null, count: 0 })).toBe(true);
+    expect(event('walkCamera', { index: 1, count: -1 })).toBe(false);
+    expect(event('walkCamera', { index: 'one', count: 3 })).toBe(false);
+    expect(event('tourSpeed', { speed: 3 })).toBe(false);
   });
 });
 

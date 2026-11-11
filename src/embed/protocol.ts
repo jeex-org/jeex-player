@@ -53,7 +53,7 @@ export type { Provenance } from '../app/provenance.js';
 export type { ViewerSelection, ViewerSelectionTarget } from '../app/selection.js';
 
 import type { ViewerMode } from '../scene/types.js';
-import type { TourProgress, TourState } from '../camera/tour-controls.js';
+import type { TourProgress, TourSpeed, TourState } from '../camera/tour-controls.js';
 import type { ViewerSelection } from '../app/selection.js';
 
 /** Every command a host may send. */
@@ -163,12 +163,20 @@ export type ErrorCode =
 /**
  * What the frame pushes to the host, unasked, and what each event carries.
  *
- * It mirrors a part of `ViewerEventMap` (`app/viewer-events.ts`, `lightTemperature` and `assets` included) and adds the tour's four:
- * `progress`, `state`, `ended` — and `disposed`, which the HOST handle raises
- * for itself when it tears the frame down.
+ * It is the part of `ViewerEventMap` (`app/viewer-events.ts`) the delivery
+ * table puts on the wire (`delivery-contract.ts`, which checks the two agree)
+ * plus the tour's three, `progress`, `state` and `ended`; `size`, which the
+ * frame PAGE raises; and `disposed`, which the HOST handle raises for itself
+ * when it tears the frame down.
  */
 export type EmbedEventMap = {
-  ready: { options: unknown; sceneId: string };
+  /**
+   * The first scene, and every one after it, is on screen. `player` (the
+   * package version) and `methods` (every method this frame answers, the
+   * wire's `METHOD_LIST`) let a host feature-detect; a frame older than the
+   * announcement sends neither.
+   */
+  ready: { options: unknown; sceneId: string; player?: string; methods?: string[] };
   /** `fatal`: the boot failed and the viewer is down; only `loadScene` brings a scene back. */
   error: { code: ErrorCode; message: string; fatal?: true };
   scene: { sceneId: string; rev: number };
@@ -190,6 +198,10 @@ export type EmbedEventMap = {
   lightTemperature: { temperature: number | null; source: 'host' | 'panel' };
   /** Once per document, when its first model pass settled: what loaded and what fell back (`ViewerAssetsInfo`). */
   assets: { models: { upgraded: number; failed: number; budget: boolean }; textures: { failed: number; budget: boolean } };
+  /** The walk's current tour camera (0-based, `null` before the walker stood on one) and how many there are. */
+  walkCamera: { index: number | null; count: number };
+  /** The tour's speed setting changed (`setTourSpeed`, the tour bar's speed button). */
+  tourSpeed: { speed: TourSpeed };
   disposed: undefined;
 };
 
