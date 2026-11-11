@@ -52,6 +52,13 @@ function rig(sink: CameraGestureSink = () => false, interaction?: 'full' | 'pass
   };
 }
 
+/** Resolves on the next task, after anything a listener deferred with `setTimeout(…, 0)`. */
+function nextTask(): Promise<void> {
+  return new Promise((resolve) => {
+    setTimeout(resolve, 0);
+  });
+}
+
 /** A wheel event with the fields the handler reads, defaults for the rest (the pointer mid-canvas). */
 function wheelEvent(init: Partial<WheelEvent> & { prevented?: { count: number } } = {}): unknown {
   const prevented = init.prevented ?? { count: 0 };
@@ -646,7 +653,7 @@ describe('touch over a viewer that is not engaged', () => {
     expect(touchRig({ value: true }).keys.dataset['jeexEngaged']).toBe('true');
   });
 
-  test('focus coming and going re-reads the answer', () => {
+  test('focus coming and going re-reads the answer', async () => {
     const engaged = { value: false };
     const built = touchRig(engaged);
     engaged.value = true;
@@ -654,7 +661,64 @@ describe('touch over a viewer that is not engaged', () => {
     expect(built.keys.dataset['jeexEngaged']).toBe('true');
     engaged.value = false;
     built.keys.fire('focusout', {});
+    await nextTask();
     expect(built.keys.dataset['jeexEngaged']).toBe('false');
+  });
+
+  test('focus leaving is read once it has left: WebKit sends focusout while the root still has focus', async () => {
+    const engaged = { value: true };
+    const built = touchRig(engaged);
+    // `:focus-within` still matches during the event and stops matching once
+    // the focus move completes.
+    built.keys.fire('focusout', {});
+    engaged.value = false;
+    await nextTask();
+    expect(built.keys.dataset['jeexEngaged']).toBe('false');
+  });
+
+  test('the page growing after boot, and fullscreen, re-read the answer', () => {
+    const saved = ['document', 'window', 'ResizeObserver'].map(
+      (name) => [name, name in globalThis, Reflect.get(globalThis, name)] as const,
+    );
+    const page = Object.assign(fakeCanvas(), { documentElement: { name: 'html' }, body: { name: 'body' } });
+    const observed: unknown[] = [];
+    const callbacks: (() => void)[] = [];
+    Reflect.set(globalThis, 'document', page);
+    Reflect.set(globalThis, 'window', fakeCanvas());
+    Reflect.set(
+      globalThis,
+      'ResizeObserver',
+      class {
+        constructor(callback: () => void) {
+          callbacks.push(callback);
+        }
+        observe(target: unknown): void {
+          observed.push(target);
+        }
+        disconnect(): void {
+          callbacks.length = 0;
+        }
+      },
+    );
+    try {
+      const engaged = { value: false };
+      const built = touchRig(engaged);
+      expect(observed).toEqual([page.documentElement, page.body]);
+      engaged.value = true; // the body shrank: the page no longer scrolls
+      for (const callback of callbacks) callback();
+      expect(built.keys.dataset['jeexEngaged']).toBe('true');
+      engaged.value = false; // the body grew after boot: the page scrolls now
+      for (const callback of callbacks) callback();
+      expect(built.keys.dataset['jeexEngaged']).toBe('false');
+      engaged.value = true; // the viewer went fullscreen
+      page.fire('fullscreenchange', {});
+      expect(built.keys.dataset['jeexEngaged']).toBe('true');
+    } finally {
+      for (const [name, had, value] of saved) {
+        if (had) Reflect.set(globalThis, name, value);
+        else Reflect.deleteProperty(globalThis, name);
+      }
+    }
   });
 
   test('a touch press the browser took for a page scroll gives the focus back, so the viewer stays unengaged', () => {
@@ -663,7 +727,36 @@ describe('touch over a viewer that is not engaged', () => {
     built.canvas.fire('pointerdown', { pointerId: 1, pointerType: 'touch', clientX: 10, clientY: 10, button: 0, shiftKey: false });
     built.canvas.fire('pointercancel', { pointerId: 1, pointerType: 'touch' });
     expect(built.blurs()).toBe(1);
-    expect(built.types()).toEqual(['press', 'release']);
+  });
+
+  test('a vertical swipe the page takes sends nothing, so a playing tour or a camera step goes on', () => {
+    // `press` is the pointer gesture that reports manual input (the
+    // controller's `onPress`), which pauses a tour and stops a step in flight.
+    const built = touchRig({ value: false });
+    built.canvas.fire('pointerdown', { pointerId: 1, pointerType: 'touch', clientX: 100, clientY: 300, button: 0, shiftKey: false });
+    built.canvas.fire('pointermove', { pointerId: 1, pointerType: 'touch', clientX: 102, clientY: 281 });
+    built.canvas.fire('pointercancel', { pointerId: 1, pointerType: 'touch' });
+    expect(built.types()).toEqual([]);
+  });
+
+  test('the press arrives once the viewer keeps the gesture: a tap, a sideways claim, a second finger', () => {
+    const tap = touchRig({ value: false });
+    tap.canvas.fire('pointerdown', { pointerId: 1, pointerType: 'touch', clientX: 10, clientY: 10, button: 0, shiftKey: false });
+    expect(tap.types()).toEqual([]);
+    tap.canvas.fire('pointerup', { pointerId: 1, pointerType: 'touch' });
+    expect(tap.types()).toEqual(['press', 'release']);
+
+    const sideways = touchRig({ value: false });
+    sideways.canvas.fire('pointerdown', { pointerId: 1, pointerType: 'touch', clientX: 100, clientY: 300, button: 0, shiftKey: false });
+    sideways.canvas.fire('pointermove', { pointerId: 1, pointerType: 'touch', clientX: 101, clientY: 290 });
+    expect(sideways.types()).toEqual([]);
+    sideways.canvas.fire('pointermove', { pointerId: 1, pointerType: 'touch', clientX: 120, clientY: 298 });
+    expect(sideways.types()).toEqual(['press', 'drag']);
+
+    const pinch = touchRig({ value: false });
+    pinch.canvas.fire('pointerdown', { pointerId: 1, pointerType: 'touch', clientX: 100, clientY: 300, button: 0, shiftKey: false });
+    pinch.canvas.fire('pointerdown', { pointerId: 2, pointerType: 'touch', clientX: 200, clientY: 300, button: 0, shiftKey: false });
+    expect(pinch.types()).toEqual(['press']);
   });
 
   test('the move the browser reports before it takes a vertical swipe turns nothing', () => {
@@ -689,11 +782,69 @@ describe('touch over a viewer that is not engaged', () => {
     expect(built.blurs()).toBe(0);
   });
 
+  test('a sideways move claims the gesture only once it is past the drag threshold', () => {
+    const threshold = CAMERA_TUNING.pointer.dragThresholdPx;
+    const under = touchRig({ value: false });
+    under.canvas.fire('pointerdown', { pointerId: 1, pointerType: 'touch', clientX: 100, clientY: 300, button: 0, shiftKey: false });
+    under.canvas.fire('pointermove', { pointerId: 1, pointerType: 'touch', clientX: 100 + threshold, clientY: 300 });
+    expect(under.types()).toEqual([]);
+    const over = touchRig({ value: false });
+    over.canvas.fire('pointerdown', { pointerId: 1, pointerType: 'touch', clientX: 100, clientY: 300, button: 0, shiftKey: false });
+    over.canvas.fire('pointermove', { pointerId: 1, pointerType: 'touch', clientX: 101 + threshold, clientY: 300 });
+    expect(over.types()).toEqual(['press', 'drag']);
+  });
+
   test('a tap keeps the focus it gave: that is what engages the viewer', () => {
     const built = touchRig({ value: false });
     built.canvas.fire('pointerdown', { pointerId: 1, pointerType: 'touch', clientX: 10, clientY: 10, button: 0, shiftKey: false });
     built.canvas.fire('pointerup', { pointerId: 1, pointerType: 'touch' });
     expect(built.blurs()).toBe(0);
+  });
+
+  test('a swipe over an untouched viewer gives the focus back to the viewer that had it', () => {
+    const had = 'document' in globalThis;
+    const previous = Reflect.get(globalThis, 'document');
+    const page: { activeElement: unknown; addEventListener: () => void } = { activeElement: null, addEventListener: () => undefined };
+    Reflect.set(globalThis, 'document', page);
+    try {
+      const focused = { a: 0 };
+      const rootA = { focus: () => ((focused.a += 1), (page.activeElement = rootA)) };
+      const built = touchRig({ value: false });
+      Object.assign(built.keys, {
+        focus: () => {
+          page.activeElement = built.keys;
+        },
+      });
+      page.activeElement = rootA;
+      built.canvas.fire('pointerdown', { pointerId: 1, pointerType: 'touch', clientX: 100, clientY: 300, button: 0, shiftKey: false });
+      expect(page.activeElement).toBe(built.keys);
+      built.canvas.fire('pointercancel', { pointerId: 1, pointerType: 'touch' });
+      expect(page.activeElement).toBe(rootA);
+      expect(focused.a).toBe(1);
+    } finally {
+      if (had) Reflect.set(globalThis, 'document', previous);
+      else Reflect.deleteProperty(globalThis, 'document');
+    }
+  });
+
+  test('a stale «not engaged» mark decides the touch it finds, as the stylesheet did, and that touch refreshes it', () => {
+    const engaged = { value: false };
+    const built = touchRig(engaged);
+    engaged.value = true; // the page around stopped scrolling, and nothing re-synced
+    built.canvas.fire('pointerdown', { pointerId: 1, pointerType: 'touch', clientX: 100, clientY: 300, button: 0, shiftKey: false });
+    built.canvas.fire('pointermove', { pointerId: 1, pointerType: 'touch', clientX: 101, clientY: 280 });
+    expect(built.types()).toEqual([]);
+    expect(built.keys.dataset['jeexEngaged']).toBe('true');
+  });
+
+  test('a stale «engaged» mark decides the touch it finds too, and that touch refreshes it', () => {
+    const engaged = { value: true };
+    const built = touchRig(engaged);
+    engaged.value = false; // a box around started scrolling, and nothing re-synced
+    built.canvas.fire('pointerdown', { pointerId: 1, pointerType: 'touch', clientX: 100, clientY: 300, button: 0, shiftKey: false });
+    built.canvas.fire('pointermove', { pointerId: 1, pointerType: 'touch', clientX: 101, clientY: 280 });
+    expect(built.types()).toEqual(['press', 'drag']);
+    expect(built.keys.dataset['jeexEngaged']).toBe('false');
   });
 
   test('a cancelled press on an engaged viewer, or by a mouse, leaves the focus alone', () => {

@@ -347,10 +347,12 @@ type ViewerHandle = {
   setMode(mode: 'plan2d' | 'plan3d' | 'orbit' | 'walk' | 'tour'): void; // 'orbit' also resets the camera, like Reset camera
   getMode(): ViewerMode;
   focusRoom(roomId: string): boolean;   // room UUID; false for anything else
+  stepCamera(to: 'next' | 'previous' | 'first' | 'last' | number): boolean;  // walk to a tour camera (0-based); false when nothing started
   setFurnitureVisible(visible: boolean): void;
   getFurnitureVisible(): boolean;
   setLocale(locale: Locale): void;    // any of the seven shipped tags, an alias like 'sr', or a registered code
   setLightTemperature(temperature: number | null): void;  // 2700..6500 K in steps of 100, null = «Original»; anything else throws bad-params
+  setQuality(quality: 'auto' | 'low' | 'high'): void;  // render tier; 'auto' (default) drops to low when motion runs slow; anything else throws bad-params
   refreshTheme(): void;               // re-read the root's CSS theme after a live change (the WebGL backdrop); see Theming
   setSelection(target: { kind: 'wall' | 'opening' | 'room' | 'furniture'; id: string } | null): void;  // highlight by UUID; null clears; drawn on the plan in plan2d
   planView(): PlanView | null;                    // { bounds, transform } the 2D plan is fitted to; null before a document
@@ -779,7 +781,7 @@ that tag and stops the refusal above); a region in it is dropped.
 
 The cursor is a grab hand over the scene, a closed hand while dragging and a four-way arrow while Space or Shift is held.
 
-**Embedded in a scrolling page.** The wheel and Space belong to the page until the viewer is engaged — a click or tap in the scene, focus anywhere inside the viewer, or fullscreen. Before that, a plain wheel over the viewer scrolls the page and a short «Ctrl + scroll to zoom» plate (⌘ on Apple platforms) says how to zoom; Ctrl/⌘ + wheel and a trackpad pinch act at once. Touch follows the same rule: until the viewer is engaged a vertical swipe that starts on it scrolls the page, while a sideways drag and a pinch still turn and zoom it. A page scrolls when `<html>`, `<body>` (the `html, body { height: 100%; overflow-x: hidden }` theme pattern makes `<body>` the scroller) or any scrolling box around the viewer has more content than room. A viewer that fills a page that cannot scroll (the standalone page, an editor) is engaged from the start; a viewer inside an iframe cannot see the host's scroll and waits for the click. Space is taken only while the viewer's own root has focus, never from a focused button inside it, and `interaction: 'passive'` never takes Space or stops the page scrolling. There is no pointer lock.
+**Embedded in a scrolling page.** The wheel and Space belong to the page until the viewer is engaged — a click or tap in the scene, focus anywhere inside the viewer, or fullscreen. Before that, a plain wheel over the viewer scrolls the page and a short «Ctrl + scroll to zoom» plate (⌘ on Apple platforms) says how to zoom; Ctrl/⌘ + wheel and a trackpad pinch act at once. Touch follows the same rule: until the viewer is engaged a vertical swipe that starts on it scrolls the page; a sideways drag turns it, and a pinch zooms it unless the fingers travel up or down, when the page may take it. A tap hands every gesture to the viewer. A page scrolls when `<html>`, `<body>` (the `html, body { height: 100%; overflow-x: hidden }` theme pattern makes `<body>` the scroller) or any scrolling box around the viewer has more content than room. A viewer that fills a page that cannot scroll (the standalone page, an editor) is engaged from the start; a viewer inside an iframe cannot see the host's scroll and waits for the click. Space is taken only while the viewer's own root has focus, never from a focused button inside it, and `interaction: 'passive'` never takes Space or stops the page scrolling. There is no pointer lock.
 
 Under `prefers-reduced-motion` (or `motion: 'reduced'`) a click on the floor and a wheel step land at once instead of gliding; a drag moves exactly as far as the hand, with no inertia, in every mode.
 

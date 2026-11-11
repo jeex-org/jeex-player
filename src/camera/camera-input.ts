@@ -30,12 +30,14 @@
  * Touch follows the same rule, but the browser decides who owns a finger
  * when it lands, before any listener runs, so the answer is written ahead of
  * time: the shell root carries `data-jeex-engaged`, kept current on focus,
- * fullscreen and page-size changes, and the stylesheet gives the canvas of an
- * unengaged viewer `touch-action: pan-y` (a vertical swipe scrolls the page;
- * a sideways drag and a pinch still reach the viewer). A touch press the
- * browser then takes for a page scroll arrives as `pointercancel`; the focus
- * that press gave the shell root is given back, so only a tap or a drag the
- * viewer kept engages it.
+ * fullscreen, page-size changes and the start of every touch gesture, and the
+ * stylesheet gives the canvas of an unengaged viewer `touch-action: pan-y` (a
+ * vertical swipe scrolls the page; a sideways drag still reaches the viewer).
+ * A touch on an unengaged viewer is decided from that same mark, and sends
+ * its `press` only once the viewer keeps the gesture. A touch the browser
+ * takes for a page scroll arrives as `pointercancel`, sends nothing, and the
+ * focus it took is handed back, so only a tap or a drag the viewer kept
+ * engages it.
  */
 
 import { CAMERA_TUNING } from './camera-tuning.js';
@@ -238,6 +240,17 @@ function pathOf(event: KeyboardEvent): readonly EventTarget[] {
   return typeof event.composedPath === 'function' ? event.composedPath() : [];
 }
 
+/**
+ * The element that has the focus, followed into shadow roots (a viewer's shell
+ * root lives in its element's shadow root), or `null` without a document.
+ */
+function focusedElement(): HTMLElement | null {
+  if (typeof document === 'undefined') return null;
+  let active = document.activeElement;
+  while (active?.shadowRoot?.activeElement) active = active.shadowRoot.activeElement;
+  return active as HTMLElement | null;
+}
+
 export class CameraInput {
   private readonly target: CameraInputTarget;
   private readonly emit: CameraGestureSink;
@@ -261,14 +274,18 @@ export class CameraInput {
   /** Whether the pointer travelled far enough for the press to be a drag. */
   private moved = false;
   /**
-   * A touch press that landed on a viewer that was not engaged, where it
-   * landed, and whether its travel has been claimed by the viewer yet. Until
-   * a sideways move claims it, a mostly vertical move is the page's swipe
-   * (the browser reports the move that crosses its slop, then takes the
-   * gesture) and turns nothing; a `pointercancel` before the claim hands back
-   * the focus the press gave.
+   * The first touch of a gesture that landed on a viewer marked not engaged,
+   * while the viewer has not kept it yet: its pointer, where it landed, and
+   * the element that had the focus before the press. The record is dropped
+   * the moment the viewer keeps the gesture (a sideways move past the drag
+   * threshold, the finger lifting, a second finger), and only then is the
+   * withheld `press` sent, so a swipe the browser takes for the page never
+   * pauses a tour or stops a camera step. Until then every move is the
+   * page's (the browser reports the move that crosses its slop, then takes
+   * the gesture) and turns nothing; a `pointercancel` sends no gesture at all
+   * and hands the focus back to `focusBefore`.
    */
-  private unengagedTouch: { pointerId: number; x: number; y: number } | null = null;
+  private unengagedTouch: { pointerId: number; x: number; y: number; focusBefore: HTMLElement | null } | null = null;
 
   constructor(target: CameraInputTarget, onGesture: CameraGestureSink) {
     this.target = target;
@@ -294,7 +311,7 @@ export class CameraInput {
     // A tab switched away while Space was held never sends its keyup here.
     if (typeof document !== 'undefined') document.addEventListener('visibilitychange', this.onBlur, listener);
     keys.addEventListener('focusin', this.syncEngaged, listener);
-    keys.addEventListener('focusout', this.syncEngaged, listener);
+    keys.addEventListener('focusout', this.syncEngagedLater, listener);
     this.watchPage(listener);
     this.syncCursor();
     this.syncEngaged();
@@ -313,12 +330,33 @@ export class CameraInput {
     const observer = new ResizeObserver(this.syncEngaged);
     observer.observe(document.documentElement);
     if (document.body) observer.observe(document.body);
-    this.listeners.signal.addEventListener('abort', () => observer.disconnect(), { once: true });
+    // The disconnecting listener has a lifetime of its own, ended by itself:
+    // bound to `this.listeners.signal` it would be removed before that
+    // signal's own `abort` event fired (`linkedAbortController` does the same).
+    const disconnected = new AbortController();
+    const disconnect = (): void => {
+      observer.disconnect();
+      disconnected.abort();
+    };
+    this.listeners.signal.addEventListener('abort', disconnect, { once: true, signal: disconnected.signal });
   }
 
   /** Writes `data-jeex-engaged` on the shell root, which the stylesheet's `touch-action` reads. */
   private readonly syncEngaged = (): void => {
     this.target.keys.dataset['jeexEngaged'] = String(this.owns());
+  };
+
+  /**
+   * `syncEngaged` once the focus move that sent `focusout` has completed.
+   * WebKit dispatches `focusout` while the root still matches
+   * `:focus-within`, so the answer read inside the event would still be
+   * «engaged». A task, not a microtask: a microtask runs as soon as the
+   * listener returns, still inside the dispatch.
+   */
+  private readonly syncEngagedLater = (): void => {
+    setTimeout(() => {
+      if (!this.listeners.signal.aborted) this.syncEngaged();
+    }, 0);
   };
 
   /** The engagement answer: the harness's, or `viewerOwnsWheel`. */
@@ -355,8 +393,18 @@ export class CameraInput {
   }
 
   private onPointerDown = (event: PointerEvent): void => {
-    this.unengagedTouch =
-      event.pointerType === 'touch' && !this.owns() ? { pointerId: event.pointerId, x: event.clientX, y: event.clientY } : null;
+    const firstTouch = event.pointerType === 'touch' && this.pointers.size === 0;
+    // The browser chose this touch's `touch-action` from the mark as it stood
+    // when the finger landed, so the input decides from the same mark, never
+    // from a fresh answer that could disagree with it. The mark is then
+    // re-read for the next gesture: a page or a box around the viewer that
+    // changed whether it scrolls without resizing `<html>` or `<body>` leaves
+    // the mark stale for at most the one touch that finds it.
+    const unengaged = firstTouch && this.target.keys.dataset['jeexEngaged'] !== 'true';
+    if (firstTouch) this.syncEngaged();
+    this.unengagedTouch = unengaged
+      ? { pointerId: event.pointerId, x: event.clientX, y: event.clientY, focusBefore: focusedElement() }
+      : null;
     // A press on the scene is what gives this viewer the keyboard: the key
     // listeners live on the shell root, so `w` after a click here walks THIS
     // camera and no other one on the page. `preventScroll` keeps a tall host
@@ -372,10 +420,15 @@ export class CameraInput {
     this.lastCentroid = null;
     this.button = event.button === 2 ? 'secondary' : 'primary';
     this.shift = event.shiftKey;
-    const move = this.button === 'secondary' || this.shift || this.space;
     this.syncCursor();
-    this.emit({ type: 'press', button: this.button, shift: this.shift, move });
+    if (this.unengagedTouch === null) this.emitPress();
   };
+
+  /** The `press` of the gesture in hand, from what its first pointer latched. */
+  private emitPress(): void {
+    const move = this.button === 'secondary' || this.shift || this.space;
+    this.emit({ type: 'press', button: this.button, shift: this.shift, move });
+  }
 
   private onPointerMove = (event: PointerEvent): void => {
     const current = this.pointers.get(event.pointerId);
@@ -409,9 +462,11 @@ export class CameraInput {
 
   /**
    * Whether this move belongs to a vertical swipe the page is about to take
-   * (see `unengagedTouch`). The first move that has travelled past the drag
-   * threshold decides: sideways claims the gesture for the viewer, anything
-   * else is withheld.
+   * (see `unengagedTouch`). Every move is measured from where the finger
+   * landed: while that travel is within the drag threshold, or at least as
+   * much vertical as sideways, the move is withheld; the first move whose
+   * travel is past the threshold and mostly sideways claims the gesture for
+   * the viewer and sends its withheld `press`.
    */
   private withheldForPage(event: PointerEvent): boolean {
     const touch = this.unengagedTouch;
@@ -420,10 +475,17 @@ export class CameraInput {
     const dy = Math.abs(event.clientY - touch.y);
     if (dx + dy <= POINTER.dragThresholdPx || dy >= dx) return true;
     this.unengagedTouch = null;
+    this.emitPress();
     return false;
   }
 
   private onPointerUp = (event: PointerEvent): void => {
+    // A tap on an unengaged viewer (or a swipe the browser left to it): the
+    // viewer kept the gesture, so its press arrives now, before the release.
+    if (this.unengagedTouch?.pointerId === event.pointerId) {
+      this.unengagedTouch = null;
+      this.emitPress();
+    }
     this.pointers.delete(event.pointerId);
     this.lastCentroid = null;
     this.syncCursor();
@@ -432,15 +494,38 @@ export class CameraInput {
 
   /**
    * The browser took the gesture, or the pointer was lost: the drag ends as
-   * on release. A touch press on an unengaged viewer that ends this way was
-   * the page's scroll, so the focus it gave is handed back.
+   * on release. A touch the viewer never kept that ends this way was the
+   * page's scroll: it sent no press, so it sends no release either, and the
+   * focus it took is handed back.
    */
   private onPointerCancel = (event: PointerEvent): void => {
-    const pageScroll = this.unengagedTouch?.pointerId === event.pointerId;
+    if (this.unengagedTouch?.pointerId !== event.pointerId) {
+      this.onPointerUp(event);
+      return;
+    }
+    // The page's scroll: no press was sent, so no release is either.
+    const { focusBefore } = this.unengagedTouch;
     this.unengagedTouch = null;
-    this.onPointerUp(event);
-    if (pageScroll) this.target.keys.blur?.();
+    this.pointers.delete(event.pointerId);
+    this.lastCentroid = null;
+    this.syncCursor();
+    this.handFocusBack(focusBefore);
   };
+
+  /**
+   * Gives back the focus a cancelled press took: to the element that had it
+   * (another viewer keeps its wheel and keys), or nowhere when nothing
+   * focusable had it. A press that found the focus on this root moved nothing.
+   */
+  private handFocusBack(focusBefore: HTMLElement | null): void {
+    const { keys } = this.target;
+    if (focusBefore === keys) return;
+    if (focusBefore !== null && focusBefore !== document.body && typeof focusBefore.focus === 'function') {
+      focusBefore.focus({ preventScroll: true });
+    } else {
+      keys.blur?.();
+    }
+  }
 
   private onPointerLeave = (): void => {
     this.emit({ type: 'leave' });
