@@ -87,7 +87,7 @@ function network() {
 
 /** A bare document: no project, the L-shape on bundled finishes. */
 function bare(): LoadedDocument {
-  return { model: new SceneModel(draftOf(lShapePlan), CATALOGUE_REGISTRIES), project: null };
+  return { model: new SceneModel(draftOf(lShapePlan), CATALOGUE_REGISTRIES), project: null, revisionGiven: false };
 }
 
 function rig(env: Partial<TextureEnv> | null, stub = network()) {

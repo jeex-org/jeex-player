@@ -167,6 +167,7 @@ function rig(
         variants: undefined as never,
         builderOptions: { modelUrl: (asset) => `https://models.test/${asset.variantId}.glb`, modelSource, log: QUIET },
       },
+      revisionGiven: false,
     };
   };
   return {
@@ -466,7 +467,7 @@ describe('the bank the document is drawn with answers its floor questions', () =
     expect(r.mount.assetFacts()).toBe(facts);
     r.mount.remount();
     expect(r.seededFacts.at(-1)).toBe(facts);
-    r.mount.mountDocument({ model: new SceneModel(lShapePlan, CATALOGUE_REGISTRIES), project: null });
+    r.mount.mountDocument({ model: new SceneModel(lShapePlan, CATALOGUE_REGISTRIES), project: null, revisionGiven: false });
     expect(r.seededFacts.at(-1)).toBe(shippedAssetFacts);
     expect(r.mount.layoutCatalogue()).toBe(shippedFacts);
   });
@@ -513,6 +514,7 @@ describe("a variant swap builds the new variant's lamp lights under the current 
     return {
       model: new SceneModel(scene, registriesFromLibrary(projectLibraryOf(manifest), CATALOGUE_REGISTRIES)),
       project: { ...context, key: 'lamp-library', builderOptions: { ...context.builderOptions, modelSource } },
+      revisionGiven: false,
     };
   }
 

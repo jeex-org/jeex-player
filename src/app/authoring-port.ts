@@ -88,6 +88,14 @@ export type AuthoringPort = Omit<Authoring, 'debug' | 'dispose'> & {
   ready(): Promise<void>;
   /** The stage is going: its tools are disposed; the next `ready()` binds the next stage. */
   unbind(): void;
+  /**
+   * A document is on screen, and whether the host loaded it with its
+   * `revision`. Without one the model counts from 0, so every `baseRev` the
+   * plan tool and the asset tool emit is a revision the host never had: armed
+   * on such a document, either tool warns `edit-without-revision`, once per
+   * document.
+   */
+  document(sceneId: string, revisionGiven: boolean): void;
   debug(): AuthoringDebug & { readonly loaded: boolean };
   dispose(): void;
 };
@@ -102,6 +110,21 @@ export function authoringPort<S, M>(deps: AuthoringPortDeps<S, M>): AuthoringPor
   /** The stage whose tools threw while they were built: reported once, not built again. */
   let broken: S | null = null;
   let disposed = false;
+  /** The document on screen, and the one `edit-without-revision` was last said for. */
+  let current: { readonly sceneId: string; readonly revisionGiven: boolean } | null = null;
+  let warnedFor: string | null = null;
+
+  /** Warns once per document when an edit tool is armed on one loaded without its revision. */
+  const checkRevision = (): void => {
+    if (current === null || current.revisionGiven || warnedFor === current.sceneId) return;
+    if (!switches.planTool && !switches.assetMove) return;
+    warnedFor = current.sceneId;
+    deps.log.warn(
+      'edit-without-revision',
+      'the document was loaded without its revision, so every baseRev an edit carries counts from 0; pass the stored revision to loadScene',
+      { sceneId: current.sceneId },
+    );
+  };
 
   const bind = (): void => {
     const stage = deps.stage();
@@ -157,11 +180,17 @@ export function authoringPort<S, M>(deps: AuthoringPortDeps<S, M>): AuthoringPor
       if (enabled) load();
       else armed = false;
       bound?.tools.setAssetMoveTool(enabled);
+      if (enabled) checkRevision();
     },
     setPlanTool(enabled) {
       switches.planTool = enabled;
       if (enabled) load();
       bound?.tools.setPlanTool(enabled);
+      if (enabled) checkRevision();
+    },
+    document(sceneId, revisionGiven) {
+      current = { sceneId, revisionGiven };
+      checkRevision();
     },
     revertPlanEdit: () => call(undefined, (tools) => tools.revertPlanEdit()),
     checkpointOverlay: () => switches.checkpointOverlay,
