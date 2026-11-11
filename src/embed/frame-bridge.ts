@@ -12,7 +12,8 @@
  * (`isExactOrigin`, so never `'*'`, never `null`, never a URL with a path); a
  * message is then read only when it came from the window this bridge was
  * pointed at AND from that origin, and a reply or an event is posted only to
- * it. Anything else is dropped in silence, because a
+ * it. Anything else is dropped in silence (but for one answer to a host of
+ * another protocol version, `answerForeign`), because a
  * page that embeds this frame may carry other postMessage traffic and an error
  * card about a stranger's message would be noise, not information.
  *
@@ -34,8 +35,10 @@
 import {
   DEFAULT_VIEWER_ID,
   METHOD_LIST,
+  PROTOCOL_VERSION,
   commandReply,
   eventMessage,
+  foreignVersion,
   resolveMethod,
   type CommandMethod,
   type CommandOutcome,
@@ -369,12 +372,35 @@ export function installFrameBridge(handle: ViewerHandle, options: FrameBridgeOpt
     }
   };
 
+  /** Whether a command of another protocol version has had its one answer. */
+  let answeredForeign = false;
+  /**
+   * The first command of another protocol version addressed to this viewer is
+   * answered once, before `ready` too, with the version this frame speaks, so
+   * the host names the cause instead of timing out. The reply carries the
+   * HOST's version, the one it can read; nothing of the command is performed,
+   * and every later foreign message is dropped.
+   */
+  const answerForeign = (data: unknown): void => {
+    const version = answeredForeign ? null : foreignVersion(data);
+    if (version === null) return;
+    const { kind, id, viewerId: addressed } = data as Record<string, unknown>;
+    if (kind !== 'command' || typeof id !== 'string' || addressed !== viewerId) return;
+    answeredForeign = true;
+    const refusal = commandReply(viewerId, id, { ok: false, error: { code: 'unknown-method', message: `protocol ${PROTOCOL_VERSION}` } });
+    post({ ...refusal, version });
+  };
+
   function onMessage(event: MessageEvent): void {
     // Who, then what: the window and the origin decide whether the message is
     // even looked at, and only then is its shape read.
     if (event.source !== target || event.origin !== hostOrigin) return;
     const data: unknown = event.data;
-    if (!isJeexEnvelope(data) || data.kind !== 'command' || data.viewerId !== viewerId) return;
+    if (!isJeexEnvelope(data)) {
+      answerForeign(data);
+      return;
+    }
+    if (data.kind !== 'command' || data.viewerId !== viewerId) return;
     options.site?.verified(hostOrigin);
     // A `dispose` uninstalls the bridge inside `perform`, and its own reply is
     // still owed: posting does not go through the listener, so the last answer

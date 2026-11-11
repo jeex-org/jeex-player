@@ -443,6 +443,39 @@ describe('a ready the frame cannot back up', () => {
   });
 });
 
+describe('a frame speaking another protocol version', () => {
+  test('its first message rejects `ready` and every waiting command with the named cause at once, logged once', async () => {
+    const logged: EmbedLogEntry[] = [];
+    const embed = make({ onLog: (entry: EmbedLogEntry) => logged.push(entry) });
+    const heard: unknown[] = [];
+    embed.on('ready', (info) => heard.push(info));
+    const play = embed.play();
+    const foreign = { ...(frameEvent('ready', { sceneId: DEMO.scene }) as object), version: PROTOCOL_VERSION + 1 };
+    fromFrame(foreign);
+    fromFrame(foreign);
+    const started = Date.now();
+    await expect(play).rejects.toMatchObject({ code: 'unknown-method', message: `protocol ${PROTOCOL_VERSION + 1}` });
+    await expect(embed.ready).rejects.toMatchObject({ code: 'unknown-method' });
+    expect(Date.now() - started).toBeLessThan(1000);
+    // A later command is refused at once too, and nothing was ever sent or heard.
+    await expect(embed.pause()).rejects.toMatchObject({ code: 'unknown-method' });
+    expect(iframe.contentWindow.commands.filter((command) => command.method !== 'context')).toEqual([]);
+    expect(heard).toEqual([]);
+    expect(logged.map((entry) => entry.code)).toEqual(['protocol-mismatch']);
+  });
+
+  test('a stranger on the same channel and another version is still ignored', async () => {
+    const logged: EmbedLogEntry[] = [];
+    const embed = make({ onLog: (entry: EmbedLogEntry) => logged.push(entry) });
+    const foreign = { ...(frameEvent('ready', { sceneId: DEMO.scene }) as object), version: PROTOCOL_VERSION + 1 };
+    fromFrame(foreign, { origin: 'https://attacker.example' });
+    fromFrame(foreign, { source: {} });
+    fromFrame(frameEvent('ready', { sceneId: DEMO.scene }));
+    expect((await embed.ready).sceneId).toBe(DEMO.scene);
+    expect(logged).toEqual([]);
+  });
+});
+
 describe('what the frame announces', () => {
   test('`player` and `methods` are null until `ready`, then the frame’s own, read-only', async () => {
     const embed = make();

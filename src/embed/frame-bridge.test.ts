@@ -333,7 +333,8 @@ describe('who the bridge answers', () => {
   test('other postMessage traffic on the page is not ours', async () => {
     const { calls } = bridge();
     sendCommand('play', undefined, { channel: 'some-other-widget' });
-    sendCommand('play', undefined, { version: 2 });
+    // Another version of this channel is not ours either; its one answer is the next block's.
+    sendCommand('play', undefined, { channel: 'some-other-widget', version: 2 });
     frameWindow.receive({ origin: HOST_ORIGIN, source: hostWindow, data: 'hello' });
     frameWindow.receive({ origin: HOST_ORIGIN, source: hostWindow, data: null });
     await settled();
@@ -445,7 +446,8 @@ describe('a flood of foreign traffic', () => {
       { ...envelope, kind: 'event', event: 'ready' },
       { ...envelope, kind: 'mystery', id: 'c', method: 'play' },
       { ...envelope, viewerId: 'v2', kind: 'command', id: 'c', method: 'play' },
-      { ...envelope, version: PROTOCOL_VERSION + 1, kind: 'command', id: 'c', method: 'play' },
+      { ...envelope, version: PROTOCOL_VERSION + 1, kind: 'event', event: 'ready' },
+      { ...envelope, version: PROTOCOL_VERSION + 1, viewerId: 'v2', kind: 'command', id: 'c', method: 'play' },
       { ...envelope, channel: 'other', kind: 'command', id: 'c', method: 'play' },
       {
         ...envelope,
@@ -469,6 +471,43 @@ describe('a flood of foreign traffic', () => {
     await settled();
     expect(calls.tour).toEqual(['pause']);
     expect(replies()).toHaveLength(1);
+  });
+});
+
+describe('a host speaking another protocol version', () => {
+  test('its first command is answered once, in its own version, with the version this frame speaks, and nothing is performed', async () => {
+    const { calls } = bridge();
+    const foreign = PROTOCOL_VERSION + 1;
+    for (let index = 0; index < 1_000; index += 1) sendCommand('play', undefined, { version: foreign });
+    sendCommand('loadScene', { url: '/scenes/a.json' }, { version: foreign });
+    await settled();
+    expect(calls.tour).toEqual([]);
+    expect(calls.scenes).toEqual([]);
+    expect(hostWindow.posted.map((entry) => entry.message as unknown)).toEqual([
+      {
+        channel: CHANNEL,
+        version: foreign,
+        viewerId: VIEWER_ID,
+        kind: 'reply',
+        id: 'c1',
+        ok: false,
+        error: { code: 'unknown-method', message: `protocol ${PROTOCOL_VERSION}` },
+      },
+    ]);
+    expect(hostWindow.posted[0]!.origin).toBe(HOST_ORIGIN);
+
+    // The host of this version is still answered as before.
+    sendCommand('play');
+    await settled();
+    expect(calls.tour).toEqual(['play']);
+  });
+
+  test('the answer does not wait for the first scene', async () => {
+    const built = fakeHandle();
+    installFrameBridge(built.handle, { hostOrigin: HOST_ORIGIN, target: hostWindow as unknown as Window, viewerId: VIEWER_ID });
+    sendCommand('play', undefined, { version: PROTOCOL_VERSION + 1 });
+    await settled();
+    expect(replies().map((reply) => reply.error)).toEqual([{ code: 'unknown-method', message: `protocol ${PROTOCOL_VERSION}` }]);
   });
 });
 

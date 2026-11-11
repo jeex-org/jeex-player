@@ -22,7 +22,9 @@
 
 import {
   DEFAULT_VIEWER_ID,
+  PROTOCOL_VERSION,
   commandMessage,
+  foreignVersion,
   isJeexMessage,
   type CaptureStillRequest,
   type CommandMethod,
@@ -354,6 +356,8 @@ export function embedViewer(container: HTMLElement, options: EmbedOptions): Jeex
   /** The frame reported an `error` before its first `ready`: it is up, and another scene is what it can take. */
   let failed = false;
   let disposed = false;
+  /** Set when the frame turned out to speak another protocol version; every command is refused with it. */
+  let foreign: EmbedError | undefined;
   let nextId = 0;
 
   let announceReady: (info: EmbedReady) => void = () => undefined;
@@ -377,6 +381,20 @@ export function embedViewer(container: HTMLElement, options: EmbedOptions): Jeex
     }
   };
 
+  /** Rejects every command waiting for a reply with `sent`, and every one still queued with `held`. */
+  const abandon = (sent: EmbedError, held: EmbedError): void => {
+    for (const waiting of pending.values()) {
+      clearTimeout(waiting.timer);
+      waiting.reject(sent);
+    }
+    pending.clear();
+    for (const queued of queue) {
+      clearTimeout(queued.booting);
+      queued.reject(held);
+    }
+    queue = [];
+  };
+
   const settle = (reply: JeexReply): void => {
     const waiting = pending.get(reply.id);
     if (!waiting) return;
@@ -391,6 +409,22 @@ export function embedViewer(container: HTMLElement, options: EmbedOptions): Jeex
     // only this viewer.
     if (event.source !== iframe.contentWindow || event.origin !== frameOrigin) return;
     const data: unknown = event.data;
+    const version = foreignVersion(data);
+    if (version !== null) {
+      // Our frame, another protocol: nothing it says is acted on, and nothing
+      // it is asked would be understood, so what waits is refused now with the
+      // cause, rather than in 20 seconds as a timeout.
+      if (foreign) return;
+      foreign = new EmbedError('unknown-method', `protocol ${version}`);
+      log({
+        level: 'error',
+        code: 'protocol-mismatch',
+        message: `jeex embed: the frame speaks protocol ${version}, this helper ${PROTOCOL_VERSION}`,
+      });
+      failReady(foreign);
+      abandon(foreign, foreign);
+      return;
+    }
     if (!isJeexMessage(data) || data.viewerId !== viewerId) return;
     if (data.kind === 'reply') {
       settle(data);
@@ -461,6 +495,7 @@ export function embedViewer(container: HTMLElement, options: EmbedOptions): Jeex
 
   const send = (method: CommandMethod, params?: Record<string, unknown>): Promise<unknown> => {
     if (disposed) return Promise.reject(new EmbedError('disposed', 'this embed has been disposed'));
+    if (foreign) return Promise.reject(foreign);
     const id = `c${(nextId += 1)}`;
     return new Promise<unknown>((resolve, reject) => {
       // The REPLY clock starts when the command is posted, not when it is
@@ -600,16 +635,10 @@ export function embedViewer(container: HTMLElement, options: EmbedOptions): Jeex
       void send('dispose').catch(() => undefined);
       disposed = true;
       claimedIds.delete(viewerId);
-      for (const waiting of pending.values()) {
-        clearTimeout(waiting.timer);
-        waiting.reject(new EmbedError('disposed', 'this embed has been disposed'));
-      }
-      pending.clear();
-      for (const queued of queue) {
-        clearTimeout(queued.booting);
-        queued.reject(new EmbedError('disposed', 'this embed was disposed before the frame was ready'));
-      }
-      queue = [];
+      abandon(
+        new EmbedError('disposed', 'this embed has been disposed'),
+        new EmbedError('disposed', 'this embed was disposed before the frame was ready'),
+      );
       // Told synchronously, before listeners are cleared: guards against
       // `dispose()` clearing its own `message` listener in the same tick it
       // posts the command, where a host subscribed to `disposed` would never

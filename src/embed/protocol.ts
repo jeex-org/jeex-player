@@ -22,9 +22,12 @@
  * pay for it, and both sides import THIS file.
  *
  * Version invariant: `version` is the semver-major of this contract. A message
- * carrying another number is not this protocol and is dropped rather than
- * interpreted, so an old page and a new frame fail visibly instead of half
- * working.
+ * carrying another number is not this protocol and is never acted on. It is
+ * not dropped in silence either, or a host and a frame of different majors
+ * would only ever see 20-second timeouts: `foreignVersion` names it, the frame
+ * answers the first such command once with `unknown-method` and
+ * `protocol <its version>`, and the host helper rejects what waits with the
+ * same code and logs `protocol-mismatch`.
  */
 
 /** Discriminator, so a frame that carries other postMessage traffic ignores it. */
@@ -341,6 +344,17 @@ export function isJeexMessage(data: unknown): data is JeexMessage {
   if (data['kind'] === 'reply') return typeof data['id'] === 'string' && typeof data['ok'] === 'boolean';
   if (data['kind'] === 'event') return typeof data['event'] === 'string';
   return false;
+}
+
+/**
+ * The version of a message on this channel that speaks ANOTHER version of the
+ * protocol, or `null` (this version, another channel, a version that is no
+ * number). Only names the mismatch: nothing else of such a message is read.
+ */
+export function foreignVersion(data: unknown): number | null {
+  if (!isRecord(data) || data['channel'] !== CHANNEL) return null;
+  const version = data['version'];
+  return typeof version === 'number' && version !== PROTOCOL_VERSION ? version : null;
 }
 
 /** The envelope every constructor below starts from. */
