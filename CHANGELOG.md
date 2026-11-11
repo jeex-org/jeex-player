@@ -9,6 +9,20 @@ as described under [Versioning](#versioning).
 
 ### Added
 
+- **`plan2d` shows a host's selection.** `setSelection` draws its wall,
+  opening, room or placement on the 2D plan in the accent, and the
+  `selection-anchor` slot is projected through the plan's top view in
+  `plan2d` as in `plan3d`, so a host's card sits on the drawing.
+  `handle.planView()` answers what the 2D plan is fitted to: the bounds in
+  metres and the metres-to-pixels transform over the viewer's box.
+- **`set_room { polygon: null }`** attaches a zone to the walls again; the
+  commit does it by itself when a new wall closes round a zone's anchor in a
+  face no other room claims.
+- **The library map vocabulary on `jeex-viewer/schema`.** `libraryMapPath`,
+  `LIBRARY_MAP_EXTENSIONS` and `LIBRARY_MAP_SIZES`: the file name rule, the
+  formats (`webp`, `ktx2`) and the sizes a baked library material's maps are
+  checked against, for a service that writes or explains a bake.
+
 - **The `assets` event.** Once per document, when its first model pass
   settles, the viewer says what its libraries delivered:
   `{ models: { upgraded, failed, budget }, textures: { failed } }`, the
@@ -150,6 +164,39 @@ as described under [Versioning](#versioning).
 
 ### Fixed
 
+- **A door pushed to the start of its wall commits.** The edge-margin check
+  of an opening compares with the plan tolerance, so a door the clamp puts
+  exactly on the margin (0.8, 1.0, 1.2 or 1.6 m wide against the start of a
+  wall) is no longer refused.
+- **Presets follow the edits that remove or cut what they dress.** Removing
+  a placement, an opening, a wall or a room forgets every preset
+  instruction that names it, whatever the operation; a `split_wall` rewrites
+  the preset's face paint, `set_wall` and `set_opening` onto the two halves
+  instead of vetoing the split.
+- **Lowering the ceiling lowers the tour cameras with it.** `set_ceiling`
+  brings a tour checkpoint under the new headroom, as `set_tour_checkpoints`
+  clamps one, instead of refusing the batch.
+- **An opening is judged at the heights it is drawn at.** A window whose
+  raised sill meets its default head (no height left) is refused instead of
+  silently not drawn.
+- **`add_wall` and `set_wall` prove the centreline before they write.** A
+  wall shorter than the minimum is refused by the operation, and a `set_wall`
+  whose arc cannot span the chord leaves the thickness and the role as they
+  were.
+- **An open-plan zone is walked into.** Walk, the room router and the tour
+  read one walkable floor: the line where a zone was cut out of its room is
+  no longer an invisible wall, and a zone is reached through the room it
+  lies in instead of being an island.
+- **A painted face keeps its paint when another room comes to own it.**
+  Dividing a room, moving an anchor or building a room against a painted
+  facade wall re-keys the paint (and a preset's) to the new owner instead of
+  refusing the batch.
+- **A door keeps the side its leaf opens to.** A door with an explicit
+  `swing` on a wall that gains or loses a room on its other side keeps
+  opening into the same room.
+- **A moved bound placement belongs to the room it stands in.** A
+  `move_object` without a `room` binds a bound placement to the room its new
+  position lies in.
 - **A scene after a failed first one is shown.** A `loadScene` after the
   first scene failed (or a corrected `src` on the element) boots the new
   scene: the error card goes, the scene is drawn and `ready` fires once.
@@ -218,6 +265,11 @@ as described under [Versioning](#versioning).
 
 ### Changed
 
+- **Openings keep their place when a wall end moves.** On `move_node` an
+  opening keeps its distance in metres from the wall end that did not move,
+  instead of its share of the wall, and openings that no longer fit slide
+  toward that end before the batch is refused; two doors that still fit
+  where they stood on a shortened wall now commit there.
 - **Cooler default light.** The interior's artificial light now defaults to a
   neutral 5000 K instead of «Original», and the daylight sky walk and tour
   are lit by is a neutral grey (`#d4d4d4` to `#b9b9b9`) instead of a warm
