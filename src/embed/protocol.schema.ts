@@ -394,6 +394,13 @@ export const eventSchema = z.discriminatedUnion('event', [
     event: z.literal('lightTemperature'),
     payload: z.object({ temperature: lightTemperatureSchema, source: z.enum(['host', 'panel']) }),
   }),
+  z.object({
+    event: z.literal('assets'),
+    payload: z.object({
+      models: z.object({ upgraded: finiteNumber, failed: finiteNumber, budget: z.boolean() }),
+      textures: z.object({ failed: finiteNumber }),
+    }),
+  }),
   z.object({ event: z.literal('disposed'), payload: z.undefined() }),
 ]);
 

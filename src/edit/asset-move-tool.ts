@@ -362,9 +362,9 @@ export class AssetMoveTool {
     return true;
   }
 
-  /** A new committed document: a pending edit is answered, a running move is void. */
+  /** The document was handed over again: only a revision past a pending edit's answers it; a running move is void. */
   documentChanged(): void {
-    this.pending.clear();
+    this.pending.answered(this.host.document()?.rev);
     this.cancel();
   }
 

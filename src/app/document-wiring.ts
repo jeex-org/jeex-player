@@ -17,7 +17,7 @@
 
 import { effectiveEditsMode } from './edits-wiring.js';
 import { debugHostFor } from './debug-parts.js';
-import { replayPendingTourCommand, type TourControls } from '../camera/tour-controls.js';
+import type { TourControls } from '../camera/tour-controls.js';
 import type { Dollhouse } from '../geometry/dollhouse.js';
 import type { DoorController } from './door-controller.js';
 import type { Messages } from '../ui/messages.js';
@@ -67,8 +67,6 @@ export function seedForDocument(deps: DocumentWiringDeps, model: SceneModel): vo
   deps.dollhouse.setState(deps.dollhouse.state, stage?.camera);
   stage?.setDocument(model, () => deps.mount.sceneRoot);
   deps.doors.seed();
-  // A host may have driven the tour before there was a clip to drive.
-  replayPendingTourCommand(deps.tour);
   // The selector exists only where all three agree: the host asked for it, the
   // scene ships interiors to choose between, and `edits` allows a panel at all
   // (under `'off'` the affordance itself is hidden, not only its effect — the

@@ -395,9 +395,18 @@ describe('keys and the host’s answer', () => {
 
     drag(tool, home, legalSpot(DEMO.asset.livingSofa, 1, 'floor'));
     const shown = host.shown.length;
+    host.rev += 1;
     tool.documentChanged();
     tool.revert();
     expect(host.shown.length).toBe(shown);
+  });
+
+  test('the same document handed back at the same revision answers nothing: a refusal still puts the start pose back', () => {
+    const home = placement(DEMO.asset.livingSofa).position;
+    drag(tool, home, legalSpot(DEMO.asset.livingSofa, 1, 'floor'));
+    tool.documentChanged();
+    tool.revert();
+    expect(host.last().position).toEqual(home);
   });
 
   test('the Move toggle moves the selected object to the next press, wherever it lands', () => {
@@ -619,6 +628,7 @@ describe('edits before the host answers build on what is on screen', () => {
   test('a new document answers the pending edits: the next turn starts from the document again', () => {
     const home = placement(DEMO.asset.livingChairA);
     expect(tool.turnAsset(DEMO.asset.livingChairA, 1)).toBe(true);
+    host.rev += 1;
     tool.documentChanged();
     expect(tool.turnAsset(DEMO.asset.livingChairA, 1)).toBe(true);
     const rotate = host.edits[1]!.ops.find((op) => op.op === 'rotate_object');

@@ -10,7 +10,8 @@
  *
  * Everything is safe to call the moment `mountViewer` returns, before the first
  * scene exists: the tour remembers the last command and replays it
- * (`tour-controls.ts`), and the other commands are no-ops until there is a
+ * (`tour-controls.ts`) after the start view, `setMode` is remembered and the
+ * viewer opens in it, and the other commands are no-ops until there is a
  * camera to move.
  */
 
@@ -178,10 +179,12 @@ export type ViewerHandle = {
   /**
    * Switches the mode, exactly as the mode buttons do. Choosing `'orbit'` (360)
    * ends on the Reset camera pose, from any mode and from 360 itself; the embed protocol's `setMode` and the
-   * element's `mode` attribute go through here too.
+   * element's `mode` attribute go through here too. Before the first scene
+   * nothing switches and no `mode` event fires: the viewer opens in the last
+   * mode asked for instead of `view.mode`.
    */
   setMode(mode: ViewerMode): void;
-  /** The mode on screen; the option's value until the camera stack exists. */
+  /** The mode on screen; until the camera stack exists, the mode `setMode` asked for, else the option's value. */
   getMode(): ViewerMode;
   /** Everything above in one consistent read (`ViewerState`). */
   getState(): ViewerState;

@@ -17,7 +17,7 @@
 import { BOOT_STEPS } from './boot-steps.js';
 import { ViewerDisposedError } from './viewer-context.js';
 import type { Messages } from '../ui/messages.js';
-import type { TourControls } from '../camera/tour-controls.js';
+import { replayPendingTourCommand, type TourControls } from '../camera/tour-controls.js';
 import type { ViewerOptions } from './viewer-options.js';
 import type { ViewerMode } from '../scene/types.js';
 import * as THREE from 'three';
@@ -127,6 +127,8 @@ export function showBootStep(ui: BootUI, messages: Messages, name: keyof typeof 
 /** What `applyStartView` needs of the running viewer. */
 type StartViewDeps = {
   options: ViewerOptions;
+  /** A mode the host set before the stage existed (`handle.setMode`); it wins over `options.view.mode`. */
+  requestedMode: ViewerMode | null;
   ui: BootUI;
   tour: TourControls;
   /** Switches the camera mode; the composition root's own `setMode`. */
@@ -150,7 +152,8 @@ function openAtDebugCamera(deps: StartViewDeps, camera: DebugCamera): void {
 }
 
 /**
- * The mode the page opens in, `options.view` as authored.
+ * The mode the page opens in: `options.view` as authored, or the mode a host
+ * asked for before there was a stage to switch.
  *
  * It runs after `ViewerUI.bind()` on purpose. The tour engages at start ONLY in
  * `view.mode: 'tour'`: a page that opens on 360, the 2D drawing or
@@ -159,13 +162,20 @@ function openAtDebugCamera(deps: StartViewDeps, camera: DebugCamera): void {
  * until the button is pressed.
  */
 export function applyStartView(deps: StartViewDeps): void {
+  openStartView(deps);
+  // A host may have driven the tour before there was a clip to drive: its
+  // command is replayed on top of the start view, so the start does not undo it.
+  replayPendingTourCommand(deps.tour);
+}
+
+function openStartView(deps: StartViewDeps): void {
   // An internal switch of a page that compares two viewers: both open on the same pose (`shared/debug-flags.ts`).
   const camera = debugCamera();
   if (camera !== null) {
     openAtDebugCamera(deps, camera);
     return;
   }
-  const mode = deps.options.view.mode;
+  const mode = deps.requestedMode ?? deps.options.view.mode;
   deps.ui.setModeButtons(mode);
   deps.ui.setHintForMode(mode);
   if (mode !== 'tour') {

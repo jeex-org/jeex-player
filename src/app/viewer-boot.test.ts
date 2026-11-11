@@ -14,6 +14,8 @@ import { TextureCache } from '../materials/texture-cache.js';
 import { ViewerDisposedError } from './viewer-context.js';
 import { DEFAULT_VIEWER_OPTIONS, type ViewerOptions } from './viewer-options.js';
 import type { ViewerMode } from '../scene/types.js';
+import { TourEvents, createTourControls } from '../camera/tour-controls.js';
+import type { TourPlayer } from '../camera/tour-player.js';
 
 type Frame = () => void;
 
@@ -140,7 +142,7 @@ describe('firstPicture', () => {
 });
 
 /** The bits of `ViewerUI` and `TourControls` the start view drives. */
-function startHarness(overrides: Partial<ViewerOptions>, camera?: unknown) {
+function startHarness(overrides: Partial<ViewerOptions>, camera?: unknown, requestedMode?: ViewerMode) {
   const calls: string[] = [];
   const page = globalThis as { __JEEX_DEBUG_CAMERA__?: unknown };
   if (camera === undefined) delete page.__JEEX_DEBUG_CAMERA__;
@@ -149,6 +151,7 @@ function startHarness(overrides: Partial<ViewerOptions>, camera?: unknown) {
   const options: ViewerOptions = { ...DEFAULT_VIEWER_OPTIONS, ...overrides };
   applyStartView({
     options,
+    requestedMode: requestedMode ?? null,
     ui: {
       setLoading: () => calls.push('loading'),
       setModeButtons: (mode: ViewerMode) => calls.push(`buttons:${mode}`),
@@ -218,6 +221,31 @@ describe('applyStartView', () => {
       tour: { ...DEFAULT_VIEWER_OPTIONS.tour, mode: 'play', start: 0.25 },
     });
     expect(calls).toEqual(['buttons:tour', 'hint:tour', 'seek:0.25', 'play']);
+  });
+
+  test('a mode the host asked for before the stage existed opens the viewer instead of the authored one', () => {
+    expect(startHarness({}, undefined, 'walk')).toEqual(['buttons:walk', 'hint:walk', 'setMode:walk']);
+  });
+
+  test('a tour command issued before the first scene is replayed after the start view, not overwritten by it', () => {
+    const seeks: number[] = [];
+    let player: TourPlayer | null = null;
+    const tour = createTourControls({ engageTour: () => null, toggleTour: () => undefined, player: () => player }, new TourEvents());
+    tour.seek(0.4);
+    player = { seek: (fraction: number) => seeks.push(fraction), setSpeed: () => undefined } as unknown as TourPlayer;
+    applyStartView({
+      options: {
+        ...DEFAULT_VIEWER_OPTIONS,
+        view: { ...DEFAULT_VIEWER_OPTIONS.view, mode: 'tour' },
+        tour: { ...DEFAULT_VIEWER_OPTIONS.tour, mode: 'paused', start: 0 },
+      },
+      requestedMode: null,
+      ui: { setLoading: () => undefined, setModeButtons: () => undefined, setHintForMode: () => undefined },
+      tour,
+      setMode: () => undefined,
+      director: () => undefined,
+    });
+    expect(seeks).toEqual([0, 0.4]);
   });
 
   test('view tour with tour paused places the camera and stops there', () => {
