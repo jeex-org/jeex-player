@@ -409,6 +409,16 @@ describe('keys and the host’s answer', () => {
     expect(host.last().position).toEqual(home);
   });
 
+  test('a different document handed over at the same revision answers the pending edit: a refusal writes nothing back', () => {
+    const home = placement(DEMO.asset.livingSofa).position;
+    drag(tool, home, legalSpot(DEMO.asset.livingSofa, 1, 'floor'));
+    const shown = host.shown.length;
+    host.scene = { ...apartmentScene, id: '01900000-0000-7000-8000-0000000000b2' };
+    tool.documentChanged();
+    tool.revert();
+    expect(host.shown.length).toBe(shown);
+  });
+
   test('the Move toggle moves the selected object to the next press, wherever it lands', () => {
     const spot = legalSpot(DEMO.asset.livingSofa, 1, 'floor');
     tool.arm();
