@@ -16,7 +16,7 @@ import { CATALOGUE_REGISTRIES } from '../../src/assets/catalogue-registries.js';
 import { SceneModel, isApplyOk } from '../../src/scene/scene-model.js';
 import { planPoint } from '../../src/plan/plan-drawing.js';
 import type { SceneData, Vec2 } from '../../src/scene/types.js';
-import { closeContainers, demoScene, nextFrame, openContainer, until } from './support.js';
+import { closeContainers, demoScene, nextFrame, openContainer, readableCanvas, until } from './support.js';
 
 type Debug = { mode: () => string | undefined };
 const debug = (): Debug => (window as unknown as { __viewerDebug: Debug }).__viewerDebug;
@@ -64,12 +64,14 @@ async function mounted() {
   handle.on('planEditRefused', (refusal) => refusals.push(refusal));
   handle.on('planToolState', (state) => states.push(state.phase));
   handle.on('scene', (info) => scenes.push(info.rev));
+  const plan = container.querySelector<HTMLCanvasElement>('[data-jeex="plan-canvas"]')!;
+  // The drawings compared below on one rasteriser (`readableCanvas`): before `plan2d` paints it first.
+  readableCanvas(plan);
   handle.setMode('plan2d');
   await until(() => debug().mode() === 'plan2d', 'plan2d');
   handle.setSelection({ kind: 'wall', id: moves.wallId });
   handle.setPlanTool(true);
   const canvas = container.querySelector<HTMLCanvasElement>('[data-jeex="scene-canvas"]')!;
-  const plan = container.querySelector<HTMLCanvasElement>('[data-jeex="plan-canvas"]')!;
   const pixel = (point: Vec2): { clientX: number; clientY: number } => {
     const box = canvas.getBoundingClientRect();
     const at = planPoint(handle.planView()!.transform, point);

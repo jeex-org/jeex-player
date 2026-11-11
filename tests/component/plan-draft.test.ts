@@ -13,7 +13,7 @@ import { RenderRuntime } from '../../src/render/render-runtime.js';
 import { SceneModel } from '../../src/scene/scene-model.js';
 import { CATALOGUE_REGISTRIES } from '../../src/assets/catalogue-registries.js';
 import { planPoint } from '../../src/plan/plan-drawing.js';
-import { closeContainers, demoPlan, demoScene, openShell, until, type Shell } from './support.js';
+import { closeContainers, demoPlan, demoScene, openShell, readableCanvas, until, type Shell } from './support.js';
 
 /** No labels, chains or camera marker: only the walls, the openings and the marks draw. */
 const BARE = (): PlanModeOptions => ({ labels: false, dimensions: false, camera: false });
@@ -33,6 +33,8 @@ async function inPlan2d(): Promise<Harness> {
     options: BARE,
   });
   open.push({ shell, runtime, modes });
+  // Every paint compared below on one rasteriser (`readableCanvas`).
+  readableCanvas(modes.element);
   modes.setDocument(demoPlan(), demoScene());
   modes.setMode('plan2d');
   await until(() => modes.element.width > 0, 'the overlay to get a backing store');
