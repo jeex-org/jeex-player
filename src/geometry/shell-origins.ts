@@ -39,6 +39,7 @@ const SEARCH_STEP_M = 0.1;
 
 const scratch = new THREE.Vector3();
 const inverse = new THREE.Quaternion();
+const UP = new THREE.Vector3(0, 1, 0);
 
 /**
  * Moves `mesh`'s origin by `delta` (in its parent's frame) and its geometry by
@@ -139,7 +140,7 @@ export function rebaseShellOrigins(shell: THREE.Object3D, plan: SolvedPlan, ceil
 
 /**
  * Moves the frame parts of one interior door group `FRAME_SHIFT_M` off the
- * wall centreline, along the group's local `z`, towards the side its leaf
+ * wall centreline, square to the wall, towards the side its leaf
  * opens into; a door on an exterior wall and an opening without a leaf are
  * left alone. Idempotent: a part remembers that it moved.
  */
@@ -147,10 +148,12 @@ export function rebaseOpeningFrames(group: THREE.Object3D): void {
   const leaf = group.children.find((child) => child.userData['isDoorLeaf'] === true);
   if (!leaf || leaf.userData['isExteriorWall'] === true) return;
   const openSign = leaf.userData['openSign'] as number;
+  // `openSign` counts across the WALL frame, which is the group frame turned by the shut leaf's angle.
+  const closedAngle = leaf.userData['closedAngle'] as number;
   for (const part of group.children) {
     if (!(part instanceof THREE.Mesh) || part.userData['isParametricWall'] !== true) continue;
     if (part.userData['originShifted'] === true) continue;
-    shiftOrigin(part, new THREE.Vector3(0, 0, openSign * FRAME_SHIFT_M));
+    shiftOrigin(part, new THREE.Vector3(0, 0, openSign * FRAME_SHIFT_M).applyAxisAngle(UP, closedAngle));
     part.userData['originShifted'] = true;
   }
 }

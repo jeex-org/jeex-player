@@ -16,23 +16,38 @@
  *  - on an arc the FRAME follows the wall, chord by chord, while the leaf —
  *    one rigid panel — keeps its flat rectangle on the tangent at the opening
  *    centre (documented limitation, curved leaves are out of scope);
- *  - a leaf records HOW it moves (`restAngle`, `hingeSign`, `openSign`, plus
- *    `slide` / `slideBase` when it slides), so `door-animator.ts` can shut it
- *    without re-deriving the swing. Leaves are built OPEN, the way the
- *    apartment is authored.
+ *  - every flat part (jamb, head, rail, pane, bar, leaf, track, pick box) is
+ *    measured out in the wall's own frame and enters the group through
+ *    `onWall` (`opening-wall-frame.ts`): the group's local `x` is the wall's
+ *    tangent mirrored, so a part placed at a raw local `x` stands off any wall
+ *    that runs along no axis;
+ *  - a leaf records HOW it moves (`closedAngle`, `restAngle`, `hingeSign`,
+ *    `openSign`, plus `slide` / `slideBase` when it slides), so
+ *    `door-animator.ts` can shut it without re-deriving the swing. Leaves are
+ *    built OPEN, the way the apartment is authored.
  */
 
 import * as THREE from 'three';
 import type { BuilderContext } from './builder-context.js';
 import { openingFinishMaterial } from '../materials/opening-finish.js';
-import type { ArcDef } from '../plan/plan-geometry.js';
 import { EPS } from '../plan/plan-geometry.js';
 import { leafPanelRects, paneLayout } from '../plan/opening-geometry.js';
 import { chordBandBoxes, curvedOpeningParts, type CurvedBox, type CurvedOpeningParts } from '../plan/opening-arc.js';
 import type { OpeningVariant } from '../assets/opening-variants.js';
 import { LEAF_REST_ANGLE_RAD, LEAF_THICKNESS_M, resolveDoorSwing } from '../plan/door-swing.js';
 import { openingFrameWidth } from '../assets/opening-frame.js';
-import type { Opening, OpeningType, Vec2, Vec3, Wall } from '../scene/types.js';
+import type { Opening, OpeningType, Vec3, Wall } from '../scene/types.js';
+import {
+  fromWall,
+  localRotation,
+  onWall,
+  toLocal,
+  toLocalVector,
+  toWall,
+  toWallVector,
+  wallFrame,
+  type OpeningPlacement,
+} from './opening-wall-frame.js';
 
 /* -------------------------------------------------------------- tunables -- */
 
@@ -73,23 +88,6 @@ const TRACK_RISE_M = 0.03;
 
 /* ----------------------------------------------------------------- model -- */
 
-/** Where an opening sits on its wall centreline. */
-export type OpeningPlacement = {
-  point: Vec2;
-  angleY: number;
-  /** Normal of the room-owning side of the wall. */
-  normal: Vec2;
-  sill: number;
-  head: number;
-  /** Centreline arc of the wall; absent on a straight wall. */
-  arc?: ArcDef | undefined;
-  /** Opening span along the arc, arc length from node `a`. */
-  t0?: number | undefined;
-  t1?: number | undefined;
-  /** `+1` when the room lies OUTSIDE the arc circle, `-1` when inside. */
-  interiorOutward?: 1 | -1 | undefined;
-};
-
 /** Everything one opening kind needs to build itself. */
 export type OpeningBuildContext = {
   /** Shared plan lookups (scene, solved plan, exterior wall ids). */
@@ -113,7 +111,7 @@ type PickBox = {
   x: number;
   y: number;
   z: number;
-  /** Rotation about local `Y`; non-zero only on a chorded arc. */
+  /** Rotation about local `Y`: a chord's own, or the wall frame's turn on a straight wall. */
   rotationY: number;
   /**
    * `openingPart` tag for the proxy mesh. Only the chorded boxes carry one —
@@ -134,37 +132,6 @@ type OpeningKind = {
   pickBoxes(ctx: OpeningBuildContext): PickBox[];
   pickLocal(ctx: OpeningBuildContext): THREE.Vector3;
 };
-
-/* ------------------------------------------------------------- local frame */
-
-/**
- * A plan point on the wall, expressed in the opening group's local frame.
- * The group is a rotation about `Y` by `placement.angleY` at
- * `placement.point`, so the inverse is that rotation transposed.
- */
-function toLocal(placement: OpeningPlacement, p: Vec2): Vec2 {
-  const cos = Math.cos(placement.angleY);
-  const sin = Math.sin(placement.angleY);
-  const dx = p.x - placement.point.x;
-  const dz = p.z - placement.point.z;
-  return { x: cos * dx - sin * dz, z: sin * dx + cos * dz };
-}
-
-/** A plan DIRECTION expressed in the opening group's local frame. */
-function toLocalVector(placement: OpeningPlacement, v: Vec2): Vec2 {
-  const cos = Math.cos(placement.angleY);
-  const sin = Math.sin(placement.angleY);
-  return { x: cos * v.x - sin * v.z, z: sin * v.x + cos * v.z };
-}
-
-/**
- * `rotation.y` a child of the group needs so that its own `+x` points along
- * the plan direction `d`. A `rotation.y` of `phi` sends `+x` to
- * `(cos phi, -sin phi)` in `(x, z)`, hence the negated `z`.
- */
-function localRotation(placement: OpeningPlacement, d: Vec2): number {
-  return Math.atan2(-d.z, d.x) - placement.angleY;
-}
 
 /* ------------------------------------------------------------- primitives */
 
@@ -309,9 +276,11 @@ function chordPickBoxes(c: OpeningBuildContext, boxes: CurvedBox[]): PickBox[] {
   });
 }
 
-/** A flat proxy box on the wall centreline, square to the group. */
-function flatPickBox(width: number, height: number, depth: number, x: number, y: number): PickBox {
-  return { width, height, depth, x, y, z: 0, rotationY: 0 };
+/** A flat proxy box on the wall centreline, `x` along the wall, in the wall frame. */
+function flatPickBox(c: OpeningBuildContext, width: number, height: number, depth: number, x: number, y: number): PickBox {
+  const frame = wallFrame(c.placement);
+  const at = fromWall(frame, x, 0);
+  return { width, height, depth, x: at.x, y, z: at.z, rotationY: frame.angle };
 }
 
 /* ------------------------------------------------------------------ window */
@@ -352,10 +321,11 @@ function buildWindow(c: OpeningBuildContext): OpeningBuild {
   }
 
   // Jambs, then sill and head rails, all flush with the wall centreline.
-  group.add(frameBox(c, frameWidth, height, frameDepth, frameMaterial, -width / 2 + frameWidth / 2, sill + height / 2, 0));
-  group.add(frameBox(c, frameWidth, height, frameDepth, frameMaterial, width / 2 - frameWidth / 2, sill + height / 2, 0));
-  group.add(frameBox(c, width, frameWidth, frameDepth, frameMaterial, 0, sill + frameWidth / 2, 0));
-  group.add(frameBox(c, width, frameWidth, frameDepth, frameMaterial, 0, head - frameWidth / 2, 0));
+  const frame = wallFrame(c.placement);
+  group.add(onWall(frame, frameBox(c, frameWidth, height, frameDepth, frameMaterial, -width / 2 + frameWidth / 2, sill + height / 2, 0)));
+  group.add(onWall(frame, frameBox(c, frameWidth, height, frameDepth, frameMaterial, width / 2 - frameWidth / 2, sill + height / 2, 0)));
+  group.add(onWall(frame, frameBox(c, width, frameWidth, frameDepth, frameMaterial, 0, sill + frameWidth / 2, 0)));
+  group.add(onWall(frame, frameBox(c, width, frameWidth, frameDepth, frameMaterial, 0, head - frameWidth / 2, 0)));
 
   const glazing = c.variant.glazing ?? DEFAULT_GLAZING;
   const glass = glassMaterial(c.variant, materials);
@@ -368,11 +338,14 @@ function buildWindow(c: OpeningBuildContext): OpeningBuild {
     mesh.position.set(originX + pane.x + pane.width / 2, originY + pane.y + pane.height / 2, 0);
     mesh.castShadow = false;
     mesh.receiveShadow = false;
-    group.add(mesh);
+    group.add(onWall(frame, mesh));
   }
   for (const bar of layout.bars) {
     group.add(
-      frameBox(c, bar.width, bar.height, barDepth, frameMaterial, originX + bar.x + bar.width / 2, originY + bar.y + bar.height / 2, 0),
+      onWall(
+        frame,
+        frameBox(c, bar.width, bar.height, barDepth, frameMaterial, originX + bar.x + bar.width / 2, originY + bar.y + bar.height / 2, 0),
+      ),
     );
   }
 
@@ -384,6 +357,7 @@ function buildWindow(c: OpeningBuildContext): OpeningBuild {
       frameMaterial,
     );
     board.position.set(local.x * offset, sill + SILL_BOARD_THICKNESS_M / 2, local.z * offset);
+    board.rotation.y = frame.angle;
     board.receiveShadow = true;
     group.add(board);
   }
@@ -397,7 +371,7 @@ function windowPickBoxes(c: OpeningBuildContext): PickBox[] {
   if (arc && t0 !== undefined && t1 !== undefined) {
     return chordPickBoxes(c, chordBandBoxes(arc, 'pick', t0, t1, sill, head, depth));
   }
-  return [flatPickBox(c.opening.width, head - sill, depth, 0, sill + (head - sill) / 2)];
+  return [flatPickBox(c, c.opening.width, head - sill, depth, 0, sill + (head - sill) / 2)];
 }
 
 function windowPickLocal(c: OpeningBuildContext): THREE.Vector3 {
@@ -428,9 +402,10 @@ function buildDoorFrame(c: OpeningBuildContext): OpeningBuild & { frameMaterial:
   if (curved) {
     for (const box of curved.boxes) group.add(curvedBox(c, box, frameMaterial));
   } else {
-    group.add(frameBox(c, frameWidth, head, frameDepth, frameMaterial, -width / 2 + frameWidth / 2, head / 2, 0));
-    group.add(frameBox(c, frameWidth, head, frameDepth, frameMaterial, width / 2 - frameWidth / 2, head / 2, 0));
-    group.add(frameBox(c, width, frameWidth, frameDepth, frameMaterial, 0, head - frameWidth / 2, 0));
+    const frame = wallFrame(c.placement);
+    group.add(onWall(frame, frameBox(c, frameWidth, head, frameDepth, frameMaterial, -width / 2 + frameWidth / 2, head / 2, 0)));
+    group.add(onWall(frame, frameBox(c, frameWidth, head, frameDepth, frameMaterial, width / 2 - frameWidth / 2, head / 2, 0)));
+    group.add(onWall(frame, frameBox(c, width, frameWidth, frameDepth, frameMaterial, 0, head - frameWidth / 2, 0)));
   }
   return { group, materials, frameMaterial, frameWidth };
 }
@@ -464,11 +439,12 @@ function buildDoor(c: OpeningBuildContext): OpeningBuild {
     { ...opening, swing: opening.swing ?? (variant.swing === 'out' ? 'out' : undefined) },
     openingFrameWidth,
   );
-  // The group's local `+x` is not the wall tangent on every wall, so the
-  // hinge end and the opening side are READ OUT of the local frame, never
-  // assumed: `toLocal` is the exact inverse of the group's transform.
-  const hingeSign = Math.sign(toLocal(placement, swing.pivot).x) || -1;
-  const openSign = Math.sign(toLocalVector(placement, swing.open).z) || 1;
+  // A leaf is measured out in the wall frame, whose `x` runs either way along
+  // the wall, so the hinge end and the opening side are READ OUT of it, never
+  // assumed.
+  const frame = wallFrame(placement);
+  const hingeSign = Math.sign(toWall(placement, frame, swing.pivot).x) || -1;
+  const openSign = Math.sign(toWallVector(placement, frame, swing.open).z) || 1;
   /** Local `x` direction the leaf runs in from its hinge, towards the far jamb. */
   const leafRun: 1 | -1 = hingeSign < 0 ? 1 : -1;
   const clear = width - frameWidth * 2;
@@ -482,20 +458,28 @@ function buildDoor(c: OpeningBuildContext): OpeningBuild {
     const leaf = doorLeaf(c, clear, leafHeight, leafSpec, leafMaterial, frameMaterial, leafRun, materials);
     const closed = { x: hingeSign * (width / 2 - frameWidth), y: LEAF_FLOOR_GAP_M, z: openSign * (wall.thickness / 2 + LEAF_THICKNESS_M) };
     const slide = { x: hingeSign * clear, y: 0, z: 0 };
-    tagLeaf(leaf, { restAngle: 0, hingeSign, openSign, slide, slideBase: closed });
+    // The animator moves the leaf in the group frame, so the contract is recorded there.
+    const inGroup = (v: Vec3): Vec3 => {
+      const at = fromWall(frame, v.x, v.z);
+      return { x: at.x, y: v.y, z: at.z };
+    };
+    tagLeaf(leaf, { closedAngle: frame.angle, restAngle: 0, hingeSign, openSign, slide: inGroup(slide), slideBase: inGroup(closed) });
     leaf.position.set(closed.x + slide.x, closed.y + slide.y, closed.z + slide.z);
-    group.add(leaf);
+    group.add(onWall(frame, leaf));
     // The track has to reach over the parked leaf, not only over the opening.
     group.add(
-      frameBox(
-        c,
-        width + clear,
-        TRACK_HEIGHT_M,
-        TRACK_DEPTH_M,
-        frameMaterial,
-        slide.x / 2,
-        head + TRACK_RISE_M,
-        openSign * (wall.thickness / 2 + TRACK_STANDOFF_M),
+      onWall(
+        frame,
+        frameBox(
+          c,
+          width + clear,
+          TRACK_HEIGHT_M,
+          TRACK_DEPTH_M,
+          frameMaterial,
+          slide.x / 2,
+          head + TRACK_RISE_M,
+          openSign * (wall.thickness / 2 + TRACK_STANDOFF_M),
+        ),
       ),
     );
     return { group, materials };
@@ -511,9 +495,9 @@ function buildDoor(c: OpeningBuildContext): OpeningBuild {
       const leaf = doorLeaf(c, half, leafHeight, leafSpec, leafMaterial, frameMaterial, run, materials);
       leaf.position.set(side * (width / 2 - frameWidth), LEAF_FLOOR_GAP_M, 0);
       const restAngle = -run * openSign * LEAF_REST_ANGLE_RAD;
-      tagLeaf(leaf, { restAngle, hingeSign: side, openSign });
+      tagLeaf(leaf, { closedAngle: frame.angle, restAngle, hingeSign: side, openSign });
       leaf.rotation.y = restAngle;
-      group.add(leaf);
+      group.add(onWall(frame, leaf));
     }
     return { group, materials };
   }
@@ -521,23 +505,26 @@ function buildDoor(c: OpeningBuildContext): OpeningBuild {
   const leaf = doorLeaf(c, clear, leafHeight, leafSpec, leafMaterial, frameMaterial, leafRun, materials);
   leaf.position.set(hingeSign * (width / 2 - frameWidth), LEAF_FLOOR_GAP_M, 0);
   const restAngle = -leafRun * openSign * LEAF_REST_ANGLE_RAD;
-  tagLeaf(leaf, { restAngle, hingeSign, openSign });
+  tagLeaf(leaf, { closedAngle: frame.angle, restAngle, hingeSign, openSign });
   leaf.rotation.y = restAngle;
-  group.add(leaf);
+  group.add(onWall(frame, leaf));
   return { group, materials };
 }
 
 /**
  * Records how a leaf moves, so `door-animator.ts` can drive it without
- * re-deriving the swing: `restAngle` is the `rotation.y` of the fully OPEN
- * leaf (`rotation.y = restAngle * t`), `slide` the open offset of a sliding
- * one (`position = slideBase + slide * t`). Leaving those implicit is what
+ * re-deriving the swing: `closedAngle` is the `rotation.y` of the SHUT leaf
+ * (the wall frame's turn, zero on an axis-aligned wall), `restAngle` the turn
+ * the fully open leaf adds to it (`rotation.y = closedAngle + restAngle * t`),
+ * `slide` the open offset of a sliding one (`position = slideBase + slide * t`,
+ * both in the group frame). Leaving those implicit is what
  * made "which way does this leaf close" a question only the builder could
  * answer.
  */
 function tagLeaf(
   leaf: THREE.Group,
   contract: {
+    closedAngle: number;
     restAngle: number;
     hingeSign: number;
     openSign: number;
@@ -545,6 +532,7 @@ function tagLeaf(
     slideBase?: Vec3;
   },
 ): void {
+  leaf.userData['closedAngle'] = contract.closedAngle;
   leaf.userData['restAngle'] = contract.restAngle;
   leaf.userData['hingeSign'] = contract.hingeSign;
   leaf.userData['openSign'] = contract.openSign;
@@ -665,9 +653,9 @@ function doorwayPickBoxes(c: OpeningBuildContext): PickBox[] {
   const width = c.opening.width;
   const centreY = sill + height / 2;
   return [
-    flatPickBox(band, height, depth, -width / 2 + band / 2, centreY),
-    flatPickBox(band, height, depth, width / 2 - band / 2, centreY),
-    flatPickBox(width, band, depth, 0, head - band / 2),
+    flatPickBox(c, band, height, depth, -width / 2 + band / 2, centreY),
+    flatPickBox(c, band, height, depth, width / 2 - band / 2, centreY),
+    flatPickBox(c, width, band, depth, 0, head - band / 2),
   ];
 }
 

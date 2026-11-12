@@ -8,6 +8,10 @@ import { OpeningBuilder } from './opening-builder.js';
 import { FRAME_SHIFT_M, rebaseOpeningFrames, rebaseShellOrigins, SHELL_ORIGIN_OFFSET_M } from './shell-origins.js';
 import { SceneBuilder } from './scene-builder.js';
 import { Dollhouse } from './dollhouse.js';
+import { angledOpeningsPlan } from '../fixtures/plan-angled-openings.js';
+import { ANGLED } from '../fixtures/plan-angled-openings-ids.js';
+import { pointAt, resolveDoorSwing } from '../plan/door-swing.js';
+import { openingFrameWidth } from '../assets/opening-frame.js';
 
 const scene = apartmentScene;
 const plan = solvePlan(scene);
@@ -187,6 +191,34 @@ describe('rebaseOpeningFrames', () => {
     for (const [uuid, then] of before) {
       const now = after.get(uuid)!;
       for (let i = 0; i < then.world.length; i += 1) expect(now.world[i]!).toBeCloseTo(then.world[i]!, 5);
+    }
+  });
+
+  test('on a diagonal wall moves the frames square to the wall, towards the side the leaf opens into', () => {
+    const angled = angledOpeningsPlan;
+    const angledPlan = solvePlan(angled);
+    const root = new THREE.Group();
+    new OpeningBuilder(createBuilderContext(angled, angledPlan)).build(root);
+    root.updateMatrixWorld(true);
+    const group = root.children.find((child) => child.name === ANGLED.opening.doorDiagonal)!;
+    // The 30° door is an entrance, which the pass leaves alone; taken as an
+    // interior door, it shows which way the pass moves a frame.
+    group.children.find((child) => child.userData['isDoorLeaf'] === true)!.userData['isExteriorWall'] = false;
+    const wall = angled.walls.find((candidate) => candidate.id === ANGLED.wall.diagonal)!;
+    const opening = wall.openings!.find((candidate) => candidate.id === ANGLED.opening.doorDiagonal)!;
+    const { tangent } = pointAt(angled, wall, opening.center);
+    const { open } = resolveDoorSwing(angled, angledPlan, wall, opening, openingFrameWidth);
+    const parts = group.children.filter(
+      (child): child is THREE.Mesh => child instanceof THREE.Mesh && child.userData['isParametricWall'] === true,
+    );
+    expect(parts.length).toBe(3);
+    const before = new Map(parts.map((part) => [part.uuid, part.getWorldPosition(new THREE.Vector3())]));
+    rebaseOpeningFrames(group);
+    group.updateMatrixWorld(true);
+    for (const part of parts) {
+      const moved = part.getWorldPosition(new THREE.Vector3()).sub(before.get(part.uuid)!);
+      expect(moved.x * tangent.x + moved.z * tangent.z).toBeCloseTo(0, 9);
+      expect(moved.x * open.x + moved.z * open.z).toBeCloseTo(FRAME_SHIFT_M, 9);
     }
   });
 });

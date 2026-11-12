@@ -211,16 +211,18 @@ function leafChecks(style: Style): void {
         const shut = hingeOf(leaf);
         applyToLeaf(leaf, 1);
         leaf.updateWorldMatrix(true, true);
-        const centre = new THREE.Box3().setFromObject(leaf).getCenter(new THREE.Vector3());
+        const centre = offsets(line, new THREE.Box3().setFromObject(leaf).getCenter(new THREE.Vector3()));
+        // The swing names a room side, not a direction square to this tangent
+        // (on an arc it is the face's normal): the open leaf belongs on the
+        // side of the wall line that normal points to.
+        const side = Math.sign(-swing.open.x * line.tangent.z + swing.open.z * line.tangent.x);
         if (style === 'sliding') {
           // Parked beside the opening, on the face it slid along, the wall line untouched.
           const moved = offsets(line, hingeOf(leaf));
           expect(Math.abs(moved.across - offsets(line, shut).across)).toBeLessThan(MM);
-          const side = (centre.x - line.centre.x) * swing.open.x + (centre.z - line.centre.z) * swing.open.z;
-          expect(side).toBeGreaterThan(0);
+          expect(Math.sign(centre.across)).toBe(side);
         } else {
-          const side = (centre.x - shut.x) * swing.open.x + (centre.z - shut.z) * swing.open.z;
-          expect(side).toBeGreaterThan(0.05);
+          expect(side * (centre.across - offsets(line, shut).across)).toBeGreaterThan(0.05);
         }
       }
     });

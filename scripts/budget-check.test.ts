@@ -93,7 +93,7 @@ describe('constants', () => {
   test('the two tool entries keep budgets of their own, distinct from chunks named after a module', () => {
     expect(SCHEMA_BUDGET_FAIL_BYTES).toBe(70_208 + 1024);
     expect(limitFor('jeex-viewer-schema.js')).toBe(SCHEMA_BUDGET_FAIL_BYTES);
-    expect(LIGHTMAP_BUDGET_FAIL_BYTES).toBe(106_841 + 1024);
+    expect(LIGHTMAP_BUDGET_FAIL_BYTES).toBe(108_083 + 1024);
     expect(limitFor('jeex-viewer-lightmap.js')).toBe(LIGHTMAP_BUDGET_FAIL_BYTES);
     // Shared chunks named after a MODULE (`scene/schema-sets`, `lightmap/lightmap-binding`) are viewer code.
     expect(limitFor('jeex-viewer-schema-sets-B1x2y3z4.js')).toBe(BUDGET_FAIL_BYTES);
