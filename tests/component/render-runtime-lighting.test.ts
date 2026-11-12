@@ -29,7 +29,24 @@ function next(canvas: HTMLCanvasElement, type: string): Promise<void> {
   });
 }
 
-/** The mean of the central pixel of a white rough plane lit ONLY by `environment`. */
+/**
+ * The mean of the central pixel of a white rough plane lit ONLY by `environment`.
+ *
+ * The plane is drawn twice and the second picture is read. On a GPU (ANGLE's
+ * OpenGL backend on NVIDIA, with other pages drawing at the same time) the
+ * FIRST draw with a program just built for this context sometimes leaves the
+ * antialiased canvas at its clear colour, (0, 0, 0, 255), while the prefiltered
+ * environment it samples holds the right texels and the very next identical draw
+ * lights the plane. Linking ahead (`renderer.compile`) or drawing something else
+ * first does not prevent it; a canvas without antialiasing never shows it. Every
+ * read here comes right after a fresh context (the first one, then the restored
+ * one), so a single draw measured that first-use draw, not the environment. It
+ * is of the same family as the settling `src/render/settle-window.ts` answers
+ * in the runtime (there a picture that brought a new program settles over a few
+ * frames; here the first one can be wholly the clear colour): the runtime draws
+ * on for its settle window, so on screen such a frame lasts one refresh at most
+ * before the next draw replaces it, and this probe draws once more.
+ */
 function environmentLit(renderer: THREE.WebGLRenderer, environment: THREE.Texture | null): number {
   const scene = new THREE.Scene();
   scene.environment = environment;
@@ -39,6 +56,7 @@ function environmentLit(renderer: THREE.WebGLRenderer, environment: THREE.Textur
   const camera = new THREE.PerspectiveCamera(40, 1, 0.1, 10);
   camera.position.set(0, 0, 2);
   camera.lookAt(0, 0, 0);
+  renderer.render(scene, camera);
   renderer.render(scene, camera);
   const gl = renderer.getContext();
   const pixel = new Uint8Array(4);
