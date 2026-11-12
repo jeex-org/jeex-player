@@ -169,6 +169,44 @@ describe('picking', () => {
   });
 });
 
+describe('relabelling in place', () => {
+  test('refresh rewrites the copy and keeps the tick, the picked swatch, the card and the focus', () => {
+    harness.panel.open(
+      request({ scope: { label: 'Only this wall', checked: false }, footer: { label: 'Apply to all', onClick: vi.fn() } }),
+    );
+    const panelNode = harness.shell.roots.byName('finish-panel');
+    const swatches = (): HTMLButtonElement[] => [
+      ...harness.shell.roots.byName('finish-swatches').querySelectorAll<HTMLButtonElement>('.finish-swatch'),
+    ];
+    harness.shell.roots.byName<HTMLInputElement>('finish-scope-wall').click();
+    swatches()[2]!.click();
+    swatches()[1]!.focus();
+    const placed = { left: panelNode.style.left, top: panelNode.style.top };
+    harness.panel.refresh(
+      request({
+        title: 'Finition du mur',
+        items: ITEMS.map((item, index) => ({ ...item, label: ['Chêne', 'Frêne', 'Noyer'][index]! })),
+        anchor: { x: 10, y: 10 },
+        scope: { label: 'Ce mur seulement', checked: false },
+        footer: { label: 'Appliquer partout', onClick: vi.fn() },
+      }),
+    );
+    expect(harness.shell.roots.byName('finish-title').textContent).toBe('Finition du mur');
+    expect(harness.shell.roots.byName('finish-scope-label').textContent).toBe('Ce mur seulement');
+    expect(swatches().map((button) => button.title)).toEqual(['Chêne', 'Frêne', 'Noyer']);
+    expect(harness.panel.scopeChecked()).toBe(true);
+    expect(swatches()[2]!.getAttribute('aria-pressed')).toBe('true');
+    expect({ left: panelNode.style.left, top: panelNode.style.top }).toEqual(placed);
+    expect(document.activeElement).toBe(swatches()[1]);
+  });
+
+  test('refresh leaves a closed panel closed', () => {
+    harness.panel.refresh(request());
+    expect(harness.panel.isOpen()).toBe(false);
+    expect(harness.shell.roots.byName('finish-title').textContent).not.toBe('Wall finish');
+  });
+});
+
 describe('closing', () => {
   test('the close button hides the panel and tells the owner', () => {
     harness.panel.open(request());

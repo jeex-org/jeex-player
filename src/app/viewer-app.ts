@@ -280,7 +280,7 @@ export class ViewerApp {
       showBootStep(this.ui, this.messages, 'support');
       if (!hasWebGL(this.roots.canvas)) {
         const failure = { code: 'webgl-unavailable', message: this.messages.t('error.noWebglBody') } as const;
-        this.fail(failure, this.messages.t('error.noWebglTitle'), false);
+        this.fail(failure, 'error.noWebglTitle', false, 'error.noWebglBody');
         // Reported, and the card is up: the boot still FAILED, so `ready` and a `loadScene` reject.
         throw new ViewerLibError(failure.code, failure.message);
       }
@@ -333,7 +333,8 @@ export class ViewerApp {
       // Already reported where it happened (no WebGL): the instance is torn down.
       if (this.disposed) throw error;
       const failure = toViewerError(sceneErrorCode(error), error, this.messages.t('error.unknown'));
-      this.fail(failure, this.messages.t('error.title'), true);
+      // The failure's own words stay as written; only the viewer's fallback follows `setLocale`.
+      this.fail(failure, 'error.title', true, error instanceof Error ? undefined : 'error.unknown');
       throw error;
     }
   }

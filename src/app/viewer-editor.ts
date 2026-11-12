@@ -37,7 +37,7 @@ import {
   type DescribeTarget,
   type SelectionDescription,
 } from '../ui/selection-options.js';
-import type { Messages } from '../ui/messages.js';
+import type { LocalisedText, Messages } from '../ui/messages.js';
 import type { VariantBank } from '../assets/asset-variants.js';
 import {
   beginSelectionGlowFadeOut,
@@ -168,7 +168,6 @@ export class ViewerEditor {
     this.interiorPresets = new EditorPresets({
       model: deps.model,
       ui: deps.ui,
-      messages: deps.messages,
       edits: deps.edits,
       usage: deps.usage,
       reopenPanel: () => {
@@ -292,6 +291,11 @@ export class ViewerEditor {
     this.panels.closePanel();
   }
 
+  /** Relabels the open panel, and its popup, in the catalogue on screen now (`handle.setLocale`). */
+  refreshPanel(): void {
+    this.panels.refresh();
+  }
+
   /** Drops the panel target when the UI closes the panel for any other reason. */
   forgetPanelTarget(): void {
     this.panels.forgetPanelTarget();
@@ -316,7 +320,7 @@ export class ViewerEditor {
     }
     const result = model.apply({ baseRev: model.rev, ops });
     if ('error' in result) {
-      this.deps.ui.setHint(this.messages.t('hint.changeRefused', { message: result.message }));
+      this.deps.ui.setHint((messages) => messages.t('hint.changeRefused', { message: result.message }));
       return;
     }
     // Any hand edit makes the document something no preset describes any more.
@@ -337,7 +341,8 @@ export class ViewerEditor {
     const action = finishPickAction(target, finishId, scopeChecked, libraryChoiceOf(this.deps.variants?.materials, finishId));
     if (!action) return;
     this.dispatch(action.op);
-    if (action.hint) this.deps.ui.setHint(this.messages.t(action.hint));
+    const hint = action.hint;
+    if (hint) this.deps.ui.setHint((messages) => messages.t(hint));
   }
 
   /** Footer button of the finish panel: the active swatch, applied broadly. */
@@ -346,7 +351,8 @@ export class ViewerEditor {
     if (!finishId || !target || target.kind !== 'surface') return;
     const action = finishApplyAllAction(target, finishId, scopeChecked, libraryChoiceOf(this.deps.variants?.materials, finishId));
     if (action) this.dispatch(action.op);
-    if (action?.hint) this.deps.ui.setHint(this.messages.t(action.hint));
+    const hint = action?.hint;
+    if (hint) this.deps.ui.setHint((messages) => messages.t(hint));
     this.closePanel();
   }
 
@@ -458,7 +464,7 @@ export class ViewerEditor {
     const placement = this.deps.model.scene.assets.find((asset) => asset.id === assetId);
     if (!group || !placement) return;
     this.selectedAssetId = assetId;
-    this.attachGlow(group, this.messages.t('hint.selected', { name: assetLabel(placement, this.deps.variants) }));
+    this.attachGlow(group, (messages) => messages.t('hint.selected', { name: assetLabel(placement, this.deps.variants) }));
   }
 
   /** Wraps a picked window, door or passage in the same aura. */
@@ -468,11 +474,12 @@ export class ViewerEditor {
     if (!group) return;
     this.selectedOpeningId = openingId;
     const entry = this.deps.builder.openingsList().find((item) => item.id === openingId);
-    const label = entry ? openingLabel(entry.type, entry.entrance, this.messages) : this.messages.t('opening.generic');
-    this.attachGlow(group, this.messages.t('hint.selected', { name: label }));
+    this.attachGlow(group, (messages) =>
+      messages.t('hint.selected', { name: entry ? openingLabel(entry.type, entry.entrance, messages) : messages.t('opening.generic') }),
+    );
   }
 
-  private attachGlow(group: THREE.Group, hint: string): void {
+  private attachGlow(group: THREE.Group, hint: LocalisedText): void {
     const glow = createSelectionGlow(group);
     group.add(glow.group);
     this.selectionGlow = glow;

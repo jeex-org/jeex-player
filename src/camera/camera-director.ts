@@ -41,7 +41,7 @@ import type { SolvedPlan } from '../plan/plan-solver.js';
 import type { Dollhouse } from '../geometry/dollhouse.js';
 import type { SceneData, Vec2, ViewerMode } from '../scene/types.js';
 import { isPlanMode } from '../scene/types.js';
-import type { MessageKey, Messages } from '../shared/messages.js';
+import type { LocalisedText, MessageKey } from '../shared/messages.js';
 
 /**
  * The seven things the director drives on the chrome — hints, mode buttons, the
@@ -54,7 +54,8 @@ import type { MessageKey, Messages } from '../shared/messages.js';
  * import — camera never imports `ui`.
  */
 export type DirectorChrome = {
-  setHint(message: string): void;
+  /** Catalogue text (`LocalisedText`) is kept and follows `setLocale` while it is on screen. */
+  setHint(text: LocalisedText): void;
   setModeButtons(mode: ViewerMode): void;
   /** Every mode switch, plan or not (`applyPlanMode`): the tour chrome shows only in `tour`. */
   setPlanMode(mode: ViewerMode): void;
@@ -69,8 +70,6 @@ type CameraDirectorDeps = {
   controller: CameraController;
   tour: TourPlayer;
   ui: DirectorChrome;
-  /** This instance's catalogue; every hint the director raises comes from it. */
-  messages: Messages;
   dollhouse: Dollhouse;
   /** The CURRENT committed scene; a plan-level commit hands out a new object. */
   scene: () => SceneData;
@@ -117,8 +116,6 @@ export type CameraStackDeps = {
   keys: HTMLElement;
   picker: Picker;
   ui: DirectorChrome;
-  /** This instance's catalogue; handed on to the director. */
-  messages: Messages;
   dollhouse: Dollhouse;
   scene: () => SceneData;
   plan: () => SolvedPlan;
@@ -180,8 +177,8 @@ export function mountCameraDirector(deps: CameraStackDeps): CameraDirector {
       if (stepped) deps.usage?.('camera_step');
       return stepped;
     },
-    // The rigs raise a hint by KEY; the director turns it into words with this
-    // instance's own catalogue. It exists before any input can reach a rig —
+    // The rigs raise a hint by KEY; the director hands it on as catalogue text,
+    // written in the language on screen. It exists before any input can reach a rig —
     // the controller is not wired to a canvas until this function returns.
     onHint: (key, params) => director?.hint(key, params),
     onSurfacePicked: deps.onSurfacePicked,
@@ -219,7 +216,6 @@ export function mountCameraDirector(deps: CameraStackDeps): CameraDirector {
     controller,
     tour,
     ui: deps.ui,
-    messages: deps.messages,
     dollhouse: deps.dollhouse,
     scene: deps.scene,
     plan: deps.plan,
@@ -233,17 +229,6 @@ export function mountCameraDirector(deps: CameraStackDeps): CameraDirector {
 
 export class CameraDirector {
   private readonly deps: CameraDirectorDeps;
-  /**
-   * This instance's catalogue. It is a FIELD rather than a read of `deps`
-   * because `handle.setLocale` replaces it mid-session (`retranslate`), and
-   * every hint in the camera stack — the director's own and the ones the rigs
-   * raise by key — is resolved through it.
-   */
-  private catalogue: Messages;
-  /** Shorthand: this module raises most of the hints. */
-  private get messages(): Messages {
-    return this.catalogue;
-  }
   private pauseOnInput: boolean;
   /** Flights, walks and jumps to a named room, with the room graph they route over (`room-travel.ts`). */
   private readonly rooms: RoomTravel;
@@ -259,7 +244,6 @@ export class CameraDirector {
 
   constructor(deps: CameraDirectorDeps) {
     this.deps = deps;
-    this.catalogue = deps.messages;
     this.pauseOnInput = deps.pauseOnInput ?? true;
     this.stepper = new WalkStepper({
       scene: deps.scene,
@@ -292,14 +276,11 @@ export class CameraDirector {
    * Says one thing, once, in this instance's language. Every hint in the
    * camera stack goes through here: the director's own, and the ones
    * `walk-rig.ts` / `walk-doors.ts` raise as a KEY without knowing the locale.
+   * It goes out as the key and its params, so the hint on screen is written
+   * again when `setLocale` switches the language.
    */
   hint(key: MessageKey, params?: Record<string, string | number>): void {
-    this.deps.ui.setHint(this.messages.t(key, params));
-  }
-
-  /** Adopts a new catalogue in place (`handle.setLocale`); nothing is rebuilt. */
-  retranslate(messages: Messages): void {
-    this.catalogue = messages;
+    this.deps.ui.setHint((messages) => messages.t(key, params));
   }
 
   /** Whether scene input pauses a running tour; a mount option, see `viewer-options.ts`. */

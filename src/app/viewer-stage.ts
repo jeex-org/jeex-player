@@ -424,7 +424,6 @@ export class ViewerStage {
       camera: this.camera,
       canvas: this.deps.roots.canvas,
       keys: this.deps.roots.root,
-      messages: this.deps.messages,
       dollhouse: this.deps.dollhouse,
       planModes: this.planModes,
       signal: this.deps.signal,

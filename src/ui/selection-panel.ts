@@ -323,6 +323,39 @@ export class SelectionPanel {
     this.setBusy(false);
     for (const [key, value] of Object.entries(request.panelData ?? {})) this.panel.dataset[key] = value;
     this.activeItemId = request.items.find((item) => item.active)?.id ?? null;
+    this.render(request);
+    // Reset on every open, scoped or not, so a stale tick cannot leak into the
+    // next wall panel.
+    this.scopeInput.checked = request.scope?.checked ?? false;
+    this.anchor(request.anchor.x, request.anchor.y);
+    this.panel.classList.remove('is-hidden');
+    // Dialog focus-in: the FIRST control of the panel, in DOM
+    // order — the close button, unless a future request removes it.
+    focusablesOf(this.panel)[0]?.focus();
+    this.deps.onInteraction();
+  }
+
+  /**
+   * Relabels the OPEN panel with a request rebuilt for the same target in
+   * another language (`handle.setLocale`). What the visitor set stays: the
+   * scope tick, the swatch they picked, where the card stands, and the control
+   * that had focus (found again by its place among the tab stops, since the
+   * swatches are new nodes). A closed panel stays closed.
+   */
+  refresh(request: PanelRequest): void {
+    if (!this.request) return;
+    const root = this.panel.getRootNode() as unknown as DocumentOrShadowRoot;
+    const focused = focusablesOf(this.panel).indexOf(root.activeElement as HTMLElement);
+    const picked = this.activeItemId;
+    this.request = request;
+    this.render(request);
+    if (picked !== null && request.items.some((item) => item.id === picked)) this.markActive(picked);
+    else this.activeItemId = request.items.find((item) => item.active)?.id ?? null;
+    if (focused >= 0) focusablesOf(this.panel)[focused]?.focus();
+  }
+
+  /** The copy and the swatches of one request; what `open` and `refresh` share. */
+  private render(request: PanelRequest): void {
     this.swatches.replaceChildren();
     for (const item of request.items) {
       this.swatches.appendChild(swatch(item, request.kind, (id) => this.pick(id), this.swatches.ownerDocument, this.deps.signal));
@@ -330,9 +363,6 @@ export class SelectionPanel {
     this.title.textContent = request.title;
     this.scope.classList.toggle('is-hidden', !request.scope);
     if (request.scope) this.scopeLabel.textContent = request.scope.label;
-    // Reset on every open, scoped or not, so a stale tick cannot leak into the
-    // next wall panel.
-    this.scopeInput.checked = request.scope?.checked ?? false;
     this.footer.classList.toggle('is-hidden', !request.footer);
     if (request.footer) {
       this.footer.textContent = request.footer.label;
@@ -344,12 +374,6 @@ export class SelectionPanel {
     this.secondary.classList.toggle('is-hidden', !request.secondary);
     if (request.secondary) this.secondary.textContent = request.secondary.label;
     this.secondary.onclick = request.secondary ? () => request.secondary?.onClick() : null;
-    this.anchor(request.anchor.x, request.anchor.y);
-    this.panel.classList.remove('is-hidden');
-    // Dialog focus-in: the FIRST control of the panel, in DOM
-    // order — the close button, unless a future request removes it.
-    focusablesOf(this.panel)[0]?.focus();
-    this.deps.onInteraction();
   }
 
   close(): void {

@@ -122,6 +122,27 @@ describe('showing', () => {
     expect(createMessages('fr').t('door.open')).not.toBe(createMessages('de').t('door.open'));
   });
 
+  test('the label is written when the door turns or the language changes, not on every frame', () => {
+    harness.hud.dispose();
+    let messages: Messages = createMessages('de');
+    harness = build({ messages: () => messages });
+    const labels = vi.spyOn(harness.hud.element, 'setAttribute');
+    const written = (): number => labels.mock.calls.filter(([name]) => name === 'aria-label').length;
+    harness.hud.showFor(DOOR.closed, 1000);
+    const afterShow = written();
+    for (let frame = 1; frame <= 5; frame += 1) harness.hud.update(1000 + frame * 16);
+    expect(written()).toBe(afterShow);
+    harness.world.phases.set(DOOR.closed, 'opening');
+    harness.hud.update(1200);
+    expect(written()).toBe(afterShow + 1);
+    expect(harness.hud.element.getAttribute('aria-label')).toBe(createMessages('de').t('door.close'));
+    messages = createMessages('fr');
+    harness.hud.update(1216);
+    harness.hud.update(1232);
+    expect(written()).toBe(afterShow + 2);
+    expect(harness.hud.element.getAttribute('aria-label')).toBe(createMessages('fr').t('door.close'));
+  });
+
   test('a hover over something that is not a door raises nothing', () => {
     harness.hud.hover(DOOR.notADoor, 1000);
     expect(harness.hud.current()).toBeNull();

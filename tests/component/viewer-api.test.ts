@@ -11,7 +11,17 @@ import { InlineSceneRepository, mountViewer, optionsFromDataset } from '../../sr
 import type { ViewerHandle } from '../../src/app/viewer-handle.js';
 import type { ViewerError, ViewerReadyInfo, ViewerSceneInfo } from '../../src/app/viewer-events.js';
 import { OVERLAY_NAMES, VIEWER_ROOT_SELECTOR } from '../../src/ui/viewer-shell.js';
-import { AUTHORING_CHUNK_TIMEOUT_MS, canvasHasInk, closeContainers, demoScene, nextFrame, openContainer, until } from './support.js';
+import {
+  AUTHORING_CHUNK_TIMEOUT_MS,
+  canvasHasInk,
+  closeContainers,
+  demoScene,
+  nextFrame,
+  openContainer,
+  until,
+  untilCameraStill,
+} from './support.js';
+import { createMessages } from '../../src/ui/messages.js';
 
 /** Fill colour of the camera marker's dot (the `drawing` palette's `accent`, `#dfbd7d`). */
 function hasAccentPixel(canvas: HTMLCanvasElement): boolean {
@@ -753,6 +763,59 @@ describe('the debug surface over a viewer that changed', () => {
     },
     MOUNT_PLUS_RELOAD_TIMEOUT_MS,
   );
+});
+
+describe('setLocale reaches what is already on screen', () => {
+  /** The debug calls this case drives the doors through (`viewer-debug.ts`). */
+  type DoorDebug = {
+    doors: () => Array<{ id: string }>;
+    doorScreenPoint: (openingId: string) => { x: number; y: number } | null;
+  };
+
+  test('a door picked in German: the open panel, the host card and the door button speak French after setLocale', async () => {
+    const { handle } = mount({ debug: true, locale: 'de', view: { mode: 'orbit' } });
+    await handle.ready;
+    await untilCameraStill('the opening view to settle');
+    const debug = (window as unknown as { __viewerDebug: DoorDebug }).__viewerDebug;
+    const canvas = handle.element.querySelector<HTMLCanvasElement>('[data-jeex="scene-canvas"]')!;
+    // `doorScreenPoint` answers in the viewer root's own pixels.
+    const viewport =
+      handle.element.closest<HTMLElement>(VIEWER_ROOT_SELECTOR) ?? handle.element.querySelector<HTMLElement>(VIEWER_ROOT_SELECTOR)!;
+    const hud = handle.element.querySelector<HTMLElement>('[data-jeex="door-hud"]')!;
+    const panelTitle = handle.element.querySelector<HTMLElement>('[data-jeex="finish-title"]')!;
+    // Which door the camera shows depends on the plan, so the first one a tap
+    // on its leaf reaches is the one this case works with (as the doors check does).
+    let door: string | null = null;
+    for (const candidate of debug.doors()) {
+      const point = debug.doorScreenPoint(candidate.id);
+      if (!point) continue;
+      const box = viewport.getBoundingClientRect();
+      // A `click` is what the camera input reads as a tap (`camera-input.ts`).
+      canvas.dispatchEvent(new MouseEvent('click', { clientX: box.left + point.x, clientY: box.top + point.y, bubbles: true, detail: 1 }));
+      await nextFrame();
+      await nextFrame();
+      if (hud.dataset['visible'] === 'true' && hud.dataset['opening'] === candidate.id) {
+        door = candidate.id;
+        break;
+      }
+    }
+    expect(door).not.toBeNull();
+    const de = createMessages('de');
+    const fr = createMessages('fr');
+    const label = (messages: typeof de): string => messages.t(hud.dataset['state'] === 'closed' ? 'door.open' : 'door.close');
+    const german = handle.describeSelection({ kind: 'opening', id: door!, mode: 'orbit' })!.title;
+    expect(german).toMatch(/^Ersetzen · /);
+    expect(panelTitle.textContent).toBe(german);
+    expect(hud.getAttribute('aria-label')).toBe(label(de));
+
+    handle.setLocale('fr');
+    await nextFrame();
+    await nextFrame();
+    const french = handle.describeSelection({ kind: 'opening', id: door!, mode: 'orbit' })!.title;
+    expect(french).toMatch(/^Remplacer · /);
+    expect(panelTitle.textContent).toBe(french);
+    expect(hud.getAttribute('aria-label')).toBe(label(fr));
+  });
 });
 
 describe('reading the state back', () => {

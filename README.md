@@ -762,6 +762,12 @@ Cyrillic. `sr-Cyrl` is refused rather than answered in Latin: no catalogue, so t
 (`locale-unknown`) and stays on the default. `getLocale()` and the shell's `lang` always report the
 canonical tag, so `setLocale('sr')` is followed by `getLocale() === 'sr-Latn'`.
 
+**Switching.** After `setLocale`, everything the viewer shows or announces is in the new language,
+including what is already on screen: an open selection panel or Replace popup is relabelled in place
+(same target, same scope tick and picked swatch, focus where it was), and the hint and an error card
+are written again. Text the viewer did not write (a scene's names, a failure's own message) stays as
+given.
+
 Add your own before you mount:
 
 ```ts

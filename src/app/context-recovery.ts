@@ -16,14 +16,14 @@
  * and the debug API (`SceneMount.mount` → `onDocument`).
  */
 
-import type { Messages } from '../ui/messages.js';
+import type { LocalisedText, Messages } from '../ui/messages.js';
 import type { SceneModel } from '../scene/scene-model.js';
 import type { SceneMount } from './scene-mount.js';
 import type { ViewerError } from './viewer-events.js';
 
 /** The part of `ViewerUI` the error card is raised through; the reveal waits for the first picture (`announceReady`). */
 type RecoveryUI = {
-  showError: (title: string, message: string, retry: boolean, keepCanvas?: boolean) => void;
+  showError: (title: LocalisedText, message: LocalisedText, retry: boolean, keepCanvas?: boolean) => void;
 };
 
 type ContextRecoveryDeps = {
@@ -50,7 +50,12 @@ export function contextRecovery(deps: ContextRecoveryDeps): { onLost: () => void
       // `keepCanvas`: the context is expected back on this very canvas, and the
       // flat stand-in would replace it with a 2D one the renderer cannot draw
       // to (`webgl-fallback.ts`).
-      ui.showError(messages.t('error.contextLostTitle'), message, true, true);
+      ui.showError(
+        (current) => current.t('error.contextLostTitle'),
+        (current) => current.t('error.contextLostBody'),
+        true,
+        true,
+      );
       deps.emitError({ code: 'context-lost', message });
     },
     onRestored: () => {

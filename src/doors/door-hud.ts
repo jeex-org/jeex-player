@@ -109,6 +109,8 @@ export class DoorHud {
   private overButton = false;
   /** A touch tap keeps the button up until something dismisses it. */
   private pinned = false;
+  /** What the button's `aria-label` was last written for. */
+  private labelled: { shut: boolean | null; messages: Messages | null } = { shut: null, messages: null };
 
   constructor(deps: DoorHudDeps) {
     this.deps = deps;
@@ -182,7 +184,12 @@ export class DoorHud {
     }
     const shut = phase === 'closed' || phase === 'closing';
     this.button.dataset['state'] = shut ? 'closed' : 'open';
-    this.button.setAttribute('aria-label', this.deps.messages().t(shut ? 'door.open' : 'door.close'));
+    // Written when the door turns or the language changes, not on every frame.
+    const messages = this.deps.messages();
+    if (shut !== this.labelled.shut || messages !== this.labelled.messages) {
+      this.button.setAttribute('aria-label', messages.t(shut ? 'door.open' : 'door.close'));
+      this.labelled = { shut, messages };
+    }
     // `setProperty`, never a `style` attribute: the CSSOM path is not what a
     // host's `style-src-attr` governs (README, "Content Security Policy").
     this.button.style.setProperty('left', `${Math.round(point.x)}px`);

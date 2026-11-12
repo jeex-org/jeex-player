@@ -29,8 +29,8 @@
 
 import type { ViewerMode } from '../scene/types.js';
 import type { TourState } from '../camera/tour-player.js';
-import { canonicalLocaleTag, DEFAULT_SCRIPT, EN, MESSAGE_KEYS, isMessageKey } from '../shared/messages.js';
-import type { Locale, MessageKey, Messages } from '../shared/messages.js';
+import { canonicalLocaleTag, DEFAULT_SCRIPT, EN, MESSAGE_KEYS, isMessageKey, renderText } from '../shared/messages.js';
+import type { Locale, LocalisedText, MessageKey, Messages } from '../shared/messages.js';
 import { DE } from './locales/de.js';
 import { ES } from './locales/es.js';
 import { FR } from './locales/fr.js';
@@ -38,8 +38,8 @@ import { IT } from './locales/it.js';
 import { RU } from './locales/ru.js';
 import { SR_LATN } from './locales/sr-latn.js';
 
-export type { Locale, MessageKey, Messages };
-export { MESSAGE_KEYS, isMessageKey };
+export type { Locale, LocalisedText, MessageKey, Messages };
+export { MESSAGE_KEYS, isMessageKey, renderText };
 
 /** The control-bar hint shown for each `ViewerMode` (`ViewerUI.setHintForMode`). */
 export const MODE_HINT: Readonly<Record<ViewerMode, MessageKey>> = {

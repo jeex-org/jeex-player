@@ -423,6 +423,44 @@ describe('hints and furniture state', () => {
   });
 });
 
+describe('text already on screen follows retranslate', () => {
+  const fr = createMessages('fr');
+
+  test('a room hint on screen stays, in the new language, and the furniture control is relabelled under it', () => {
+    const button = harness.shell.roots.byName('furniture-button');
+    harness.chrome.setFurnitureState(true);
+    harness.chrome.setHint((messages) => messages.t('hint.room', { name: 'Kitchen' }));
+    expect(harness.shell.roots.byName('hint-text').textContent).toBe(createMessages('en').t('hint.room', { name: 'Kitchen' }));
+    harness.chrome.retranslate(fr);
+    expect(harness.shell.roots.byName('hint-text').textContent).toBe(fr.t('hint.room', { name: 'Kitchen' }));
+    expect(button.getAttribute('aria-label')).toBe(fr.t('furniture.hide'));
+  });
+
+  test('a hint given as finished text is left as it is', () => {
+    harness.chrome.setHint('Fullscreen is not available here');
+    harness.chrome.retranslate(fr);
+    expect(harness.shell.roots.byName('hint-text').textContent).toBe('Fullscreen is not available here');
+  });
+
+  test('an error card on screen is re-rendered from what it was raised with', () => {
+    harness.chrome.showError(
+      (messages) => messages.t('error.title'),
+      (messages) => messages.t('error.unknown'),
+      true,
+    );
+    harness.chrome.retranslate(fr);
+    expect(harness.shell.roots.byName('error-title').textContent).toBe(fr.t('error.title'));
+    expect(harness.shell.roots.byName('error-message').textContent).toBe(fr.t('error.unknown'));
+  });
+
+  test('an error body that is the failure’s own text keeps it; the title still follows', () => {
+    harness.chrome.showError((messages) => messages.t('error.title'), 'scene.json: unexpected token', true);
+    harness.chrome.retranslate(fr);
+    expect(harness.shell.roots.byName('error-title').textContent).toBe(fr.t('error.title'));
+    expect(harness.shell.roots.byName('error-message').textContent).toBe('scene.json: unexpected token');
+  });
+});
+
 describe('auto-hide', () => {
   test('wake(true) shows the bar and leaves it shown', async () => {
     harness.chrome.wake(true);

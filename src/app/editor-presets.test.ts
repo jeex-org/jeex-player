@@ -6,7 +6,6 @@
 
 import { describe, expect, test } from 'bun:test';
 import { EditorPresets, type EditorPresetsDeps } from './editor-presets.js';
-import { createMessages } from '../ui/messages.js';
 import { editsWiring } from './edits-wiring.js';
 import { resolveViewerOptions } from './viewer-options.js';
 import type { ViewerEditRequest } from './viewer-events.js';
@@ -52,7 +51,6 @@ function presetsHarness(mode: 'local' | 'emit' | 'off'): PresetsHarness {
       },
     },
     ui: { setHint: () => {}, setPanelBusy: () => {} },
-    messages: () => createMessages('en'),
     edits: editsWiring(resolveViewerOptions({ edits: mode }), (edit) => sent.push(edit)),
     reopenPanel: () => {},
   } as unknown as EditorPresetsDeps;

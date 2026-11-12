@@ -269,11 +269,16 @@ as described under [Versioning](#versioning).
 
 ### Fixed
 
-- **The selection speaks the language `setLocale` chose.** After a locale
-  switch, `describeSelection`, the viewer's own Replace and finish panels,
-  their hints and the door button kept the mount locale ("Ersetzen · Tür"
-  after `setLocale('fr')`); they now read the catalogue on screen at every
-  use.
+- **Everything the viewer shows follows `setLocale`, including text already
+  on screen.** After a locale switch, `describeSelection`, the viewer's own
+  Replace, finish, opening and interior panels, the Replace popup and the door
+  button kept the mount locale ("Ersetzen · Tür" after `setLocale('fr')`). A
+  panel or popup open during the switch is now relabelled in place, keeping
+  its target, its scope tick, the picked swatch and the focus; a hint and an
+  error card on screen are written again in the new language (a host's own
+  words stay as given); the furniture control is relabelled without replacing
+  the hint; the minimap's name and a producer mark that appears after the
+  switch are in the new language too.
 - **A swipe over an untouched viewer on a phone scrolls the page.** Touch
   follows the wheel's engagement rule: until the viewer is engaged (a tap,
   focus inside it, fullscreen, or a page that cannot scroll) its canvas takes

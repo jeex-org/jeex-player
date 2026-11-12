@@ -12,6 +12,7 @@ import { Minimap, type MinimapDeps } from '../../src/ui/minimap.js';
 import { HostSlots } from '../../src/ui/host-slots.js';
 import { WalkCameraBar } from '../../src/ui/walk-camera-bar.js';
 import { OVERLAY_NAMES } from '../../src/ui/viewer-shell.js';
+import { applyDomMessages, createMessages } from '../../src/ui/messages.js';
 import { roomAt } from '../../src/plan/plan-drawing.js';
 import type { PlanCameraMarker } from '../../src/plan/plan-canvas.js';
 import {
@@ -88,6 +89,12 @@ describe('the card', () => {
     harness.map.setMode('plan2d');
     harness.map.update();
     expect(harness.map.state().visible).toBe(false);
+  });
+
+  test('its name follows the shell’s translation sweep (`setLocale`)', () => {
+    const fr = createMessages('fr');
+    applyDomMessages(harness.shell.roots.root, fr);
+    expect(harness.map.element.getAttribute('aria-label')).toBe(fr.t('minimap.label'));
   });
 
   test('the mount option takes the map away even in walk', () => {
