@@ -97,6 +97,9 @@ const arcPlan: SceneData = {
 /** A fixed UUID v7 literal for the zoned fixture's door, generated once. */
 const ZONED_DOOR = '01a1cf26-bc5b-76f4-a681-8c6e9afe2f73';
 
+/** A fixed UUID v7 literal for the zone on room B's floor at the partition door. */
+const ZONED_DOOR_ZONE = '01a1cf3c-99cf-7490-92f2-13c9ee590812';
+
 describe('doorLeaf', () => {
   test('a door with no explicit hinge or swing answers the derived jamb and side', () => {
     // At 1.25 m on a 6 m wall the derived hinge is the jamb farther from node a's end: b.
@@ -151,6 +154,45 @@ describe('doorLeaf', () => {
 
     // Slid to z = 6.5 it opens onto the living room's own floor again.
     expect(doorLeaf(withDoor(6.5), ZONED_DOOR)?.rooms).toEqual({ in: ZONED.room.living, out: null });
+  });
+
+  test('a narrow door in a thick wall still names the zone beyond the wall face', () => {
+    // A 0.6 m door in a 0.5 m east wall, whose inner face is x = 9.75: half its
+    // leaf ends inside the wall, short of the kitchen zone outlined up to that face.
+    const kitchen = [
+      { x: 7.1, z: 2 },
+      { x: 9.75, z: 2 },
+      { x: 9.75, z: 5 },
+      { x: 7.1, z: 5 },
+    ];
+    const scene = zonedLivingPlan([zone(ZONED.room.kitchen, 'Kitchen', kitchen)]);
+    const door = { id: ZONED_DOOR, type: 'door', center: 3.5, width: 0.6, sill: 0, head: 2.1, swing: 'in' } as const;
+    const thick: SceneData = {
+      ...scene,
+      walls: scene.walls.map((wall) => (wall.id === ZONED.wall.east ? { ...wall, thickness: 0.5, openings: [door] } : wall)),
+    };
+    expect(doorLeaf(thick, ZONED_DOOR)?.rooms).toEqual({ in: ZONED.room.kitchen, out: null });
+  });
+
+  test('a partition door opening out onto a zone names the zone on that side', () => {
+    // Room B lies east of the partition (x = 6); a zone outlined on its floor at the doorway.
+    const scene = opDraft();
+    scene.rooms.push({
+      id: ZONED_DOOR_ZONE,
+      name: 'Reading corner',
+      anchor: { x: 7, z: 2.5 },
+      polygon: [
+        { x: 6.15, z: 1.5 },
+        { x: 8, z: 1.5 },
+        { x: 8, z: 3.5 },
+        { x: 6.15, z: 3.5 },
+      ],
+      floorMaterial: FINISH.oak,
+    });
+    applyOp(scene, { op: 'set_opening', openingId: DOOR_AB, swing: 'out' }, CATALOGUE_REGISTRIES);
+    const leaf = doorLeaf(scene, DOOR_AB)!;
+    expect(leaf.rooms).toEqual({ in: L_SHAPE.room.a, out: ZONED_DOOR_ZONE });
+    expect(leaf.rooms[leaf.swing]).toBe(ZONED_DOOR_ZONE);
   });
 
   test('explicit values are answered as the document carries them', () => {

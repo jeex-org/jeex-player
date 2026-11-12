@@ -43,6 +43,9 @@ import type { Opening, SceneData, Vec2, Wall } from '../scene/types.js';
 
 /** Rest angle of an open leaf, radians: a quarter turn, never more (rule 4). */
 export const LEAF_REST_ANGLE_RAD = Math.PI / 2;
+/** How far past the wall face a doorway's room is read at least, in metres. */
+const PAST_FACE_M = 0.05;
+
 /** Door leaf thickness in metres; the builder uses the same figure. */
 export const LEAF_THICKNESS_M = 0.045;
 /** Angular samples taken across the swept sector when it is tested for clearance. */
@@ -181,9 +184,12 @@ export function resolveDoorSwing(scene: SceneData, plan: SolvedPlan, wall: Wall,
   // Each side's room is read half a leaf off the centreline at the opening's
   // centre, square to the wall there: the same point whichever jamb the leaf
   // hangs on, and inside the quarter circle the leaf sweeps from either jamb.
+  // A narrow door in a thick wall would put that point inside the wall, so it
+  // is never nearer than 5 cm past the wall face, on the floor of the doorway.
   const left = leftN(tangent);
   const inSide = dot(interior.normal, left) >= 0 ? left : mul(left, -1);
-  const sample = (side: Vec2): Vec2 => add(centre, mul(side, leaf / 2));
+  const reach = Math.max(leaf / 2, wall.thickness / 2 + PAST_FACE_M);
+  const sample = (side: Vec2): Vec2 => add(centre, mul(side, reach));
   return {
     openingId: opening.id,
     wallId: wall.id,
