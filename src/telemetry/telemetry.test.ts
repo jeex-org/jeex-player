@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, test } from 'bun:test';
-import { FLUSH_INTERVAL_MS, createTelemetry, type TelemetryConfig, type TelemetryHost } from './telemetry.js';
+import { CONTEXT_HOLD_MS, FLUSH_INTERVAL_MS, createTelemetry, type TelemetryConfig, type TelemetryHost } from './telemetry.js';
 import { COUNTER_KEYS, DEFAULT_TELEMETRY_ENDPOINT, ERROR_CODES, ERROR_NAMES, ERROR_STAGES, EMBED_FORMS } from './vocabulary.js';
 import { DWELL_BUCKETS, ENGAGED_BUCKETS, LOAD_BUCKETS, WIDTH_BUCKETS } from './buckets.js';
 
@@ -8,14 +8,20 @@ const BAKE = '0192f5c4-7a1b-7c3d-8e9f-0a1b2c3d4e52';
 const SCENE = '0192f5c4-7a1b-7c3d-8e9f-0a1b2c3d4e53';
 const ROOM = '0192f5c4-7a1b-7c3d-8e9f-0a1b2c3d4e54';
 const OWN = 'https://cdn.example/jeex/jeex-viewer.iife.js';
+/** The documented longest wait of `view` for its project, from `viewed`. */
+const VIEW_SUBJECT_MAX_MS = 10_000;
 
 type FakeHost = TelemetryHost & {
   leave(): void;
   tick(): void;
   pageError(code: 'exception' | 'rejection', error: unknown): void;
   listeners: { leave: number; pageError: number; timers: number; timeouts: number };
-  /** Runs every pending one-shot timer, as if its time had come. */
+  /** Runs every pending one-shot timer, including those they arm, as if their time had come. */
   elapse(): void;
+  /** Moves the clock on by `ms`, running each one-shot timer that falls due on the way, in order. */
+  advance(ms: number): void;
+  /** Milliseconds since the host was made. */
+  readonly now: number;
   gpcValue: boolean;
 };
 
@@ -23,7 +29,9 @@ function fakeHost(): FakeHost {
   const leave = new Set<() => void>();
   const pageErrors = new Set<(code: 'exception' | 'rejection', error: unknown) => void>();
   const timers = new Set<() => void>();
-  const timeouts = new Set<() => void>();
+  /** Each pending one-shot timer and the time it falls due. */
+  const timeouts = new Map<() => void, number>();
+  let now = 0;
   const host: FakeHost = {
     gpcValue: false,
     gpc: () => host.gpcValue,
@@ -43,15 +51,29 @@ function fakeHost(): FakeHost {
       timers.add(run);
       return () => timers.delete(run);
     },
-    after(_ms, run) {
-      timeouts.add(run);
+    after(ms, run) {
+      timeouts.set(run, now + ms);
       return () => timeouts.delete(run);
     },
     elapse: () => {
-      for (const run of [...timeouts]) {
-        timeouts.delete(run);
-        run();
+      for (let next = timeouts.keys().next(); !next.done; next = timeouts.keys().next()) {
+        timeouts.delete(next.value);
+        next.value();
       }
+    },
+    advance: (ms) => {
+      const target = now + ms;
+      for (;;) {
+        const due = [...timeouts].filter(([, at]) => at <= target).sort((a, b) => a[1] - b[1])[0];
+        if (due === undefined) break;
+        timeouts.delete(due[0]);
+        now = due[1];
+        due[0]();
+      }
+      now = target;
+    },
+    get now() {
+      return now;
     },
     leave: () => {
       for (const listener of [...leave]) listener();
@@ -329,6 +351,89 @@ describe('sends', () => {
     host.leave();
     expect(requests.map((request) => request.body['group'])).toEqual(['actions']);
     telemetry.dispose();
+  });
+});
+
+describe('a view waits for its project', () => {
+  const SUBJECT = { project: PROJECT, bake: BAKE, scene: null };
+  /** Every send so far as `[event, project]`. */
+  const sent = () => requests.map((request) => [request.body['event'], (request.body['subject'] as { project: string | null }).project]);
+
+  test('a manifest read late and a document settled later: one view, when the document settles, naming the project', () => {
+    const host = fakeHost();
+    let manifest: typeof SUBJECT | null = null;
+    const telemetry = createTelemetry(config(host))!;
+    telemetry.viewed(() => manifest);
+    host.advance(CONTEXT_HOLD_MS);
+    expect(sent()).toEqual([]);
+    host.advance(5000 - CONTEXT_HOLD_MS);
+    manifest = SUBJECT;
+    host.advance(999);
+    expect(sent()).toEqual([]);
+    host.advance(1);
+    expect(host.now).toBe(6000);
+    telemetry.setSubject({ project: PROJECT, bake: BAKE, scene: SCENE });
+    telemetry.documentSettled();
+    expect(sent()).toEqual([['view', PROJECT]]);
+    host.advance(VIEW_SUBJECT_MAX_MS);
+    host.leave();
+    telemetry.dispose();
+    expect(sent()).toEqual([['view', PROJECT]]);
+  });
+
+  test('nothing known by the bound: one view at the bound without a project, never a second', () => {
+    const host = fakeHost();
+    const telemetry = createTelemetry(config(host))!;
+    telemetry.viewed(() => null);
+    host.advance(VIEW_SUBJECT_MAX_MS - 1);
+    expect(sent()).toEqual([]);
+    host.advance(1);
+    expect(sent()).toEqual([['view', null]]);
+    telemetry.setSubject({ project: PROJECT, bake: BAKE, scene: SCENE });
+    telemetry.documentSettled();
+    telemetry.ready(12);
+    host.advance(VIEW_SUBJECT_MAX_MS);
+    telemetry.dispose();
+    expect(sent()).toEqual([
+      ['view', null],
+      ['ready', PROJECT],
+    ]);
+    expect(host.listeners.timeouts).toBe(0);
+  });
+
+  test('the page left at 3 s with nothing known: the view leaves then, before the engaged time', () => {
+    const host = fakeHost();
+    const telemetry = createTelemetry(config(host))!;
+    telemetry.viewed(() => null);
+    telemetry.engage(3000);
+    host.advance(3000);
+    expect(sent()).toEqual([]);
+    host.leave();
+    expect(sent()).toEqual([
+      ['view', null],
+      ['engaged', null],
+    ]);
+    host.advance(VIEW_SUBJECT_MAX_MS);
+    telemetry.dispose();
+    expect(sent()).toEqual([
+      ['view', null],
+      ['engaged', null],
+    ]);
+  });
+
+  test('a manifest already read at 2 s: the view leaves at 2 s with its project', () => {
+    const host = fakeHost();
+    const telemetry = createTelemetry(config(host))!;
+    telemetry.viewed(() => SUBJECT);
+    host.advance(CONTEXT_HOLD_MS - 1);
+    expect(sent()).toEqual([]);
+    host.advance(1);
+    expect(sent()).toEqual([['view', PROJECT]]);
+    telemetry.setSubject({ project: PROJECT, bake: BAKE, scene: SCENE });
+    telemetry.documentSettled();
+    host.advance(VIEW_SUBJECT_MAX_MS);
+    telemetry.dispose();
+    expect(sent()).toEqual([['view', PROJECT]]);
   });
 });
 
