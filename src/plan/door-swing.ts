@@ -67,6 +67,12 @@ export type DoorSwing = {
   leaf: number;
   /** Room the leaf swings into; `null` when that side is outside the plan. */
   roomId: string | null;
+  /**
+   * Room on each side, read at the opening's own point and tangent: `in` the
+   * interior side, `out` the other one; `null` where that side is outside the
+   * plan. `rooms[swing]` is `roomId`.
+   */
+  rooms: { in: string | null; out: string | null };
 };
 
 /** Centreline run of a wall: its endpoints, its true length and its arc. */
@@ -167,6 +173,7 @@ export function resolveDoorSwing(scene: SceneData, plan: SolvedPlan, wall: Wall,
     open,
     leaf: Math.max(0, opening.width - 2 * frame),
     roomId,
+    rooms: { in: interior.roomId, out: outerRoom },
   };
 }
 
