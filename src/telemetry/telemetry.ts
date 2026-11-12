@@ -175,6 +175,8 @@ export class Telemetry {
   /** `view` was asked for and waits for the first document. */
   private viewPending = false;
   private stopViewHold: () => void = () => undefined;
+  /** Cancels the `VIEW_SUBJECT_MAX_MS` bound, armed in `viewed` beside the 2 s timer. */
+  private stopViewBound: () => void = () => undefined;
   /** What `view` names when it leaves before the first document settled. */
   private early: () => TelemetrySubject | null = () => null;
   private disposed = false;
@@ -240,10 +242,9 @@ export class Telemetry {
     this.viewPending = true;
     if (early) this.early = early;
     this.stopViewHold = this.config.host.after(CONTEXT_HOLD_MS, () => {
-      if (this.earlySubject().project === null)
-        this.stopViewHold = this.config.host.after(VIEW_SUBJECT_MAX_MS - CONTEXT_HOLD_MS, () => this.sendView(false));
-      else this.sendView(false);
+      if (this.earlySubject().project !== null) this.sendView(false);
     });
+    this.stopViewBound = this.config.host.after(VIEW_SUBJECT_MAX_MS, () => this.sendView(false));
   }
 
   /** The first document settled, loaded or failed: `view` leaves with the subject set now. Idempotent. */
@@ -255,6 +256,7 @@ export class Telemetry {
     if (!this.viewPending) return;
     this.viewPending = false;
     this.stopViewHold();
+    this.stopViewBound();
     const subject = settled ? { ...this.subject } : this.earlySubject();
     this.soon(() => ({ ...this.context(), subject, group: 'lifecycle', event: 'view' }));
   }

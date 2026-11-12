@@ -358,20 +358,28 @@ describe('a view waits for its project', () => {
   const SUBJECT = { project: PROJECT, bake: BAKE, scene: null };
   /** Every send so far as `[event, project]`. */
   const sent = () => requests.map((request) => [request.body['event'], (request.body['subject'] as { project: string | null }).project]);
+  /** Every instance a test made, disposed after it even when an expectation failed first. */
+  const made: Array<NonNullable<ReturnType<typeof createTelemetry>>> = [];
+  const make = (host: TelemetryHost) => {
+    const telemetry = createTelemetry(config(host))!;
+    made.push(telemetry);
+    return telemetry;
+  };
+  afterEach(() => {
+    for (const telemetry of made.splice(0)) telemetry.dispose();
+  });
 
   test('a manifest read late and a document settled later: one view, when the document settles, naming the project', () => {
     const host = fakeHost();
     let manifest: typeof SUBJECT | null = null;
-    const telemetry = createTelemetry(config(host))!;
+    const telemetry = make(host);
     telemetry.viewed(() => manifest);
     host.advance(CONTEXT_HOLD_MS);
     expect(sent()).toEqual([]);
     host.advance(5000 - CONTEXT_HOLD_MS);
     manifest = SUBJECT;
-    host.advance(999);
+    host.advance(1000);
     expect(sent()).toEqual([]);
-    host.advance(1);
-    expect(host.now).toBe(6000);
     telemetry.setSubject({ project: PROJECT, bake: BAKE, scene: SCENE });
     telemetry.documentSettled();
     expect(sent()).toEqual([['view', PROJECT]]);
@@ -383,7 +391,7 @@ describe('a view waits for its project', () => {
 
   test('nothing known by the bound: one view at the bound without a project, never a second', () => {
     const host = fakeHost();
-    const telemetry = createTelemetry(config(host))!;
+    const telemetry = make(host);
     telemetry.viewed(() => null);
     host.advance(VIEW_SUBJECT_MAX_MS - 1);
     expect(sent()).toEqual([]);
@@ -403,7 +411,7 @@ describe('a view waits for its project', () => {
 
   test('the page left at 3 s with nothing known: the view leaves then, before the engaged time', () => {
     const host = fakeHost();
-    const telemetry = createTelemetry(config(host))!;
+    const telemetry = make(host);
     telemetry.viewed(() => null);
     telemetry.engage(3000);
     host.advance(3000);
@@ -423,7 +431,7 @@ describe('a view waits for its project', () => {
 
   test('a manifest already read at 2 s: the view leaves at 2 s with its project', () => {
     const host = fakeHost();
-    const telemetry = createTelemetry(config(host))!;
+    const telemetry = make(host);
     telemetry.viewed(() => SUBJECT);
     host.advance(CONTEXT_HOLD_MS - 1);
     expect(sent()).toEqual([]);
@@ -434,6 +442,22 @@ describe('a view waits for its project', () => {
     host.advance(VIEW_SUBJECT_MAX_MS);
     telemetry.dispose();
     expect(sent()).toEqual([['view', PROJECT]]);
+  });
+
+  test('the 2 s timer run late, at 5 s, with nothing known: the bound still falls at 10 s from the mount', () => {
+    const host = fakeHost();
+    // A busy main thread: the 2 s callback runs at 5 s; every other timer runs on time.
+    const onTime = host.after.bind(host);
+    host.after = (ms, run) => onTime(ms === CONTEXT_HOLD_MS ? 5000 : ms, run);
+    const telemetry = make(host);
+    telemetry.viewed(() => null);
+    host.advance(VIEW_SUBJECT_MAX_MS - 1);
+    expect(sent()).toEqual([]);
+    host.advance(1);
+    expect(sent()).toEqual([['view', null]]);
+    host.advance(VIEW_SUBJECT_MAX_MS);
+    telemetry.dispose();
+    expect(sent()).toEqual([['view', null]]);
   });
 });
 
