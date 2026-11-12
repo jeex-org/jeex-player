@@ -52,6 +52,8 @@ When the canvas of a parked viewer is connected to a document again, the viewer 
 
 In `orbit` and `plan3d` every animation frame SHALL still run the frame hooks, but a display draw SHALL happen only when the camera (identity, pose, projection, layers, mode) differs from the last displayed picture beyond the same tolerance walk and tour use, or something visible changed since it; demand SHALL accumulate across ticks and SHALL clear only after a successful display draw. Camera inertia SHALL draw until its motion falls below that tolerance.
 
+A change SHALL be drawn, and drawn once more when the view has rested for three ticks, so the picture kept on screen is a settled one: on some GPUs the first picture after a change resolves its antialiased edges differently from every later picture of the same inputs. A change here is something visible reported since the last picture, another camera object, another projection, other layers or another mode. That second draw SHALL draw the same inputs and SHALL owe nothing itself. Any draw before the third resting tick SHALL replace it: a change owes it again, a camera move owes nothing. A draw of the settle window after new GPU resources draws the same inputs again and SHALL count as that second draw. A resting view SHALL draw nothing.
+
 #### Scenario: Resting orbit
 - **WHEN** the camera rests in `orbit` after the scene has settled, with no selection, no animation and no pending change
 - **THEN** ticks keep advancing while display draws stay at zero over 60 ticks and over a two-second window, on the GPU and on software rendering, and the screen keeps the last picture
@@ -63,6 +65,14 @@ In `orbit` and `plan3d` every animation frame SHALL still run the frame hooks, b
 #### Scenario: Inertia after a drag
 - **WHEN** an orbit drag is released and the camera eases to its target
 - **THEN** every tick of the easing that moves the camera beyond the tolerance draws, and the view rests afterwards
+
+#### Scenario: A change is drawn again once the view rests
+- **WHEN** something visible changes once in `orbit`, or the camera's layers or projection change at the same pose, and nothing else follows
+- **THEN** the change draws on the next tick, the view draws once more on the third tick with nothing to draw, and then rests
+
+#### Scenario: A camera move before the second draw
+- **WHEN** a change draws in `orbit` and the camera moves before the third resting tick
+- **THEN** the move draws, no second draw follows it, and the view rests
 
 #### Scenario: Slow movement accumulates
 - **WHEN** the camera drifts by less than the per-tick tolerance on every tick in `orbit`
@@ -126,7 +136,7 @@ The camera-preview inset SHALL be drawn only right after a main display draw and
 
 #### Scenario: Open and rest
 - **WHEN** the preview inset opens in `orbit` and nothing else changes
-- **THEN** one main draw and one inset draw follow, and then both rest
+- **THEN** one main draw and one inset draw follow, the same pair again once the view has rested for three ticks, and then both rest
 
 #### Scenario: Move or resize the card
 - **WHEN** the inset card is dragged, resized or relocated
@@ -150,11 +160,11 @@ In `orbit` and `plan3d` a display draw SHALL follow a resize, a pixel-ratio chan
 
 #### Scenario: Resize
 - **WHEN** the canvas is resized while the camera rests in `orbit`
-- **THEN** one display draw follows the fit, and the view rests afterwards
+- **THEN** one display draw follows the fit, one more once the view has rested for three ticks, and the view rests afterwards
 
 #### Scenario: Pixel ratio only
 - **WHEN** only the device pixel ratio changes at a fixed CSS size, in `orbit` or in `plan2d`
-- **THEN** the drawing buffer and the plan canvas are refitted to the new ratio, one display draw follows in `orbit`, and `plan2d` keeps its heartbeat
+- **THEN** the drawing buffer and the plan canvas are refitted to the new ratio, one display draw follows in `orbit` and one more once the view has rested for three ticks, and `plan2d` keeps its heartbeat
 
 #### Scenario: Hidden mount
 - **WHEN** a viewer is mounted hidden in `orbit` and later revealed

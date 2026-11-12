@@ -35,13 +35,6 @@ const TICKS_TIMEOUT_MS = 180_000;
 /** Ticks without a draw that count as resting. */
 const REST_TICKS = 15;
 
-/**
- * Ticks of a followed motion that need not draw: the first (the change lands
- * between ticks) and the idle ticks before the steady draw that ends it, which
- * `follow` counts because that steady draw is its last (`RenderDemand`).
- */
-const UNDRAWN_MOTION_TICKS = STEADY_AFTER_IDLE_TICKS;
-
 const debug = () => window.__viewerDebug!;
 const counters = (): DemandCounters => debug().renderDemand();
 
@@ -61,25 +54,73 @@ async function rest(what: string): Promise<void> {
   throw new Error(`${what}: the view never came to rest`);
 }
 
+/** A draw of the gate: answering a change or a camera move, the steady draw after the view rested, or a repeat of the settle window. */
+type DrawKind = 'change' | 'steady' | 'repeat';
+
+/** A draw a followed change made: its tick, counted from the change (the first tick after it is 1), and its kind. */
+type FollowedDraw = { at: number; kind: DrawKind };
+
+/** What a followed change drew: ticks up to its last draw, its draws, and each draw. */
+type Followed = { ticks: number; draws: number; drawn: FollowedDraw[] };
+
+/** The gate's own state before a commit, read for the kind of the draw (`RenderDemand`). */
+type GateState = { dirty: boolean; repeating: boolean; idle: number };
+
 /**
  * Runs `change` on a resting view and follows the draws it caused until the
- * view rests again: how many ticks the motion lasted (up to its last draw)
- * and how many of them drew.
+ * view rests again: how many ticks the motion lasted (up to its last draw),
+ * how many of them drew, and on which tick each draw landed.
  */
-async function follow(change: () => void): Promise<{ ticks: number; draws: number }> {
+async function follow(change: () => void): Promise<Followed> {
   await rest('before the change');
   const start = counters();
-  change();
-  let last = start;
-  const deadline = performance.now() + TICKS_TIMEOUT_MS;
-  for (;;) {
-    await nextFrame();
-    const now = counters();
-    if (now.draws > last.draws) last = now;
-    else if (now.ticks - last.ticks >= REST_TICKS) break;
-    if (performance.now() > deadline) throw new Error('the change never came to rest');
+  const drawn: FollowedDraw[] = [];
+  const commit = Object.getOwnPropertyDescriptor(RenderDemand.prototype, 'commit')!.value as RenderDemand['commit'];
+  const commits = vi.spyOn(RenderDemand.prototype, 'commit').mockImplementation(function (this: RenderDemand, live) {
+    const gate = this as unknown as GateState;
+    const kind: DrawKind = gate.dirty ? 'change' : gate.repeating ? 'repeat' : gate.idle >= STEADY_AFTER_IDLE_TICKS ? 'steady' : 'change';
+    commit.call(this, live);
+    drawn.push({ at: this.counters().ticks - start.ticks, kind });
+  });
+  try {
+    change();
+    let last = start;
+    const deadline = performance.now() + TICKS_TIMEOUT_MS;
+    for (;;) {
+      await nextFrame();
+      const now = counters();
+      if (now.draws > last.draws) last = now;
+      else if (now.ticks - last.ticks >= REST_TICKS) break;
+      if (performance.now() > deadline) throw new Error('the change never came to rest');
+    }
+    return { ticks: last.ticks - start.ticks, draws: last.draws - start.draws, drawn };
+  } finally {
+    commits.mockRestore();
   }
-  return { ticks: last.ticks - start.ticks, draws: last.draws - start.draws };
+}
+
+/**
+ * The exact draws of a followed motion: every tick of it draws, from its
+ * first draw (the first or second tick, as the change lands between ticks) to
+ * its last, settle-window repeats included. Then either the view rests
+ * `STEADY_AFTER_IDLE_TICKS - 1` ticks and draws the steady picture once on the
+ * next, or the motion ended on a repeat, which already drew its inputs again
+ * and owes nothing (`RenderDemand`). One skipped draw fails.
+ */
+function expectMotionDrawn(what: string, motion: Followed): void {
+  const steady = motion.drawn.at(-1)?.kind === 'steady' ? motion.drawn.at(-1)! : undefined;
+  const drawn = steady ? motion.drawn.slice(0, -1) : motion.drawn;
+  expect(drawn.length, `${what}: motion draws`).toBeGreaterThanOrEqual(1);
+  const drawnAt = drawn.map((draw) => draw.at);
+  const first = drawnAt[0]!;
+  expect(first, `${what}: the first draw`).toBeLessThanOrEqual(2);
+  expect(drawnAt, `${what}: every tick of the motion draws`).toEqual(Array.from({ length: drawnAt.length }, (_, index) => first + index));
+  expect(
+    drawn.filter((draw) => draw.kind === 'steady'),
+    `${what}: no steady draw inside the motion`,
+  ).toEqual([]);
+  if (steady) expect(steady.at - drawnAt.at(-1)!, `${what}: the steady draw, after the view rested`).toBe(STEADY_AFTER_IDLE_TICKS);
+  else expect(drawn.at(-1)!.kind, `${what}: a motion with no steady draw ends on a settle-window repeat`).toBe('repeat');
 }
 
 /** Share of pixels of two PNG screenshots (base64) that differ by more than 8 levels in any channel. */
@@ -211,8 +252,7 @@ describe('walk and tour draw on demand', { timeout: MOUNT_TIMEOUT_MS }, () => {
     const door = debug().doors()[0]!;
     const motion = await follow(() => debug().toggleDoor(door.id));
     // The swing lasts wall-clock time, so its tick count is the frame rate's; every one of them draws.
-    expect(motion.draws).toBeGreaterThanOrEqual(1);
-    expect(motion.draws).toBeGreaterThanOrEqual(motion.ticks - UNDRAWN_MOTION_TICKS);
+    expectMotionDrawn('door', motion);
     expect(
       debug()
         .doors()
@@ -222,8 +262,7 @@ describe('walk and tour draw on demand', { timeout: MOUNT_TIMEOUT_MS }, () => {
 
   test('the furniture ripple draws while it runs and rests after it, both ways', async () => {
     const hidden = await follow(() => handle.setFurnitureVisible(false));
-    expect(hidden.draws).toBeGreaterThanOrEqual(1);
-    expect(hidden.draws).toBeGreaterThanOrEqual(hidden.ticks - UNDRAWN_MOTION_TICKS);
+    expectMotionDrawn('furniture hidden', hidden);
     const shown = await follow(() => handle.setFurnitureVisible(true));
     expect(shown.draws).toBeGreaterThanOrEqual(1);
   });
@@ -523,7 +562,7 @@ describe('the editing modes draw on demand', { timeout: MOUNT_TIMEOUT_MS }, () =
   }
 
   /** `change` on a resting view draws and the view rests again, with nothing skipped. */
-  async function draws(what: string, change: () => void): Promise<{ ticks: number; draws: number }> {
+  async function draws(what: string, change: () => void): Promise<Followed> {
     const result = await follow(change);
     expect(result.draws, `${what}: draws`).toBeGreaterThanOrEqual(1);
     await verifyNothingSkipped(what);
@@ -682,7 +721,7 @@ describe('the editing modes draw on demand', { timeout: MOUNT_TIMEOUT_MS }, () =
     editorOf().handleFurniturePick(DEMO.asset.livingSofa);
     // A live aura never rests: every tick draws while it is shown.
     const whileShown = await ticks(30);
-    expect(whileShown.draws).toBeGreaterThanOrEqual(whileShown.ticks - 1);
+    expect(whileShown.draws).toBe(whileShown.ticks);
     const cleared = await followNow(() => editorOf().handleFurniturePick(null));
     expect(cleared.draws).toBeGreaterThanOrEqual(1);
     expect(await differingShare(without, await canvasShot())).toBe(0);
@@ -722,9 +761,9 @@ describe('the editing modes draw on demand', { timeout: MOUNT_TIMEOUT_MS }, () =
   test('a door draws every tick of its motion and its final pose; the furniture ripple draws to its last frame', async () => {
     const door = debug().doors()[0]!;
     const motion = await draws('door', () => debug().toggleDoor(door.id));
-    expect(motion.draws).toBeGreaterThanOrEqual(motion.ticks - UNDRAWN_MOTION_TICKS);
+    expectMotionDrawn('door', motion);
     const hidden = await draws('furniture hidden', () => handle.setFurnitureVisible(false));
-    expect(hidden.draws).toBeGreaterThanOrEqual(hidden.ticks - UNDRAWN_MOTION_TICKS);
+    expectMotionDrawn('furniture hidden', hidden);
     await draws('furniture shown', () => handle.setFurnitureVisible(true));
   });
 

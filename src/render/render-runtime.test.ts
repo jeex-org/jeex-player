@@ -1092,6 +1092,11 @@ describe('WebGL context loss', () => {
       tick(16);
     }
     expect(stub.renders).toBe(afterWindow);
+    // Something asks: the change draws them, and that picture opens the window, so the next tick draws again.
+    runtime.demand.invalidate();
+    tick(16);
+    tick(16);
+    expect(stub.renders).toBe(afterWindow + 2);
     runtime.dispose();
   });
 

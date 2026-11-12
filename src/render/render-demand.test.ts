@@ -169,6 +169,30 @@ describe('RenderDemand', () => {
     expect(drawn).toEqual([true, false, false, true, false, false, false, false, false, false]);
   });
 
+  test('a layer or projection change at the same pose is followed by one steady draw once the view rests', () => {
+    const layered = camera();
+    const byLayers = displayed(layered, 'orbit');
+    layered.layers.enable(5);
+    expect(run(byLayers, layered, 10).drawn).toEqual([true, false, false, true, false, false, false, false, false, false]);
+
+    const zoomed = camera();
+    const byProjection = displayed(zoomed, 'orbit');
+    zoomed.fov = 50;
+    zoomed.updateProjectionMatrix();
+    expect(run(byProjection, zoomed, 10).drawn).toEqual([true, false, false, true, false, false, false, false, false, false]);
+  });
+
+  test('a camera move before the steady draw replaces the debt: its draw, then nothing', () => {
+    const live = camera();
+    const demand = displayed(live, 'orbit');
+    demand.invalidate();
+    const { drawn } = run(demand, live, 30, (tick) => {
+      if (tick === 1) live.position.x += 0.01;
+    });
+    expect(drawn.slice(0, 2)).toEqual([true, true]);
+    expect(drawn.filter(Boolean).length).toBe(2);
+  });
+
   test('a mode switch at the same pose draws, between any two modes', () => {
     const live = camera();
     expect(displayed(live, 'walk').shouldDraw(live, 'tour')).toBe(true);

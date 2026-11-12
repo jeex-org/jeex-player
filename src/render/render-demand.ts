@@ -26,10 +26,11 @@
  *
  * The first picture of a change is not always the steady one, so the picture
  * the view RESTS on is drawn once more: after a draw that answered
- * `invalidate` or a switch of camera object or mode, the `STEADY_AFTER_IDLE_TICKS`th
- * tick with nothing to draw draws the same inputs again (`commit`). A change
- * before then draws anyway and starts the count again, so a drag at any pointer
- * rate draws as its changes do, plus one draw at its end. A draw asked for by
+ * `invalidate`, or another camera object, projection, layers or mode, the
+ * `STEADY_AFTER_IDLE_TICKS`th tick with nothing to draw draws the same inputs
+ * again (`commit`). A change before then draws anyway and starts the count
+ * again, so a drag that reports its changes draws as they come, plus one draw
+ * at its end; a camera move alone owes nothing. A draw asked for by
  * `repeat` (the settle window drawing the picture again) is such a second draw
  * of unchanged inputs: it pays the debt instead of adding one.
  *
@@ -137,14 +138,22 @@ export class RenderDemand {
    * edges (0.1 to 0.3 % of the pixels, up to 50 levels) differed from every
    * later draw of the same inputs, while the second and every later draw
    * agreed. A resting view would keep that picture until the next change. So
-   * a draw that answered either owes one more draw, drawn only once the view
-   * rests (`STEADY_AFTER_IDLE_TICKS`), and that steady draw owes nothing. Any
-   * draw before then replaces the debt with its own: a change owes again, a
-   * camera move owes nothing, as its sub-tolerance tail is not redrawn either.
+   * a draw that answered either, or another projection or other layers (they
+   * change what is drawn, like a scene change), owes one more draw, drawn only
+   * once the view rests (`STEADY_AFTER_IDLE_TICKS`), and that steady draw owes
+   * nothing. Any draw before then replaces the debt with its own: a change
+   * owes again, a camera move owes nothing, as its sub-tolerance tail is not
+   * redrawn either.
    */
   commit(camera: DemandCamera): void {
     this.draws += 1;
-    const switched = this.shown !== null && (this.shown.camera !== camera || this.shown.mode !== this.asked);
+    const shown = this.shown;
+    const switched =
+      shown !== null &&
+      (shown.camera !== camera ||
+        shown.mode !== this.asked ||
+        shown.layers !== camera.layers.mask ||
+        !within(shown.projection, camera.projectionMatrix.elements, 0));
     this.steady = switched || this.answering;
     this.idle = 0;
     this.answering = false;
