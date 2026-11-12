@@ -269,18 +269,16 @@ as described under [Versioning](#versioning).
 
 ### Fixed
 
-- **The picture a resting view keeps is a settled one.** On some GPUs (seen
-  on ANGLE's OpenGL backend on NVIDIA) the first picture drawn after a change
-  can resolve its antialiased edges differently from every later picture of
-  the same view, and a view drawn on demand kept that first picture until
-  the next change. Now a change is drawn, and drawn once more when the view
-  has rested for three frames; a change of the camera's layers or projection
-  counts as a change, a camera move does not. A resting view still draws
-  nothing. The cost is one extra draw per change (about 10–30 ms of CPU on a
-  phone), once for a whole drag of an object, not once per frame of it. The draws a new
-  model's or texture's settle window makes already draw the change again and
-  count as its second picture, so moving from orbit into walk draws about as
-  many frames as before (55–58, was 55–56).
+- **The picture a resting view keeps is a settled one.** On some GPUs the
+  first picture drawn after a change can resolve its antialiased edges
+  differently from every later picture of the same view, and a view drawn on
+  demand kept that first picture until the next change. Now a change is
+  drawn, and drawn once more when the view has rested for three frames; a
+  change of the camera's layers or projection counts as a change, a camera
+  move does not. A resting view still draws nothing. The cost is one extra
+  draw per change, once for a whole drag of an object, not once per frame of
+  it. The draws a new model's or texture's settle window makes already draw
+  the change again and count as its second picture, so they add nothing.
 - **Everything the viewer shows follows `setLocale`, including text already
   on screen.** After a locale switch, `describeSelection`, the viewer's own
   Replace, finish, opening and interior panels, the Replace popup and the door
@@ -538,8 +536,9 @@ as described under [Versioning](#versioning).
   camera, the scene, a selection, an overlay or the lighting. A change is
   drawn, and drawn once more when the view has rested for three frames, so
   the picture kept on screen is a settled one. A view at rest keeps ticking
-  without drawing, which saves battery and GPU time on every device. The flat 2D plan keeps its half-second heartbeat. Telemetry measures
-  frame times only between two drawn frames, so a view that never moves
+  without drawing, which saves battery and GPU time on every device. The
+  flat 2D plan keeps its half-second heartbeat. Telemetry measures frame
+  times only between two drawn frames, so a view that never moves
   reports none.
 
 - **Reflection probes keep clear of furniture.** A room's reflection probe

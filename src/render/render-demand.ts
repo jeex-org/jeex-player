@@ -110,7 +110,10 @@ export class RenderDemand {
   shouldDraw(camera: DemandCamera, mode: string | undefined): boolean {
     this.ticks += 1;
     this.asked = mode;
-    if (mode === undefined || !ON_DEMAND_MODES.has(mode)) return true;
+    if (mode === undefined || !ON_DEMAND_MODES.has(mode)) {
+      this.answering = false;
+      return true;
+    }
     camera.updateMatrixWorld();
     const shown = this.shown;
     this.answering = this.dirty;

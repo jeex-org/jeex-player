@@ -193,6 +193,21 @@ describe('RenderDemand', () => {
     expect(drawn.filter(Boolean).length).toBe(2);
   });
 
+  test('a change whose draw failed, then a commit in a mode that always draws, owes only the switch back', () => {
+    const live = camera();
+    const demand = displayed(live, 'plan2d');
+    // A tick in walk asks to draw a change; the draw throws, nothing is committed.
+    demand.invalidate();
+    expect(demand.shouldDraw(live, 'walk')).toBe(true);
+    // The flat plan draws and commits: the failed answer is not its debt.
+    expect(demand.shouldDraw(live, 'plan2d')).toBe(true);
+    demand.commit(live);
+    // Back in walk: the switch draws and owes its own steady draw, nothing more.
+    const { drawn } = run(demand, live, 10, () => undefined, 'walk');
+    expect(drawn.slice(0, 5)).toEqual([true, false, false, true, false]);
+    expect(drawn.filter(Boolean).length).toBe(2);
+  });
+
   test('a mode switch at the same pose draws, between any two modes', () => {
     const live = camera();
     expect(displayed(live, 'walk').shouldDraw(live, 'tour')).toBe(true);
