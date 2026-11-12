@@ -215,8 +215,12 @@ export class ViewerApp {
       edits: editsWiring(this.options, (edit) => this.events.emit('edit', edit)),
       onDocument: (model) => this.onDocument(model),
       onAssetsChanged: (model) => this.stage?.placementsChanged(model.scene),
-      // A variant swap hands out a new opening group with its leaf open again.
-      onOpeningsChanged: () => this.doors.reapply(),
+      // A variant swap hands out a new opening group with its leaf open again,
+      // and may change the leaves the 2D plan draws.
+      onOpeningsChanged: (model) => {
+        this.stage?.openingsChanged(model);
+        this.doors.reapply();
+      },
       onError: (error) => this.events.emit('error', error),
       onModelsSettled: (model, result, maps) => {
         this.telemetry.modelsSettled(model, result);

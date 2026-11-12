@@ -18,7 +18,8 @@
  * - one `opening` cut per authored opening, of the wall's true thickness;
  * - one `leaf` and one `swing` per hinged door leaf, taken from `door-swing.ts`,
  *   so the arc on paper is the sector the layout linter keeps clear; a door
- *   with two leaves (`PlanDrawingOptions.leafCountOf`) gets one from each jamb,
+ *   with two leaves (`PlanDrawingOptions.leafCountOf`) gets two, hung half the
+ *   clear width either side of the opening's centre along the tangent there,
  *   each half the clear width, both opening to the same side;
  * - every `leaf` and `swing` names its door (`PlanDoorRef`), so a click on the
  *   symbol can select it (`door-symbol-hit.ts`);

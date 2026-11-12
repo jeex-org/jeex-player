@@ -83,7 +83,8 @@ type SceneMountDeps = {
   /**
    * Called after a commit that rebuilt an opening group WITHOUT rebuilding the
    * shell. A variant swap hands out a brand-new group whose door leaf is open
-   * again, so whoever owns door state has to put it back (`door-animator.ts`).
+   * again, so whoever owns door state has to put it back (`door-animator.ts`),
+   * and its leaves may differ, so the plan views draw it again.
    */
   onOpeningsChanged?: (model: SceneModel) => void;
   /**

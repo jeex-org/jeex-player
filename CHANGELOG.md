@@ -300,6 +300,7 @@ as described under [Versioning](#versioning).
 - **A double door was drawn with one leaf on the 2D plan.** It is drawn with
   a leaf and a swing arc from each jamb, each half the opening's width, with
   both hinges where the 3D builder places them, on a curved wall too.
+  Swapping a door to a double variant redraws the plan at once.
 - **A swipe over an untouched viewer on a phone scrolls the page.** Touch
   follows the wheel's engagement rule: until the viewer is engaged (a tap,
   focus inside it, fullscreen, or a page that cannot scroll) its canvas takes

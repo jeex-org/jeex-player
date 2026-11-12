@@ -454,6 +454,17 @@ export class ViewerStage {
     this.planModes.placementsChanged(scene);
   }
 
+  /**
+   * An opening changed without a rebuild (a variant swap): the 2D plan and the
+   * mini-map draw its leaves and arcs from the document, so they are drawn
+   * again. The rest of `setDocument` (lighting, camera, selection) is a plan's
+   * business and stays untouched.
+   */
+  openingsChanged(model: SceneModel): void {
+    this.planModes.setDocument(model.plan, model.scene);
+    this.minimap.setDocument();
+  }
+
   syncMinimap(): void {
     const mode = this.mode;
     if (mode) this.minimap.setMode(mode);

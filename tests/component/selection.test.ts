@@ -8,7 +8,8 @@ import { afterEach, describe, expect, test } from 'vitest';
 import { InlineSceneRepository, mountViewer } from '../../src/app/viewer-api.js';
 import type { ViewerHandle } from '../../src/app/viewer-handle.js';
 import type { ViewerSelection } from '../../src/app/selection.js';
-import type { SceneData, Vec2 } from '../../src/scene/types.js';
+import type { ReplaceOpeningVariantOp, SceneData, SceneOp, Vec2 } from '../../src/scene/types.js';
+import { OPENING_VARIANT } from '../../src/assets/catalogue-ids.js';
 import { closeContainers, demoScene, openContainer, until } from './support.js';
 import { buildPlanDrawing, planPoint, roomAt, type PlanPrimitive } from '../../src/plan/plan-drawing.js';
 import { solvePlan } from '../../src/plan/plan-solver.js';
@@ -160,5 +161,51 @@ describe('select in plan2d: the drawn door symbols', () => {
   test('a click on the room away from every door still selects the room', async () => {
     const selection = await clickPlanPoint({ x: 2.5, z: 4 });
     expect({ kind: selection.kind, id: selection.id }).toEqual({ kind: 'room', id: TWO_ROOM_ENTRANCE.room.living });
+  });
+});
+
+describe('select in plan2d after a door’s variant swap', () => {
+  type Swing = Extract<PlanPrimitive, { kind: 'swing' }>;
+  const INNER = TWO_ROOM_ENTRANCE.opening.inner;
+  const swap: ReplaceOpeningVariantOp = { op: 'replace_opening_variant', openingId: INNER, variant: OPENING_VARIANT.door_white_double };
+
+  /** The partition door's swing arcs once it wears the double variant, in plan metres. */
+  function doubleDoorArcs(): Swing[] {
+    const scene: SceneData = {
+      ...twoRoomEntrancePlan,
+      walls: twoRoomEntrancePlan.walls.map((wall) => ({
+        ...wall,
+        openings: (wall.openings ?? []).map((opening) => (opening.id === INNER ? { ...opening, variant: swap.variant } : opening)),
+      })),
+    };
+    const drawing = buildPlanDrawing(solvePlan(scene), scene, planDrawingInputs(scene));
+    return drawing.primitives.filter((p): p is Swing => p.kind === 'swing' && p.door.openingId === INNER);
+  }
+
+  test('the redrawn plan takes a click on either new arc as the door', async () => {
+    const arcs = doubleDoorArcs();
+    expect(arcs.length).toBe(2);
+    const { container, handle, seen } = mount({ select: true, debug: true }, twoRoomEntrancePlan);
+    await handle.ready;
+    handle.setMode('plan2d');
+    const applied = (window as unknown as { __viewerDebug: { applyOps: (ops: SceneOp[]) => { error?: unknown } } }).__viewerDebug.applyOps([
+      swap,
+    ]);
+    expect(applied.error).toBeUndefined();
+    const view = handle.planView();
+    if (!view) throw new Error('no plan view');
+    const canvas = canvasOf(container);
+    const box = canvas.getBoundingClientRect();
+    for (const arc of arcs) {
+      const angle = (arc.a0 + arc.a1) / 2;
+      const pixel = planPoint(view.transform, {
+        x: arc.centre.x + Math.cos(angle) * arc.radius,
+        z: arc.centre.z + Math.sin(angle) * arc.radius,
+      });
+      const before = seen.length;
+      press(canvas, box.left + pixel.x, box.top + pixel.y);
+      await until(() => seen.length > before, 'a select event');
+      expect({ kind: seen.at(-1)!.kind, id: seen.at(-1)!.id }).toEqual({ kind: 'opening', id: INNER });
+    }
   });
 });

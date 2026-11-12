@@ -11,8 +11,9 @@ import { buildPlanDrawing, fitTransform, type PlanDrawing, type PlanPrimitive } 
 import { PLAN_PADDING } from './plan-canvas.js';
 import { solvePlan } from './plan-solver.js';
 import { planDrawingInputs } from '../assets/plan-fixtures.js';
+import { OPENING_VARIANT } from '../assets/catalogue-ids.js';
 import { TWO_ROOM_ENTRANCE, twoRoomEntrancePlan } from '../fixtures/plan-two-room-entrance.js';
-import type { Vec2 } from '../scene/types.js';
+import type { SceneData, Vec2 } from '../scene/types.js';
 
 type Swing = Extract<PlanPrimitive, { kind: 'swing' }>;
 type Leaf = Extract<PlanPrimitive, { kind: 'leaf' }>;
@@ -111,5 +112,35 @@ describe('doorSymbolAt', () => {
     const swing = swingOf(INNER);
     const point = alongBisector(swing, 1 + off / planScale() / swing.radius);
     expect(doorSymbolAt(drawing, point, slopAtPlanScale())?.openingId ?? null).toBe(door);
+  });
+});
+
+describe('doorSymbolAt: a double door', () => {
+  /** The two-room plan with the partition door wearing the double variant. */
+  const scene: SceneData = {
+    ...twoRoomEntrancePlan,
+    walls: twoRoomEntrancePlan.walls.map((wall) => ({
+      ...wall,
+      openings: (wall.openings ?? []).map((opening) =>
+        opening.id === INNER ? { ...opening, variant: OPENING_VARIANT.door_white_double } : opening,
+      ),
+    })),
+  };
+  const double = buildPlanDrawing(solvePlan(scene), scene, planDrawingInputs(scene));
+  const arcs = double.primitives.filter((p): p is Swing => p.kind === 'swing' && p.door.openingId === INNER);
+
+  test('it has two arcs', () => {
+    expect(arcs.length).toBe(2);
+  });
+
+  test.each([0, 1])('a point on arc %i’s stroke names the door', (index) => {
+    expect(doorSymbolAt(double, alongBisector(arcs[index]!, 1), slopAtPlanScale())).toEqual({
+      openingId: INNER,
+      wallId: TWO_ROOM_ENTRANCE.wall.partition,
+    });
+  });
+
+  test.each([0, 1])('the empty floor halfway inside arc %i names no door', (index) => {
+    expect(doorSymbolAt(double, alongBisector(arcs[index]!, 0.5), slopAtPlanScale())).toBeNull();
   });
 });
