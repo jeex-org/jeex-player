@@ -131,7 +131,8 @@ function ancestry(ops: readonly SceneOp[]): (wallId: string) => ReadonlySet<stri
  * Rewrites every explicit door swing whose wall's interior side turned round
  * between the two plans. A door moved onto an unrelated wall (`set_opening`
  * naming another `wallId`) is the caller's: its swing is read on the wall it
- * joined, so it is left as written.
+ * joined, so it is left as written. So is a swing a `set_opening` of the batch
+ * wrote: it is the author's latest word, read on the plan the batch commits.
  */
 function keepSwingSides(
   draft: Draft<SceneData>,
@@ -142,13 +143,14 @@ function keepSwingSides(
 ): TouchedEntity[] {
   const touched: TouchedEntity[] = [];
   const ancestorsOf = ancestry(ops);
+  const written = new Set(ops.flatMap((op) => (op.op === 'set_opening' && op.swing !== undefined ? [op.openingId] : [])));
   // Found by OPENING id: a split in the same batch carries a door onto a new wall id.
   const doorsBefore = new Map(
     committed.walls.flatMap((wall) => (wall.openings ?? []).map((opening) => [opening.id, { wall, opening }] as const)),
   );
   for (const wall of draft.walls) {
     for (const opening of wall.openings ?? []) {
-      if (opening.swing === undefined) continue;
+      if (opening.swing === undefined || written.has(opening.id)) continue;
       const found = doorsBefore.get(opening.id);
       if (found?.opening.swing === undefined) continue;
       const { wall: old, opening: was } = found;

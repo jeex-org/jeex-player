@@ -224,6 +224,26 @@ describe('a door moved to another wall keeps the swing its move names', () => {
   });
 });
 
+describe('a swing set_opening writes in a shell batch is the author’s latest word', () => {
+  test('a door that opened in, set to open out in a batch with a shell edit, ends out', () => {
+    const base = livingRoom();
+    const scene: SceneData = {
+      ...base,
+      walls: base.walls.map((wall) =>
+        wall.id === ZONED.wall.north ? { ...wall, openings: [{ id: NEW.door, type: 'door', center: 5, width: 0.9, swing: 'in' }] } : wall,
+      ),
+    };
+    const model = commit(scene, [
+      { op: 'set_opening', openingId: NEW.door, swing: 'out' },
+      // A node added and removed again: a shell edit that changes no wall side.
+      { op: 'add_node', id: NEW.p, p: { x: 20, z: 20 } },
+      { op: 'remove_node', nodeId: NEW.p },
+    ]);
+    const north = model.scene.walls.find((wall) => wall.id === ZONED.wall.north)!;
+    expect(north.openings?.[0]).toMatchObject({ id: NEW.door, swing: 'out' });
+  });
+});
+
 describe('a door carried onto a split wall keeps its side too', () => {
   test('split the balcony wall and build a balcony against the half with the door, in one batch: the leaf stays in the living room', () => {
     const base = livingRoom();

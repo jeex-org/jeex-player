@@ -30,7 +30,9 @@ import type { FaceKey, FinishSurface, SceneFinishes, WallSide } from './types.fi
 import type { SceneSite, SiteSun } from './types.site.js';
 import type {
   Opening,
+  OpeningHinge,
   OpeningShape,
+  OpeningSwing,
   OpeningType,
   PlanNode,
   Room,
@@ -456,6 +458,13 @@ export type SetOpeningOp = {
   readonly dwidth?: number;
   readonly dsill?: number;
   readonly dhead?: number;
+  /**
+   * A door's hinge jamb and swing side (`Opening.hinge`, `Opening.swing`).
+   * `null` removes the explicit value, so the side is derived again. Refused
+   * on a window or a passage, which carry neither.
+   */
+  readonly hinge?: OpeningHinge | null;
+  readonly swing?: OpeningSwing | null;
 };
 
 export type AddOpeningOp = {
@@ -470,6 +479,9 @@ export type AddOpeningOp = {
   readonly id: string;
   readonly entrance?: boolean;
   readonly variant?: string;
+  /** A door's hinge jamb and swing side; refused on a window or a passage. */
+  readonly hinge?: OpeningHinge;
+  readonly swing?: OpeningSwing;
 };
 
 export type RemoveOpeningOp = { readonly op: 'remove_opening'; readonly openingId: string };

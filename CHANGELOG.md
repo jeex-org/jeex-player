@@ -9,6 +9,17 @@ as described under [Versioning](#versioning).
 
 ### Added
 
+- **`add_opening` and `set_opening` carry a door's `hinge` and `swing`.**
+  `add_opening` takes `hinge` (`'a'` or `'b'`) and `swing` (`'in'` or
+  `'out'`); `set_opening` takes the same words or `null`, which removes the
+  explicit value so the side is derived again. A door editor can now keep a
+  leaf on its jamb: a door without an explicit hinge takes the jamb farther
+  from its wall end, so a slide past the middle of its wall moved the drawn
+  leaf to the other jamb. A hinge or a swing on a window or a passage is
+  refused by the operation, as the document refuses it. A swing a
+  `set_opening` writes in the same batch as a shell edit is kept as written
+  instead of being re-read from the side the door opened to before the
+  batch.
 - **One table says what each delivery form carries.** Every `ViewerHandle`
   member and every handle event has a row saying whether the iframe wire and
   the custom element carry it (`src/embed/delivery-contract.ts`); the wire
