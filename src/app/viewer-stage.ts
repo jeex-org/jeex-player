@@ -342,6 +342,7 @@ export class ViewerStage {
       // The plan modes swap the camera a pick is cast with; the rig is the
       // answer everywhere else (`plan-modes.pickCamera`).
       camera: () => this.planModes.pickCamera(),
+      planDoorAt: (clientX, clientY) => this.planModes.doorAt(clientX, clientY),
       mode: () => this.mode,
       emit: deps.selection.emit,
       // `interaction: 'none'` puts `pointer-events: none` on the canvas and
@@ -451,6 +452,17 @@ export class ViewerStage {
   placementsChanged(scene: SceneData): void {
     this.cameraDirector?.controller.refreshObstacles(scene);
     this.planModes.placementsChanged(scene);
+  }
+
+  /**
+   * An opening changed without a rebuild (a variant swap): the 2D plan and the
+   * mini-map draw its leaves and arcs from the document, so they are drawn
+   * again. The rest of `setDocument` (lighting, camera, selection) is a plan's
+   * business and stays untouched.
+   */
+  openingsChanged(model: SceneModel): void {
+    this.planModes.setDocument(model.plan, model.scene);
+    this.minimap.setDocument();
   }
 
   syncMinimap(): void {

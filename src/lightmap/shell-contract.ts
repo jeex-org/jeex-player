@@ -39,6 +39,7 @@ import { DEFAULT_WALL_FINISH, faceFinishRefOf, floorFinishRefOf } from '../scene
 import { isFaceKey, type FaceKey, type FinishRef, type OpeningType, type SceneData } from '../scene/types.js';
 import { FINISH } from '../materials/finish-ids.js';
 import { unseenTriangles } from '../geometry/shell-unseen.js';
+import { isPickProxy } from '../geometry/pick-proxy.js';
 import { litMaterialOf } from '../geometry/site-ground.js';
 import { LightBakeError } from './light-bake-error.js';
 import type { ShellMaterialExtras, ShellNodeExtras } from './shell-extras.schema.js';
@@ -56,11 +57,6 @@ export type ShellEntry = {
 };
 
 const round = (value: number): number => Math.round(value * 1e6) / 1e6;
-
-function isPickProxy(mesh: THREE.Mesh): boolean {
-  const material = Array.isArray(mesh.material) ? mesh.material[0] : mesh.material;
-  return material instanceof THREE.Material && material.transparent && material.opacity === 0;
-}
 
 /** The opening group a mesh sits in, if any. */
 function openingGroupOf(mesh: THREE.Object3D, shell: THREE.Object3D): THREE.Object3D | null {

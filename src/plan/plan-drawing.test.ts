@@ -30,6 +30,8 @@ import { L_SHAPE } from '../fixtures/plan-l-shape-ids.js';
 import { lShapePlan, bayPlan } from '../fixtures/plan-l-shape.js';
 import { apartmentScene } from '../demo/scene-data.js';
 import { findCatalogueEntry } from '../assets/asset-catalogue.js';
+import { OPENING_VARIANT } from '../assets/catalogue-ids.js';
+import { TWO_ROOM_ENTRANCE, twoRoomEntrancePlan } from '../fixtures/plan-two-room-entrance.js';
 import type { SceneData, Vec2 } from '../scene/types.js';
 
 function drawingOf(scene: SceneData): PlanDrawing {
@@ -149,6 +151,64 @@ describe('buildPlanDrawing: doors', () => {
     expect(Math.sin(arc.a0)).toBeCloseTo(swing.open.z, 6);
     expect(Math.cos(arc.a1)).toBeCloseTo(swing.closed.x, 6);
     expect(Math.sin(arc.a1)).toBeCloseTo(swing.closed.z, 6);
+  });
+});
+
+describe('buildPlanDrawing: a double door', () => {
+  type Leaf = Extract<PlanPrimitive, { kind: 'leaf' }>;
+  type Swing = Extract<PlanPrimitive, { kind: 'swing' }>;
+  const INNER = TWO_ROOM_ENTRANCE.opening.inner;
+
+  /** The two-room plan with the partition door wearing `variant`. */
+  function withInnerVariant(variant: string | undefined): SceneData {
+    return {
+      ...twoRoomEntrancePlan,
+      walls: twoRoomEntrancePlan.walls.map((wall) => ({
+        ...wall,
+        openings: (wall.openings ?? []).map((opening) => (opening.id === INNER && variant ? { ...opening, variant } : opening)),
+      })),
+    };
+  }
+
+  function doorParts(scene: SceneData): { leaves: Leaf[]; arcs: Swing[] } {
+    const drawing = drawingOf(scene);
+    return {
+      leaves: drawing.primitives.filter((p): p is Leaf => p.kind === 'leaf' && p.door.openingId === INNER),
+      arcs: drawing.primitives.filter((p): p is Swing => p.kind === 'swing' && p.door.openingId === INNER),
+    };
+  }
+
+  test('draws a leaf and an arc from each jamb, each half the clear width, opening to the same side', () => {
+    const scene = withInnerVariant(OPENING_VARIANT.door_white_double);
+    const plan = solvePlan(scene);
+    const swing = doorSwings(scene, plan, openingFrameWidth).find((entry) => entry.openingId === INNER)!;
+    const { leaves, arcs } = doorParts(scene);
+    expect({ leaves: leaves.length, arcs: arcs.length }).toEqual({ leaves: 2, arcs: 2 });
+
+    const otherJamb = { x: swing.pivot.x + swing.closed.x * swing.leaf, z: swing.pivot.z + swing.closed.z * swing.leaf };
+    const anchors = leaves.map((leaf) => leaf.from);
+    for (const jamb of [swing.pivot, otherJamb]) {
+      expect(anchors.some((from) => Math.hypot(from.x - jamb.x, from.z - jamb.z) < 1e-9)).toBe(true);
+    }
+    for (const leaf of leaves) {
+      const run = { x: leaf.to.x - leaf.from.x, z: leaf.to.z - leaf.from.z };
+      expect(Math.hypot(run.x, run.z)).toBeCloseTo(swing.leaf / 2, 9);
+      expect(run.x * swing.open.x + run.z * swing.open.z).toBeCloseTo(swing.leaf / 2, 9);
+    }
+    for (const arc of arcs) {
+      expect(arc.radius).toBeCloseTo(swing.leaf / 2, 9);
+      expect(Math.abs(arc.a1 - arc.a0)).toBeCloseTo(Math.PI / 2, 6);
+    }
+    // The two arcs close towards each other: they meet at the opening's centre.
+    const closedEnds = arcs.map((arc) => ({
+      x: arc.centre.x + Math.cos(arc.a1) * arc.radius,
+      z: arc.centre.z + Math.sin(arc.a1) * arc.radius,
+    }));
+    expect(Math.hypot(closedEnds[0]!.x - closedEnds[1]!.x, closedEnds[0]!.z - closedEnds[1]!.z)).toBeCloseTo(0, 9);
+  });
+
+  test('a single-leaf door stays one leaf and one arc', () => {
+    expect(Object.values(doorParts(withInnerVariant(undefined))).map((parts) => parts.length)).toEqual([1, 1]);
   });
 });
 

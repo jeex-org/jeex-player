@@ -26,7 +26,15 @@
 
 import type { AssetFactsSource } from '../assets/asset-facts.js';
 import * as THREE from 'three';
-import { buildPlanDrawing, fitTransform, type PlanBounds, type PlanDrawing, type PlanTransform } from '../plan/plan-drawing.js';
+import {
+  buildPlanDrawing,
+  fitTransform,
+  planPointAt,
+  type PlanBounds,
+  type PlanDrawing,
+  type PlanTransform,
+} from '../plan/plan-drawing.js';
+import { DOOR_HIT_SLOP_PX, doorSymbolAt, type DoorSymbolHit } from '../plan/door-symbol-hit.js';
 import { selectionMark, type PlanSelectionMark, type PlanSelectionTarget } from '../plan/plan-selection.js';
 import { planDrawingInputs } from '../assets/plan-fixtures.js';
 import { PLAN_PADDING, fitCanvasToBox, paintPlan, type PlanCameraMarker } from '../plan/plan-canvas.js';
@@ -240,6 +248,24 @@ export class PlanModes {
     const w = Math.max(1, Math.round(this.deps.viewport.clientWidth));
     const h = Math.max(1, Math.round(this.deps.viewport.clientHeight));
     return { bounds: this.drawing.bounds, transform: fitTransform(this.drawing.bounds, { w, h }, PLAN_PADDING) };
+  }
+
+  /**
+   * The door whose drawn leaf or swing arc is under a client point in
+   * `plan2d` (the draft's drawing while one is shown), with the plan point;
+   * `null` in any other mode, before a document, or off every door symbol.
+   * The 3D pick cannot answer this: cast from above, it lands on the floor
+   * under the symbol (`app/selection.ts` asks here first).
+   */
+  doorAt(clientX: number, clientY: number): (DoorSymbolHit & { point: { x: number; z: number } }) | null {
+    if (this.mode !== 'plan2d') return null;
+    const view = this.view();
+    const drawing = this.draft?.drawing ?? this.drawing;
+    if (!view || !drawing) return null;
+    const box = this.canvas.getBoundingClientRect();
+    const point = planPointAt(view.transform, { x: clientX - box.left, y: clientY - box.top });
+    const hit = doorSymbolAt(drawing, point, DOOR_HIT_SLOP_PX / Math.max(view.transform.scale, Number.EPSILON));
+    return hit ? { ...hit, point } : null;
   }
 
   /**

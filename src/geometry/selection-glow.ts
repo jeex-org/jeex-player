@@ -37,6 +37,7 @@
 
 import * as THREE from 'three';
 import { FRAGMENT_SHADER, VERTEX_SHADER } from './selection-glow-shader.js';
+import { expandByShape, isPickProxy } from './pick-proxy.js';
 import {
   AURA_MAX_PARTS,
   AURA_MIN_EXTENT,
@@ -187,14 +188,18 @@ export type SelectionGlow = {
   fade: SelectionGlowFade;
 };
 
-/** Collects the local-space bounding box of every furniture mesh under `group`. */
+/**
+ * Collects the local-space bounding box of every mesh under `group` that is
+ * part of its shape: an opening's invisible pick proxies (`pick-proxy.ts`) are
+ * not, or the aura of a door would climb the wall over it.
+ */
 function collectMeshBoxes(group: THREE.Group): AuraBox[] {
   const toLocal = new THREE.Matrix4().copy(group.matrixWorld).invert();
   const relative = new THREE.Matrix4();
   const boxes: AuraBox[] = [];
   const box = new THREE.Box3();
   group.traverse((child) => {
-    if (!(child instanceof THREE.Mesh)) return;
+    if (!(child instanceof THREE.Mesh) || isPickProxy(child)) return;
     // Never wrap an aura envelope in another aura envelope.
     for (let node: THREE.Object3D | null = child; node; node = node.parent) {
       if (node.name === GLOW_GROUP_NAME) return;
@@ -264,7 +269,7 @@ function auraSolidsOf(boxes: readonly AuraBox[]): AuraSolid[] {
  */
 export function createSelectionGlow(group: THREE.Group): SelectionGlow {
   group.updateMatrixWorld(true);
-  const worldBox = new THREE.Box3().setFromObject(group);
+  const worldBox = expandByShape(new THREE.Box3(), group);
   const height = worldBox.isEmpty() ? 0 : worldBox.max.y - worldBox.min.y;
   const origin = worldBox.isEmpty() ? group.getWorldPosition(new THREE.Vector3()) : worldBox.min.clone();
 

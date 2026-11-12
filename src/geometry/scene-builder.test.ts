@@ -55,6 +55,7 @@ import { projectAssetFacts } from '../assets/asset-facts.js';
 import { planDrawingInputs } from '../assets/plan-fixtures.js';
 import { buildPlanDrawing } from '../plan/plan-drawing.js';
 import { lintContext, lintLayout, projectLayoutCatalogue } from '../layout/layout-lint.js';
+import { expandByShape } from './pick-proxy.js';
 
 type Built = { scene: SceneData; plan: SolvedPlan; builder: SceneBuilder; root: THREE.Group };
 
@@ -492,8 +493,9 @@ describe('openings on curved walls', () => {
       vertexCount += object.geometry.getAttribute('position').count;
       expect(object.userData['openingPart']).toBeUndefined();
     });
-    expect(meshCount).toBe(9);
-    expect(vertexCount).toBe(320);
+    // Nine meshes as before plus the wall-top pick quad (`wallTopPickBoxes`).
+    expect(meshCount).toBe(10);
+    expect(vertexCount).toBe(324);
   });
 });
 
@@ -505,12 +507,15 @@ describe('straight walls keep the flat single-rectangle path', () => {
    * boxes were re-captured when the leaf rest angle became a quarter turn
    * (`door-swing.LEAF_REST_ANGLE_RAD`), which is what keeps a leaf inside its
    * own opening span instead of swinging past the jamb into the next wall.
+   * Every group then gained one invisible quad, its share of the wall top
+   * (`wallTopPickBoxes`): one mesh and 4 vertices more, and a top at the
+   * ceiling (3.15) plus the quad's 0.005 lift.
    */
   const BEFORE: Record<string, { meshes: number; vertices: number; min: [number, number, number]; max: [number, number, number] }> = {
-    [L_SHAPE.opening.doorEntry]: { meshes: 9, vertices: 320, min: [0.75, 0, -0.19], max: [1.75, 2.15, 0.86] },
-    [L_SHAPE.opening.windowASouth]: { meshes: 9, vertices: 176, min: [3.09, 0.82, -0.19], max: [5.21, 2.35, 0.31] },
-    [L_SHAPE.opening.windowBEast]: { meshes: 9, vertices: 176, min: [9.69, 0.82, 1.64], max: [10.19, 2.35, 3.36] },
-    [L_SHAPE.opening.doorAb]: { meshes: 9, vertices: 320, min: [5.22, 0, 2.0445], max: [6.09, 2.1, 2.95] },
+    [L_SHAPE.opening.doorEntry]: { meshes: 10, vertices: 324, min: [0.75, 0, -0.19], max: [1.75, 3.155, 0.86] },
+    [L_SHAPE.opening.windowASouth]: { meshes: 10, vertices: 180, min: [3.09, 0.82, -0.19], max: [5.21, 3.155, 0.31] },
+    [L_SHAPE.opening.windowBEast]: { meshes: 10, vertices: 180, min: [9.69, 0.82, 1.64], max: [10.19, 3.155, 3.36] },
+    [L_SHAPE.opening.doorAb]: { meshes: 10, vertices: 324, min: [5.22, 0, 2.0445], max: [6.09, 3.155, 2.95] },
   };
 
   test('mesh counts, vertex counts and bounding boxes are unchanged', () => {
@@ -769,7 +774,8 @@ describe('openings are built to the same heights the wall was cut to', () => {
     expect(cut!.head).toBeCloseTo(1.95, 10);
     const group = builder.getOpeningGroup(L_SHAPE.opening.doorAb);
     expect(group).not.toBeNull();
-    expect(new THREE.Box3().setFromObject(group!).max.y).toBeCloseTo(cut!.head, 6);
+    // The opening's shape only: its pick proxies include the wall-top quad, which lies on the ceiling.
+    expect(expandByShape(new THREE.Box3(), group!).max.y).toBeCloseTo(cut!.head, 6);
   });
 
   test('every opening the builder lists is centred on its own cut', () => {

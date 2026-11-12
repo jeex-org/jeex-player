@@ -34,6 +34,7 @@
 
 import * as THREE from 'three';
 import { highlightMatches } from '../render/selection-highlight.js';
+import { expandByShape } from '../geometry/pick-proxy.js';
 import { projectToViewport } from '../render/viewport-projection.js';
 import type { HostSlots } from '../ui/host-slots.js';
 import type { AnchorPoint, AnchorTarget, ViewerSlots } from './viewer-handle.js';
@@ -72,11 +73,13 @@ function matchesUnder(root: THREE.Object3D, target: Exclude<AnchorTarget, { x: n
 
 /**
  * The centre of the union of `objects`' boxes, written into `out`; `null` when
- * they enclose nothing at all.
+ * they enclose nothing at all. An opening's invisible pick proxies
+ * (`geometry/pick-proxy.ts`) are not part of its shape: its share of the wall
+ * top would otherwise lift the anchor towards the ceiling.
  */
 function centreOf(objects: readonly THREE.Object3D[], out: THREE.Vector3): THREE.Vector3 | null {
   SCRATCH_BOX.makeEmpty();
-  for (const object of objects) SCRATCH_BOX.expandByObject(object);
+  for (const object of objects) expandByShape(SCRATCH_BOX, object);
   if (SCRATCH_BOX.isEmpty()) return null;
   return SCRATCH_BOX.getCenter(out);
 }

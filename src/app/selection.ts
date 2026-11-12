@@ -18,7 +18,8 @@
  */
 
 import type * as THREE from 'three';
-import type { FaceKey, ViewerMode } from '../scene/types.js';
+import type { FaceKey, Vec2, ViewerMode } from '../scene/types.js';
+import type { DoorSymbolHit } from '../plan/door-symbol-hit.js';
 import type { Picker, SurfacePick } from '../geometry/picker.js';
 import { linkedAbortController } from '../shared/abort.js';
 import { SelectionHighlight, type HighlightKind, type HighlightTarget } from '../render/selection-highlight.js';
@@ -98,6 +99,11 @@ export type SelectionDeps = {
   camera: () => THREE.Camera | undefined;
   /** The mode on screen; `undefined` before the camera stack exists. */
   mode: () => ViewerMode | undefined;
+  /**
+   * The door whose drawn symbol is under a client point in `plan2d`
+   * (`PlanModes.doorAt`), asked before the 3D pick; absent asks nothing.
+   */
+  planDoorAt?: ((clientX: number, clientY: number) => (DoorSymbolHit & { point: Vec2 }) | null) | undefined;
   /** Raises the public `select` event. */
   emit: (selection: ViewerSelection) => void;
   /** `options.select` (and `interaction !== 'none'`): whether to listen at all. */
@@ -178,13 +184,24 @@ export class ViewerSelectionController {
     if (!isSelectClick(down, { x: event.clientX, y: event.clientY, at: event.timeStamp })) return;
     const mode = this.deps.mode();
     if (!mode || !SELECT_MODES.has(mode)) return;
+    // The 2D plan draws each door's leaf and swing arc over the floor; a click
+    // on them means the door, and the pick from above would answer the floor.
+    const door = mode === 'plan2d' ? this.deps.planDoorAt?.(event.clientX, event.clientY) : null;
+    if (door) {
+      this.report(selectionFrom({ surface: 'opening', openingId: door.openingId, wallId: door.wallId }, door.point, mode));
+      return;
+    }
     const camera = this.deps.camera();
     if (!camera) return;
     const picked = this.deps.picker.pickSelection(event.clientX, event.clientY, camera);
     const selection: ViewerSelection = picked
       ? selectionFrom(picked.pick, { x: picked.point.x, z: picked.point.z }, mode)
       : { kind: 'none', mode };
+    this.report(selection);
+  };
+
+  private report(selection: ViewerSelection): void {
     this.last = selection;
     this.deps.emit(selection);
-  };
+  }
 }

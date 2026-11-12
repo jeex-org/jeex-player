@@ -288,6 +288,19 @@ as described under [Versioning](#versioning).
   along the wall, and a door still opens to the side the plan gives it. On a
   curved wall a flat leaf hangs on the wall's tangent at the opening's
   centre. Walls along an axis build exactly as before.
+- **A click on a door or window from above selected its wall.** In `plan2d`,
+  `plan3d` and a high orbit the wall standing over an opening up to the
+  ceiling took the pick; every opening now owns the wall top over its span,
+  and `plan2d` keeps the facade walls standing for its picks.
+- **A click on a door's drawn leaf or swing arc in `plan2d` selected the floor.**
+  It now selects the door, as a click on its gap does; where two door symbols
+  overlap, the door with the nearer centre wins. Only the drawn lines take
+  the click, with a few pixels of grace: the empty floor inside the swing
+  still selects the room, the furniture or the wall under the pointer.
+- **A double door was drawn with one leaf on the 2D plan.** It is drawn with
+  a leaf and a swing arc from each jamb, each half the opening's width, with
+  both hinges where the 3D builder places them, on a curved wall too.
+  Swapping a door to a double variant redraws the plan at once.
 - **A swipe over an untouched viewer on a phone scrolls the page.** Touch
   follows the wheel's engagement rule: until the viewer is engaged (a tap,
   focus inside it, fullscreen, or a page that cannot scroll) its canvas takes

@@ -12,8 +12,13 @@ import { describe, expect, test } from 'bun:test';
 import * as THREE from 'three';
 import { SceneBuilder } from './scene-builder.js';
 import { solvePlan } from '../plan/plan-solver.js';
-import { lShapePlan } from '../fixtures/plan-l-shape.js';
-import { L_SHAPE } from '../fixtures/plan-l-shape-ids.js';
+import { bayPlan, lShapePlan } from '../fixtures/plan-l-shape.js';
+import { BAY, L_SHAPE } from '../fixtures/plan-l-shape-ids.js';
+import { buildPlanDrawing, type PlanPrimitive } from '../plan/plan-drawing.js';
+import { doorSymbolAt } from '../plan/door-symbol-hit.js';
+import { planDrawingInputs } from '../assets/plan-fixtures.js';
+import { resolveDoorSwing } from '../plan/door-swing.js';
+import { openingFrameWidth } from '../assets/opening-frame.js';
 import { effectiveOpening } from '../plan/plan-openings.js';
 import { OPENING_BUILDERS, openingMaterialFacts } from './opening-kinds.js';
 import { createBuilderContext } from './builder-context.js';
@@ -54,6 +59,38 @@ function leavesOf(group: THREE.Object3D): THREE.Object3D[] {
 
 function pickProxies(group: THREE.Object3D, openingId: string): THREE.Mesh[] {
   return group.children.filter((child): child is THREE.Mesh => child instanceof THREE.Mesh && child.name === `${openingId}-pick`);
+}
+
+/** A proxy's bounds in its opening group's frame, where `x` runs along the wall and `z` across it. */
+function localBox(proxy: THREE.Mesh): THREE.Box3 {
+  proxy.updateMatrix();
+  proxy.geometry.computeBoundingBox();
+  return proxy.geometry.boundingBox!.clone().applyMatrix4(proxy.matrix);
+}
+
+/**
+ * Splits an opening's proxies into the kind's own and its share of the wall
+ * top, and checks where that share lies: on the wall top (just over the
+ * ceiling height), over the opening's whole width and as deep as the wall —
+ * a quad facing up, so only a ray from above can hit it.
+ */
+function splitWallTop(proxies: readonly THREE.Mesh[], wallId: string, openingId: string): THREE.Mesh[] {
+  const wall = lShapePlan.walls.find((item) => item.id === wallId)!;
+  const opening = wall.openings!.find((item) => item.id === openingId)!;
+  const ceiling = lShapePlan.ceilingHeight;
+  const onTop = proxies.filter((proxy) => localBox(proxy).min.y >= ceiling);
+  expect(onTop.length).toBe(1);
+  const box = localBox(onTop[0]!);
+  expect(box.min.y).toBeCloseTo(box.max.y, 9);
+  expect(box.min.y).toBeGreaterThan(ceiling);
+  expect(box.min.y).toBeLessThan(ceiling + 0.01);
+  expect(box.min.x).toBeCloseTo(-opening.width / 2, 6);
+  expect(box.max.x).toBeCloseTo(opening.width / 2, 6);
+  expect(box.min.z).toBeCloseTo(-wall.thickness / 2, 6);
+  expect(box.max.z).toBeCloseTo(wall.thickness / 2, 6);
+  const normal = onTop[0]!.geometry.getAttribute('normal');
+  expect(normal.getY(0)).toBeCloseTo(1, 9);
+  return proxies.filter((proxy) => proxy !== onTop[0]);
 }
 
 describe('the opening-kind table', () => {
@@ -104,8 +141,9 @@ describe('doors and passages', () => {
     for (const type of ['door', 'passage'] as const) {
       const builder = build(sceneWithOpening(L_SHAPE.wall.wPart, L_SHAPE.opening.doorAb, { type }));
       const proxies = pickProxies(builder.getOpeningGroup(L_SHAPE.opening.doorAb)!, L_SHAPE.opening.doorAb);
-      expect({ type, proxies: proxies.length }).toEqual({ type, proxies: 3 });
-      // None of the three spans the whole opening at mid height: that is what
+      // Two jambs and the head, plus the opening's share of the wall top (`wallTopPickBoxes`).
+      expect({ type, proxies: splitWallTop(proxies, L_SHAPE.wall.wPart, L_SHAPE.opening.doorAb).length }).toEqual({ type, proxies: 3 });
+      // None of them spans the whole opening at mid height: that is what
       // lets a click travel through an open doorway.
       const opening = lShapePlan.walls.find((wall) => wall.id === L_SHAPE.wall.wPart)!.openings![0]!;
       const spanning = proxies.filter((proxy) => {
@@ -136,7 +174,8 @@ describe('windows', () => {
   test('a window is picked over its whole pane', () => {
     const builder = build(lShapePlan);
     const proxies = pickProxies(builder.getOpeningGroup(L_SHAPE.opening.windowASouth)!, L_SHAPE.opening.windowASouth);
-    expect(proxies.length).toBe(1);
+    // The pane, plus the window's share of the wall top (`wallTopPickBoxes`).
+    expect(splitWallTop(proxies, L_SHAPE.wall.wSA, L_SHAPE.opening.windowASouth).length).toBe(1);
   });
 
   test('an authored window with no sill or head keeps the effectiveOpening defaults', () => {
@@ -194,5 +233,57 @@ describe('a graphite metal window frame', () => {
       expect(openingMaterialFacts.get(frame)?.finish).toBe('01a16f65-52cd-7066-8e5f-4ffbd54a7290');
       expect((frame as THREE.MeshStandardMaterial).color.getHexString(THREE.SRGBColorSpace)).toBe('6a6862');
     }
+  });
+});
+
+describe('a double door on a curved wall', () => {
+  /** The bay window's opening, made a door here. */
+  const DOOR = BAY.opening.windowBay;
+  /** The bay fixture with its arc-wall window swapped for a 0.9 m double door, off the arc's middle. */
+  const scene: SceneData = {
+    ...bayPlan,
+    walls: bayPlan.walls.map((wall) =>
+      wall.id === BAY.wall.bay
+        ? {
+            ...wall,
+            openings: [
+              { id: DOOR, type: 'door', center: Math.PI - 0.6, width: 0.9, sill: 0, head: 2.1, variant: OPENING_VARIANT.door_white_double },
+            ],
+          }
+        : wall,
+    ),
+  };
+
+  test('the plan draws both hinges where the builder places them, and the hit test follows the drawing', () => {
+    const builder = build(scene);
+    const group = builder.getOpeningGroup(DOOR)!;
+    expect(leavesOf(group).length).toBe(2);
+    // The builder sets each hinge `width / 2 - frame` either way of the
+    // opening's centre along the tangent there: the group's position and its
+    // turn (`angleY = atan2(tangent.z, tangent.x)`).
+    const plan = solvePlan(scene);
+    const wall = scene.walls.find((candidate) => candidate.id === BAY.wall.bay)!;
+    const swing = resolveDoorSwing(scene, plan, wall, wall.openings![0]!, openingFrameWidth);
+    const tangent = { x: Math.cos(group.rotation.y), z: Math.sin(group.rotation.y) };
+    const across = { x: -tangent.z, z: tangent.x };
+    const side = Math.sign(across.x * swing.open.x + across.z * swing.open.z);
+    const open = { x: across.x * side, z: across.z * side };
+    const hinges = [1, -1].map((sign) => ({
+      x: group.position.x + tangent.x * sign * (swing.leaf / 2),
+      z: group.position.z + tangent.z * sign * (swing.leaf / 2),
+    }));
+
+    const drawing = buildPlanDrawing(plan, scene, planDrawingInputs(scene));
+    const drawn = drawing.primitives.filter(
+      (p): p is Extract<PlanPrimitive, { kind: 'leaf' }> => p.kind === 'leaf' && p.door.openingId === DOOR,
+    );
+    expect(drawn.length).toBe(2);
+    for (const hinge of hinges) {
+      expect(Math.min(...drawn.map((line) => Math.hypot(line.from.x - hinge.x, line.from.z - hinge.z)))).toBeLessThan(0.001);
+      // Halfway along that open leaf, a click names the door.
+      const middle = { x: hinge.x + open.x * (swing.leaf / 4), z: hinge.z + open.z * (swing.leaf / 4) };
+      expect(doorSymbolAt(drawing, middle)?.openingId).toBe(DOOR);
+    }
+    builder.dispose();
   });
 });

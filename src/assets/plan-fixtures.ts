@@ -18,7 +18,7 @@
 
 import { shippedAssetFacts, type AssetFactsSource } from './asset-facts.js';
 import { footprintOf } from './asset-footprint.js';
-import { openingFrameWidth } from './opening-frame.js';
+import { openingFrameWidth, openingLeafCount } from './opening-frame.js';
 import { obbQuad } from '../plan/plan-geometry.js';
 import { isPlanFixtureCategory, type PlanDrawingOptions, type PlanFixture } from '../plan/plan-drawing.js';
 import { effectiveAsset, type SceneData } from '../scene/types.js';
@@ -56,5 +56,5 @@ export function planFixtures(scene: SceneData, source: AssetFactsSource = shippe
  * and never has to know which of the inputs came from where.
  */
 export function planDrawingInputs(scene: SceneData, source: AssetFactsSource = shippedAssetFacts): PlanDrawingOptions {
-  return { frameWidthOf: openingFrameWidth, fixtures: planFixtures(scene, source) };
+  return { frameWidthOf: openingFrameWidth, leafCountOf: openingLeafCount, fixtures: planFixtures(scene, source) };
 }

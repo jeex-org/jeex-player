@@ -13,6 +13,9 @@ import * as THREE from 'three';
 import { SlotAnchor, viewerSlots, type AnchorScene } from './slot-anchor.js';
 import type { AnchorPoint } from './viewer-handle.js';
 import { projectToViewport } from '../render/viewport-projection.js';
+import { SceneBuilder } from '../geometry/scene-builder.js';
+import { solvePlan } from '../plan/plan-solver.js';
+import { TWO_ROOM_ENTRANCE, twoRoomEntrancePlan } from '../fixtures/plan-two-room-entrance.js';
 
 const VIEWPORT = { width: 900, height: 600 };
 
@@ -160,6 +163,27 @@ describe('an entity target', () => {
     anchor.target({ kind: 'furniture', id: ASSET.sofa });
     expect(() => anchor.update({ camera: camera(), root: undefined, viewport: VIEWPORT })).not.toThrow();
     expect(anchor.point()!.visible).toBe(false);
+  });
+  test('a door resolves to the centre of its frame and leaf, never of its invisible pick proxies', () => {
+    // The entrance of the two-room fixture: 1.0 wide at x = 1.2 on the z = 0
+    // facade, sill 0, head 2.1. Its share of the wall top (a pick proxy at the
+    // 2.7 ceiling) must not lift the anchor towards the ceiling.
+    const builder = new SceneBuilder(twoRoomEntrancePlan, solvePlan(twoRoomEntrancePlan));
+    const root = builder.build().root;
+    root.updateMatrixWorld(true);
+    // Orthographic, square to the facade: the screen point reads x and y alone.
+    const side = new THREE.OrthographicCamera(-3, 3, 2, -2, 0.1, 100);
+    side.position.set(1.2, 1, -5);
+    side.lookAt(1.2, 1, 0);
+    side.updateProjectionMatrix();
+    side.updateMatrixWorld(true);
+    anchor.target({ kind: 'opening', id: TWO_ROOM_ENTRANCE.opening.entrance });
+    anchor.update({ camera: side, root, viewport: VIEWPORT });
+    const expected = projectToViewport(side, new THREE.Vector3(1.2, 1.05, 0), VIEWPORT)!;
+    const point = anchor.point()!;
+    expect(point.x).toBeCloseTo(expected.x, 3);
+    expect(point.y).toBeCloseTo(expected.y, 3);
+    builder.dispose();
   });
 });
 
