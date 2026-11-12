@@ -146,6 +146,19 @@ describe('RenderDemand', () => {
     expect(run(demand, live, 40).draws).toBe(1);
   });
 
+  test('a repeat draws the unchanged inputs once more: after a change it is the steady draw, alone it owes nothing', () => {
+    const live = camera();
+    const demand = displayed(live, 'orbit');
+    demand.invalidate();
+    const afterChange = run(demand, live, 10, (tick) => {
+      if (tick === 1) demand.repeat();
+    });
+    expect(afterChange.drawn.slice(0, 3)).toEqual([true, true, false]);
+    expect(afterChange.draws).toBe(2);
+    demand.repeat();
+    expect(run(demand, live, 10).draws).toBe(1);
+  });
+
   test('a draw with another camera object is followed by one steady draw once the view rests', () => {
     // The first picture after the render camera changes is not the steady one (measured: the
     // top view's first frame differed from a later, identical-input frame in 7 runs of 10).

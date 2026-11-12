@@ -29,7 +29,9 @@
  * `invalidate` or a switch of camera object or mode, the `STEADY_AFTER_IDLE_TICKS`th
  * tick with nothing to draw draws the same inputs again (`commit`). A change
  * before then draws anyway and starts the count again, so a drag at any pointer
- * rate draws as its changes do, plus one draw at its end.
+ * rate draws as its changes do, plus one draw at its end. A draw asked for by
+ * `repeat` (the settle window drawing the picture again) is such a second draw
+ * of unchanged inputs: it pays the debt instead of adding one.
  *
  * Pure: no `three` and no DOM; the camera is read through its matrices.
  */
@@ -77,6 +79,8 @@ export class RenderDemand {
   private idle = 0;
   /** Whether the draw `shouldDraw` last allowed answers `invalidate`. */
   private answering = false;
+  /** The next tick draws the unchanged inputs again (`repeat`). */
+  private repeating = false;
   private shown: Shown | null = null;
   /** The mode of the last `shouldDraw`, which `commit` records. */
   private asked: string | undefined;
@@ -90,6 +94,15 @@ export class RenderDemand {
   }
 
   /**
+   * Nothing changed, but the next tick draws the same inputs again (the
+   * runtime's settle window, `settle-window.ts`). Such a draw owes no steady
+   * draw, and pays one that is owed.
+   */
+  repeat(): void {
+    this.repeating = true;
+  }
+
+  /**
    * Whether this tick draws, with `camera` in `mode`. Called once per tick,
    * after the frame hooks; brings the camera's world matrix up to date first.
    */
@@ -100,7 +113,7 @@ export class RenderDemand {
     camera.updateMatrixWorld();
     const shown = this.shown;
     this.answering = this.dirty;
-    if (this.dirty || shown === null) return true;
+    if (this.dirty || this.repeating || shown === null) return true;
     const changed =
       shown.camera !== camera ||
       shown.mode !== mode ||
@@ -135,6 +148,7 @@ export class RenderDemand {
     this.steady = switched || this.answering;
     this.idle = 0;
     this.answering = false;
+    this.repeating = false;
     this.dirty = false;
     this.shown = {
       camera,

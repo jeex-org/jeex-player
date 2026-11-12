@@ -1052,17 +1052,46 @@ describe('WebGL context loss', () => {
     const inside = Math.floor((NEW_RESOURCES_SETTLE_MS - 1) / 16);
     for (let i = 0; i < inside; i += 1) tick(16);
     expect(stub.renders).toBe(3 + inside);
-    // The window's last draw answered its own demand: one steady draw once the view rests, then rest.
+    // The window's draws repeat the change's inputs: they are its steady draws, and the view rests after them.
     tick(NEW_RESOURCES_SETTLE_MS);
     untilSteady(tick);
     tick(16);
-    expect(stub.renders).toBe(4 + inside);
+    expect(stub.renders).toBe(3 + inside);
     // Nothing new: a change draws, with its steady draw, and rests.
     runtime.demand.invalidate();
     tick(16);
     untilSteady(tick);
     tick(16);
-    expect(stub.renders).toBe(6 + inside);
+    expect(stub.renders).toBe(5 + inside);
+    runtime.dispose();
+  });
+
+  test('resources uploaded after a settle window without asking for a draw are not drawn until something asks', () => {
+    // The walk lighting's bake uploads one target after another while its result is not on
+    // screen yet. A view at rest after a settle window must not wake up for them: no draw
+    // follows the window, so none counts them and reopens it.
+    const { runtime, stub, tick } = harness({ mode: () => 'walk' });
+    const memory = (runtime.renderer.info as unknown as { memory: { textures: number; geometries: number } }).memory;
+    runtime.setCamera(new THREE.PerspectiveCamera());
+    runtime.start();
+    tick(16);
+    untilSteady(tick);
+    tick(16);
+    expect(stub.renders).toBe(2);
+    memory.textures += 1;
+    runtime.demand.invalidate();
+    tick(16);
+    const inside = Math.floor((NEW_RESOURCES_SETTLE_MS - 1) / 16);
+    for (let i = 0; i < inside; i += 1) tick(16);
+    tick(NEW_RESOURCES_SETTLE_MS);
+    const afterWindow = stub.renders;
+    expect(afterWindow).toBe(3 + inside);
+    // A bake: a new texture every other tick, nobody asks for a draw.
+    for (let i = 0; i < 60; i += 1) {
+      if (i % 2 === 0) memory.textures += 1;
+      tick(16);
+    }
+    expect(stub.renders).toBe(afterWindow);
     runtime.dispose();
   });
 
@@ -1086,11 +1115,11 @@ describe('WebGL context loss', () => {
     const inside = Math.floor((NEW_RESOURCES_SETTLE_MS - 1) / 16);
     for (let i = 0; i < inside; i += 1) tick(16);
     expect(stub.renders).toBe(settled + 1 + inside);
-    // One steady draw once the view rests after the window, then rest.
+    // The window's draws repeat the restored picture: they are its steady draws, and the view rests.
     tick(NEW_RESOURCES_SETTLE_MS);
     untilSteady(tick);
     tick(16);
-    expect(stub.renders).toBe(settled + 2 + inside);
+    expect(stub.renders).toBe(settled + 1 + inside);
     runtime.dispose();
   });
 
