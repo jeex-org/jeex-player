@@ -69,7 +69,7 @@ function harness(): Harness {
   const deps = {
     model: { scene: { assets: [SOFA], walls: [] }, rev: 0, apply: () => ({ rev: 1, applied: [], touched: [] }) },
     ui: { closePanel: () => {}, openPanel: () => {}, setHint: () => {}, wakeControls: () => {} },
-    messages: createMessages('en'),
+    messages: () => createMessages('en'),
     picker: {
       registerFurniture: (group: THREE.Object3D) => {
         registered.push(group);
@@ -131,7 +131,7 @@ describe('a shell rebuild adopts the new root before anything re-seeds', () => {
     const editor = new ViewerEditor({
       model: { scene: { assets: [], walls: [] } },
       ui: { closePanel: () => {} },
-      messages: createMessages('en'),
+      messages: () => createMessages('en'),
       picker: { registerFurniture: () => {}, unregister: () => {} },
       builder: {},
       animator: {
@@ -241,7 +241,7 @@ describe('edits', () => {
         setPanelBusy: () => {},
         wakeControls: () => {},
       },
-      messages: createMessages('en'),
+      messages: () => createMessages('en'),
       picker: { registerFurniture: () => {}, unregister: () => {} },
       builder: {},
       animator: { attach: () => {} },
@@ -430,7 +430,7 @@ describe('a second tap on the selected object deselects it', () => {
         setHint: () => {},
         wakeControls: () => {},
       },
-      messages: createMessages('en'),
+      messages: () => createMessages('en'),
       edits: { mode: 'local' },
       picker: { registerFurniture: () => {}, unregister: () => {} },
       builder: {

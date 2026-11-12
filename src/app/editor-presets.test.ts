@@ -52,7 +52,7 @@ function presetsHarness(mode: 'local' | 'emit' | 'off'): PresetsHarness {
       },
     },
     ui: { setHint: () => {}, setPanelBusy: () => {} },
-    messages: createMessages('en'),
+    messages: () => createMessages('en'),
     edits: editsWiring(resolveViewerOptions({ edits: mode }), (edit) => sent.push(edit)),
     reopenPanel: () => {},
   } as unknown as EditorPresetsDeps;

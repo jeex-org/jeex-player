@@ -8,6 +8,7 @@
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest';
 import { DoorHud, type DoorHudDeps } from '../../src/doors/door-hud.js';
 import type { DoorPhase } from '../../src/doors/door-state.js';
+import { createMessages, type Messages } from '../../src/ui/messages.js';
 import { OVERLAY_NAMES } from '../../src/ui/viewer-shell.js';
 import { closeContainers, openShell, type Shell } from './support.js';
 
@@ -50,7 +51,7 @@ function build(overrides: Partial<DoorHudDeps> = {}): Harness {
     toggle,
     panelOpen: () => world.panelOpen,
     enabled: () => world.enabled,
-    messages: shell.messages,
+    messages: () => shell.messages,
     ...overrides,
   });
   return { shell, hud, world, toggle };
@@ -106,6 +107,19 @@ describe('showing', () => {
     harness.hud.hover(DOOR.open, 1000);
     expect(harness.hud.element.dataset['state']).toBe('open');
     expect(harness.hud.element.getAttribute('aria-label')).toBe(harness.shell.messages.t('door.close'));
+  });
+
+  test('the label speaks the catalogue on screen now, not the one at construction', () => {
+    harness.hud.dispose();
+    let messages: Messages = createMessages('de');
+    harness = build({ messages: () => messages });
+    harness.hud.hover(DOOR.closed, 1000);
+    expect(harness.hud.element.getAttribute('aria-label')).toBe(createMessages('de').t('door.open'));
+    harness.hud.hide();
+    messages = createMessages('fr');
+    harness.hud.hover(DOOR.closed, 1000);
+    expect(harness.hud.element.getAttribute('aria-label')).toBe(createMessages('fr').t('door.open'));
+    expect(createMessages('fr').t('door.open')).not.toBe(createMessages('de').t('door.open'));
   });
 
   test('a hover over something that is not a door raises nothing', () => {

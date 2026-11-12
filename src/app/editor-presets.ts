@@ -21,7 +21,8 @@ import type { EditsWiring } from './edits-wiring.js';
 export type EditorPresetsDeps = {
   model: SceneModel;
   ui: Pick<ViewerUI, 'setPanelBusy' | 'setHint'>;
-  messages: Messages;
+  /** The catalogue on screen now (`handle.setLocale` replaces it). */
+  messages: () => Messages;
   /** What this viewer does with an edit made in its own panel (`edits-wiring.ts`). */
   edits: EditsWiring;
   /** Hears an interior preset the visitor applied (`shared/usage.ts`). */
@@ -82,7 +83,8 @@ export class EditorPresets {
    * refusal and leaves the active preset alone.
    */
   applyPreset(presetId: string): ApplyResult {
-    const { model, ui, messages } = this.deps;
+    const { model, ui } = this.deps;
+    const messages = this.deps.messages();
     const preset = findPreset(model.scene, presetId);
     ui.setPanelBusy(true);
     let result: ApplyResult;

@@ -33,7 +33,8 @@ export type PanelTarget =
 /** What the panels read of the editor and the document, and where their picks go. */
 export type EditorPanelsPort = {
   ui: Pick<ViewerUI, 'openPanel' | 'closePanel' | 'wakeControls' | 'openReplacePopup'>;
-  messages: Messages;
+  /** The catalogue on screen now, read per panel: `handle.setLocale` replaces it. */
+  messages: () => Messages;
   /** The committed scene. */
   scene: () => SceneData;
   /** The document's variant bank, absent for a bare scene. */
@@ -78,7 +79,7 @@ export class EditorPanels {
   openFinishPanel(target: FinishTarget, clientX: number, clientY: number): void {
     const { port } = this;
     const request = finishPanelRequest({
-      messages: port.messages,
+      messages: port.messages(),
       scene: port.scene(),
       target,
       variants: port.variants(),
@@ -101,7 +102,7 @@ export class EditorPanels {
     this.panelTarget = { kind: 'furniture', assetId };
     port.ui.openPanel(
       furniturePanelRequest({
-        messages: port.messages,
+        messages: port.messages(),
         placement,
         renderPreview: (definition, variantId) => port.furniturePreview(definition, variantId),
         variants: port.variants(),
@@ -129,7 +130,7 @@ export class EditorPanels {
     this.panelTarget = { kind: 'opening', openingId };
     port.ui.openPanel(
       openingPanelRequest({
-        messages: port.messages,
+        messages: port.messages(),
         entry,
         current: port.openingVariantOf(openingId),
         anchor: { x: clientX, y: clientY },
@@ -164,7 +165,7 @@ export class EditorPanels {
     this.panelTarget = { kind: 'interior' };
     port.ui.openPanel(
       interiorPanelRequest({
-        messages: port.messages,
+        messages: port.messages(),
         presets,
         activeId: port.activePresetId(),
         anchor: this.interiorAnchor,

@@ -192,7 +192,7 @@ export class ViewerApp {
     this.doors = new DoorController({
       container: this.roots.viewport,
       canvas: () => this.roots.canvas,
-      messages: this.messages,
+      messages: () => this.messages,
       interactive: options.doors.interactive,
       autoOpen: () => options.doors.autoOpen,
       openings: () => this.mount.builder?.openingsList() ?? [],
@@ -211,7 +211,7 @@ export class ViewerApp {
       dollhouse: this.dollhouse,
       animator: this.animator,
       ui: this.ui,
-      messages: this.messages,
+      messages: () => this.messages,
       renderPreview: (group) => this.stage?.runtime.preview.render(group) ?? null,
       edits: editsWiring(this.options, (edit) => this.events.emit('edit', edit)),
       onDocument: (model) => this.onDocument(model),

@@ -269,6 +269,11 @@ as described under [Versioning](#versioning).
 
 ### Fixed
 
+- **The selection speaks the language `setLocale` chose.** After a locale
+  switch, `describeSelection`, the viewer's own Replace and finish panels,
+  their hints and the door button kept the mount locale ("Ersetzen · Tür"
+  after `setLocale('fr')`); they now read the catalogue on screen at every
+  use.
 - **A swipe over an untouched viewer on a phone scrolls the page.** Touch
   follows the wheel's engagement rule: until the viewer is engaged (a tap,
   focus inside it, fullscreen, or a page that cannot scroll) its canvas takes

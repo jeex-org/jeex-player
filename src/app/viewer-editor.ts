@@ -50,8 +50,11 @@ import {
 export type EditorDeps = {
   model: SceneModel;
   ui: ViewerUI;
-  /** This instance's catalogue; every hint and panel title below comes from it. */
-  messages: Messages;
+  /**
+   * The catalogue on screen NOW; every hint and panel title below comes from it.
+   * Read at every use, never kept: `handle.setLocale` replaces it mid-session.
+   */
+  messages: () => Messages;
   picker: Picker;
   builder: SceneBuilder;
   animator: FurnitureAnimator;
@@ -86,9 +89,9 @@ export type EditorDeps = {
 
 export class ViewerEditor {
   private readonly deps: EditorDeps;
-  /** Shorthand for `deps.messages`: this module writes a lot of copy. */
+  /** Shorthand for `deps.messages()`: this module writes a lot of copy. */
   private get messages(): Messages {
-    return this.deps.messages;
+    return this.deps.messages();
   }
   private furnitureGroup: THREE.Group | null = null;
   private readonly furnitureAssets = new Map<string, THREE.Group>();

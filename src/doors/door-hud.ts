@@ -53,8 +53,8 @@ export type DoorHudDeps = {
   panelOpen: () => boolean;
   /** True in the modes that allow door interaction (orbit and walk). */
   enabled: () => boolean;
-  /** This instance's catalogue; the button's `aria-label` is its only copy. */
-  messages: Messages;
+  /** The catalogue on screen now, read per label: `handle.setLocale` replaces it. The button's `aria-label` is its only copy. */
+  messages: () => Messages;
   /** The mounted viewer's lifetime; every listener bound here carries it. */
   signal?: AbortSignal | undefined;
 };
@@ -182,7 +182,7 @@ export class DoorHud {
     }
     const shut = phase === 'closed' || phase === 'closing';
     this.button.dataset['state'] = shut ? 'closed' : 'open';
-    this.button.setAttribute('aria-label', this.deps.messages.t(shut ? 'door.open' : 'door.close'));
+    this.button.setAttribute('aria-label', this.deps.messages().t(shut ? 'door.open' : 'door.close'));
     // `setProperty`, never a `style` attribute: the CSSOM path is not what a
     // host's `style-src-attr` governs (README, "Content Security Policy").
     this.button.style.setProperty('left', `${Math.round(point.x)}px`);
