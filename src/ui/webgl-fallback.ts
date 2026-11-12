@@ -12,6 +12,8 @@
  * `SILHOUETTE`), not literals inside the painting code.
  */
 
+import type { Messages } from './messages.js';
+
 /** Horizon gradient stops, top to bottom, plus the silhouette fill. */
 const FALLBACK_PALETTE = {
   skyTop: '#182526',
@@ -43,21 +45,23 @@ type FallbackBox = { clientWidth: number; clientHeight: number };
  * Replaces `canvas` with a 2D-capable one when it has already been taken by a
  * WebGL context, and returns whichever canvas the caller should keep.
  *
- * `label` is the accessible name of the replacement (`canvas.fallbackLabel`);
+ * The replacement is named `canvas.fallbackLabel` in `messages` and marked with
+ * that key, so the shell's translation sweep (`setLocale`) renames it;
  * `shellName` is the `data-jeex` name the shell knows the canvas by, which the
  * replacement inherits so no lookup breaks.
  */
 export function adoptFallbackCanvas(
   canvas: HTMLCanvasElement,
   shellName: string,
-  label: string,
+  messages: Messages,
 ): { canvas: HTMLCanvasElement; context: CanvasRenderingContext2D | null } {
   const existing = canvas.getContext('2d');
   if (existing) return { canvas, context: existing };
   const replacement = canvas.ownerDocument.createElement('canvas');
   replacement.dataset['jeex'] = shellName;
   replacement.className = canvas.className;
-  replacement.setAttribute('aria-label', label);
+  replacement.dataset['i18nAttr'] = 'aria-label:canvas.fallbackLabel';
+  replacement.setAttribute('aria-label', messages.t('canvas.fallbackLabel'));
   canvas.replaceWith(replacement);
   return { canvas: replacement, context: replacement.getContext('2d') };
 }

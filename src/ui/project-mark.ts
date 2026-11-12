@@ -22,8 +22,8 @@ export const PROJECT_MARK_NAME = 'project-mark';
 export type ProjectMarkDeps = {
   /** The viewport box the mark sits in. */
   container: HTMLElement;
-  /** This instance's catalogue; `setLocale` retranslates through `data-i18n`. */
-  messages: Messages;
+  /** The catalogue on screen now, read when the link is created; once it is up, `setLocale` retranslates it through `data-i18n`. */
+  messages: () => Messages;
 };
 
 export class ProjectMark {
@@ -48,7 +48,7 @@ export class ProjectMark {
       link.target = '_blank';
       link.rel = 'noopener noreferrer';
       link.dataset['i18n'] = 'mark.madeWith';
-      link.textContent = this.deps.messages.t('mark.madeWith');
+      link.textContent = this.deps.messages().t('mark.madeWith');
       this.deps.container.appendChild(link);
       this.link = link;
     }

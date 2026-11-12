@@ -122,6 +122,8 @@ export class Minimap {
     // does, and reads correctly for a labelled, navigable landmark.
     this.card.setAttribute('role', 'region');
     this.card.setAttribute('aria-label', deps.messages.t('minimap.label'));
+    // The shell's translation sweep (`setLocale`) rewrites the name from this.
+    this.card.dataset['i18nAttr'] = 'aria-label:minimap.label';
     this.canvas = this.card.ownerDocument.createElement('canvas');
     this.canvas.className = 'minimap-canvas';
     this.canvas.setAttribute('aria-hidden', 'true');

@@ -87,10 +87,9 @@ export class ViewerApp {
     mount: () => this.mount,
     shell: () => this.shell,
     tour: this.tour,
-    messages: () => this.messages,
     director: () => this.stage?.director,
     handle: () => this.handle,
-    onFullscreenUnavailable: (message) => this.ui.setHint(message),
+    onFullscreenUnavailable: (text) => this.ui.setHint(text),
     usage: this.usage,
   });
   private readonly ui: ViewerUI;
@@ -192,7 +191,7 @@ export class ViewerApp {
     this.doors = new DoorController({
       container: this.roots.viewport,
       canvas: () => this.roots.canvas,
-      messages: this.messages,
+      messages: () => this.messages,
       interactive: options.doors.interactive,
       autoOpen: () => options.doors.autoOpen,
       openings: () => this.mount.builder?.openingsList() ?? [],
@@ -211,7 +210,7 @@ export class ViewerApp {
       dollhouse: this.dollhouse,
       animator: this.animator,
       ui: this.ui,
-      messages: this.messages,
+      messages: () => this.messages,
       renderPreview: (group) => this.stage?.runtime.preview.render(group) ?? null,
       edits: editsWiring(this.options, (edit) => this.events.emit('edit', edit)),
       onDocument: (model) => this.onDocument(model),
@@ -280,7 +279,7 @@ export class ViewerApp {
       showBootStep(this.ui, this.messages, 'support');
       if (!hasWebGL(this.roots.canvas)) {
         const failure = { code: 'webgl-unavailable', message: this.messages.t('error.noWebglBody') } as const;
-        this.fail(failure, this.messages.t('error.noWebglTitle'), false);
+        this.fail(failure, 'error.noWebglTitle', false, 'error.noWebglBody');
         // Reported, and the card is up: the boot still FAILED, so `ready` and a `loadScene` reject.
         throw new ViewerLibError(failure.code, failure.message);
       }
@@ -333,7 +332,8 @@ export class ViewerApp {
       // Already reported where it happened (no WebGL): the instance is torn down.
       if (this.disposed) throw error;
       const failure = toViewerError(sceneErrorCode(error), error, this.messages.t('error.unknown'));
-      this.fail(failure, this.messages.t('error.title'), true);
+      // The failure's own words stay as written; only the viewer's fallback follows `setLocale`.
+      this.fail(failure, 'error.title', true, error instanceof Error ? undefined : 'error.unknown');
       throw error;
     }
   }

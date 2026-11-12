@@ -11,7 +11,7 @@ import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest';
 import { userEvent } from 'vitest/browser';
 import { ViewerChrome, type ChromeCommands, type ViewerChromeDeps } from '../../src/ui/viewer-chrome.js';
 import { FullscreenController } from '../../src/ui/fullscreen-controller.js';
-import { createMessages } from '../../src/ui/messages.js';
+import { applyDomMessages, createMessages } from '../../src/ui/messages.js';
 import type { ViewerMode } from '../../src/scene/types.js';
 import { canvasHasInk, closeContainers, openShell, type Shell } from './support.js';
 
@@ -120,6 +120,14 @@ describe('shell states', () => {
     expect(canvas!.className).toBe(taken.className);
     expect(canvas!.getAttribute('aria-label')).toBe(harness.shell.messages.t('canvas.fallbackLabel'));
     expect(canvasHasInk(canvas!)).toBe(true);
+  });
+
+  test('the stand-in’s name follows the shell’s translation sweep (`setLocale`)', () => {
+    expect(harness.shell.roots.canvas.getContext('webgl2')).not.toBeNull();
+    harness.chrome.showError('Boot failed', 'the scene did not build', false);
+    const fr = createMessages('fr');
+    applyDomMessages(harness.shell.roots.root, fr);
+    expect(harness.shell.roots.canvas.getAttribute('aria-label')).toBe(fr.t('canvas.fallbackLabel'));
   });
 
   test('showError leaves the canvas untouched when Retry is offered, so a retried buildStage can still take WebGL', () => {
@@ -420,6 +428,44 @@ describe('hints and furniture state', () => {
     // `messages.ts`'s business, so this asserts the CALL happened, by identity.
     expect(button.getAttribute('aria-label')).toBe(createMessages('ru').t('furniture.hide'));
     expect(typeof english).toBe('string');
+  });
+});
+
+describe('text already on screen follows retranslate', () => {
+  const fr = createMessages('fr');
+
+  test('a room hint on screen stays, in the new language, and the furniture control is relabelled under it', () => {
+    const button = harness.shell.roots.byName('furniture-button');
+    harness.chrome.setFurnitureState(true);
+    harness.chrome.setHint((messages) => messages.t('hint.room', { name: 'Kitchen' }));
+    expect(harness.shell.roots.byName('hint-text').textContent).toBe(createMessages('en').t('hint.room', { name: 'Kitchen' }));
+    harness.chrome.retranslate(fr);
+    expect(harness.shell.roots.byName('hint-text').textContent).toBe(fr.t('hint.room', { name: 'Kitchen' }));
+    expect(button.getAttribute('aria-label')).toBe(fr.t('furniture.hide'));
+  });
+
+  test('a hint given as finished text is left as it is', () => {
+    harness.chrome.setHint('Fullscreen is not available here');
+    harness.chrome.retranslate(fr);
+    expect(harness.shell.roots.byName('hint-text').textContent).toBe('Fullscreen is not available here');
+  });
+
+  test('an error card on screen is re-rendered from what it was raised with', () => {
+    harness.chrome.showError(
+      (messages) => messages.t('error.title'),
+      (messages) => messages.t('error.unknown'),
+      true,
+    );
+    harness.chrome.retranslate(fr);
+    expect(harness.shell.roots.byName('error-title').textContent).toBe(fr.t('error.title'));
+    expect(harness.shell.roots.byName('error-message').textContent).toBe(fr.t('error.unknown'));
+  });
+
+  test('an error body that is the failure’s own text keeps it; the title still follows', () => {
+    harness.chrome.showError((messages) => messages.t('error.title'), 'scene.json: unexpected token', true);
+    harness.chrome.retranslate(fr);
+    expect(harness.shell.roots.byName('error-title').textContent).toBe(fr.t('error.title'));
+    expect(harness.shell.roots.byName('error-message').textContent).toBe('scene.json: unexpected token');
   });
 });
 

@@ -22,7 +22,7 @@ import type { ViewerMode } from '../scene/types.js';
 import { isPlanMode } from '../scene/types.js';
 import type { TourProgress, TourSpeed, TourState } from '../camera/tour-player.js';
 import type { DirectorChrome } from '../camera/camera-director.js';
-import type { Messages } from './messages.js';
+import type { LocalisedText, Messages } from './messages.js';
 import type { ViewerRoots } from './viewer-shell.js';
 import type { FullscreenController } from './fullscreen-controller.js';
 import { SelectionPanel, type PanelRequest } from './selection-panel.js';
@@ -99,6 +99,8 @@ export class ViewerUI implements DirectorChrome {
   private readonly settings: SettingsPanel;
   /** The producer's mark a project's manifest may require (`project-mark.ts`). */
   private readonly mark: ProjectMark;
+  /** The catalogue on screen now (`retranslate` replaces it); the mark reads it when it is created. */
+  private messages: Messages;
   /** The mode the camera director last switched to; the tour chrome shows only in `tour`. */
   private mode: ViewerMode = 'orbit';
 
@@ -106,7 +108,8 @@ export class ViewerUI implements DirectorChrome {
     this.commands = options.commands;
     this.usage = options.usage;
     this.onEscape = options.onEscape;
-    this.mark = new ProjectMark({ container: options.roots.viewport, messages: options.messages });
+    this.messages = options.messages;
+    this.mark = new ProjectMark({ container: options.roots.viewport, messages: () => this.messages });
     this.chrome = new ViewerChrome({
       roots: options.roots,
       viewport: options.shell,
@@ -190,6 +193,7 @@ export class ViewerUI implements DirectorChrome {
 
   /** Adopts a new catalogue: every string the UI owns is re-rendered. */
   retranslate(messages: Messages): void {
+    this.messages = messages;
     this.chrome.retranslate(messages);
     this.tourBar.retranslate(messages);
     this.settings.retranslate(messages);
@@ -209,14 +213,15 @@ export class ViewerUI implements DirectorChrome {
   showDegradedNotice(): void {
     this.chrome.showDegradedNotice();
   }
-  showError(title: string, message: string, retry: boolean, keepCanvas = false): void {
+  showError(title: LocalisedText, message: LocalisedText, retry: boolean, keepCanvas = false): void {
     this.chrome.showError(title, message, retry, keepCanvas);
   }
 
   // ---- Control bar --------------------------------------------------------
 
-  setHint(message: string): void {
-    this.chrome.setHint(message);
+  /** A hint given as catalogue text (`LocalisedText`) follows `setLocale` while it is on screen. */
+  setHint(text: LocalisedText): void {
+    this.chrome.setHint(text);
   }
   setHintForMode(mode: ViewerMode): void {
     this.chrome.setHintForMode(mode);
@@ -312,13 +317,28 @@ export class ViewerUI implements DirectorChrome {
    * variants of the asset being replaced.
    */
   openReplacePopup(request: ReplacePopupRequest): void {
-    this.popup.open({
+    this.popup.open(this.closingPanelOnPick(request));
+  }
+  /**
+   * The open panel's request rebuilt in another language (`handle.setLocale`):
+   * relabelled in place, so its scope tick, active swatch and focus stay.
+   */
+  refreshPanel(request: PanelRequest): void {
+    this.panel.refresh(request);
+  }
+  /** The open popup's request rebuilt in another language, relabelled in place like the panel. */
+  refreshReplacePopup(request: ReplacePopupRequest): void {
+    this.popup.refresh(this.closingPanelOnPick(request));
+  }
+  /** A popup pick closes the panel too: it lists the variants of the asset being replaced. */
+  private closingPanelOnPick(request: ReplacePopupRequest): ReplacePopupRequest {
+    return {
       ...request,
       onPick: (id) => {
         this.panel.close();
         request.onPick(id);
       },
-    });
+    };
   }
   closeReplacePopup(): void {
     this.popup.close();

@@ -14,14 +14,12 @@
 import type { UsageSink } from '../shared/usage.js';
 import { isApplyOk, type ApplyResult, type SceneModel } from '../scene/scene-model.js';
 import { applyPresetBatch, findPreset, presetBatchOps } from '../scene/interior-presets.js';
-import type { Messages } from '../ui/messages.js';
 import type { ViewerUI } from '../ui/viewer-ui.js';
 import type { EditsWiring } from './edits-wiring.js';
 
 export type EditorPresetsDeps = {
   model: SceneModel;
   ui: Pick<ViewerUI, 'setPanelBusy' | 'setHint'>;
-  messages: Messages;
   /** What this viewer does with an edit made in its own panel (`edits-wiring.ts`). */
   edits: EditsWiring;
   /** Hears an interior preset the visitor applied (`shared/usage.ts`). */
@@ -82,7 +80,7 @@ export class EditorPresets {
    * refusal and leaves the active preset alone.
    */
   applyPreset(presetId: string): ApplyResult {
-    const { model, ui, messages } = this.deps;
+    const { model, ui } = this.deps;
     const preset = findPreset(model.scene, presetId);
     ui.setPanelBusy(true);
     let result: ApplyResult;
@@ -92,11 +90,11 @@ export class EditorPresets {
       ui.setPanelBusy(false);
     }
     if (!isApplyOk(result)) {
-      ui.setHint(messages.t('hint.changeRefused', { message: result.message }));
+      ui.setHint((messages) => messages.t('hint.changeRefused', { message: result.message }));
       return result;
     }
     this.activePresetId = presetId;
-    if (preset) ui.setHint(messages.t('interiors.applied', { name: preset.name }));
+    if (preset) ui.setHint((messages) => messages.t('interiors.applied', { name: preset.name }));
     // Re-open so the active ring, and the swatches themselves, match the commit.
     this.deps.reopenPanel();
     return result;

@@ -97,6 +97,32 @@ export class ReplacePopup {
       this.opener = root.activeElement as HTMLElement | null;
     }
     this.request = request;
+    this.render(request);
+    this.popup.classList.remove('is-hidden');
+    this.popup.dataset['open'] = 'true';
+    this.list.scrollTop = 0;
+    focusablesOf(this.card)[0]?.focus();
+  }
+
+  /**
+   * Relabels the OPEN popup with a request rebuilt in another language
+   * (`handle.setLocale`): the list keeps its scroll, and the control that had
+   * focus gets it back by its place among the tab stops. A closed popup stays
+   * closed.
+   */
+  refresh(request: ReplacePopupRequest): void {
+    if (this.request === null) return;
+    const root = this.popup.getRootNode() as unknown as DocumentOrShadowRoot;
+    const focused = focusablesOf(this.card).indexOf(root.activeElement as HTMLElement);
+    const scrolled = this.list.scrollTop;
+    this.request = request;
+    this.render(request);
+    this.list.scrollTop = scrolled;
+    if (focused >= 0) focusablesOf(this.card)[focused]?.focus();
+  }
+
+  /** The title, the groups and the empty state of one request; what `open` and `refresh` share. */
+  private render(request: ReplacePopupRequest): void {
     this.title.textContent = request.title;
     const document = this.list.ownerDocument;
     this.list.replaceChildren();
@@ -117,10 +143,6 @@ export class ReplacePopup {
     this.empty.textContent = request.empty;
     this.empty.classList.toggle('is-hidden', !nothing);
     this.list.classList.toggle('is-hidden', nothing);
-    this.popup.classList.remove('is-hidden');
-    this.popup.dataset['open'] = 'true';
-    this.list.scrollTop = 0;
-    focusablesOf(this.card)[0]?.focus();
   }
 
   close(): void {

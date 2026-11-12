@@ -14,7 +14,7 @@
  */
 
 import type { ViewerMode } from '../scene/types.js';
-import { LIVE_MODE_LABEL, MODE_HINT, type Messages } from './messages.js';
+import { LIVE_MODE_LABEL, MODE_HINT, renderText, type LocalisedText, type Messages } from './messages.js';
 import { listenerOptions } from '../shared/abort.js';
 import type { ViewerRoots } from './viewer-shell.js';
 import { applyChromeOverlay, type ShellChromeFlags } from './chrome-overlay.js';
@@ -121,6 +121,10 @@ export class ViewerChrome {
   private interiorsAvailable = false;
   /** What the furniture toggle currently reports; re-rendered on a locale change. */
   private furnitureShown = true;
+  /** The hint on screen, as it was raised, so `retranslate` writes it again (the shell opens on the orbit hint). */
+  private hint: LocalisedText = (messages) => messages.t('hint.orbit');
+  /** The error card's copy while it is up, as it was raised; `null` once the card is down. */
+  private errorCopy: { title: LocalisedText; message: LocalisedText } | null = null;
   private collapsed = false;
   /** `options.chrome.autoHide`; `false` pins the bar open and arms no idle timer. */
   private autoHide = true;
@@ -295,13 +299,22 @@ export class ViewerChrome {
     this.announceTimer = undefined;
   }
 
-  /** Adopts a new catalogue and re-renders every string the chrome owns. */
+  /**
+   * Adopts a new catalogue and re-renders every string the chrome owns,
+   * including what is on screen now: the hint and the error card are written
+   * again from what they were raised with, and nothing new is announced.
+   */
   retranslate(messages: Messages): void {
     this.messages = messages;
     this.updateFullscreenButton();
-    this.setFurnitureState(this.furnitureShown);
+    this.labelFurnitureButton(this.furnitureShown);
     this.setTourButtonLabel(this.tourPlaying);
     if (this.lastDescription) this.setCanvasDescription(this.lastDescription.sceneName, this.lastDescription.roomNames);
+    this.hintText.textContent = renderText(this.hint, messages);
+    if (this.errorCopy) {
+      this.errorTitle.textContent = renderText(this.errorCopy.title, messages);
+      this.errorMessage.textContent = renderText(this.errorCopy.message, messages);
+    }
   }
 
   // ---- Shell states -------------------------------------------------------
@@ -313,6 +326,7 @@ export class ViewerChrome {
 
   /** Back to the loading card: what Retry shows while the instance boots again. */
   showLoading(): void {
+    this.errorCopy = null;
     this.errorState.classList.add('is-hidden');
     this.viewerUI.classList.add('is-hidden');
     this.loadingState.classList.remove('is-hidden');
@@ -326,6 +340,7 @@ export class ViewerChrome {
    * running scene without a loading step in between (`viewer-app.ts`).
    */
   showViewer(): void {
+    this.errorCopy = null;
     this.loadingState.classList.add('is-hidden');
     this.errorState.classList.add('is-hidden');
     this.viewerUI.classList.remove('is-hidden');
@@ -349,15 +364,16 @@ export class ViewerChrome {
    * failure that offers neither — truly no way back on this canvas — reaches
    * the illustration below.
    */
-  showError(title: string, message: string, retry: boolean, keepCanvas = false): void {
+  showError(title: LocalisedText, message: LocalisedText, retry: boolean, keepCanvas = false): void {
     this.loadingState.classList.add('is-hidden');
     this.viewerUI.classList.add('is-hidden');
-    this.errorTitle.textContent = title;
-    this.errorMessage.textContent = message;
+    this.errorCopy = { title, message };
+    this.errorTitle.textContent = renderText(title, this.messages);
+    this.errorMessage.textContent = renderText(message, this.messages);
     this.retryButton.classList.toggle('is-hidden', !retry);
     this.errorState.classList.remove('is-hidden');
     if (keepCanvas || retry) return;
-    const adopted = adoptFallbackCanvas(this.deps.roots.canvas, 'scene-canvas', this.messages.t('canvas.fallbackLabel'));
+    const adopted = adoptFallbackCanvas(this.deps.roots.canvas, 'scene-canvas', this.messages);
     // The shell's own reference follows the replacement, as it does a Retry's fresh canvas (`ViewerApp.retry`).
     this.deps.roots.canvas = adopted.canvas;
     if (adopted.context) paintWebglFallback(adopted.canvas, adopted.context, this.deps.viewport);
@@ -372,7 +388,9 @@ export class ViewerChrome {
    * second room tracker, only a second SINK for the one the director
    * already raises hints through (`camera-director.ts`).
    */
-  setHint(message: string): void {
+  setHint(text: LocalisedText): void {
+    this.hint = text;
+    const message = renderText(text, this.messages);
     this.hintText.textContent = message;
     this.announce(message);
   }
@@ -383,7 +401,7 @@ export class ViewerChrome {
   }
 
   setHintForMode(mode: ViewerMode): void {
-    this.setHint(this.messages.t(MODE_HINT[mode]));
+    this.setHint((messages) => messages.t(MODE_HINT[mode]));
   }
 
   /**
@@ -558,12 +576,17 @@ export class ViewerChrome {
 
   /** Mirrors furniture visibility onto the toggle button and the hint. */
   setFurnitureState(visible: boolean): void {
+    this.labelFurnitureButton(visible);
+    this.setHint((messages) => messages.t(visible ? 'hint.furnitureShown' : 'hint.furnitureHidden'));
+  }
+
+  /** The toggle's own state and copy; `retranslate` relabels it without touching the hint. */
+  private labelFurnitureButton(visible: boolean): void {
     this.furnitureShown = visible;
     this.furnitureButton.setAttribute('aria-pressed', String(!visible));
     this.furnitureButton.setAttribute('aria-label', this.messages.t(visible ? 'furniture.hide' : 'furniture.show'));
     this.furnitureButton.title = this.messages.t(visible ? 'furniture.stateShown' : 'furniture.stateHidden');
     this.furnitureButton.classList.toggle('is-off', !visible);
-    this.setHint(this.messages.t(visible ? 'hint.furnitureShown' : 'hint.furnitureHidden'));
   }
 
   /**

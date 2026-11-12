@@ -66,8 +66,8 @@ type SceneMountDeps = {
   dollhouse: Dollhouse;
   animator: FurnitureAnimator;
   ui: ViewerUI;
-  /** This instance's catalogue; handed on to the editor it builds. */
-  messages: Messages;
+  /** The catalogue on screen NOW, read at every use: `handle.setLocale` replaces it mid-session. */
+  messages: () => Messages;
   renderPreview: (group: THREE.Object3D) => string | null;
   /** What the built-in panel does with an edit made in it (`edits-wiring.ts`). */
   edits: EditsWiring;

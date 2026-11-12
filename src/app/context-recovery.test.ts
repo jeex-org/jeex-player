@@ -9,7 +9,7 @@
 
 import { describe, expect, test } from 'bun:test';
 import { contextRecovery } from './context-recovery.js';
-import { createMessages } from '../ui/messages.js';
+import { createMessages, renderText } from '../ui/messages.js';
 import type { SceneModel } from '../scene/scene-model.js';
 import type { SceneMount } from './scene-mount.js';
 import type { ViewerError } from './viewer-events.js';
@@ -30,7 +30,13 @@ function harness(options: { committed?: boolean; released?: boolean } = {}) {
   } as unknown as SceneMount;
   const recovery = contextRecovery({
     ui: () => ({
-      showError: (title, message, retry, keepCanvas) => shown.push({ title, message, retry, keepCanvas }),
+      showError: (title, message, retry, keepCanvas) =>
+        shown.push({
+          title: renderText(title, createMessages('en')),
+          message: renderText(message, createMessages('en')),
+          retry,
+          keepCanvas,
+        }),
     }),
     mount: () => mount,
     messages: () => createMessages('en'),

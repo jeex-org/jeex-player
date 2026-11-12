@@ -211,6 +211,19 @@ export type Messages = {
   t: (key: MessageKey, params?: Record<string, string | number>) => string;
 };
 
+/**
+ * Text the viewer shows: finished words, or how to write them in a catalogue.
+ * The second form is what lets text already on screen follow
+ * `handle.setLocale`: the UI keeps it and renders it again in the new language.
+ * Finished words (a host's or a browser's message) stay as they were given.
+ */
+export type LocalisedText = string | ((messages: Messages) => string);
+
+/** `text` in `messages`' language; finished words come back unchanged. */
+export function renderText(text: LocalisedText, messages: Messages): string {
+  return typeof text === 'string' ? text : text(messages);
+}
+
 /** True when `key` exists in the catalogue; guards attributes read from the DOM. */
 export function isMessageKey(key: string): key is MessageKey {
   return key in EN;

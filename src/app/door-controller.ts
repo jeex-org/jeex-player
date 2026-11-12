@@ -34,7 +34,8 @@ type DoorControllerDeps = {
   /** The viewport the HUD is positioned inside, and the canvas it dismisses on (read per boot: a Retry boots on a fresh one). */
   container: HTMLElement;
   canvas: () => HTMLElement;
-  messages: Messages;
+  /** The catalogue on screen now (`handle.setLocale` replaces it). */
+  messages: () => Messages;
   /** `options.doors.interactive`: the whole feature, on or off. */
   interactive: boolean;
   /** `options.doors.autoOpen`: the approach automation, on or off. */

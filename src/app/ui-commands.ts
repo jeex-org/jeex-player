@@ -15,7 +15,7 @@
 import type { UsageSink } from '../shared/usage.js';
 import type { ViewerCommands } from '../ui/viewer-ui.js';
 import type { CameraDirector } from '../camera/camera-director.js';
-import type { Messages } from '../ui/messages.js';
+import type { LocalisedText } from '../ui/messages.js';
 import type { SceneMount } from './scene-mount.js';
 import type { TourControls } from '../camera/tour-controls.js';
 import type { FullscreenController } from '../ui/fullscreen-controller.js';
@@ -26,7 +26,6 @@ type UiCommandDeps = {
   mount: () => SceneMount;
   shell: () => FullscreenController;
   tour: TourControls;
-  messages: () => Messages;
   director: () => CameraDirector | undefined;
   /**
    * The host commands, read lazily: the mode switch (which also re-hints and
@@ -34,8 +33,8 @@ type UiCommandDeps = {
    * ones a host drives, so the bar and the panel go through them too.
    */
   handle: () => HandleCommands;
-  /** Fullscreen was asked for and the browser has no API for it. */
-  onFullscreenUnavailable: (message: string) => void;
+  /** Fullscreen was asked for and the browser has no API for it; the hint is catalogue text, so it follows `setLocale`. */
+  onFullscreenUnavailable: (text: LocalisedText) => void;
   /** Hears the visitor entering fullscreen (`shared/usage.ts`). */
   usage?: UsageSink | undefined;
 };
@@ -48,7 +47,7 @@ export function uiCommands(deps: UiCommandDeps): ViewerCommands {
     resetCamera: () => deps.director()?.reset(),
     toggleFullscreen: async () => {
       const shell = deps.shell();
-      if (!(await shell.toggle())) deps.onFullscreenUnavailable(deps.messages().t('hint.fullscreenUnavailable'));
+      if (!(await shell.toggle())) deps.onFullscreenUnavailable((messages) => messages.t('hint.fullscreenUnavailable'));
       else if (shell.isFullscreen()) deps.usage?.('fullscreen');
     },
     toggleFurniture: () => deps.handle().setFurnitureVisible(!deps.handle().getFurnitureVisible()),

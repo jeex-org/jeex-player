@@ -275,9 +275,8 @@ export function handleCommands(deps: HandleCommandsDeps): HandleCommands {
       const messages = deps.context.retranslate(locale);
       deps.setMessages(messages);
       deps.ui.retranslate(messages);
-      // The camera stack keeps a catalogue of its own — it is where every hint
-      // the rigs raise by key is turned into words (`camera-director.ts`).
-      deps.stage()?.director?.retranslate(messages);
+      // The selection panel on screen, rebuilt for the same target in the new language.
+      deps.mount().editor?.refreshPanel();
       // And the authoring tools' own chrome, when they are in.
       authoring.retranslate(messages);
       deps.stage()?.walkCameras.retranslate(messages);

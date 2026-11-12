@@ -107,7 +107,7 @@ function rig(env: Partial<TextureEnv> | null, stub = network()) {
     dollhouse: { prepare: () => {}, isExterior: () => false, update: () => {} } as unknown as Dollhouse,
     animator: new FurnitureAnimator(),
     ui: ui as unknown as ViewerUI,
-    messages: createMessages('en'),
+    messages: () => createMessages('en'),
     renderPreview: () => null,
     edits: editsWiring(resolveViewerOptions({}), () => {}),
     onDocument: () => {},

@@ -12,6 +12,10 @@
  * Invariant: `target()` names what the open panel edits, and only while that
  * panel is the one the chrome shows: closing it for any reason goes through
  * `forgetPanelTarget`, so a late pick in a closed panel finds no target.
+ *
+ * Each request is built by one method per kind, read at the moment it is
+ * built, so `refresh()` (a locale switch) rebuilds the open panel's request for
+ * the same target and anchor and the UI relabels it in place.
  */
 
 import type { DemoAsset, ReplaceAssetOp, SceneData } from '../scene/types.js';
@@ -20,7 +24,15 @@ import type { OpeningListEntry } from '../geometry/opening-builder.js';
 import type { Messages } from './messages.js';
 import type { ViewerUI } from './viewer-ui.js';
 import type { FinishTarget } from './selection-options.js';
-import { finishPanelRequest, furniturePanelRequest, interiorPanelRequest, openingPanelRequest } from './panel-requests.js';
+import type { PanelRequest } from './selection-panel.js';
+import type { ReplacePopupRequest } from './replace-popup.js';
+import {
+  finishPanelRequest,
+  furniturePanelRequest,
+  interiorPanelRequest,
+  openingPanelRequest,
+  replacePopupRequest,
+} from './panel-requests.js';
 
 /** What the open panel is editing. */
 export type PanelTarget =
@@ -32,8 +44,12 @@ export type PanelTarget =
 
 /** What the panels read of the editor and the document, and where their picks go. */
 export type EditorPanelsPort = {
-  ui: Pick<ViewerUI, 'openPanel' | 'closePanel' | 'wakeControls' | 'openReplacePopup'>;
-  messages: Messages;
+  ui: Pick<
+    ViewerUI,
+    'openPanel' | 'refreshPanel' | 'closePanel' | 'wakeControls' | 'openReplacePopup' | 'refreshReplacePopup' | 'isReplacePopupOpen'
+  >;
+  /** The catalogue on screen now, read per panel: `handle.setLocale` replaces it. */
+  messages: () => Messages;
   /** The committed scene. */
   scene: () => SceneData;
   /** The document's variant bank, absent for a bare scene. */
@@ -63,6 +79,8 @@ export class EditorPanels {
   private panelTarget: PanelTarget = null;
   /** Where the interior panel last opened, so a commit does not move it. */
   private interiorAnchor = { x: 0, y: 0 };
+  /** Where the open finish or opening panel was anchored, so `refresh()` rebuilds it there. */
+  private pickAnchor = { x: 0, y: 0 };
   /** Rendered previews of the popup's offers, per archetype: rendering one is the expensive part of opening it. */
   private readonly offerPreviews = new Map<string, string | null>();
 
@@ -76,74 +94,33 @@ export class EditorPanels {
   }
 
   openFinishPanel(target: FinishTarget, clientX: number, clientY: number): void {
-    const { port } = this;
-    const request = finishPanelRequest({
-      messages: port.messages,
-      scene: port.scene(),
-      target,
-      variants: port.variants(),
-      anchor: { x: clientX, y: clientY },
-      onPick: (finishId, scopeChecked) => port.applyFinish(finishId, scopeChecked),
-      onApplyToAll: (finishId, scopeChecked) => port.applyFinishToAll(finishId, scopeChecked),
-    });
+    const anchor = { x: clientX, y: clientY };
+    const request = this.finishRequest(target, anchor);
     // A surface the paint vocabulary cannot address (a floor click that carried
     // no room) opens nothing, which is also what `describeSelection` answers
     // for it: one rule, in `selection-options.ts`.
     if (!request) return;
+    this.pickAnchor = anchor;
     this.panelTarget = { kind: 'surface', ...target };
-    port.ui.openPanel(request);
+    this.port.ui.openPanel(request);
   }
 
   openReplacePanel(assetId: string): void {
-    const { port } = this;
-    const placement = port.scene().assets.find((asset) => asset.id === assetId);
-    if (!placement) return;
+    const request = this.furnitureRequest(assetId);
+    if (!request) return;
     this.panelTarget = { kind: 'furniture', assetId };
-    port.ui.openPanel(
-      furniturePanelRequest({
-        messages: port.messages,
-        placement,
-        renderPreview: (definition, variantId) => port.furniturePreview(definition, variantId),
-        variants: port.variants(),
-        onPick: (variantId) => {
-          if (this.panelTarget?.kind !== 'furniture') return;
-          port.requestFurnitureVariant(this.panelTarget.assetId, variantId);
-        },
-        onStandard: (variantId) => {
-          this.closePanel();
-          port.requestFurnitureVariant(assetId, variantId);
-        },
-        replace:
-          port.editsMode() === 'off'
-            ? undefined
-            : { previews: this.offerPreviews, open: (popup) => port.ui.openReplacePopup(popup), commit: (op) => port.commitReplace(op) },
-      }),
-    );
-    port.ui.wakeControls();
+    this.port.ui.openPanel(request);
+    this.port.ui.wakeControls();
   }
 
   openOpeningPanel(openingId: string, clientX: number, clientY: number): void {
-    const { port } = this;
-    const entry = port.openings().find((item) => item.id === openingId);
-    if (!entry) return;
+    const anchor = { x: clientX, y: clientY };
+    const request = this.openingRequest(openingId, anchor);
+    if (!request) return;
+    this.pickAnchor = anchor;
     this.panelTarget = { kind: 'opening', openingId };
-    port.ui.openPanel(
-      openingPanelRequest({
-        messages: port.messages,
-        entry,
-        current: port.openingVariantOf(openingId),
-        anchor: { x: clientX, y: clientY },
-        onPick: (variantId) => {
-          if (this.panelTarget?.kind !== 'opening') return;
-          port.requestOpeningVariant(this.panelTarget.openingId, variantId);
-        },
-        onStandard: (variantId) => {
-          this.closePanel();
-          port.requestOpeningVariant(openingId, variantId);
-        },
-      }),
-    );
-    port.ui.wakeControls();
+    this.port.ui.openPanel(request);
+    this.port.ui.wakeControls();
   }
 
   /**
@@ -162,20 +139,117 @@ export class EditorPanels {
     if (anchor) this.interiorAnchor = anchor;
     port.clearSelection();
     this.panelTarget = { kind: 'interior' };
-    port.ui.openPanel(
-      interiorPanelRequest({
-        messages: port.messages,
-        presets,
-        activeId: port.activePresetId(),
-        anchor: this.interiorAnchor,
-        onPick: (presetId) => port.commitPreset(presetId),
-      }),
-    );
+    port.ui.openPanel(this.interiorRequest());
     port.ui.wakeControls();
+  }
+
+  /**
+   * Rebuilds the open panel's request, for the same target and where it
+   * stands, in the catalogue on screen NOW, and has the UI relabel it in
+   * place: the scope tick, the active swatch and the focus stay. An open
+   * replace popup over the furniture panel is relabelled the same way.
+   * `handle.setLocale` calls it; with no panel open it does nothing.
+   */
+  refresh(): void {
+    const target = this.panelTarget;
+    if (!target) return;
+    const { port } = this;
+    let request: PanelRequest | null = null;
+    if (target.kind === 'surface') request = this.finishRequest(target, this.pickAnchor);
+    else if (target.kind === 'furniture') request = this.furnitureRequest(target.assetId);
+    else if (target.kind === 'opening') request = this.openingRequest(target.openingId, this.pickAnchor);
+    else request = this.interiorRequest();
+    if (request) port.ui.refreshPanel(request);
+    if (target.kind !== 'furniture' || !port.ui.isReplacePopupOpen()) return;
+    const popup = this.popupRequest(target.assetId);
+    if (popup) port.ui.refreshReplacePopup(popup);
   }
 
   closePanel(): void {
     this.port.ui.closePanel();
+  }
+
+  private finishRequest(target: FinishTarget, anchor: { x: number; y: number }): PanelRequest | null {
+    const { port } = this;
+    return finishPanelRequest({
+      messages: port.messages(),
+      scene: port.scene(),
+      target,
+      variants: port.variants(),
+      anchor,
+      onPick: (finishId, scopeChecked) => port.applyFinish(finishId, scopeChecked),
+      onApplyToAll: (finishId, scopeChecked) => port.applyFinishToAll(finishId, scopeChecked),
+    });
+  }
+
+  private furnitureRequest(assetId: string): PanelRequest | null {
+    const { port } = this;
+    const placement = port.scene().assets.find((asset) => asset.id === assetId);
+    if (!placement) return null;
+    return furniturePanelRequest({
+      messages: port.messages(),
+      placement,
+      renderPreview: (definition, variantId) => port.furniturePreview(definition, variantId),
+      variants: port.variants(),
+      onPick: (variantId) => {
+        if (this.panelTarget?.kind !== 'furniture') return;
+        port.requestFurnitureVariant(this.panelTarget.assetId, variantId);
+      },
+      onStandard: (variantId) => {
+        this.closePanel();
+        port.requestFurnitureVariant(assetId, variantId);
+      },
+      replace:
+        port.editsMode() === 'off'
+          ? undefined
+          : { previews: this.offerPreviews, open: (popup) => port.ui.openReplacePopup(popup), commit: (op) => port.commitReplace(op) },
+    });
+  }
+
+  /** The popup the furniture panel's «Replace with another…» opens, as `furniturePanelRequest` builds it. */
+  private popupRequest(assetId: string): ReplacePopupRequest | null {
+    const { port } = this;
+    const placement = port.scene().assets.find((asset) => asset.id === assetId);
+    if (!placement) return null;
+    return replacePopupRequest({
+      messages: port.messages(),
+      placement,
+      variants: port.variants(),
+      renderPreview: (definition, variantId) => port.furniturePreview(definition, variantId),
+      previews: this.offerPreviews,
+      onPick: (op) => port.commitReplace(op),
+    });
+  }
+
+  private openingRequest(openingId: string, anchor: { x: number; y: number }): PanelRequest | null {
+    const { port } = this;
+    const entry = port.openings().find((item) => item.id === openingId);
+    if (!entry) return null;
+    return openingPanelRequest({
+      messages: port.messages(),
+      entry,
+      current: port.openingVariantOf(openingId),
+      anchor,
+      onPick: (variantId) => {
+        if (this.panelTarget?.kind !== 'opening') return;
+        port.requestOpeningVariant(this.panelTarget.openingId, variantId);
+      },
+      onStandard: (variantId) => {
+        this.closePanel();
+        port.requestOpeningVariant(openingId, variantId);
+      },
+    });
+  }
+
+  private interiorRequest(): PanelRequest {
+    const { port } = this;
+    return interiorPanelRequest({
+      messages: port.messages(),
+      presets: port.scene().interiors ?? [],
+      activeId: port.activePresetId(),
+      anchor: this.interiorAnchor,
+      onPick: (presetId) => port.commitPreset(presetId),
+    });
   }
 
   /** Drops the panel target when the UI closes the panel for any other reason. */

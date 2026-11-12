@@ -31,7 +31,7 @@ import type { Dollhouse } from '../geometry/dollhouse.js';
 import type { SceneData } from '../scene/types.js';
 import { EYE_HEIGHT_M, isInDoorway, isNavigable } from '../navigation/navigation.js';
 import { tourNavigation } from '../navigation/tour-legs.js';
-import { createMessages } from '../ui/messages.js';
+import { createMessages, renderText, type LocalisedText } from '../ui/messages.js';
 import { fakeCanvas, fakeWindowHooks } from '../fixtures/stubs.js';
 
 /** The director's own catalogue, so an assertion reads the copy the UI got. */
@@ -63,6 +63,8 @@ function harness(options: { pauseOnInput?: boolean; scene?: SceneData; wireInput
   const canvas = canvasStub as unknown as HTMLCanvasElement;
   let plan = solvePlan(scene);
   const hints: string[] = [];
+  /** Each hint as the director handed it on, before any catalogue wrote it. */
+  const raised: LocalisedText[] = [];
   const controller = new CameraController(camera, canvas, scene, plan, new Picker(canvas), {
     keys: canvas,
     // Manual input reaches the director only where a suite asks for it
@@ -95,8 +97,9 @@ function harness(options: { pauseOnInput?: boolean; scene?: SceneData; wireInput
   const ui = {
     setTourState: () => undefined,
     setTourProgress: () => undefined,
-    setHint: (message: string) => {
-      hints.push(message);
+    setHint: (text: LocalisedText) => {
+      raised.push(text);
+      hints.push(renderText(text, createMessages('en')));
     },
     setModeButtons: (mode: string) => {
       modeButtons.push(mode);
@@ -147,7 +150,6 @@ function harness(options: { pauseOnInput?: boolean; scene?: SceneData; wireInput
     ui,
     dollhouse,
     planModes,
-    messages: createMessages('en'),
     scene: () => scene,
     plan: () => plan,
     camera: () => camera,
@@ -170,6 +172,7 @@ function harness(options: { pauseOnInput?: boolean; scene?: SceneData; wireInput
     runtime,
     top,
     hints,
+    raised,
     modeButtons,
     canvas: canvasStub,
     keepExteriors: () => keepExteriors,
@@ -182,28 +185,19 @@ function harness(options: { pauseOnInput?: boolean; scene?: SceneData; wireInput
   };
 }
 
-describe('hints are keys until the director speaks them', () => {
-  test('the director turns a key into words with ITS catalogue, not a process-wide one', () => {
+describe('hints are keys until the UI writes them', () => {
+  test('the director hands a key on as catalogue text, written in the catalogue on screen', () => {
     const { director, hints } = harness();
     director.hint('hint.doorClosed');
     expect(hints.at(-1)).toBe('The door is closed · hover it to open');
   });
 
-  test('setLocale reaches the camera stack: the next hint is in the new language', () => {
-    const { director, hints } = harness();
-    director.retranslate(createMessages('ru'));
-    director.hint('hint.doorClosed');
-    expect(hints.at(-1)).toBe('Дверь закрыта · наведите на неё, чтобы открыть');
-  });
-
-  test('two directors in two languages answer the same key differently at once', () => {
-    const english = harness();
-    const russian = harness();
-    russian.director.retranslate(createMessages('ru'));
-    english.director.hint('hint.arrivedInstantly', { name: 'Kitchen' });
-    russian.director.hint('hint.arrivedInstantly', { name: 'Кухня' });
-    expect(english.hints.at(-1)).toBe('Jumped to Kitchen');
-    expect(russian.hints.at(-1)).toBe('Перенос в Кухня');
+  test('the same hint, written again after setLocale, is in the new language with its params', () => {
+    const { director, raised } = harness();
+    director.hint('hint.arrivedInstantly', { name: 'Kitchen' });
+    const hint = raised.at(-1)!;
+    expect(renderText(hint, createMessages('en'))).toBe('Jumped to Kitchen');
+    expect(renderText(hint, createMessages('ru'))).toBe('Перенос в Kitchen');
   });
 });
 

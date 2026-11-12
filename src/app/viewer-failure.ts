@@ -14,6 +14,7 @@
  */
 
 import { consoleSink, createLogger, type LogEntry, type Logger } from '../shared/logger.js';
+import type { LocalisedText, MessageKey } from '../ui/messages.js';
 import type { ViewerError } from './viewer-events.js';
 import type { ViewerOptions } from './viewer-options.js';
 
@@ -37,14 +38,19 @@ type FailureDeps = {
   emitError: (error: ViewerError) => void;
   /** Everything that exists once per BOOT; the shell and the events survive it. */
   teardown: () => void;
-  showError: (title: string, message: string, retry: boolean) => void;
+  showError: (title: LocalisedText, message: LocalisedText, retry: boolean) => void;
 };
 
-/** The user-facing card AND the machine-readable event, from one place: `fail(failure, title, retry)`. */
-export function failureRaiser(deps: FailureDeps): (failure: ViewerError, title: string, retry: boolean) => void {
-  return (failure, title, retry) => {
+/**
+ * The user-facing card AND the machine-readable event, from one place:
+ * `fail(failure, title, retry, body)`. The card's title and the viewer's own
+ * body are catalogue KEYS, so a card on screen follows `setLocale`; without
+ * `body` the card shows the failure's message, which stays as it was written.
+ */
+export function failureRaiser(deps: FailureDeps): (failure: ViewerError, title: MessageKey, retry: boolean, body?: MessageKey) => void {
+  return (failure, title, retry, body) => {
     deps.emitError({ ...failure, fatal: true });
     deps.teardown();
-    deps.showError(title, failure.message, retry);
+    deps.showError((messages) => messages.t(title), body === undefined ? failure.message : (messages) => messages.t(body), retry);
   };
 }

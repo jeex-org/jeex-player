@@ -131,7 +131,7 @@ function rig(
     dollhouse: dollhouse as unknown as Dollhouse,
     animator: new FurnitureAnimator(),
     ui: ui as unknown as ViewerUI,
-    messages: createMessages('en'),
+    messages: () => createMessages('en'),
     renderPreview: () => null,
     edits: editsWiring(resolveViewerOptions({}), () => {}),
     onDocument: (model) => {

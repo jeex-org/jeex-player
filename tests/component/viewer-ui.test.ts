@@ -8,6 +8,8 @@ import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest';
 import { ViewerUI, type ViewerCommands } from '../../src/ui/viewer-ui.js';
 import { FullscreenController } from '../../src/ui/fullscreen-controller.js';
 import { closeContainers, openShell, type Shell } from './support.js';
+import { createMessages } from '../../src/ui/messages.js';
+import { PROJECT_MARK_NAME } from '../../src/ui/project-mark.js';
 import { FINISH } from '../../src/materials/finish-ids.js';
 
 function noop(): void {
@@ -159,5 +161,15 @@ describe('Escape clears the selection', () => {
   test('a key other than Escape clears nothing', () => {
     harness.shell.roots.root.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true, cancelable: true }));
     expect(deselects).toBe(0);
+  });
+});
+
+describe('the producer mark follows setLocale', () => {
+  test('a mark that arrives after a locale switch is written in the new language', () => {
+    const fr = createMessages('fr');
+    harness.ui.retranslate(fr);
+    harness.ui.setProjectMark({ href: 'https://example.org/owners' });
+    const mark = harness.shell.roots.viewport.querySelector(`[data-jeex="${PROJECT_MARK_NAME}"]`);
+    expect(mark?.textContent).toBe(fr.t('mark.madeWith'));
   });
 });
