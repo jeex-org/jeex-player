@@ -23,6 +23,7 @@
 
 import {
   EPS,
+  add,
   arcFromChord,
   arcLength,
   arcPointAt,
@@ -32,6 +33,7 @@ import {
   leftN,
   mul,
   norm,
+  pointInPolygon,
   signedArea,
   spanQuad,
   sub,
@@ -68,9 +70,11 @@ export type DoorSwing = {
   /** Room the leaf swings into; `null` when that side is outside the plan. */
   roomId: string | null;
   /**
-   * Room on each side, read at the opening's own point and tangent: `in` the
-   * interior side, `out` the other one; `null` where that side is outside the
-   * plan. `rooms[swing]` is `roomId`.
+   * Room whose floor the door opens onto on each side, zones included: `in`
+   * the interior side, `out` the other one; `null` where that side is outside
+   * the plan. Sampled at the doorway (`floorRoomAt`), so it can name a zone
+   * where `roomId`, the wall face's room, names the zone's host. A naming
+   * field only: nothing that draws, lints or builds the leaf reads it.
    */
   rooms: { in: string | null; out: string | null };
 };
@@ -118,6 +122,18 @@ function roomOnSide(plan: SolvedPlan, wallId: string, normal: Vec2): string | nu
   return null;
 }
 
+/**
+ * The room that owns the floor at `point` (`SolvedPlan.rooms[].polygon`, the
+ * floor-ownership answer), zones first, so a zone wins over its host where a
+ * zone the solver left as drawn still overlaps it; `fallback` (the wall face's
+ * room) when the point is on no room's floor, such as inside a thick wall.
+ */
+function floorRoomAt(plan: SolvedPlan, point: Vec2, fallback: string | null): string | null {
+  const zone = plan.rooms.find((room) => room.loop.length === 0 && pointInPolygon(point, room.polygon));
+  if (zone) return zone.roomId;
+  return plan.rooms.find((room) => room.loop.length > 0 && pointInPolygon(point, room.polygon))?.roomId ?? fallback;
+}
+
 function roomArea(plan: SolvedPlan, roomId: string | null): number {
   if (!roomId) return 0;
   const room = plan.rooms.find((candidate) => candidate.roomId === roomId);
@@ -161,6 +177,13 @@ export function resolveDoorSwing(scene: SceneData, plan: SolvedPlan, wall: Wall,
   const jambT = hinge === 'a' ? opening.center - half + frame : opening.center + half - frame;
   const { point: pivot } = pointAt(scene, wall, jambT);
   const closed = hinge === 'a' ? tangent : mul(tangent, -1);
+  const leaf = Math.max(0, opening.width - 2 * frame);
+  // Each side's room is read half a leaf off the centreline at the opening's
+  // centre, square to the wall there: the same point whichever jamb the leaf
+  // hangs on, and inside the quarter circle the leaf sweeps from either jamb.
+  const left = leftN(tangent);
+  const inSide = dot(interior.normal, left) >= 0 ? left : mul(left, -1);
+  const sample = (side: Vec2): Vec2 => add(centre, mul(side, leaf / 2));
   return {
     openingId: opening.id,
     wallId: wall.id,
@@ -171,9 +194,12 @@ export function resolveDoorSwing(scene: SceneData, plan: SolvedPlan, wall: Wall,
     pivot,
     closed,
     open,
-    leaf: Math.max(0, opening.width - 2 * frame),
+    leaf,
     roomId,
-    rooms: { in: interior.roomId, out: outerRoom },
+    rooms: {
+      in: floorRoomAt(plan, sample(inSide), interior.roomId),
+      out: floorRoomAt(plan, sample(mul(inSide, -1)), outerRoom),
+    },
   };
 }
 

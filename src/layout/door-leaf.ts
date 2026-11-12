@@ -10,10 +10,9 @@
  * `swing` is not read (the opening builder lets it fill a missing swing; every
  * shipped variant says `'in'`). `leaves` comes from
  * `assets/opening-frame.openingLeafCount`, the variant's `leaf.style` the
- * builder reads. `rooms` is the side rule of the same call, read at the
- * opening's own point and tangent, so on an arc wall it names the rooms the
- * drawn leaf swings between, not the ones either side of the chord. It sits in
- * `layout/`, the lowest layer that reaches both.
+ * builder reads. `rooms` comes from the same call: on each side, the room
+ * whose floor the door opens onto, zones included, sampled at the doorway. It
+ * sits in `layout/`, the lowest layer that reaches both.
  *
  * Invariants: `explicit` says only whether the document names the value; the
  * answered `hinge` and `swing` are always the resolved ones. With `leaves: 2`
@@ -38,9 +37,11 @@ export type DoorLeaf = {
   leaves: 1 | 2;
   explicit: { hinge: boolean; swing: boolean };
   /**
-   * Room id on each side of the door: `in` the one the leaf opens into with
-   * `swing: 'in'`, `out` the one with `swing: 'out'`; `null` where that side
-   * is outside the flat (a facade). `rooms[swing]` is the room it opens into now.
+   * Room id on each side of the door, the room whose floor the door opens onto
+   * there (a zone when the doorway lands on one): `in` the one the leaf opens
+   * into with `swing: 'in'`, `out` the one with `swing: 'out'`; `null` where
+   * that side is outside the flat (a facade). `rooms[swing]` is the room it
+   * opens into now.
    */
   rooms: { in: string | null; out: string | null };
 };

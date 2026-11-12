@@ -13,10 +13,10 @@ import { L_SHAPE } from '../fixtures/plan-l-shape-ids.js';
 import { lShapePlan } from '../fixtures/plan-l-shape.js';
 import { CATALOGUE_REGISTRIES } from '../assets/catalogue-registries.js';
 import { doorSwings } from '../plan/door-swing.js';
-import { add, leftN, mul, norm, pointInPolygon, sub } from '../plan/plan-geometry.js';
-import { solvePlan, type SolvedPlan } from '../plan/plan-solver.js';
+import { ZONED, ZONE_OUTLINES, zone, zonedLivingPlan } from '../fixtures/plan-zoned-living.js';
+import { solvePlan } from '../plan/plan-solver.js';
 import { applyOp } from '../scene/scene-ops.js';
-import type { SceneData, Vec2 } from '../scene/types.js';
+import type { SceneData } from '../scene/types.js';
 import { doorLeaf } from './door-leaf.js';
 
 const ENTRY = L_SHAPE.opening.doorEntry;
@@ -94,19 +94,8 @@ const arcPlan: SceneData = {
   autotour: { path: [], gaze: [] },
 };
 
-/**
- * The reading this function must NOT do: the side taken off the wall's chord,
- * sampled a little either side of the point the chord puts the door at.
- */
-function chordRooms(scene: SceneData, plan: SolvedPlan, along: number, length: number): { in: string | null; out: string | null } {
-  const wall = scene.walls.find((candidate) => candidate.id === ARC.wall.arc)!;
-  const a = scene.nodes.find((node) => node.id === wall.a)!.p;
-  const b = scene.nodes.find((node) => node.id === wall.b)!.p;
-  const at = add(a, mul(sub(b, a), along / length));
-  const side = leftN(norm(sub(b, a)));
-  const roomAt = (point: Vec2): string | null => plan.rooms.find((room) => pointInPolygon(point, room.polygon))?.roomId ?? null;
-  return { in: roomAt(add(at, mul(side, 0.2))), out: roomAt(add(at, mul(side, -0.2))) };
-}
+/** A fixed UUID v7 literal for the zoned fixture's door, generated once. */
+const ZONED_DOOR = '01a1cf26-bc5b-76f4-a681-8c6e9afe2f73';
 
 describe('doorLeaf', () => {
   test('a door with no explicit hinge or swing answers the derived jamb and side', () => {
@@ -142,18 +131,26 @@ describe('doorLeaf', () => {
     expect(doorLeaf(scene, ENTRY)?.rooms).toEqual({ in: L_SHAPE.room.a, out: null });
   });
 
-  test('on an arc wall the rooms are read at the door, where the drawn leaf swings, not off the chord', () => {
+  test('an arc partition door names the room on each side and agrees with the drawn swing', () => {
     const plan = solvePlan(arcPlan);
     const leaf = doorLeaf(arcPlan, ARC.opening.door, plan)!;
     // At the door the wall runs south-east; its left, the concave side, is the north room.
     expect(leaf.rooms).toEqual({ in: ARC.room.north, out: ARC.room.south });
     const drawn = doorSwings(arcPlan, plan, openingFrameWidth)[0]!;
     expect(leaf.rooms[leaf.swing]).toBe(drawn.roomId);
+  });
 
-    // The chord puts this door over the bowl, so both of its sides read the north room.
-    const wall = arcPlan.walls.find((candidate) => candidate.id === ARC.wall.arc)!;
-    const length = 3.2 * 2 * Math.asin(3 / 3.2);
-    expect(chordRooms(arcPlan, plan, wall.openings![0]!.center, length)).toEqual({ in: ARC.room.north, out: ARC.room.north });
+  test('a door that opens onto a zone names the zone, not the room the zone lies in', () => {
+    // The kitchen zone runs along the east wall from z = 2 to z = 5; a door at z = 3.5 opens onto its floor.
+    const withDoor = (center: number): SceneData => {
+      const scene = zonedLivingPlan([zone(ZONED.room.kitchen, 'Kitchen', ZONE_OUTLINES.kitchen)]);
+      const door = { id: ZONED_DOOR, type: 'door', center, width: 0.9, sill: 0, head: 2.1, swing: 'in' } as const;
+      return { ...scene, walls: scene.walls.map((wall) => (wall.id === ZONED.wall.east ? { ...wall, openings: [door] } : wall)) };
+    };
+    expect(doorLeaf(withDoor(3.5), ZONED_DOOR)?.rooms).toEqual({ in: ZONED.room.kitchen, out: null });
+
+    // Slid to z = 6.5 it opens onto the living room's own floor again.
+    expect(doorLeaf(withDoor(6.5), ZONED_DOOR)?.rooms).toEqual({ in: ZONED.room.living, out: null });
   });
 
   test('explicit values are answered as the document carries them', () => {

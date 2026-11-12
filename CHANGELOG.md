@@ -12,10 +12,10 @@ as described under [Versioning](#versioning).
 - **`doorLeaf` names the room on each side of a door.** Its answer carries
   `rooms: { in, out }`: the room id the leaf opens into with `swing: 'in'` and
   with `swing: 'out'`, `null` where that side is outside the flat (a facade),
-  so `rooms[swing]` is the room it opens into now. The rooms come from the side
-  rule the drawn leaf uses, read at the door's own point and tangent, so on an
-  arc wall a door card names the rooms the leaf really swings between rather
-  than the ones either side of the wall's chord.
+  so `rooms[swing]` is the room it opens into now. Each side names the room
+  whose floor the door opens onto there, sampled at the doorway, zones
+  included: a door onto a kitchen zone outlined inside a living room names the
+  kitchen, not the living room.
 - **`jeex-viewer/ops` answers a door's hinge and swing.** `doorLeaf(scene,
   openingId, plan?)` (type `DoorLeaf`) gives the jamb and side a door's leaf
   shows, explicit or derived, how many leaves it has (`leaves: 2` for a double
