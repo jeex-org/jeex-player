@@ -1302,7 +1302,7 @@ A name not on this list is not public, whatever module it lives in — the same 
 
 ### Layout issue codes
 
-Every `LayoutIssue` carries a stable `code` and typed `params` beside its English `message`, so a host that shows the linter's issues in another language translates the code and fills in the params instead of a finished sentence. `params` is a discriminated union keyed by `code`: `issue.code === 'double_bed_nightstands'` narrows `issue.params` to `{ placement: string; count: number }`. `message` is unchanged, word for word, and is built by `renderLayoutIssue(issue.code, issue.params)`; a rule cannot write a sentence that disagrees with its code.
+Every `LayoutIssue` carries a stable `code` and typed `params` beside its English `message`, so a host that shows the linter's issues in another language translates the code and fills in the params instead of a finished sentence. `params` is a discriminated union keyed by `code`: `issue.code === 'double_bed_nightstands'` narrows `issue.params` to `{ placement: string; count: number }`. `message` is unchanged, word for word, and is built by `renderLayoutIssue(issue)`, which takes the code and params as one value (`LayoutIssueDetail`), so a `LayoutIssue` passes as it is and a code with another code's params does not compile; a rule cannot write a sentence that disagrees with its code.
 
 The params hold values, never English words:
 
@@ -1311,7 +1311,7 @@ The params hold values, never English words:
 - `archetype` is the catalogue's archetype id, `anchor` the catalogue anchor (`'wall'` or `'ceiling'`);
 - lengths are metres and `degrees` degrees, **unrounded**. The English rounds them as it always has: two decimals for a length, three for the `wall_hung_off_face` gap, one for an angle; the rule's own limits (`maxGap`, `min`, `max`, `furthest`, the wardrobe front's `depth`) print as the numbers they are.
 
-The codes are part of the public API: adding a code is a minor change, renaming or removing one, or changing its params, is a breaking change. In the table, `{name}` stands for an id param and the numbers are examples.
+The codes are part of the public API: adding a code is a minor change, renaming or removing one, or changing its params, is a breaking change. A host that maps codes to its own sentences therefore types its table as `Partial<Record<LayoutIssueCode, …>>` and shows `message` for a code it does not know, so a newer viewer with a new code still reads. In the table, `{name}` stands for an id param and the numbers are examples.
 
 | Code | Rule | Params | Example sentence |
 |---|---|---|---|

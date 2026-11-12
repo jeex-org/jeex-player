@@ -22,9 +22,12 @@
  *   the numbers they are.
  *
  * The codes are public (`jeex-viewer/ops`): adding one is a minor change,
- * renaming or removing one is a breaking change. The list is the source of
- * the `LayoutIssueCode` union, and the renderer's table is typed over it, so
- * a code without params or without a sentence does not compile.
+ * renaming or removing one, or changing its params, is a breaking change. So
+ * a host that maps codes to its own sentences does not assume it knows every
+ * code: it types its table as `Partial<Record<LayoutIssueCode, …>>` and shows
+ * `message` for a code the table lacks. The list is the source of the
+ * `LayoutIssueCode` union, and the renderer's table is typed over it, so a
+ * code without params or without a sentence does not compile here.
  *
  * Pure module: no `three`, no DOM.
  */
@@ -164,19 +167,6 @@ export type LayoutIssueParams = {
 /** One issue's code with its params: `issue.code === 'x'` narrows `issue.params`. */
 export type LayoutIssueDetail = { [C in LayoutIssueCode]: { code: C; params: LayoutIssueParams[C] } }[LayoutIssueCode];
 
-/**
- * Rule 6's three sentences, with the corridor width already printed. Kept in
- * this shape because `scene/issue-heirs.ts` tells the three apart by their
- * words (`circulationSentenceOf`), and its tests write them through these.
- */
-export const circulationSentence = {
-  noFloor: (opening: string, width: string, room: string): string =>
-    `${opening} has no ${width} m of free floor in front of it inside ${room}`,
-  noPath: (from: string, to: string, width: string, room: string): string => `no ${width} m path from ${from} to ${to} across ${room}`,
-  mainZone: (room: string, opening: string, width = '0.80'): string =>
-    `the main zone of ${room} is not reachable on a ${width} m path from ${opening}`,
-} as const;
-
 /** Metres to two decimals, as every sentence prints a measured length. */
 const m = (value: number): string => value.toFixed(2);
 
@@ -195,9 +185,9 @@ const TEMPLATES: { readonly [C in LayoutIssueCode]: (params: LayoutIssueParams[C
   wall_hung_centre_height: (p) => `${p.placement} hangs at ${m(p.height)} m; ${p.archetype} centres belong in ${m(p.low)}..${m(p.high)} m`,
   wall_hung_bottom_height: (p) =>
     `${p.placement} has its bottom at ${m(p.bottom)} m; ${p.archetype} belongs in ${m(p.low)}..${m(p.high)} m`,
-  door_no_free_floor: (p) => circulationSentence.noFloor(p.opening, m(p.width), p.room),
-  doors_not_connected: (p) => circulationSentence.noPath(p.from, p.to, m(p.width), p.room),
-  main_zone_unreachable: (p) => circulationSentence.mainZone(p.room, p.opening, m(p.width)),
+  door_no_free_floor: (p) => `${p.opening} has no ${m(p.width)} m of free floor in front of it inside ${p.room}`,
+  doors_not_connected: (p) => `no ${m(p.width)} m path from ${p.from} to ${p.to} across ${p.room}`,
+  main_zone_unreachable: (p) => `the main zone of ${p.room} is not reachable on a ${m(p.width)} m path from ${p.opening}`,
   window_blocked: (p) => `${p.placement} is ${m(p.height)} m tall and blocks window ${p.opening}`,
   raised_without_support: (p) => `${p.placement} stands ${m(p.height)} m above the floor on no top that may hold it`,
   floor_object_outside_rooms: (p) => `${p.placement} stands outside every room`,
@@ -225,7 +215,12 @@ const TEMPLATES: { readonly [C in LayoutIssueCode]: (params: LayoutIssueParams[C
   entrance_axis_blocked: (p) => `${p.placement} stands on the axis from ${p.opening} into ${p.room}`,
 };
 
-/** The English sentence of an issue, from its code and params: what `LayoutIssue.message` holds. */
-export function renderLayoutIssue<C extends LayoutIssueCode>(code: C, params: LayoutIssueParams[C]): string {
-  return (TEMPLATES[code] as (params: LayoutIssueParams[C]) => string)(params);
+/**
+ * The English sentence of an issue, from its code and params: what
+ * `LayoutIssue.message` holds. It takes the pair as one value, so a
+ * `LayoutIssue` passes as it is and a code with another code's params does not
+ * compile.
+ */
+export function renderLayoutIssue(detail: LayoutIssueDetail): string {
+  return (TEMPLATES[detail.code] as (params: LayoutIssueDetail['params']) => string)(detail.params);
 }

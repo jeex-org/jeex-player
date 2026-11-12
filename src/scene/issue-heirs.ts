@@ -129,8 +129,8 @@ const SAME_POINT_M = 0.01;
  * widen it without a case that needs it.
  */
 export function inheritedPath(
-  issue: Pick<LayoutIssue, 'rule' | 'ids' | 'message' | 'at'>,
-  base: readonly Pick<LayoutIssue, 'rule' | 'ids' | 'message' | 'at'>[],
+  issue: Pick<LayoutIssue, 'code' | 'ids' | 'at'>,
+  base: readonly Pick<LayoutIssue, 'code' | 'ids' | 'at'>[],
   roomMerges: readonly RoomMerge[],
   ops: readonly SceneOp[],
 ): boolean {

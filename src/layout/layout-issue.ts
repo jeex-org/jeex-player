@@ -19,15 +19,7 @@
 
 import type { SolvedPlan } from '../plan/plan-solver.js';
 import type { SceneData, Vec2 } from '../scene/types.js';
-import {
-  circulationSentence,
-  renderLayoutIssue,
-  type LayoutIssueCode,
-  type LayoutIssueDetail,
-  type LayoutIssueParams,
-} from './layout-issue-codes.js';
-
-export { circulationSentence };
+import { renderLayoutIssue, type LayoutIssueCode, type LayoutIssueDetail, type LayoutIssueParams } from './layout-issue-codes.js';
 
 /**
  * What a layout issue is ABOUT, named rather than numbered.
@@ -180,7 +172,7 @@ export function layoutIssue<C extends LayoutIssueCode>(
     rule: RULE_OF_CODE[code],
     severity: where.severity,
     ids: where.ids,
-    message: renderLayoutIssue(code, params),
+    message: renderLayoutIssue(detail),
     at: where.at,
     ...detail,
   };
@@ -198,11 +190,10 @@ export function layoutIssue<C extends LayoutIssueCode>(
  */
 export type LayoutLinter = (scene: SceneData, plan: SolvedPlan) => readonly LayoutIssue[];
 
-/** Which of rule 6's sentences `issue` is, or `null` for any other issue. */
-export function circulationSentenceOf(issue: Pick<LayoutIssue, 'rule' | 'message'>): 'no-floor' | 'no-path' | 'main-zone' | null {
-  if (issue.rule !== 'circulation') return null;
-  if (/^no \d+\.\d+ m path from /.test(issue.message)) return 'no-path';
-  if (/ has no \d+\.\d+ m of free floor in front of it inside /.test(issue.message)) return 'no-floor';
-  if (issue.message.startsWith('the main zone of ')) return 'main-zone';
+/** Which of rule 6's issues `issue` is, told by its code, or `null` for any other issue. */
+export function circulationSentenceOf(issue: Pick<LayoutIssue, 'code'>): 'no-floor' | 'no-path' | 'main-zone' | null {
+  if (issue.code === 'door_no_free_floor') return 'no-floor';
+  if (issue.code === 'doors_not_connected') return 'no-path';
+  if (issue.code === 'main_zone_unreachable') return 'main-zone';
   return null;
 }
