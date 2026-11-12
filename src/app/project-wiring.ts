@@ -70,7 +70,12 @@ export type LoadedProjectContext = {
 };
 
 /** A validated document and the libraries it is drawn with, if any beyond the bundled bank. */
-export type LoadedDocument = { readonly model: SceneModel; readonly project: LoadedProjectContext | null };
+export type LoadedDocument = {
+  readonly model: SceneModel;
+  readonly project: LoadedProjectContext | null;
+  /** Whether the source named the host's `revision`; without one the model counts from 0 (`authoring-port.ts` warns an edit tool). */
+  readonly revisionGiven: boolean;
+};
 
 /**
  * Loads and VALIDATES one document, whichever of the two shapes it is.
@@ -105,7 +110,11 @@ export async function loadDocument(
   }
   const project = info !== null || offers !== null ? projectContext(info, log, offers) : null;
   const options = source?.revision === undefined ? undefined : { revision: source.revision };
-  return { model: SceneModel.load(input, project?.registries ?? CATALOGUE_REGISTRIES, log, options), project };
+  return {
+    model: SceneModel.load(input, project?.registries ?? CATALOGUE_REGISTRIES, log, options),
+    project,
+    revisionGiven: options !== undefined,
+  };
 }
 /**
  * The raw manifest a mount should read, or `null` for a bare scene.

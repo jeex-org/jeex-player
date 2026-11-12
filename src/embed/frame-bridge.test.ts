@@ -11,7 +11,8 @@
 
 import { afterEach, beforeEach, describe, expect, test } from 'bun:test';
 import { installFrameBridge } from './frame-bridge.js';
-import { CHANNEL, PROTOCOL_VERSION, type JeexMessage } from './protocol.js';
+import { CHANNEL, METHOD_LIST, PROTOCOL_VERSION, type JeexMessage } from './protocol.js';
+import { VIEWER_VERSION } from '../shared/version.js';
 import { MAX_SCENE_BYTES } from '../shared/limits.js';
 import type { TourProgress } from '../camera/tour-player.js';
 import type { ViewerError } from '../app/viewer-events.js';
@@ -81,6 +82,8 @@ type Fired = {
   ended: () => void;
   lightTemperature: (change: { temperature: number | null; source: 'host' | 'panel' }) => void;
   assets: (info: unknown) => void;
+  walkCamera: (camera: { index: number | null; count: number }) => void;
+  tourSpeed: (speed: { speed: number }) => void;
 };
 
 /** The viewer window the bridge installs itself on. */
@@ -219,6 +222,8 @@ function fakeHandle(
       ended: fireOne('tour:ended'),
       lightTemperature: fireOne('lightTemperature'),
       assets: fireOne('assets'),
+      walkCamera: fireOne('walkCamera'),
+      tourSpeed: fireOne('tourSpeed'),
     },
   };
 }
@@ -238,7 +243,7 @@ function settled(): Promise<void> {
 function sendCommand(
   method: string,
   params?: Record<string, unknown>,
-  over: Partial<{ origin: string; source: unknown; viewerId: string; channel: string; version: number }> = {},
+  over: Partial<{ origin: string; source: unknown; viewerId: string; channel: string; version: number; id: string }> = {},
 ): void {
   frameWindow.receive({
     origin: over.origin ?? HOST_ORIGIN,
@@ -248,7 +253,7 @@ function sendCommand(
       version: over.version ?? PROTOCOL_VERSION,
       viewerId: over.viewerId ?? VIEWER_ID,
       kind: 'command',
-      id: 'c1',
+      id: over.id ?? 'c1',
       method,
       ...(params ? { params } : {}),
     },
@@ -256,7 +261,7 @@ function sendCommand(
 }
 
 /** Everything the bridge posted back, replies and events alike. */
-function replies(): Array<{ ok: boolean; result?: unknown; error?: { code: string; message: string }; origin: string }> {
+function replies(): Array<{ id: string; ok: boolean; result?: unknown; error?: { code: string; message: string }; origin: string }> {
   return hostWindow.posted
     .filter((entry) => entry.message.kind === 'reply')
     .map((entry) => ({ ...(entry.message as { ok: boolean }), origin: entry.origin }) as never);
@@ -328,7 +333,6 @@ describe('who the bridge answers', () => {
   test('other postMessage traffic on the page is not ours', async () => {
     const { calls } = bridge();
     sendCommand('play', undefined, { channel: 'some-other-widget' });
-    sendCommand('play', undefined, { version: 2 });
     frameWindow.receive({ origin: HOST_ORIGIN, source: hostWindow, data: 'hello' });
     frameWindow.receive({ origin: HOST_ORIGIN, source: hostWindow, data: null });
     await settled();
@@ -440,7 +444,8 @@ describe('a flood of foreign traffic', () => {
       { ...envelope, kind: 'event', event: 'ready' },
       { ...envelope, kind: 'mystery', id: 'c', method: 'play' },
       { ...envelope, viewerId: 'v2', kind: 'command', id: 'c', method: 'play' },
-      { ...envelope, version: PROTOCOL_VERSION + 1, kind: 'command', id: 'c', method: 'play' },
+      { ...envelope, version: PROTOCOL_VERSION + 1, kind: 'event', event: 'ready' },
+      { ...envelope, version: PROTOCOL_VERSION + 1, viewerId: 'v2', kind: 'command', id: 'c', method: 'play' },
       { ...envelope, channel: 'other', kind: 'command', id: 'c', method: 'play' },
       {
         ...envelope,
@@ -464,6 +469,54 @@ describe('a flood of foreign traffic', () => {
     await settled();
     expect(calls.tour).toEqual(['pause']);
     expect(replies()).toHaveLength(1);
+  });
+});
+
+describe('a host speaking another protocol version', () => {
+  test('its first command is answered once, in its own version, with the version this frame speaks, and nothing is performed', async () => {
+    const { calls } = bridge();
+    const foreign = PROTOCOL_VERSION + 1;
+    for (let index = 0; index < 1_000; index += 1) sendCommand('play', undefined, { version: foreign });
+    sendCommand('loadScene', { url: '/scenes/a.json' }, { version: foreign });
+    await settled();
+    expect(calls.tour).toEqual([]);
+    expect(calls.scenes).toEqual([]);
+    expect(hostWindow.posted.map((entry) => entry.message as unknown)).toEqual([
+      {
+        channel: CHANNEL,
+        version: foreign,
+        viewerId: VIEWER_ID,
+        kind: 'reply',
+        id: 'c1',
+        ok: false,
+        error: { code: 'unknown-method', message: `protocol ${PROTOCOL_VERSION}` },
+      },
+    ]);
+    expect(hostWindow.posted[0]!.origin).toBe(HOST_ORIGIN);
+
+    // The host of this version is still answered as before.
+    sendCommand('play');
+    await settled();
+    expect(calls.tour).toEqual(['play']);
+  });
+
+  test("the helper's own `context` does not spend the answer: the first real command gets it", async () => {
+    bridge();
+    const foreign = PROTOCOL_VERSION + 1;
+    sendCommand('context', { context: {} }, { version: foreign, id: 'h1' });
+    sendCommand('getScene', undefined, { version: foreign, id: 'h2' });
+    await settled();
+    expect(replies().map((reply) => [reply.id, reply.error])).toEqual([
+      ['h2', { code: 'unknown-method', message: `protocol ${PROTOCOL_VERSION}` }],
+    ]);
+  });
+
+  test('the answer does not wait for the first scene', async () => {
+    const built = fakeHandle();
+    installFrameBridge(built.handle, { hostOrigin: HOST_ORIGIN, target: hostWindow as unknown as Window, viewerId: VIEWER_ID });
+    sendCommand('play', undefined, { version: PROTOCOL_VERSION + 1 });
+    await settled();
+    expect(replies().map((reply) => reply.error)).toEqual([{ code: 'unknown-method', message: `protocol ${PROTOCOL_VERSION}` }]);
   });
 });
 
@@ -776,6 +829,27 @@ describe('the events', () => {
     ]);
     expect(events().at(-2)!.payload).toEqual({ temperature: 6500, source: 'host' });
     expect(events().at(-1)!.payload).toEqual({ models: { upgraded: 2, failed: 1, budget: false }, textures: { failed: 0, budget: false } });
+  });
+
+  test('the walk camera and the tour speed cross the wire, for a host that draws its own tour bar', () => {
+    const { fire } = bridge();
+    fire.walkCamera({ index: 1, count: 4 });
+    fire.tourSpeed({ speed: 2 });
+    expect(events().map(({ event, payload }) => ({ event, payload }))).toEqual([
+      { event: 'walkCamera', payload: { index: 1, count: 4 } },
+      { event: 'tourSpeed', payload: { speed: 2 } },
+    ]);
+  });
+
+  test('`ready` announces the player version and the wire methods it answers', () => {
+    const { fire } = bridge();
+    fire.ready({ options: { locale: 'en' }, sceneId: DEMO.scene });
+    expect(events()[0]!.payload).toEqual({
+      options: { locale: 'en' },
+      sceneId: DEMO.scene,
+      player: VIEWER_VERSION,
+      methods: [...METHOD_LIST],
+    });
   });
 
   test('a boot failure is marked fatal on the wire; any other error is not', () => {

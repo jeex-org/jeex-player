@@ -23,6 +23,12 @@
       Query control, so one page can play every part the host tests need:
         ?silent=1         never answer anything (the reply-timeout path)
         ?readyDelay=<ms>  how long the boot takes before the `ready` event
+        ?announce=1       the `ready` also names a player version and a method list
+
+      `jeexEmit(event, payload)` raises an event of this protocol from inside
+      the frame, and `jeexPostRaw(message)` posts any message as it is (a
+      frame of another protocol version, for instance); the host tests call
+      both on the frame's window, so `event.source` is really this frame.
     -->
     <script>
       (function () {
@@ -33,6 +39,7 @@
         var hostOrigin = params.get('host') || '*';
         var silent = params.get('silent') === '1';
         var readyDelay = Number(params.get('readyDelay') || 0);
+        var announce = params.get('announce') === '1';
         /** Every command this frame was sent, in order, for the host test to read back. */
         var received = [];
         window.jeexReceived = received;
@@ -56,6 +63,13 @@
           return undefined;
         }
 
+        window.jeexEmit = function (event, payload) {
+          post(envelope({ kind: 'event', event: event, payload: payload }));
+        };
+        window.jeexPostRaw = function (message) {
+          parent.postMessage(message, hostOrigin);
+        };
+
         window.addEventListener('message', function (event) {
           var data = event.data;
           if (!data || data.channel !== CHANNEL || data.version !== VERSION) return;
@@ -69,13 +83,12 @@
         });
 
         setTimeout(function () {
-          post(
-            envelope({
-              kind: 'event',
-              event: 'ready',
-              payload: { options: { locale: 'en' }, sceneId: '01a12ffa-de51-7028-923d-5dd489ef10bf' },
-            }),
-          );
+          var payload = { options: { locale: 'en' }, sceneId: '01a12ffa-de51-7028-923d-5dd489ef10bf' };
+          if (announce) {
+            payload.player = '0.0.0-stub';
+            payload.methods = ['getMode', 'setMode'];
+          }
+          post(envelope({ kind: 'event', event: 'ready', payload: payload }));
         }, readyDelay);
       })();
     </script>

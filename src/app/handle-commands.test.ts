@@ -8,6 +8,7 @@ import { handleCommands } from './handle-commands.js';
 import { ViewerEvents } from './viewer-events.js';
 import { DEFAULT_VIEWER_OPTIONS } from './viewer-options.js';
 import type { ViewerMode } from '../scene/types.js';
+import { defaultLogger } from '../shared/logger.js';
 
 /** The commands over a viewer whose stage has not been built yet. */
 function beforeTheStage() {
@@ -32,6 +33,7 @@ function beforeTheStage() {
     setFurnitureVisible: () => undefined,
     messages: () => ({}) as never,
     setMessages: () => undefined,
+    log: defaultLogger,
   });
   return { commands, modes, buttons };
 }

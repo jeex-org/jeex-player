@@ -49,10 +49,15 @@ function plannedMoves(scene: SceneData): { wallId: string; nodeId: string; from:
 
 let pointerId = 7000;
 
-async function mounted() {
+async function mounted(logged: string[] = []) {
   const scene = demoScene();
   const container = openContainer();
-  const handle = mountViewer(container, { scene: { repository: new InlineSceneRepository(scene) }, tour: { mode: 'off' }, debug: true });
+  const handle = mountViewer(container, {
+    scene: { repository: new InlineSceneRepository(scene) },
+    tour: { mode: 'off' },
+    debug: true,
+    onLog: (entry) => void logged.push(entry.code),
+  });
   handles.push(handle);
   await handle.ready;
   const moves = plannedMoves(scene);
@@ -160,5 +165,20 @@ describe('the plan tool', () => {
     expect(m.pixels()).not.toEqual(before);
     m.handle.revertPlanEdit();
     expect(m.pixels()).toEqual(before);
+  }, 120_000);
+
+  test('armed on a document without its revision it warns once; the same scene at the host’s revision is the next baseRev', async () => {
+    const logged: string[] = [];
+    const m = await mounted(logged);
+    const warnings = (): string[] => logged.filter((code) => code === 'edit-without-revision');
+    expect(warnings()).toHaveLength(1);
+    await m.handle.loadScene({ document: m.scene, revision: 3 });
+    await m.handle.loadScene({ document: m.scene, revision: 9 });
+    expect(warnings()).toHaveLength(1);
+    expect(m.handle.getState().rev).toBe(9);
+    await m.overNode(m.moves.from);
+    await m.drag(m.moves.legal);
+    expect(m.edits).toHaveLength(1);
+    expect(m.edits[0]).toMatchObject({ gesture: 'node', baseRev: 9 });
   }, 120_000);
 });

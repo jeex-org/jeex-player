@@ -257,6 +257,7 @@ export class ViewerApp {
         this.messages = messages;
         this.telemetry.localeChanged(messages.locale);
       },
+      log: this.log,
     });
   }
 
@@ -293,6 +294,7 @@ export class ViewerApp {
       if (this.stage) this.telemetry.attach(this.stage);
       // A tool switched on before the first scene is bound before it, so the first `scene` event finds it.
       await mountAfterAuthoring(this.handle.authoring, () => this.mount.mountDocument(loaded), this.context.signal);
+      this.handle.authoring.document(model.scene.id, loaded.revisionGiven);
       this.stage?.director?.setMotion(resolveMotionInstant(this.options.motion, prefersReducedMotion()));
       showBootStep(this.ui, this.messages, 'furniture');
       await nextFrame(this.context.signal);
@@ -384,6 +386,7 @@ export class ViewerApp {
     // A failure tore this instance down (`fail`): there is no stage to present into, so the scene is booted.
     if (this.disposed) return this.boot(loaded);
     this.mount.present(loaded);
+    this.handle.authoring.document(loaded.model.scene.id, loaded.revisionGiven);
     await this.announceReady(loaded.model);
   }
 

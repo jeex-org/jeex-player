@@ -63,6 +63,14 @@ export type JeexEmbed = {
   readonly viewerId: string;
   /** Resolves when the frame's first scene is on screen; rejects with the code of an `error` the frame reports before that. */
   ready: Promise<EmbedReady>;
+  /** The frame's player version, from its first `ready`; `null` before it, or from a frame that does not announce one. */
+  readonly player: string | null;
+  /**
+   * Every method the frame answers, from its first `ready`, for a host that
+   * feature-detects rather than meeting `unknown-method` at call time; `null`
+   * before it, or from a frame that does not announce them.
+   */
+  readonly methods: readonly string[] | null;
   play(): Promise<void>;
   pause(): Promise<void>;
   toggle(): Promise<void>;

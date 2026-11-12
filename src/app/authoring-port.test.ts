@@ -251,3 +251,68 @@ describe('the authoring port', () => {
     expect(h.reports).toEqual([failure]);
   });
 });
+
+describe('an edit tool on a document loaded without its revision', () => {
+  const SCENE_A = '01a13a40-6f2e-7c41-9b1d-3e5f0a7c2d85';
+  const SCENE_B = '01a13a40-6f2e-7c41-9b1d-3e5f0a7c2d86';
+  const warnings = (h: ReturnType<typeof harness>): string[] => h.log.codes().filter((code) => code === 'edit-without-revision');
+
+  test('arming the plan tool or the asset tool warns once, naming the problem', () => {
+    const h = harness();
+    h.port.document(SCENE_A, false);
+    h.port.setPlanTool(true);
+    expect(warnings(h)).toEqual(['edit-without-revision']);
+    expect(h.log.messages().join(' ')).toContain('revision');
+    // A second arming, of either tool, on the same document says nothing more.
+    h.port.setPlanTool(false);
+    h.port.setPlanTool(true);
+    h.port.setAssetMoveTool(true);
+    expect(warnings(h)).toHaveLength(1);
+  });
+
+  test('a document loaded with its revision never warns', () => {
+    const h = harness();
+    h.port.document(SCENE_A, true);
+    h.port.setAssetMoveTool(true);
+    h.port.setPlanTool(true);
+    expect(warnings(h)).toEqual([]);
+  });
+
+  test('a tool armed before the document warns when the document arrives without a revision', () => {
+    const h = harness();
+    h.port.setAssetMoveTool(true);
+    expect(warnings(h)).toEqual([]);
+    h.port.document(SCENE_A, false);
+    expect(warnings(h)).toEqual(['edit-without-revision']);
+  });
+
+  test('a new document without a revision warns again; the same one reloaded does not', () => {
+    const h = harness();
+    h.port.setPlanTool(true);
+    h.port.document(SCENE_A, false);
+    h.port.document(SCENE_A, false);
+    expect(warnings(h)).toHaveLength(1);
+    h.port.document(SCENE_B, false);
+    expect(warnings(h)).toHaveLength(2);
+  });
+
+  test('a load with a revision re-arms the warning: the same document without one again warns again', () => {
+    const h = harness();
+    h.port.setPlanTool(true);
+    h.port.document(SCENE_A, false);
+    h.port.document(SCENE_A, true);
+    h.port.document(SCENE_A, false);
+    expect(warnings(h)).toHaveLength(2);
+    // Unbinding the tools re-arms it too.
+    h.port.unbind();
+    h.port.document(SCENE_A, false);
+    expect(warnings(h)).toHaveLength(3);
+  });
+
+  test('no tool armed, no warning: the checkpoint overlay is not an edit of the plan or the furniture', () => {
+    const h = harness();
+    h.port.document(SCENE_A, false);
+    h.port.setCheckpointOverlay(true);
+    expect(warnings(h)).toEqual([]);
+  });
+});

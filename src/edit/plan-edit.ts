@@ -21,7 +21,12 @@ export type PlanEdit = {
   readonly target: PlanEditTarget;
   /** `move_node` (one, or two for a wall moved sideways) or one `set_opening`. */
   readonly ops: readonly PlanEditOp[];
-  /** The committed revision the drag started from. */
+  /**
+   * The committed revision the drag started from. It counts from the
+   * `revision` the host loaded the document with, so a host passes the
+   * document's stored revision to `loadScene` (or the scene source); without
+   * one the viewer counts from 0.
+   */
   readonly baseRev: number;
   /** Which handle moved: an end node, the wall's middle, an opening's body, one of its jambs. */
   readonly gesture: 'node' | 'wall' | 'opening' | 'opening-width';

@@ -16,7 +16,7 @@
  */
 
 import { OPTION_SCHEMA, resolveViewerOptions, type DeepPartial, type ViewerOptions } from '../app/viewer-options.js';
-import type { TourControls, TourProgress, TourState } from '../camera/tour-controls.js';
+import type { TourControls } from '../camera/tour-controls.js';
 import type { ViewerHandle } from '../app/viewer-handle.js';
 import { createLogger, type Logger, type LogSink } from '../shared/logger.js';
 import { ViewerLibError } from '../shared/errors.js';
@@ -30,6 +30,14 @@ import { convertRaw } from '../app/option-raw.js';
 import { isQualityMode } from '../app/quality-check.js';
 import { PendingViewer } from './pending-viewer.js';
 import type { ElementRuntime } from './element-runtime.js';
+import {
+  ELEMENT_EVENTS,
+  TOUR_EVENT_NAMES,
+  elementEventName,
+  tourElementEventName,
+  tourEventPayload,
+  type TourEventName,
+} from './delivery-contract.js';
 import {
   DEFAULT_TAG,
   QUALITY_ATTRIBUTE,
@@ -62,9 +70,6 @@ const MISSING_SCENE: SceneRepository = {
 
 /** A sink that drops everything: the handle's early answers re-read the options, the mount reports them. */
 const SILENT: LogSink = () => undefined;
-
-/** Every element event starts with this; `ready` becomes `jeex-ready`. */
-const EVENT_PREFIX = 'jeex-';
 
 /**
  * The element's side of the contract, as little of the DOM as the controller
@@ -231,7 +236,7 @@ export class ViewerElementController {
     const error = new ViewerLibError('internal', `<${DEFAULT_TAG}>: the viewer module could not be loaded`, { cause });
     this.log().error('runtime-load-failed', error.message, cause);
     this.setState('error');
-    this.host.emit(`${EVENT_PREFIX}error`, { code: error.code, message: error.message });
+    this.host.emit(elementEventName('error'), { code: error.code, message: error.message });
     facade.fail(error);
   }
 
@@ -253,27 +258,19 @@ export class ViewerElementController {
     this.handle = handle;
     // First, so the handle's own listeners run before the element re-emits an event (`PendingViewer.attach`).
     facade.attach(handle);
+    // Every handle event the delivery table marks for the element
+    // (`delivery-contract.ts`), editing ones included: the element is the
+    // module's second form, not a frame boundary, so a host that edits
+    // through `element.viewer` hears the same events as DOM events.
+    const tourOn = handle.tour.on as (event: TourEventName, callback: (value: unknown) => void) => () => void;
     this.subscriptions = [
-      handle.on('ready', (info) => {
-        this.setState('ready');
-        this.host.emit(`${EVENT_PREFIX}ready`, info);
-      }),
-      handle.on('error', (error) => {
-        this.setState('error');
-        this.host.emit(`${EVENT_PREFIX}error`, error);
-      }),
-      handle.on('scene', (info) => this.host.emit(`${EVENT_PREFIX}scene`, info)),
-      handle.on('mode', (mode) => this.host.emit(`${EVENT_PREFIX}mode`, mode)),
-      handle.on('select', (selection) => this.host.emit(`${EVENT_PREFIX}select`, selection)),
-      // The custom element is the SECOND FORM of the ES module, not a
-      // frame boundary, so it forwards every handle event — the iframe
-      // protocol deliberately does not carry `edit`.
-      handle.on('edit', (edit) => this.host.emit(`${EVENT_PREFIX}edit`, edit)),
-      handle.tour.on('progress', (progress: TourProgress) => this.host.emit(`${EVENT_PREFIX}tour-progress`, progress)),
-      handle.tour.on('state', (state: TourState) => this.host.emit(`${EVENT_PREFIX}tour-state`, { state })),
-      handle.tour.on('ended', () => this.host.emit(`${EVENT_PREFIX}tour-ended`, {})),
-      handle.on('lightTemperature', (change) => this.host.emit(`${EVENT_PREFIX}light-temperature`, change)),
-      handle.on('assets', (info) => this.host.emit(`${EVENT_PREFIX}assets`, info)),
+      ...ELEMENT_EVENTS.map((name) =>
+        handle.on(name, (payload) => {
+          if (name === 'ready' || name === 'error') this.setState(name);
+          this.host.emit(elementEventName(name), payload);
+        }),
+      ),
+      ...TOUR_EVENT_NAMES.map((name) => tourOn(name, (value) => this.host.emit(tourElementEventName(name), tourEventPayload(name, value)))),
     ];
   }
 

@@ -430,12 +430,85 @@ describe('a ready the frame cannot back up', () => {
       { payload: null, valid: false },
       { payload: { sceneId: 7 }, valid: false },
       { payload: 'ready', valid: false },
+      { payload: { sceneId: DEMO.scene, player: '1.2.3', methods: ['play'] }, valid: true },
+      { payload: { sceneId: DEMO.scene, player: 7 }, valid: false },
+      { payload: { sceneId: DEMO.scene, methods: 'play' }, valid: false },
+      { payload: { sceneId: DEMO.scene, methods: ['play', 7] }, valid: false },
     ];
     for (const { payload, valid } of FIXTURES) {
       const byHand = await offer(payload);
       expect({ payload, byHand: byHand.ready }).toEqual({ payload, byHand: valid });
       expect({ payload, bySchema: z.safeParse(readyPayloadSchema, payload).success }).toEqual({ payload, bySchema: valid });
     }
+  });
+});
+
+describe('a frame speaking another protocol version', () => {
+  test('its first message rejects `ready` and every waiting command with the named cause at once, logged once', async () => {
+    const logged: EmbedLogEntry[] = [];
+    const embed = make({ onLog: (entry: EmbedLogEntry) => logged.push(entry) });
+    const heard: unknown[] = [];
+    embed.on('ready', (info) => heard.push(info));
+    const play = embed.play();
+    const foreign = { ...(frameEvent('ready', { sceneId: DEMO.scene }) as object), version: PROTOCOL_VERSION + 1 };
+    fromFrame(foreign);
+    fromFrame(foreign);
+    const started = Date.now();
+    await expect(play).rejects.toMatchObject({ code: 'unknown-method', message: `protocol ${PROTOCOL_VERSION + 1}` });
+    await expect(embed.ready).rejects.toMatchObject({ code: 'unknown-method' });
+    expect(Date.now() - started).toBeLessThan(1000);
+    // A later command is refused at once too, and nothing was ever sent or heard.
+    await expect(embed.pause()).rejects.toMatchObject({ code: 'unknown-method' });
+    expect(iframe.contentWindow.commands.filter((command) => command.method !== 'context')).toEqual([]);
+    expect(heard).toEqual([]);
+    expect(logged.map((entry) => entry.code)).toEqual(['protocol-mismatch']);
+  });
+
+  test('a stranger on the same channel and another version is still ignored', async () => {
+    const logged: EmbedLogEntry[] = [];
+    const embed = make({ onLog: (entry: EmbedLogEntry) => logged.push(entry) });
+    const foreign = { ...(frameEvent('ready', { sceneId: DEMO.scene }) as object), version: PROTOCOL_VERSION + 1 };
+    fromFrame(foreign, { origin: 'https://attacker.example' });
+    fromFrame(foreign, { source: {} });
+    fromFrame(frameEvent('ready', { sceneId: DEMO.scene }));
+    expect((await embed.ready).sceneId).toBe(DEMO.scene);
+    expect(logged).toEqual([]);
+  });
+});
+
+describe('what the frame announces', () => {
+  test('`player` and `methods` are null until `ready`, then the frame’s own, read-only', async () => {
+    const embed = make();
+    expect([embed.player, embed.methods]).toEqual([null, null]);
+    fromFrame(frameEvent('ready', { sceneId: DEMO.scene, player: '1.2.3', methods: ['play', 'stepCamera'] }));
+    await embed.ready;
+    expect(embed.player).toBe('1.2.3');
+    expect(embed.methods).toEqual(['play', 'stepCamera']);
+    expect(() => {
+      // @ts-expect-error the announcement is read-only
+      embed.player = '9.9.9';
+    }).toThrow(TypeError);
+    expect(embed.player).toBe('1.2.3');
+  });
+
+  test('the method list cannot be changed through the handle or a `ready` listener', async () => {
+    const embed = make();
+    let heard: readonly string[] | undefined;
+    embed.on('ready', (info) => {
+      heard = info.methods;
+    });
+    fromFrame(frameEvent('ready', { sceneId: DEMO.scene, methods: ['play'] }));
+    await embed.ready;
+    expect(() => (embed.methods as string[]).push('dispose')).toThrow(TypeError);
+    expect(() => (heard as string[]).push('dispose')).toThrow(TypeError);
+    expect(embed.methods).toEqual(['play']);
+  });
+
+  test('a frame that announces nothing (an older one of this protocol) leaves both null', async () => {
+    const embed = make();
+    fromFrame(frameEvent('ready', { sceneId: DEMO.scene }));
+    await embed.ready;
+    expect([embed.player, embed.methods]).toEqual([null, null]);
   });
 });
 

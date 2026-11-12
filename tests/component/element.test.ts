@@ -12,7 +12,7 @@ import { afterEach, beforeAll, describe, expect, test, vi } from 'vitest';
 import { defineJeexViewer, DEFAULT_TAG, SHADOW_ATTRIBUTE, SHADOW_NONE } from '../../src/embed/element.js';
 import { VIEWER_ROOT_SELECTOR } from '../../src/ui/viewer-shell.js';
 import type { JeexViewerElement } from '../../src/embed/element.js';
-import { closeContainers, demoScene, openContainer, until } from './support.js';
+import { AUTHORING_CHUNK_TIMEOUT_MS, closeContainers, demoScene, openContainer, until } from './support.js';
 
 /**
  * A test that mounts the demo apartment and then builds a SECOND scene — an
@@ -68,6 +68,13 @@ const SCENE = {
   swapped: '01a12ffa-de5a-7fe1-81ad-658485d06e41',
   flatB: '01a12ffa-de5b-7bdd-b129-0b1806aac068',
 } as const;
+
+/** Two tour cameras in the demo apartment and the id a placement would drop, by fixed UUID v7. */
+const ELEMENT_CAMERAS = [
+  { id: '01a12ffa-de63-7c30-9d40-4b5c6d7e8f01', position: { x: 4.4, y: 1.55, z: 2.4 }, yaw: 0.5, pitch: -0.3 },
+  { id: '01a12ffa-de64-7c30-9d40-4b5c6d7e8f02', position: { x: 1.1, y: 1.5, z: 5.2 }, yaw: -Math.PI / 2, pitch: -0.4 },
+];
+const PLACED_CAMERA = '01a12ffa-de65-7c30-9d40-4b5c6d7e8f03';
 
 const urls: string[] = [];
 const elements: HTMLElement[] = [];
@@ -195,6 +202,40 @@ describe('events', () => {
     await until(() => modes.length > 0, 'the mode event');
     expect(modes).toEqual(['walk']);
   });
+
+  test(
+    'walkCamera, tourSpeed and an authoring event arrive as jeex-* DOM events, and stop with the disconnect',
+    async () => {
+      const { element } = place({ src: sceneUrl({ tourCheckpoints: ELEMENT_CAMERAS }), tour: 'off', motion: 'reduced', readonly: '0' });
+      const viewer = element.viewer!;
+      await viewer.ready;
+      const heard: Array<[string, unknown]> = [];
+      for (const name of ['jeex-walk-camera', 'jeex-tour-speed', 'jeex-checkpoint-placing'] as const) {
+        element.addEventListener(name, (event: Event) => heard.push([name, (event as CustomEvent).detail]));
+      }
+      const of = (name: string): unknown[] => heard.filter(([heardName]) => heardName === name).map(([, detail]) => detail);
+
+      viewer.tour.setSpeed(2);
+      expect(of('jeex-tour-speed')).toEqual([{ speed: 2 }]);
+      viewer.setMode('walk');
+      await until(() => of('jeex-walk-camera').length > 0, 'the walk-camera event');
+      expect(of('jeex-walk-camera')[0]).toEqual({ index: 0, count: ELEMENT_CAMERAS.length });
+
+      // An editing event: off the iframe wire, but the element is the module's second form and re-emits it.
+      viewer.setMode('orbit');
+      viewer.setCheckpointOverlay(true);
+      await until(() => viewer.startCheckpointPlacement({ id: PLACED_CAMERA }), 'the authoring tools', AUTHORING_CHUNK_TIMEOUT_MS);
+      viewer.cancelCheckpointPlacement();
+      expect(of('jeex-checkpoint-placing')).toEqual([{ active: true }, { active: false }]);
+
+      const before = heard.length;
+      element.remove();
+      viewer.tour.setSpeed(0.5);
+      viewer.setMode('walk');
+      expect(heard.length).toBe(before);
+    },
+    MOUNT_PLUS_RELOAD_TIMEOUT_MS,
+  );
 });
 
 describe('live attributes', () => {

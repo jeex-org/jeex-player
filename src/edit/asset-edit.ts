@@ -18,7 +18,12 @@ export type AssetEdit = {
    * changed, for the dragged object and then for each carried one.
    */
   readonly ops: readonly SceneOp[];
-  /** The revision the move started from. */
+  /**
+   * The revision the move started from. It counts from the `revision` the
+   * host loaded the document with, so a host passes the document's stored
+   * revision to `loadScene` (or the scene source); without one the viewer
+   * counts from 0.
+   */
   readonly baseRev: number;
   readonly summary: string;
   /**

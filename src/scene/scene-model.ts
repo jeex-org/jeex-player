@@ -417,18 +417,22 @@ export class SceneModel {
    * `next` was loaded and validated against registries describing the same
    * library as this model's — the caller's judgement (`SceneMount.present`) —
    * so its committed scene and solved plan are taken as they are, never
-   * judged twice. A document that differs in nothing commits nothing:
-   * `null`, revision unchanged. Listeners hear `touched` and no operations.
+   * judged twice. `revision` is the host's number for `next` when it named
+   * one: the model takes it, so the next edit is based on it; without one
+   * the model counts on by one. A document that differs in nothing, at no
+   * new revision, commits nothing: `null`, revision unchanged. Listeners
+   * hear `touched` and no operations.
    */
-  replaceDocument(next: SceneModel): { rev: number; touched: readonly TouchedEntity[] } | null {
+  replaceDocument(next: SceneModel, revision?: number): { rev: number; touched: readonly TouchedEntity[] } | null {
     if (this.applying) throw new Error('A revision listener cannot replace the document; the commit in flight has not finished notifying');
     // A change that draws nothing (the name, the presets) touches nothing and
     // is still a revision: only the SAME document commits nothing.
-    if (sameData(this.committed, next.scene)) return null;
-    const touched = diffScenes(this.committed, next.scene);
+    const same = sameData(this.committed, next.scene);
+    if (same && (revision === undefined || revision === this.revision)) return null;
+    const touched = same ? [] : diffScenes(this.committed, next.scene);
     this.committed = next.committed;
     this.solved = next.solved;
-    this.revision += 1;
+    this.revision = revision ?? this.revision + 1;
     this.pendingErrors = [];
     this.applying = true;
     try {

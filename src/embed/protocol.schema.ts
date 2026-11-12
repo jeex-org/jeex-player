@@ -355,6 +355,11 @@ export function readCommand(method: CommandMethod, params: unknown): CommandRead
 
 // ------------------------------------------------------------------ the events
 
+/** A camera index or a count of cameras: a whole number of 0 or more. */
+const wireCount = finiteNumber.check(
+  z.refine((value: number) => Number.isSafeInteger(value) && value >= 0, { error: 'must be a whole number of 0 or more' }),
+);
+
 /**
  * The `ready` payload alone, named because `embed/host.ts` re-implements it by
  * hand under a 4 KB budget and `host.test.ts` runs both over one set of
@@ -367,7 +372,14 @@ export function readCommand(method: CommandMethod, params: unknown): CommandRead
  * is about.
  */
 export const readyPayloadSchema = z.object(
-  { options: z.optional(z.unknown()), sceneId: wireString },
+  {
+    options: z.optional(z.unknown()),
+    sceneId: wireString,
+    // Optional: a frame of this protocol older than the announcement sends neither.
+    player: z.optional(wireString),
+    // Strings, not this build's method names: a newer frame may answer a method this module has never heard of.
+    methods: z.optional(z.readonly(z.array(wireString, { error: 'must be a list of method names' }))),
+  },
   {
     error: 'must be an object naming a `sceneId`',
   },
@@ -420,6 +432,8 @@ export const eventSchema = z.discriminatedUnion('event', [
       textures: z.object({ failed: finiteNumber, budget: z.boolean() }),
     }),
   }),
+  z.object({ event: z.literal('walkCamera'), payload: z.object({ index: z.nullable(wireCount), count: wireCount }) }),
+  z.object({ event: z.literal('tourSpeed'), payload: z.object({ speed: tourSpeedSchema }) }),
   z.object({ event: z.literal('disposed'), payload: z.undefined() }),
 ]);
 

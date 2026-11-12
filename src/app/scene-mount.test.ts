@@ -95,7 +95,7 @@ type Rig = {
   settled: Array<{ model: SceneModel; upgraded: number; failed: number }>;
   /** How many times the whole document was built. */
   builds: () => number;
-  load: (document: SceneData, key?: string) => LoadedDocument;
+  load: (document: SceneData, key?: string, revision?: number) => LoadedDocument;
   seededFacts: AssetFactsSource[];
   /** Redraws the mount asked the runtime for (`RenderDemand.invalidate`). */
   invalidations: () => number;
@@ -153,8 +153,8 @@ function rig(
     group.add(new THREE.Mesh(new THREE.BoxGeometry(1, 0.5, 1), new THREE.MeshStandardMaterial()));
     return Promise.resolve({ group, triangles: 12, warnings: [], bytes: 16 });
   };
-  const load = (document: SceneData, key = KEY): LoadedDocument => {
-    const model = new SceneModel(document, CATALOGUE_REGISTRIES);
+  const load = (document: SceneData, key = KEY, revision?: number): LoadedDocument => {
+    const model = new SceneModel(document, CATALOGUE_REGISTRIES, revision === undefined ? {} : { revision });
     return {
       model,
       project: {
@@ -167,6 +167,7 @@ function rig(
         variants: undefined as never,
         builderOptions: { modelUrl: (asset) => `https://models.test/${asset.variantId}.glb`, modelSource, log: QUIET },
       },
+      revisionGiven: revision !== undefined,
     };
   };
   return {
@@ -359,6 +360,24 @@ describe('a committed edit of one placement leaves every other placement alone',
     expect(model.rev).toBe(1);
     expect(subject.seeded).toHaveLength(3);
   });
+
+  test("the same scene handed back at the host's revision takes that revision; without one it counts on", () => {
+    const subject = rig();
+    subject.mount.mountDocument(subject.load(lShapePlan, KEY, 3));
+    const model = subject.mount.model!;
+    const turned = edited((draft) => {
+      draft.assets.find((asset) => asset.id === SOFA)!.rotationY = 1;
+    });
+    subject.mount.present(subject.load(turned, KEY, 9));
+    expect(subject.mount.model).toBe(model);
+    expect(model.rev).toBe(9);
+    // The same document at a newer revision commits nothing new and still moves to it.
+    subject.mount.present(subject.load(turned, KEY, 10));
+    expect(model.rev).toBe(10);
+    // Without a revision it counts on from the host's last one.
+    subject.mount.present(subject.load(lShapePlan));
+    expect(model.rev).toBe(11);
+  });
 });
 
 describe('what is not a revision of the document on screen is mounted from scratch', () => {
@@ -466,7 +485,7 @@ describe('the bank the document is drawn with answers its floor questions', () =
     expect(r.mount.assetFacts()).toBe(facts);
     r.mount.remount();
     expect(r.seededFacts.at(-1)).toBe(facts);
-    r.mount.mountDocument({ model: new SceneModel(lShapePlan, CATALOGUE_REGISTRIES), project: null });
+    r.mount.mountDocument({ model: new SceneModel(lShapePlan, CATALOGUE_REGISTRIES), project: null, revisionGiven: false });
     expect(r.seededFacts.at(-1)).toBe(shippedAssetFacts);
     expect(r.mount.layoutCatalogue()).toBe(shippedFacts);
   });
@@ -513,6 +532,7 @@ describe("a variant swap builds the new variant's lamp lights under the current 
     return {
       model: new SceneModel(scene, registriesFromLibrary(projectLibraryOf(manifest), CATALOGUE_REGISTRIES)),
       project: { ...context, key: 'lamp-library', builderOptions: { ...context.builderOptions, modelSource } },
+      revisionGiven: false,
     };
   }
 

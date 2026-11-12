@@ -12,7 +12,8 @@
  * (`isExactOrigin`, so never `'*'`, never `null`, never a URL with a path); a
  * message is then read only when it came from the window this bridge was
  * pointed at AND from that origin, and a reply or an event is posted only to
- * it. Anything else is dropped in silence, because a
+ * it. Anything else is dropped in silence (but for one answer to a host of
+ * another protocol version, `answerForeign`), because a
  * page that embeds this frame may carry other postMessage traffic and an error
  * card about a stranger's message would be noise, not information.
  *
@@ -33,8 +34,11 @@
 
 import {
   DEFAULT_VIEWER_ID,
+  METHOD_LIST,
+  PROTOCOL_VERSION,
   commandReply,
   eventMessage,
+  foreignVersion,
   resolveMethod,
   type CommandMethod,
   type CommandOutcome,
@@ -47,7 +51,9 @@ import { isJeexEnvelope, readCommand, type Command, type ParamsOf } from './prot
 import { badParams } from '../shared/schema-issues.js';
 import { MAX_SCENE_BYTES, inlineDocumentBytes } from '../shared/limits.js';
 import type { CaptureResult, CaptureStillRequest, CapturePanoramaRequest } from '../app/capture-commands.js';
-import type { ViewerError } from '../app/viewer-events.js';
+import type { ViewerError, ViewerReadyInfo } from '../app/viewer-events.js';
+import { VIEWER_VERSION } from '../shared/version.js';
+import { TOUR_EVENT_NAMES, WIRE_EVENTS, tourEventPayload, type TourEventName, type WireViewerEvent } from './delivery-contract.js';
 import type { ViewerHandle } from '../app/viewer-handle.js';
 import type { ExportGlbOptions } from '../app/export-gltf.js';
 import type { ExportUsdzOptions } from '../app/export-usdz.js';
@@ -115,6 +121,11 @@ function exportUsdzOptions(params: ParamsOf<'exportUsdz'>): ExportUsdzOptions {
   return includeFurniture === undefined ? {} : { includeFurniture };
 }
 
+/** The `never` arm of `perform`: reached only by a method the switch has no case for, which `tsc` refuses. */
+function unperformed(command: never): never {
+  throw new ViewerLibError('internal', `frame bridge: no case for ${(command as { method: string }).method}`);
+}
+
 function messageOf(error: unknown): string {
   return error instanceof Error ? error.message : String(error);
 }
@@ -162,23 +173,30 @@ export function installFrameBridge(handle: ViewerHandle, options: FrameBridgeOpt
     post(eventMessage(viewerId, event, payload));
   };
 
-  const subscriptions: Array<() => void> = [
-    handle.on('ready', (info) => {
+  /** What the frame announces with every `ready`, so a host can feature-detect. */
+  const announcement = { player: VIEWER_VERSION, methods: [...METHOD_LIST] };
+  /** The one place a handle event becomes a message; the wire's shape where it differs from the handle's. */
+  const forward = (name: WireViewerEvent, payload: unknown): void => {
+    if (name === 'ready') {
       ready = true;
-      emit('ready', info);
-    }),
-    handle.on('error', (error) => {
+      emit('ready', { ...(payload as ViewerReadyInfo), ...announcement });
+      return;
+    }
+    if (name === 'error') {
+      const error = payload as ViewerError;
       lastError = error;
+      // The code and the message, never the cause: a stack is the frame's business.
       emit('error', { code: error.code, message: error.message, ...(error.fatal === true ? { fatal: true as const } : {}) });
-    }),
-    handle.on('scene', (info) => emit('scene', info)),
-    handle.on('mode', (mode) => emit('mode', mode)),
-    handle.on('select', (selection) => emit('select', selection)),
-    handle.on('lightTemperature', (change) => emit('lightTemperature', change)),
-    handle.on('assets', (info) => emit('assets', info)),
-    handle.tour.on('progress', (progress) => emit('progress', progress)),
-    handle.tour.on('state', (state) => emit('state', { state })),
-    handle.tour.on('ended', () => emit('ended', {})),
+      return;
+    }
+    emit(name, payload);
+  };
+  const tourOn = handle.tour.on as (event: TourEventName, callback: (value: unknown) => void) => () => void;
+
+  // Every event the delivery table puts on the wire (`delivery-contract.ts`), and no other.
+  const subscriptions: Array<() => void> = [
+    ...WIRE_EVENTS.map((name) => handle.on(name, (payload) => forward(name, payload))),
+    ...TOUR_EVENT_NAMES.map((name) => tourOn(name, (value) => emit(name, tourEventPayload(name, value)))),
     ...(options.sizes ? [options.sizes((size) => emit('size', size))] : []),
   ];
 
@@ -299,6 +317,10 @@ export function installFrameBridge(handle: ViewerHandle, options: FrameBridgeOpt
         emit('disposed', {});
         uninstall();
         return undefined;
+      default:
+        // Every wire method of the table (`delivery-contract.ts`) has a case
+        // above: a `Command` this switch forgot does not compile here.
+        return unperformed(command);
     }
   };
 
@@ -350,12 +372,37 @@ export function installFrameBridge(handle: ViewerHandle, options: FrameBridgeOpt
     }
   };
 
+  /** Whether a command of another protocol version has had its one answer. */
+  let answeredForeign = false;
+  /**
+   * The first command of another protocol version addressed to this viewer is
+   * answered once, before `ready` too, with the version this frame speaks, so
+   * the host names the cause instead of timing out. The reply carries the
+   * HOST's version, the one it can read; nothing of the command is performed,
+   * and every later foreign message is dropped. The helper's own `context`
+   * is not that command: nobody waits on its answer, so the first real one
+   * gets it.
+   */
+  const answerForeign = (data: unknown): void => {
+    const version = answeredForeign ? null : foreignVersion(data);
+    if (version === null) return;
+    const { kind, id, method, viewerId: addressed } = data as Record<string, unknown>;
+    if (kind !== 'command' || method === 'context' || typeof id !== 'string' || addressed !== viewerId) return;
+    answeredForeign = true;
+    const refusal = commandReply(viewerId, id, { ok: false, error: { code: 'unknown-method', message: `protocol ${PROTOCOL_VERSION}` } });
+    post({ ...refusal, version });
+  };
+
   function onMessage(event: MessageEvent): void {
     // Who, then what: the window and the origin decide whether the message is
     // even looked at, and only then is its shape read.
     if (event.source !== target || event.origin !== hostOrigin) return;
     const data: unknown = event.data;
-    if (!isJeexEnvelope(data) || data.kind !== 'command' || data.viewerId !== viewerId) return;
+    if (!isJeexEnvelope(data)) {
+      answerForeign(data);
+      return;
+    }
+    if (data.kind !== 'command' || data.viewerId !== viewerId) return;
     options.site?.verified(hostOrigin);
     // A `dispose` uninstalls the bridge inside `perform`, and its own reply is
     // still owed: posting does not go through the listener, so the last answer

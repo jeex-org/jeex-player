@@ -22,7 +22,9 @@
 
 import {
   DEFAULT_VIEWER_ID,
+  PROTOCOL_VERSION,
   commandMessage,
+  foreignVersion,
   isJeexMessage,
   type CaptureStillRequest,
   type CommandMethod,
@@ -180,15 +182,22 @@ type EmbedOptions = {
  * `host.test.ts` runs the two over one set of fixtures so they cannot drift;
  * `src/purity.test.ts` proves this module reaches no Zod at all.
  *
- * `sceneId` is the whole of it: `options` is `unknown` on the wire, so there is
- * nothing about it a check could prove, and a `ready` that names only its
- * `sceneId` has always been accepted here.
+ * `sceneId` is what it needs, and `player` and `methods` are proved only when
+ * present: `options` is `unknown` on the wire, so there is nothing about it a
+ * check could prove, and a `ready` that names only its `sceneId` (a frame
+ * older than the announcement) has always been accepted here.
  */
 function readyPayload(payload: unknown): EmbedReady | null {
   if (typeof payload !== 'object' || payload === null) return null;
+  const { sceneId, player, methods } = payload as Record<string, unknown>;
   // The value that travels on is the one the frame sent, not a copy: a host
   // reading `options` must see the object the viewer actually mounted with.
-  return typeof (payload as { sceneId?: unknown }).sceneId === 'string' ? (payload as EmbedReady) : null;
+  // Its method list is frozen: what one listener reads, `embed.methods` advertises.
+  return typeof sceneId === 'string' &&
+    (player === undefined || typeof player === 'string') &&
+    (methods === undefined || (Array.isArray(methods) && Object.freeze(methods).every((method) => typeof method === 'string')))
+    ? (payload as EmbedReady)
+    : null;
 }
 
 /**
@@ -343,9 +352,13 @@ export function embedViewer(container: HTMLElement, options: EmbedOptions): Jeex
   let queue: Array<{ method: CommandMethod; post: () => void; reject: (error: Error) => void; booting: ReturnType<typeof setTimeout> }> =
     [];
   let ready = false;
+  /** The first `ready`'s payload: what `player` and `methods` read. */
+  let announced: EmbedReady | undefined;
   /** The frame reported an `error` before its first `ready`: it is up, and another scene is what it can take. */
   let failed = false;
   let disposed = false;
+  /** Set when the frame turned out to speak another protocol version; every command is refused with it. */
+  let foreign: EmbedError | undefined;
   let nextId = 0;
 
   let announceReady: (info: EmbedReady) => void = () => undefined;
@@ -369,6 +382,20 @@ export function embedViewer(container: HTMLElement, options: EmbedOptions): Jeex
     }
   };
 
+  /** Rejects every command waiting for a reply with `sent`, and every one still queued with `held`. */
+  const abandon = (sent: EmbedError, held: EmbedError): void => {
+    for (const waiting of pending.values()) {
+      clearTimeout(waiting.timer);
+      waiting.reject(sent);
+    }
+    pending.clear();
+    for (const queued of queue) {
+      clearTimeout(queued.booting);
+      queued.reject(held);
+    }
+    queue = [];
+  };
+
   const settle = (reply: JeexReply): void => {
     const waiting = pending.get(reply.id);
     if (!waiting) return;
@@ -383,6 +410,22 @@ export function embedViewer(container: HTMLElement, options: EmbedOptions): Jeex
     // only this viewer.
     if (event.source !== iframe.contentWindow || event.origin !== frameOrigin) return;
     const data: unknown = event.data;
+    const version = foreignVersion(data);
+    if (version !== null) {
+      // Our frame, another protocol: nothing it says is acted on, and nothing
+      // it is asked would be understood, so what waits is refused now with the
+      // cause, rather than in 20 seconds as a timeout.
+      if (foreign) return;
+      foreign = new EmbedError('unknown-method', `protocol ${version}`);
+      log({
+        level: 'error',
+        code: 'protocol-mismatch',
+        message: `jeex embed: the frame speaks protocol ${version}, this helper ${PROTOCOL_VERSION}`,
+      });
+      failReady(foreign);
+      abandon(foreign, foreign);
+      return;
+    }
     if (!isJeexMessage(data) || data.viewerId !== viewerId) return;
     if (data.kind === 'reply') {
       settle(data);
@@ -400,13 +443,14 @@ export function embedViewer(container: HTMLElement, options: EmbedOptions): Jeex
         log({
           level: 'error',
           code: 'ready-invalid',
-          message: 'jeex embed: the frame reported ready without a sceneId',
+          message: 'jeex embed: the frame sent an invalid ready',
           detail: data.payload,
         });
         return;
       }
       if (!ready) {
         ready = true;
+        announced = info;
         announceReady(info);
         const held = queue;
         queue = [];
@@ -452,6 +496,7 @@ export function embedViewer(container: HTMLElement, options: EmbedOptions): Jeex
 
   const send = (method: CommandMethod, params?: Record<string, unknown>): Promise<unknown> => {
     if (disposed) return Promise.reject(new EmbedError('disposed', 'this embed has been disposed'));
+    if (foreign) return Promise.reject(foreign);
     const id = `c${(nextId += 1)}`;
     return new Promise<unknown>((resolve, reject) => {
       // The REPLY clock starts when the command is posted, not when it is
@@ -539,6 +584,12 @@ export function embedViewer(container: HTMLElement, options: EmbedOptions): Jeex
     iframe,
     viewerId,
     ready: readyPromise,
+    get player() {
+      return announced?.player ?? null;
+    },
+    get methods() {
+      return announced?.methods ?? null;
+    },
     play: () => nothing('play'),
     pause: () => nothing('pause'),
     toggle: () => nothing('toggle'),
@@ -585,16 +636,10 @@ export function embedViewer(container: HTMLElement, options: EmbedOptions): Jeex
       void send('dispose').catch(() => undefined);
       disposed = true;
       claimedIds.delete(viewerId);
-      for (const waiting of pending.values()) {
-        clearTimeout(waiting.timer);
-        waiting.reject(new EmbedError('disposed', 'this embed has been disposed'));
-      }
-      pending.clear();
-      for (const queued of queue) {
-        clearTimeout(queued.booting);
-        queued.reject(new EmbedError('disposed', 'this embed was disposed before the frame was ready'));
-      }
-      queue = [];
+      abandon(
+        new EmbedError('disposed', 'this embed has been disposed'),
+        new EmbedError('disposed', 'this embed was disposed before the frame was ready'),
+      );
       // Told synchronously, before listeners are cleared: guards against
       // `dispose()` clearing its own `message` listener in the same tick it
       // posts the command, where a host subscribed to `disposed` would never

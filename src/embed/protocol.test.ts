@@ -16,6 +16,7 @@ import {
   commandMessage,
   commandReply,
   eventMessage,
+  foreignVersion,
   isJeexMessage,
   resolveMethod,
 } from './protocol.js';
@@ -224,5 +225,19 @@ describe('negative paths', () => {
     expect(isJeexMessage(base)).toBe(false);
     expect(isJeexMessage({ ...base, id: 7 })).toBe(false);
     expect(isJeexMessage({ ...base, id: 'c1' })).toBe(true);
+  });
+});
+
+describe('foreignVersion', () => {
+  test('names the version of a message on this channel that speaks another one', () => {
+    expect(foreignVersion({ ...command, version: 2 })).toBe(2);
+    expect(foreignVersion({ ...command, version: 0 })).toBe(0);
+  });
+
+  test('is null for this version, another channel, a version that is no number, or no message at all', () => {
+    expect(foreignVersion(command)).toBeNull();
+    expect(foreignVersion({ ...command, channel: 'other-widget', version: 2 })).toBeNull();
+    expect(foreignVersion({ ...command, version: '2' })).toBeNull();
+    for (const value of [null, undefined, 'jeex-embed', 7]) expect(foreignVersion(value)).toBeNull();
   });
 });

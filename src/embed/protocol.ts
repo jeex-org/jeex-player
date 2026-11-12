@@ -22,9 +22,12 @@
  * pay for it, and both sides import THIS file.
  *
  * Version invariant: `version` is the semver-major of this contract. A message
- * carrying another number is not this protocol and is dropped rather than
- * interpreted, so an old page and a new frame fail visibly instead of half
- * working.
+ * carrying another number is not this protocol and is never acted on. It is
+ * not dropped in silence either, or a host and a frame of different majors
+ * would only ever see 20-second timeouts: `foreignVersion` names it, the frame
+ * answers the first such command once with `unknown-method` and
+ * `protocol <its version>`, and the host helper rejects what waits with the
+ * same code and logs `protocol-mismatch`.
  */
 
 /** Discriminator, so a frame that carries other postMessage traffic ignores it. */
@@ -53,7 +56,7 @@ export type { Provenance } from '../app/provenance.js';
 export type { ViewerSelection, ViewerSelectionTarget } from '../app/selection.js';
 
 import type { ViewerMode } from '../scene/types.js';
-import type { TourProgress, TourState } from '../camera/tour-controls.js';
+import type { TourProgress, TourSpeed, TourState } from '../camera/tour-controls.js';
 import type { ViewerSelection } from '../app/selection.js';
 
 /** Every command a host may send. */
@@ -163,12 +166,20 @@ export type ErrorCode =
 /**
  * What the frame pushes to the host, unasked, and what each event carries.
  *
- * It mirrors a part of `ViewerEventMap` (`app/viewer-events.ts`, `lightTemperature` and `assets` included) and adds the tour's four:
- * `progress`, `state`, `ended` — and `disposed`, which the HOST handle raises
- * for itself when it tears the frame down.
+ * It is the part of `ViewerEventMap` (`app/viewer-events.ts`) the delivery
+ * table puts on the wire (`delivery-contract.ts`, which checks the two agree)
+ * plus the tour's three, `progress`, `state` and `ended`; `size`, which the
+ * frame PAGE raises; and `disposed`, which the HOST handle raises for itself
+ * when it tears the frame down.
  */
 export type EmbedEventMap = {
-  ready: { options: unknown; sceneId: string };
+  /**
+   * The first scene, and every one after it, is on screen. `player` (the
+   * package version) and `methods` (every method this frame answers, the
+   * wire's `METHOD_LIST`) let a host feature-detect; a frame older than the
+   * announcement sends neither.
+   */
+  ready: { options: unknown; sceneId: string; player?: string; methods?: readonly string[] };
   /** `fatal`: the boot failed and the viewer is down; only `loadScene` brings a scene back. */
   error: { code: ErrorCode; message: string; fatal?: true };
   scene: { sceneId: string; rev: number };
@@ -190,6 +201,10 @@ export type EmbedEventMap = {
   lightTemperature: { temperature: number | null; source: 'host' | 'panel' };
   /** Once per document, when its first model pass settled: what loaded and what fell back (`ViewerAssetsInfo`). */
   assets: { models: { upgraded: number; failed: number; budget: boolean }; textures: { failed: number; budget: boolean } };
+  /** The walk's current tour camera (0-based, `null` before the walker stood on one) and how many there are. */
+  walkCamera: { index: number | null; count: number };
+  /** The tour's speed setting changed (`setTourSpeed`, the tour bar's speed button). */
+  tourSpeed: { speed: TourSpeed };
   disposed: undefined;
 };
 
@@ -251,7 +266,9 @@ export const METHOD_ALIASES: Readonly<Record<string, CommandMethod>> = {
  *
  * Exported because `protocol.schema.test.ts` walks it to prove that every
  * method has a branch of its own in `commandSchema` — the list drives the
- * test, never the other way round.
+ * test, never the other way round. The delivery table
+ * (`delivery-contract.ts`) proves at compile time that it is exactly the wire
+ * methods its rows name.
  */
 export const METHOD_LIST = [
   'play',
@@ -327,6 +344,17 @@ export function isJeexMessage(data: unknown): data is JeexMessage {
   if (data['kind'] === 'reply') return typeof data['id'] === 'string' && typeof data['ok'] === 'boolean';
   if (data['kind'] === 'event') return typeof data['event'] === 'string';
   return false;
+}
+
+/**
+ * The version of a message on this channel that speaks ANOTHER version of the
+ * protocol, or `null` (this version, another channel, a version that is no
+ * number). Only names the mismatch: nothing else of such a message is read.
+ */
+export function foreignVersion(data: unknown): number | null {
+  if (!isRecord(data) || data['channel'] !== CHANNEL) return null;
+  const version = data['version'];
+  return typeof version === 'number' && version !== PROTOCOL_VERSION ? version : null;
 }
 
 /** The envelope every constructor below starts from. */

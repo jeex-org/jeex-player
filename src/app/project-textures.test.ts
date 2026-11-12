@@ -111,6 +111,7 @@ function loaded(key = 'project-under-test'): LoadedDocument {
         log: QUIET,
       },
     },
+    revisionGiven: false,
   };
 }
 

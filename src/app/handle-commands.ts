@@ -28,7 +28,7 @@ import type { ViewerOptions } from './viewer-options.js';
 import type { ViewerSelection, ViewerSelectionTarget } from './selection.js';
 import type { SelectionDescription } from '../ui/selection-options.js';
 import { authoringPort, type AuthoringPort } from './authoring-port.js';
-import { defaultLogger } from '../shared/logger.js';
+import type { Logger } from '../shared/logger.js';
 import { LightTemperatureControl } from './light-temperature-control.js';
 import { QualityControl } from './quality-control.js';
 
@@ -46,6 +46,8 @@ type HandleCommandsDeps = {
   setFurnitureVisible: (visible: boolean) => void;
   messages: () => Messages;
   setMessages: (messages: Messages) => void;
+  /** The instance's sink (`options.onLog`, else the console): the authoring tools' warnings reach the host. */
+  log: Logger;
 };
 
 export type HandleCommands = {
@@ -131,7 +133,7 @@ export function handleCommands(deps: HandleCommandsDeps): HandleCommands {
         visible: () => authoring.checkpointOverlay(),
         switchMode,
       }),
-    log: defaultLogger,
+    log: deps.log,
     report: (error) => deps.events.emit('error', toViewerError('internal', error, deps.messages().t('error.unknown'))),
   });
   /** A host's `setMode` before there was a camera to switch: the start view opens in it. */

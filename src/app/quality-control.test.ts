@@ -19,6 +19,7 @@ import type { ViewerOptions } from './viewer-options.js';
 import type { ViewerStage } from './viewer-stage.js';
 import type { ViewerUI } from '../ui/viewer-ui.js';
 import type { ViewerMode } from '../scene/types.js';
+import { defaultLogger } from '../shared/logger.js';
 
 function harness(options: { initial?: 'auto' | 'low' | 'high'; withRuntime?: boolean } = {}) {
   const caps: number[] = [];
@@ -303,6 +304,7 @@ function commandHarness(options: { initial?: 'auto' | 'low' | 'high' } = {}) {
       throw new Error('commandHarness: the messages are not part of this test');
     },
     setMessages: () => undefined,
+    log: defaultLogger,
   });
   return {
     commands,

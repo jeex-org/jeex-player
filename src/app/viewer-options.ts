@@ -335,9 +335,18 @@ export const DEFAULT_VIEWER_OPTIONS: ViewerOptions = {
 /**
  * Option paths whose value is a HOST OBJECT (a scene document, a repository, a library the host holds): never validated, spelled
  * in a query string or written in an attribute, but copied through verbatim; the loaders decide whether what arrived is usable.
+ * `scene.revision` goes with the document it numbers, and is judged where `loadScene`'s is: by the model it starts.
  */
 const OFFERS_HOST = ['offers.library', 'offers.baseUrl'];
-const OPAQUE_PATHS: readonly string[] = ['scene.document', 'scene.repository', 'scene.library', ...OFFERS_HOST, 'onLog', 'resolveTexture'];
+const OPAQUE_PATHS: readonly string[] = [
+  'scene.document',
+  'scene.repository',
+  'scene.library',
+  'scene.revision',
+  ...OFFERS_HOST,
+  'onLog',
+  'resolveTexture',
+];
 
 // Each closed set is proved complete against its union (`closedSet`, `option-sets.ts`).
 const TOUR_MODES = closedSet<TourStartMode>()(['play', 'paused', 'off']);

@@ -30,7 +30,9 @@ import {
 } from '../../src/embed/host.js';
 import { installFrameBridge } from '../../src/embed/frame-bridge.js';
 import { embedPageOptions, hostOriginFrom } from '../../src/embed/frame-page.js';
-import { CHANNEL, PROTOCOL_VERSION, commandReply, type JeexMessage } from '../../src/embed/protocol.js';
+import { CHANNEL, METHOD_LIST, PROTOCOL_VERSION, commandReply, type JeexMessage } from '../../src/embed/protocol.js';
+import { wireMethods } from '../../src/embed/delivery-contract.js';
+import { VIEWER_VERSION } from '../../src/shared/version.js';
 import { InlineSceneRepository, mountViewer } from '../../src/app/viewer-api.js';
 import type { ViewerHandle } from '../../src/app/viewer-handle.js';
 import { closeContainers, delay, demoScene, openContainer, parkForExport, until } from './support.js';
@@ -64,6 +66,12 @@ const STUB_SCENE_ID = '01a12ffa-de51-7028-923d-5dd489ef10bf';
  * which reads the scene's own id off the wire.
  */
 const fixtureScene = (): SceneData => lShapePlan;
+
+/** Two tour cameras for the fixture, one per room, by fixed UUID v7: what the walkCamera test steps onto. */
+const WIRE_CAMERAS: NonNullable<SceneData['tourCheckpoints']> = [
+  { id: '01a12ffa-de61-7b10-8c20-3a4b5c6d7e01', position: { x: 3, y: 1.6, z: 4 }, yaw: 0.5, pitch: -0.2 },
+  { id: '01a12ffa-de62-7b10-8c20-3a4b5c6d7e02', position: { x: 8, y: 1.6, z: 2.5 }, yaw: Math.PI / 2, pitch: -0.2 },
+];
 
 type StubWindow = Window & { jeexReceived?: Array<{ id: string; method: string; params?: Record<string, unknown>; origin: string }> };
 
@@ -287,6 +295,61 @@ describe('the host side, against a real frame', () => {
     const info = await embed().ready;
     expect(info.sceneId).toBe(STUB_SCENE_ID);
     expect(info.options).toEqual({ locale: 'en' });
+  });
+
+  test('a ready that announces the player and its methods is what `player` and `methods` read, frozen', async () => {
+    const quiet = embed({ viewerId: 'old-frame' });
+    await quiet.ready;
+    // A frame older than the announcement names only its scene: both read null.
+    expect([quiet.player, quiet.methods]).toEqual([null, null]);
+    const handle = embed({ viewerId: 'announcing', announce: 1 });
+    expect([handle.player, handle.methods]).toEqual([null, null]);
+    await handle.ready;
+    expect(handle.player).toBe('0.0.0-stub');
+    expect(handle.methods).toEqual(['getMode', 'setMode']);
+    expect(Object.isFrozen(handle.methods)).toBe(true);
+  });
+
+  test('walkCamera and tourSpeed from the frame reach the host’s listeners', async () => {
+    const handle = embed();
+    await handle.ready;
+    const stub = await stubOf(handle);
+    const seen: unknown[] = [];
+    handle.on('walkCamera', (camera) => seen.push(['walkCamera', camera]));
+    handle.on('tourSpeed', (speed) => seen.push(['tourSpeed', speed]));
+    const frame = stub as StubWindow & { jeexEmit(event: string, payload: unknown): void };
+    frame.jeexEmit('walkCamera', { index: 1, count: 3 });
+    frame.jeexEmit('tourSpeed', { speed: 2 });
+    await until(() => seen.length === 2, 'both events');
+    expect(seen).toEqual([
+      ['walkCamera', { index: 1, count: 3 }],
+      ['tourSpeed', { speed: 2 }],
+    ]);
+  });
+
+  test('a frame of another protocol version fails the boot and every command with the cause, logged once', async () => {
+    const entries: Array<{ level: string; code: string }> = [];
+    const handle = embed({ readyDelay: 60_000, onLog: (entry: { level: string; code: string }) => entries.push(entry) });
+    const queued = handle.getMode();
+    const stub = (await stubOf(handle)) as StubWindow & { jeexPostRaw(message: unknown): void };
+    const foreign = {
+      channel: CHANNEL,
+      version: PROTOCOL_VERSION + 1,
+      viewerId: handle.viewerId,
+      kind: 'event',
+      event: 'ready',
+      payload: {},
+    };
+    stub.jeexPostRaw(foreign);
+    const cause = { code: 'unknown-method', message: `protocol ${String(PROTOCOL_VERSION + 1)}` };
+    await expect(handle.ready).rejects.toMatchObject(cause);
+    // The command held for the boot is refused now, not after the queue timeout.
+    await expect(queued).rejects.toMatchObject(cause);
+    await expect(handle.getMode()).rejects.toMatchObject(cause);
+    // A second foreign message changes nothing and says nothing more.
+    stub.jeexPostRaw(foreign);
+    await delay(50);
+    expect(entries.filter((entry) => entry.code === 'protocol-mismatch')).toEqual([expect.objectContaining({ level: 'error' })]);
   });
 
   test('commands issued before ready are queued and flushed in order', async () => {
@@ -708,6 +771,58 @@ describe('the frame side, wrapping a real viewer', () => {
     post(command('a3', 'teleport'));
     await arrived(isReply('a3'), 'the reply to the unknown method');
     expect(replyTo(posted, 'a3')!.error).toEqual({ code: 'unknown-method', message: 'no method teleport' });
+  });
+
+  test('ready announces the player version and every wire method the delivery table names', async () => {
+    const { handle, posted, arrived } = await bridged();
+    await handle.ready;
+    await arrived(isEvent('ready'), 'the ready event');
+    const ready = posted.find(isEvent('ready')) as { payload: { sceneId: string; player: string; methods: string[] } };
+    expect(ready.payload.sceneId).toBe(fixtureScene().id);
+    expect(ready.payload.player).toBe(VIEWER_VERSION);
+    expect(ready.payload.methods).toEqual([...METHOD_LIST]);
+    expect([...ready.payload.methods].sort()).toEqual(wireMethods().sort());
+  });
+
+  test('a tour speed change and a step onto a tour camera cross as tourSpeed and walkCamera', async () => {
+    // Two cameras in the fixture's two rooms; reduced motion lands the entry glide in one frame.
+    const scene: SceneData = { ...fixtureScene(), tourCheckpoints: WIRE_CAMERAS };
+    const { handle, posted, post, arrived } = await bridged(scene, { motion: 'reduced' });
+    await handle.ready;
+    post(command('sp1', 'setTourSpeed', { speed: 2 }));
+    await arrived(isEvent('tourSpeed'), 'the tourSpeed event');
+    expect((posted.find(isEvent('tourSpeed')) as { payload: unknown }).payload).toEqual({ speed: 2 });
+    post(command('wk1', 'setMode', { mode: 'walk' }));
+    await arrived(
+      (message) => isEvent('walkCamera')(message) && (message as { payload: { index: number | null } }).payload.index === 0,
+      'the walkCamera event for the first camera',
+    );
+    const walk = posted.filter(isEvent('walkCamera')).at(-1) as { payload: unknown };
+    expect(walk.payload).toEqual({ index: 0, count: WIRE_CAMERAS.length });
+  });
+
+  test('the first command of another protocol version is answered once in that version, and nothing is performed', async () => {
+    const { handle, posted, post, arrived } = await bridged();
+    await handle.ready;
+    const foreign = (id: string, method: string, params?: Record<string, unknown>): Record<string, unknown> => ({
+      ...command(id, method, params),
+      version: PROTOCOL_VERSION + 1,
+    });
+    // The helper's own `context` is nobody's question: it does not use up the one answer.
+    post(foreign('f0', 'context', { page: '/' }));
+    post(foreign('f1', 'setMode', { mode: 'walk' }));
+    await arrived(isReply('f1'), 'the answer to the foreign command');
+    post(foreign('f2', 'setMode', { mode: 'walk' }));
+    post(command('own', 'getMode'));
+    await arrived(isReply('own'), 'the reply to a command of this version');
+    const answer = posted.find((message) => message.kind === 'reply' && message.id === 'f1') as Record<string, unknown>;
+    expect(answer['version']).toBe(PROTOCOL_VERSION + 1);
+    expect(answer['ok']).toBe(false);
+    expect(answer['error']).toEqual({ code: 'unknown-method', message: `protocol ${String(PROTOCOL_VERSION)}` });
+    expect(replyTo(posted, 'f0')).toBeUndefined();
+    expect(posted.some((message) => message.kind === 'reply' && message.id === 'f2')).toBe(false);
+    expect(replyTo(posted, 'own')!.result).toBe('orbit');
+    expect(handle.getMode()).toBe('orbit');
   });
 
   test('getState crosses as ONE reply carrying the whole reading', async () => {
