@@ -35,7 +35,7 @@ import { validateScene } from './scene-validator.js';
 import { ViewerLibError } from '../shared/errors.js';
 import { applyOp, OpError, sameTouched, type SceneOp, type TouchedEntity } from './scene-ops.js';
 import { applyRoomMerges, planRoomMerges, type RoomMerge } from './room-merge.js';
-import { SHELL_EDITS, rebindMovedPlacements, settleShellEdit, zoneLeavingItsRoom } from './shell-settle.js';
+import { SHELL_EDITS, rebindMovedPlacements, settleShellEdit, writtenSwingSides, zoneLeavingItsRoom } from './shell-settle.js';
 import { heirsOf, inheritedCirculation, inheritedKeys, inheritedPath, issueKey } from './issue-heirs.js';
 import { diffScenes, sameData } from './scene-diff.js';
 import { Fanout } from '../shared/fanout.js';
@@ -347,9 +347,11 @@ export class SceneModel {
     const draft = draftOf(this.committed);
     const applied: AppliedOp[] = [];
     const touched: TouchedEntity[] = [];
+    const swingSides = writtenSwingSides(batch.ops, this.solved);
     try {
-      for (const op of batch.ops) {
+      for (const [index, op] of batch.ops.entries()) {
         const outcome = applyOp(draft, op, this.catalogues);
+        swingSides?.after(index, draft);
         applied.push({ op, summary: outcome.summary });
         for (const entity of outcome.touched) if (!touched.some((seen) => sameTouched(seen, entity))) touched.push(entity);
       }
@@ -374,7 +376,7 @@ export class SceneModel {
     // solver's answers: a shell edit re-reads the paint and the door swings
     // stored against them (`shell-settle.ts`).
     if (batch.ops.some((op) => SHELL_EDITS.has(op.op))) {
-      for (const entity of settleShellEdit(draft, this.committed, this.solved, this.catalogues, batch.ops)) {
+      for (const entity of settleShellEdit(draft, this.committed, this.solved, this.catalogues, batch.ops, swingSides?.sides)) {
         if (!touched.some((seen) => sameTouched(seen, entity))) touched.push(entity);
       }
     }

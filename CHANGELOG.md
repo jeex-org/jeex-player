@@ -16,10 +16,13 @@ as described under [Versioning](#versioning).
   leaf on its jamb: a door without an explicit hinge takes the jamb farther
   from its wall end, so a slide past the middle of its wall moved the drawn
   leaf to the other jamb. A hinge or a swing on a window or a passage is
-  refused by the operation, as the document refuses it. A swing a
-  `set_opening` writes in the same batch as a shell edit is kept as written
-  instead of being re-read from the side the door opened to before the
-  batch.
+  refused by the operation, as the document refuses it. Operations apply in
+  order: a hinge or a swing word is read on the door's wall as it stands when
+  its operation applies, and the later operations of the batch carry the leaf
+  physically. A reversed `merge_wall` turns both words round, and a later
+  shell edit that turns the wall's interior side round rewrites the swing so
+  the leaf keeps the side it was set to; a swing written after the batch's
+  last shell edit is kept exactly as written.
 - **One table says what each delivery form carries.** Every `ViewerHandle`
   member and every handle event has a row saying whether the iframe wire and
   the custom element carry it (`src/embed/delivery-contract.ts`); the wire

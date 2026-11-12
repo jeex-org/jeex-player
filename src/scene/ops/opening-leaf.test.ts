@@ -175,6 +175,30 @@ describe('an explicit hinge keeps its jamb', () => {
   });
 });
 
+describe('a swing set in a batch is carried by the later operations of that batch', () => {
+  test('set between a split and a merge that turns the partition round, the word turns and the leaf keeps its side', () => {
+    const split: SceneOp = { op: 'split_wall', wallId: L_SHAPE.wall.wPart, at: 1.5, nodeId: NEW.node, ids: [NEW.left, NEW.right] };
+    const set: SceneOp = { op: 'set_opening', openingId: L_SHAPE.opening.doorAb, swing: 'in' };
+    // The leaf right after the set_opening: the reference the rest of the batch keeps.
+    const midway = opDraft();
+    apply(midway, split);
+    apply(midway, set);
+    const wasLeaf = leafOf(midway, L_SHAPE.opening.doorAb);
+    expect<string[]>([L_SHAPE.room.a, L_SHAPE.room.b]).toContain(wasLeaf.roomId!);
+
+    const model = SceneModel.load(lShapePlan, CATALOGUE_REGISTRIES);
+    const result = model.apply({
+      baseRev: model.rev,
+      ops: [split, set, { op: 'merge_wall', wallIds: [NEW.right, NEW.left], id: L_SHAPE.wall.wPart }],
+    });
+    expect(isApplyOk(result)).toBe(true);
+    const merged = model.scene.walls.find((wall) => wall.id === L_SHAPE.wall.wPart)!;
+    expect({ a: merged.a, b: merged.b }).toEqual({ a: L_SHAPE.node.n5, b: L_SHAPE.node.n2 });
+    expect(openingOf(model.scene as Draft<SceneData>, L_SHAPE.opening.doorAb).swing).toBe('out');
+    expect(leafOf(model.scene, L_SHAPE.opening.doorAb).roomId).toBe(wasLeaf.roomId);
+  });
+});
+
 describe('the op schema', () => {
   test('accepts the hinge and swing words and null on set_opening, and only the words on add_opening', () => {
     expect(sceneOpsIssues([{ op: 'set_opening', openingId: ENTRY, hinge: 'a', swing: 'in' }])).toEqual([]);
