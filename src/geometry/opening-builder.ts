@@ -22,7 +22,8 @@ import type { ArcDef } from '../plan/plan-geometry.js';
 import { EPS, arcFromChord, arcLength, arcPointAt, arcTangent, dot, leftN, norm, sub } from '../plan/plan-geometry.js';
 import { clamp } from '../shared/math.js';
 import { defaultOpeningVariant, findOpeningVariant, variantFamily, type OpeningVariant } from '../assets/opening-variants.js';
-import { OPENING_BUILDERS, type OpeningBuildContext, type OpeningPlacement } from './opening-kinds.js';
+import { OPENING_BUILDERS, type OpeningBuildContext } from './opening-kinds.js';
+import type { OpeningPlacement } from './opening-wall-frame.js';
 import type { Opening, OpeningType, Vec2, Vec3, Wall } from '../scene/types.js';
 
 /** A built opening group plus everything needed to rebuild it in place. */

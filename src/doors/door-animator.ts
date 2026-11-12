@@ -4,7 +4,7 @@
  *
  * Invariant: the animator owns a leaf's `rotation.y` (hinged) or its
  * `position` (sliding) and reads how to move it from the leaf's own
- * `userData` contract (`restAngle`, `slide`, `slideBase`, written by
+ * `userData` contract (`closedAngle`, `restAngle`, `slide`, `slideBase`, written by
  * `opening-builder.ts`). It never derives a swing, never touches materials or
  * visibility — the dollhouse owns those — and never writes to the document.
  *
@@ -210,7 +210,8 @@ export function applyToLeaf(leaf: THREE.Object3D, t: number): void {
   }
   const restAngle = leaf.userData['restAngle'];
   if (typeof restAngle !== 'number') return;
-  leaf.rotation.y = restAngle * t;
+  // The shut leaf lies along the wall at `closedAngle`; opening adds the swing to it.
+  leaf.rotation.y = (leaf.userData['closedAngle'] as number) + restAngle * t;
 }
 
 /**

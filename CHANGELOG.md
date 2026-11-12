@@ -279,6 +279,15 @@ as described under [Versioning](#versioning).
   words stay as given); the furniture control is relabelled without replacing
   the hint; the minimap's name and a producer mark that appears after the
   switch are in the new language too.
+- **A door or a window on a diagonal or curved wall is built on the wall.**
+  Before, on a wall that runs along neither axis, a door's leaf (single,
+  double or sliding) and the side frames of a door or a window stood turned
+  off the wall line, by up to about 1 m at the far edge of an open leaf on a
+  30° wall; the window's rails, panes and bars and the click areas of both
+  turned the same wrong way. Every flat part of an opening is now laid out
+  along the wall, and a door still opens to the side the plan gives it. On a
+  curved wall a flat leaf hangs on the wall's tangent at the opening's
+  centre. Walls along an axis build exactly as before.
 - **A swipe over an untouched viewer on a phone scrolls the page.** Touch
   follows the wheel's engagement rule: until the viewer is engaged (a tap,
   focus inside it, fullscreen, or a page that cannot scroll) its canvas takes

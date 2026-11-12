@@ -131,13 +131,16 @@ export const LIGHTING_BUDGET_FAIL_BYTES = 12_085 + 1024;
  * raised 2026-11-11 from 68,936 measured on the main branch, +1,272 bytes, for
  * the validator's drawn opening heights and the walkable floor its plan solve
  * now carries, and the library map vocabulary the entry publishes; first set
- * at 68,827 when the entries were added on 2026-10-27), `jeex-viewer-lightmap.js` 106,841
+ * at 68,827 when the entries were added on 2026-10-27), `jeex-viewer-lightmap.js` 108,083
  * (the scene builder and the bank the bake lights and the shell are built
- * from). The fix for a crossing is to re-measure and update this comment,
- * never to raise the number from memory.
+ * from; raised 2026-11-12 from 107,746 measured on the main branch, +337
+ * bytes, for the wall frame every flat part of an opening is laid out in, so
+ * a door or a window on a diagonal or curved wall stands on its wall; first
+ * set at 106,841). The fix for a crossing is to re-measure and update this
+ * comment, never to raise the number from memory.
  */
 export const SCHEMA_BUDGET_FAIL_BYTES = 70_208 + 1024;
-export const LIGHTMAP_BUDGET_FAIL_BYTES = 106_841 + 1024;
+export const LIGHTMAP_BUDGET_FAIL_BYTES = 108_083 + 1024;
 
 /**
  * The custom-element entry (`vite.lib.config.ts`) and the hard limit for it
