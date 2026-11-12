@@ -25,7 +25,17 @@ Sends of different groups SHALL be separate requests, and each distinct error re
 
 ### Requirement: When sends leave
 
-`view` SHALL be sent once per mount when it mounts; `ready` when the first frame of each shown scene is drawn. Everything else, `models_loaded` included, SHALL be accumulated in memory and sent when the document becomes hidden, on `pagehide`, every 5 minutes while mounted, before a scene replacement and on dispose; what was sent is reset.
+`view` SHALL be sent once per mount, never a second time to correct the first: when the first document loads or fails; earlier, 2 seconds after the mount, only when a subject naming a project is known by then (the manifest was read); otherwise at the first flush or 10 seconds after the mount, whichever comes first, with the subject known then; `ready` when the first frame of each shown scene is drawn. Everything else, `models_loaded` included, SHALL be accumulated in memory and sent when the document becomes hidden, on `pagehide`, every 5 minutes while mounted, before a scene replacement and on dispose; what was sent is reset.
+
+#### Scenario: A view on a slow connection waits for its project
+
+- **WHEN** the manifest is read 5 seconds after the mount and the first scene loads at 6 seconds
+- **THEN** one `view` is sent at 6 seconds, naming the project
+
+#### Scenario: A view that never learns its project
+
+- **WHEN** nothing names the project 10 seconds after the mount and the visitor is still there
+- **THEN** one `view` is sent then with `project: null`, and no second `view` follows
 
 #### Scenario: Hidden flush
 

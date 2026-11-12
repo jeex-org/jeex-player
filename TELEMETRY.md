@@ -61,7 +61,7 @@ Each request belongs to one group (`group`) and carries the shared context. Ever
 | `assets` | `models_loaded`: UUIDs of the project's library assets, at most 50 | `["0192…"]` |
 | `engaged` | `engaged`: time while the page was visible and the player was running, since the view began or since the last `engaged`, in every view mode: `<10s`, `10-30s`, `30s-2m`, `2-5m`, `5-15m`, `>15m`; never sent for no time at all | `"2-5m"` |
 
-`view` is sent once per player, when its first scene has loaded or failed, at most 2 seconds after the mount, with the `subject` known then (a failed load names the project and bake when its manifest was read); `ready` is sent at once (the iframe page holds both up to 2 seconds for its host to name the page first); `engaged` is sent when the page is hidden, the scene is replaced or the player is removed, for the scene the time was spent on; everything else is sent when the page is hidden or closed, every 5 minutes, and when the scene changes.
+`view` is sent once per player, when its first scene has loaded or failed, with the `subject` known then (a failed load names the project and bake when its manifest was read); it leaves 2 seconds after the mount when the project is known by then, and otherwise waits for the project, at most 10 seconds after the mount or until the page is hidden or closed, and then names what is known, a project or none; `ready` is sent at once (the iframe page holds both up to 2 seconds for its host to name the page first); `engaged` is sent when the page is hidden, the scene is replaced or the player is removed, for the scene the time was spent on; everything else is sent when the page is hidden or closed, every 5 minutes, and when the scene changes.
 
 ### `actions`
 
