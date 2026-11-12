@@ -1,6 +1,6 @@
 import { describe, expect, test } from 'bun:test';
 import * as THREE from 'three';
-import { POSE_TOLERANCE, RenderDemand } from './render-demand.js';
+import { POSE_TOLERANCE, RenderDemand, STEADY_AFTER_IDLE_TICKS } from './render-demand.js';
 
 /** The modes that draw on demand. */
 const ON_DEMAND = ['walk', 'tour', 'orbit', 'plan3d'];
@@ -11,13 +11,17 @@ function camera(): THREE.PerspectiveCamera {
   return live;
 }
 
-/** A demand that has displayed `live` in `mode` (its first picture and the steady one after it), clean afterwards. */
+/** A demand that has displayed `live` in `mode` (its first picture and, once at rest, the steady one), clean afterwards. */
 function displayed(live: THREE.Camera, mode = 'walk'): RenderDemand {
   const demand = new RenderDemand();
-  expect(demand.shouldDraw(live, mode)).toBe(true);
-  demand.commit(live);
-  expect(demand.shouldDraw(live, mode)).toBe(true);
-  demand.commit(live);
+  const drawn: boolean[] = [];
+  for (let tick = 0; tick <= STEADY_AFTER_IDLE_TICKS; tick += 1) {
+    const draws = demand.shouldDraw(live, mode);
+    drawn.push(draws);
+    if (draws) demand.commit(live);
+  }
+  // Outside the on-demand modes every tick draws.
+  if (ON_DEMAND.includes(mode)) expect(drawn).toEqual([true, false, false, true]);
   return demand;
 }
 
@@ -53,7 +57,8 @@ describe('RenderDemand', () => {
       // No commit (the draw threw): the demand stays.
       expect(demand.shouldDraw(live, mode)).toBe(true);
       demand.commit(live);
-      // The steady draw of the same inputs, then nothing.
+      // Nothing until the view has rested, then the steady draw of the same inputs, then nothing.
+      for (let tick = 1; tick < STEADY_AFTER_IDLE_TICKS; tick += 1) expect(demand.shouldDraw(live, mode)).toBe(false);
       expect(demand.shouldDraw(live, mode)).toBe(true);
       demand.commit(live);
       expect(demand.shouldDraw(live, mode)).toBe(false);
@@ -99,35 +104,56 @@ describe('RenderDemand', () => {
     });
   });
 
-  test('a draw that answered a change draws once more with the same inputs, then rests', () => {
-    // The first picture of a changed scene is not always the steady one: on ANGLE's OpenGL
-    // backend on NVIDIA its antialiased edges sometimes resolve differently from the next draw
-    // of identical inputs, and a resting view would keep that picture until the next change.
-    const live = camera();
-    const demand = displayed(live, 'orbit');
-    demand.invalidate();
+  /** Ticks `demand` `count` times with `live` in `mode`, committing every draw; `change(tick)` runs before each tick. */
+  function run(demand: RenderDemand, live: THREE.Camera, count: number, change: (tick: number) => void = () => undefined, mode = 'orbit') {
     const drawn: boolean[] = [];
-    for (let tick = 0; tick < 4; tick += 1) {
-      const draws = demand.shouldDraw(live, 'orbit');
+    for (let tick = 0; tick < count; tick += 1) {
+      change(tick);
+      const draws = demand.shouldDraw(live, mode);
       drawn.push(draws);
       if (draws) demand.commit(live);
     }
-    expect(drawn).toEqual([true, true, false, false]);
+    return { drawn, draws: drawn.filter(Boolean).length };
+  }
+
+  // The first picture of a changed scene is not always the steady one: on ANGLE's OpenGL backend
+  // on NVIDIA its antialiased edges sometimes resolve differently from a later draw of identical
+  // inputs, and a resting view would keep that picture until the next change. So the picture the
+  // view rests on is drawn once more, after three ticks with no change.
+  test('a single change draws, then once more when the view has rested three ticks, then nothing', () => {
+    const live = camera();
+    const demand = displayed(live, 'orbit');
+    demand.invalidate();
+    const { drawn } = run(demand, live, 30);
+    expect(drawn.slice(0, 5)).toEqual([true, false, false, true, false]);
+    expect(drawn.filter(Boolean).length).toBe(2);
   });
 
-  test('a draw with another camera object draws once more on the next tick, then rests', () => {
+  test('a sparse drag (a change every third tick) draws as its changes do, plus one steady draw at its end', () => {
+    const live = camera();
+    const demand = displayed(live, 'orbit');
+    const drag = run(demand, live, 30, (tick) => {
+      if (tick % 3 === 0) demand.invalidate();
+    });
+    expect(drag.draws).toBe(10);
+    expect(run(demand, live, 40).draws).toBe(1);
+  });
+
+  test('a change on every tick draws every tick, and its steady draw comes only after it stops', () => {
+    const live = camera();
+    const demand = displayed(live, 'orbit');
+    expect(run(demand, live, 20, () => demand.invalidate()).draws).toBe(20);
+    expect(run(demand, live, 40).draws).toBe(1);
+  });
+
+  test('a draw with another camera object is followed by one steady draw once the view rests', () => {
     // The first picture after the render camera changes is not the steady one (measured: the
-    // top view's first frame differed from the next, identical-input frame in 7 runs of 10).
+    // top view's first frame differed from a later, identical-input frame in 7 runs of 10).
     const live = camera();
     const top = new THREE.OrthographicCamera(-5, 5, 5, -5, 0.1, 100);
     const demand = displayed(live, 'orbit');
-    const drawn: boolean[] = [];
-    for (let tick = 0; tick < 4; tick += 1) {
-      const draws = demand.shouldDraw(top, 'plan3d');
-      drawn.push(draws);
-      if (draws) demand.commit(top);
-    }
-    expect(drawn).toEqual([true, true, false, false]);
+    const { drawn } = run(demand, top, 10, () => undefined, 'plan3d');
+    expect(drawn).toEqual([true, false, false, true, false, false, false, false, false, false]);
   });
 
   test('a mode switch at the same pose draws, between any two modes', () => {
@@ -143,13 +169,13 @@ describe('RenderDemand', () => {
     const demand = displayed(live);
     demand.shouldDraw(live, 'walk');
     demand.shouldDraw(live, 'walk');
-    expect(demand.counters()).toEqual({ ticks: 4, draws: 2, insetDraws: 0 });
+    expect(demand.counters()).toEqual({ ticks: STEADY_AFTER_IDLE_TICKS + 3, draws: 2, insetDraws: 0 });
   });
 
   test('counts inset draws apart from display draws', () => {
     const live = camera();
     const demand = displayed(live, 'orbit');
     demand.insetDrawn();
-    expect(demand.counters()).toEqual({ ticks: 2, draws: 2, insetDraws: 1 });
+    expect(demand.counters()).toEqual({ ticks: STEADY_AFTER_IDLE_TICKS + 1, draws: 2, insetDraws: 1 });
   });
 });

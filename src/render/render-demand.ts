@@ -24,12 +24,22 @@
  * snapshot and the demand are committed only after a draw succeeded
  * (`commit`): a draw that throws leaves the demand for the next tick.
  *
- * The first picture of a change is not always the steady one, so a draw that
- * answered `invalidate` or a switch of camera object is followed by exactly
- * one more draw of the same inputs before the view rests (`commit`).
+ * The first picture of a change is not always the steady one, so the picture
+ * the view RESTS on is drawn once more: after a draw that answered
+ * `invalidate` or a switch of camera object or mode, the `STEADY_AFTER_IDLE_TICKS`th
+ * tick with nothing to draw draws the same inputs again (`commit`). A change
+ * before then draws anyway and starts the count again, so a drag at any pointer
+ * rate draws as its changes do, plus one draw at its end.
  *
  * Pure: no `three` and no DOM; the camera is read through its matrices.
  */
+
+/**
+ * Ticks with nothing to draw before the steady draw of a change: the third
+ * idle tick draws it. Two idle ticks between changes (a pointer moving every
+ * third tick) never reach it, so a sparse drag draws only its changes.
+ */
+export const STEADY_AFTER_IDLE_TICKS = 3;
 
 /** The modes that draw on demand. */
 const ON_DEMAND_MODES: ReadonlySet<string> = new Set(['walk', 'tour', 'orbit', 'plan3d']);
@@ -61,8 +71,10 @@ export type DemandCounters = { readonly ticks: number; readonly draws: number; r
 
 export class RenderDemand {
   private dirty = true;
-  /** One more draw of unchanged inputs is owed: the last draw answered a change (`commit`). */
+  /** One more draw of unchanged inputs is owed once the view rests: the last draw answered a change (`commit`). */
   private steady = false;
+  /** Ticks with nothing to draw since the last draw, counted while the steady draw is owed. */
+  private idle = 0;
   /** Whether the draw `shouldDraw` last allowed answers `invalidate`. */
   private answering = false;
   private shown: Shown | null = null;
@@ -88,14 +100,16 @@ export class RenderDemand {
     camera.updateMatrixWorld();
     const shown = this.shown;
     this.answering = this.dirty;
-    if (this.dirty || this.steady || shown === null) return true;
-    return (
+    if (this.dirty || shown === null) return true;
+    const changed =
       shown.camera !== camera ||
       shown.mode !== mode ||
       shown.layers !== camera.layers.mask ||
       !within(shown.projection, camera.projectionMatrix.elements, 0) ||
-      !within(shown.world, camera.matrixWorld.elements, POSE_TOLERANCE)
-    );
+      !within(shown.world, camera.matrixWorld.elements, POSE_TOLERANCE);
+    if (changed || !this.steady) return changed;
+    this.idle += 1;
+    return this.idle >= STEADY_AFTER_IDLE_TICKS;
   }
 
   /**
@@ -110,14 +124,16 @@ export class RenderDemand {
    * edges (0.1 to 0.3 % of the pixels, up to 50 levels) differed from every
    * later draw of the same inputs, while the second and every later draw
    * agreed. A resting view would keep that picture until the next change. So
-   * a draw that answered either leaves exactly one more draw owed, and that
-   * steady draw owes nothing. A camera move is not followed by one: its
-   * sub-tolerance tail is not redrawn either.
+   * a draw that answered either owes one more draw, drawn only once the view
+   * rests (`STEADY_AFTER_IDLE_TICKS`), and that steady draw owes nothing. Any
+   * draw before then replaces the debt with its own: a change owes again, a
+   * camera move owes nothing, as its sub-tolerance tail is not redrawn either.
    */
   commit(camera: DemandCamera): void {
     this.draws += 1;
-    const switched = this.shown !== null && this.shown.camera !== camera;
+    const switched = this.shown !== null && (this.shown.camera !== camera || this.shown.mode !== this.asked);
     this.steady = switched || this.answering;
+    this.idle = 0;
     this.answering = false;
     this.dirty = false;
     this.shown = {

@@ -16,7 +16,7 @@ import { page } from 'vitest/browser';
 import * as THREE from 'three';
 import { InlineSceneRepository, mountViewer } from '../../src/app/viewer-api.js';
 import type { ViewerHandle } from '../../src/app/viewer-handle.js';
-import { RenderDemand, type DemandCounters } from '../../src/render/render-demand.js';
+import { RenderDemand, STEADY_AFTER_IDLE_TICKS, type DemandCounters } from '../../src/render/render-demand.js';
 import { KEEP_WARM_MS, RenderRuntime } from '../../src/render/render-runtime.js';
 import { trackLibraryMaps, type LibraryMaps } from './library-maps.js';
 import { WalkLighting } from '../../src/render/walk-post.js';
@@ -34,6 +34,13 @@ const MOUNT_TIMEOUT_MS = 300_000;
 const TICKS_TIMEOUT_MS = 180_000;
 /** Ticks without a draw that count as resting. */
 const REST_TICKS = 15;
+
+/**
+ * Ticks of a followed motion that need not draw: the first (the change lands
+ * between ticks) and the idle ticks before the steady draw that ends it, which
+ * `follow` counts because that steady draw is its last (`RenderDemand`).
+ */
+const UNDRAWN_MOTION_TICKS = STEADY_AFTER_IDLE_TICKS;
 
 const debug = () => window.__viewerDebug!;
 const counters = (): DemandCounters => debug().renderDemand();
@@ -205,7 +212,7 @@ describe('walk and tour draw on demand', { timeout: MOUNT_TIMEOUT_MS }, () => {
     const motion = await follow(() => debug().toggleDoor(door.id));
     // The swing lasts wall-clock time, so its tick count is the frame rate's; every one of them draws.
     expect(motion.draws).toBeGreaterThanOrEqual(1);
-    expect(motion.draws).toBeGreaterThanOrEqual(motion.ticks - 1);
+    expect(motion.draws).toBeGreaterThanOrEqual(motion.ticks - UNDRAWN_MOTION_TICKS);
     expect(
       debug()
         .doors()
@@ -216,7 +223,7 @@ describe('walk and tour draw on demand', { timeout: MOUNT_TIMEOUT_MS }, () => {
   test('the furniture ripple draws while it runs and rests after it, both ways', async () => {
     const hidden = await follow(() => handle.setFurnitureVisible(false));
     expect(hidden.draws).toBeGreaterThanOrEqual(1);
-    expect(hidden.draws).toBeGreaterThanOrEqual(hidden.ticks - 1);
+    expect(hidden.draws).toBeGreaterThanOrEqual(hidden.ticks - UNDRAWN_MOTION_TICKS);
     const shown = await follow(() => handle.setFurnitureVisible(true));
     expect(shown.draws).toBeGreaterThanOrEqual(1);
   });
@@ -715,9 +722,9 @@ describe('the editing modes draw on demand', { timeout: MOUNT_TIMEOUT_MS }, () =
   test('a door draws every tick of its motion and its final pose; the furniture ripple draws to its last frame', async () => {
     const door = debug().doors()[0]!;
     const motion = await draws('door', () => debug().toggleDoor(door.id));
-    expect(motion.draws).toBeGreaterThanOrEqual(motion.ticks - 1);
+    expect(motion.draws).toBeGreaterThanOrEqual(motion.ticks - UNDRAWN_MOTION_TICKS);
     const hidden = await draws('furniture hidden', () => handle.setFurnitureVisible(false));
-    expect(hidden.draws).toBeGreaterThanOrEqual(hidden.ticks - 1);
+    expect(hidden.draws).toBeGreaterThanOrEqual(hidden.ticks - UNDRAWN_MOTION_TICKS);
     await draws('furniture shown', () => handle.setFurnitureVisible(true));
   });
 
