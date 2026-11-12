@@ -73,7 +73,7 @@ describe('constants', () => {
   });
 
   test('the ops entry keeps a budget of its own, distinct from the unrelated opening-frame chunk', () => {
-    expect(OPS_BUDGET_FAIL_BYTES).toBe(100_242 + 1024);
+    expect(OPS_BUDGET_FAIL_BYTES).toBe(101_269 + 1024);
     expect(limitFor('jeex-viewer-ops.js')).toBe(OPS_BUDGET_FAIL_BYTES);
     // `dist-lib/` also carries `jeex-viewer-opening-frame-<hash>.js`, an `es`
     // build chunk that shares the `jeex-viewer-op` prefix with the ops entry

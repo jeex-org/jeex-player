@@ -27,6 +27,8 @@ import { isDoorLike } from '../types.js';
 import type {
   AddOpeningOp,
   Opening,
+  OpeningHinge,
+  OpeningSwing,
   OpeningType,
   RemoveOpeningOp,
   ReplaceOpeningVariantOp,
@@ -225,6 +227,7 @@ export function applyReplaceOpeningVariant(scene: Draft<SceneData>, op: ReplaceO
 export function applySetOpening(scene: Draft<SceneData>, op: SetOpeningOp): OpOutcome {
   const found = findOpening(scene, op.openingId);
   if (!found) throw new OpError(`Unknown opening ${op.openingId}`);
+  requireDoorForLeaf(found.opening.type, op.openingId, op);
   const destination = movedTo(scene, op, found);
   const current = effectiveOpening(found.opening, scene.ceilingHeight);
   const requested: OpeningGeometry = {
@@ -247,6 +250,7 @@ export function applySetOpening(scene: Draft<SceneData>, op: SetOpeningOp): OpOu
         ceilingHeight: scene.ceilingHeight,
       });
   writeGeometry(found.opening, clamped, scene.ceilingHeight);
+  const leaf = writeLeaf(found.opening, op);
   if (destination) {
     (found.wall.openings ?? []).splice(found.index, 1);
     destination.openings ??= [];
@@ -256,9 +260,41 @@ export function applySetOpening(scene: Draft<SceneData>, op: SetOpeningOp): OpOu
   return {
     summary:
       `Opening ${op.openingId} ${moved} to centre ${round(clamped.center)} m, width ${round(clamped.width)} m, ` +
-      `sill ${round(clamped.sill)} m, head ${round(clamped.head)} m`,
+      `sill ${round(clamped.sill)} m, head ${round(clamped.head)} m${leaf}`,
     touched: [TOUCHED_SHELL],
   };
+}
+
+/**
+ * Refuses a hinge or a swing on an opening that is not a door: a window and a
+ * leafless passage carry neither, and `validate/walls.ts` refuses either in a
+ * document (`opening-hinge-not-door`, `opening-swing-not-door`). Said here, at
+ * the operation that asked, rather than at commit. `null` asks for nothing.
+ */
+function requireDoorForLeaf(
+  type: OpeningType,
+  openingId: string,
+  op: { readonly hinge?: OpeningHinge | null; readonly swing?: OpeningSwing | null },
+): void {
+  if (type === 'door') return;
+  if (op.hinge !== undefined && op.hinge !== null) throw new OpError(`Opening ${openingId} is a ${type} and cannot carry a hinge`);
+  if (op.swing !== undefined && op.swing !== null) throw new OpError(`Opening ${openingId} is a ${type} and cannot carry a swing`);
+}
+
+/**
+ * Writes a `set_opening`'s hinge and swing: a word is stored, `null` removes
+ * the explicit value so `door-swing.ts` derives the side again, and an omitted
+ * field is left as it is. Answers the summary's tail.
+ */
+function writeLeaf(opening: Draft<Opening>, op: SetOpeningOp): string {
+  let tail = '';
+  if (op.hinge === null) delete opening.hinge;
+  else if (op.hinge !== undefined) opening.hinge = op.hinge;
+  if (op.hinge !== undefined) tail += `, hinge ${op.hinge ?? 'derived'}`;
+  if (op.swing === null) delete opening.swing;
+  else if (op.swing !== undefined) opening.swing = op.swing;
+  if (op.swing !== undefined) tail += `, swing ${op.swing ?? 'derived'}`;
+  return tail;
 }
 
 /**
@@ -286,6 +322,7 @@ export function applyAddOpening(scene: Draft<SceneData>, op: AddOpeningOp): OpOu
   if (op.type !== 'door' && op.type !== 'window' && op.type !== 'passage') {
     throw new OpError(`Unknown opening type ${String(op.type)}`);
   }
+  requireDoorForLeaf(op.type, id, op);
   if (op.entrance) {
     if (op.type !== 'door') throw new OpError('Only a door can be the entrance');
     const existing = entranceOpening(scene);
@@ -301,6 +338,8 @@ export function applyAddOpening(scene: Draft<SceneData>, op: AddOpeningOp): OpOu
   const opening: Draft<Opening> = { id, type: op.type, center: clamped.center, width: clamped.width };
   if (op.entrance) opening.entrance = true;
   if (op.variant) opening.variant = op.variant;
+  if (op.hinge !== undefined) opening.hinge = op.hinge;
+  if (op.swing !== undefined) opening.swing = op.swing;
   writeGeometry(opening, clamped, scene.ceilingHeight);
   wall.openings ??= [];
   wall.openings.push(opening);

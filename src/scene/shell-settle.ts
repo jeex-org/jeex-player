@@ -38,7 +38,17 @@ import type { Draft } from '../shared/committed.js';
 import { finishMaterialOf } from './finish-value.js';
 import { TOUCHED_SHELL, touchedAsset, touchedFace, touchedOpening, type TouchedEntity } from './ops/context.js';
 import { surfacesIn, type SceneRegistries } from './registries.js';
-import { FaceMap, type FaceKey, type FinishRef, type Room, type SceneData, type SceneOp } from './types.js';
+import {
+  FaceMap,
+  type FaceKey,
+  type FinishRef,
+  type Opening,
+  type Room,
+  type SceneData,
+  type SceneOp,
+  type Vec2,
+  type Wall,
+} from './types.js';
 
 /** Who owns each wall side on a plan: a room id, `null` for the facade. */
 function ownersOf(plan: SolvedPlan): Map<string, string | null> {
@@ -127,11 +137,87 @@ function ancestry(ops: readonly SceneOp[]): (wallId: string) => ReadonlySet<stri
   return of;
 }
 
+/** The side a door's swing opens to on `plan`: the wall's interior normal for `in`, its opposite for `out`. */
+function physicalSide(data: SceneData, plan: SolvedPlan, wall: Wall, opening: Opening): Vec2 | undefined {
+  if (opening.swing === undefined) return undefined;
+  const interior = interiorSideOf(plan, wall.id, pointAt(data, wall, opening.center).tangent).normal;
+  return opening.swing === 'in' ? interior : { x: -interior.x, z: -interior.z };
+}
+
+/** The physical sides of the swings a batch wrote before a later shell edit, by opening id. */
+export interface WrittenSwingSides {
+  readonly sides: ReadonlyMap<string, Vec2>;
+  /** Called after operation `index` of the batch applied to `draft`. */
+  after(index: number, draft: Draft<SceneData>): void;
+}
+
+/** The opening whose swing `op` writes, or `undefined`: a `set_opening` or an `add_opening` naming a `swing`. */
+function swingWrittenBy(op: SceneOp): string | undefined {
+  if (op.op === 'set_opening') return op.swing === undefined ? undefined : op.openingId;
+  if (op.op === 'add_opening') return op.swing === undefined ? undefined : op.id;
+  return undefined;
+}
+
+/** The opening whose earlier recorded side `op` ends: a new swing or wall, a removal, an opening added under the id. */
+function openingReplacedBy(op: SceneOp): string | undefined {
+  if (op.op === 'set_opening') return op.swing === undefined && op.wallId === undefined ? undefined : op.openingId;
+  if (op.op === 'add_opening') return op.id;
+  return op.op === 'remove_opening' ? op.openingId : undefined;
+}
+
+/**
+ * Records, as the batch applies, the side each swing a `set_opening` or an
+ * `add_opening` writes opens to on the wall as it stands at that moment, when a
+ * shell edit follows it in the batch: the settle step then keeps that side on
+ * the final plan. `undefined` for a batch with no such operation, which costs
+ * nothing more.
+ * The plan of the moment is the committed one until the first shell edit, and
+ * is solved from the draft after it; a draft that does not solve there records
+ * nothing, and the word stays as written.
+ */
+export function writtenSwingSides(ops: readonly SceneOp[], committedPlan: SolvedPlan): WrittenSwingSides | undefined {
+  const shellAt = ops.flatMap((op, index) => (SHELL_EDITS.has(op.op) ? [index] : []));
+  const firstShell = shellAt[0] ?? ops.length;
+  const lastShell = shellAt.at(-1) ?? -1;
+  const writesBefore = (op: SceneOp, index: number) => swingWrittenBy(op) !== undefined && index < lastShell;
+  if (!ops.some((op, index) => writesBefore(op, index))) return undefined;
+  const sides = new Map<string, Vec2>();
+  return {
+    sides,
+    after(index, draft) {
+      const op = ops[index]!;
+      // A later swing, a move to another wall, a removal or a new opening under the id is read where it is
+      // written: the earlier side no longer holds.
+      const id = openingReplacedBy(op);
+      if (id === undefined) return;
+      sides.delete(id);
+      if (!writesBefore(op, index)) return;
+      let plan = committedPlan;
+      if (index > firstShell) {
+        try {
+          plan = solvePlan(draft);
+        } catch {
+          return;
+        }
+      }
+      for (const wall of draft.walls) {
+        const opening = (wall.openings ?? []).find((candidate) => candidate.id === id);
+        const side = opening === undefined ? undefined : physicalSide(draft, plan, wall, opening);
+        if (side !== undefined) sides.set(id, side);
+      }
+    },
+  };
+}
+
 /**
  * Rewrites every explicit door swing whose wall's interior side turned round
- * between the two plans. A door moved onto an unrelated wall (`set_opening`
- * naming another `wallId`) is the caller's: its swing is read on the wall it
- * joined, so it is left as written.
+ * between two plans, so the leaf keeps the physical side it opened to. The
+ * side is read on the committed plan, or, for a swing a `set_opening` or an
+ * `add_opening` of the batch wrote before a later shell edit, on the wall as
+ * it stood when that op applied (`swingSides`). A swing written after the
+ * batch's last shell edit is kept as written. A door moved onto an unrelated wall (`set_opening` naming
+ * another `wallId`) is the caller's: its swing is read on the wall it joined,
+ * so it is left as written too.
  */
 function keepSwingSides(
   draft: Draft<SceneData>,
@@ -139,23 +225,26 @@ function keepSwingSides(
   before: SolvedPlan,
   after: SolvedPlan,
   ops: readonly SceneOp[],
+  swingSides: ReadonlyMap<string, Vec2>,
 ): TouchedEntity[] {
   const touched: TouchedEntity[] = [];
   const ancestorsOf = ancestry(ops);
+  const written = new Set(ops.flatMap((op) => swingWrittenBy(op) ?? []));
   // Found by OPENING id: a split in the same batch carries a door onto a new wall id.
   const doorsBefore = new Map(
     committed.walls.flatMap((wall) => (wall.openings ?? []).map((opening) => [opening.id, { wall, opening }] as const)),
   );
+  const committedSide = (wallId: string, openingId: string): Vec2 | undefined => {
+    const found = doorsBefore.get(openingId);
+    if (found === undefined || !ancestorsOf(wallId).has(found.wall.id)) return undefined;
+    return physicalSide(committed, before, found.wall, found.opening);
+  };
   for (const wall of draft.walls) {
     for (const opening of wall.openings ?? []) {
       if (opening.swing === undefined) continue;
-      const found = doorsBefore.get(opening.id);
-      if (found?.opening.swing === undefined) continue;
-      const { wall: old, opening: was } = found;
-      if (!ancestorsOf(wall.id).has(old.id)) continue;
-      const oldInterior = interiorSideOf(before, old.id, pointAt(committed, old, was.center).tangent).normal;
+      const physical = swingSides.get(opening.id) ?? (written.has(opening.id) ? undefined : committedSide(wall.id, opening.id));
+      if (physical === undefined) continue;
       const newInterior = interiorSideOf(after, wall.id, pointAt(draft, wall, opening.center).tangent).normal;
-      const physical = was.swing === 'in' ? oldInterior : { x: -oldInterior.x, z: -oldInterior.z };
       const word = dot(physical, newInterior) > 0 ? 'in' : 'out';
       if (word === opening.swing) continue;
       opening.swing = word;
@@ -202,6 +291,7 @@ export function settleShellEdit(
   committedPlan: SolvedPlan,
   registries: SceneRegistries,
   ops: readonly SceneOp[],
+  swingSides: ReadonlyMap<string, Vec2> = new Map(),
 ): TouchedEntity[] {
   const reattached = reattachZones(draft);
   let plan: SolvedPlan;
@@ -220,7 +310,7 @@ export function settleShellEdit(
       return kept.length === 0 ? [] : [{ ...preset, ops: kept }];
     });
   }
-  touched.push(...keepSwingSides(draft, committed, committedPlan, plan, ops));
+  touched.push(...keepSwingSides(draft, committed, committedPlan, plan, ops, swingSides));
   return touched;
 }
 

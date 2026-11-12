@@ -250,6 +250,10 @@ const planNodeSchema = z.object({ id: uuidSchema, p: vec2Schema });
 
 const wallArcSchema = z.object({ radius: z.number(), ccw: z.boolean() });
 
+/** A door's hinge jamb and swing side: the document's words, which the opening operations write too. */
+const openingHingeSchema = z.enum(['a', 'b']);
+const openingSwingSchema = z.enum(['in', 'out']);
+
 const openingSchema = z.object({
   id: uuidSchema,
   type: z.enum(['door', 'window', 'passage']),
@@ -259,8 +263,8 @@ const openingSchema = z.object({
   head: z.optional(z.number()),
   shape: z.optional(z.enum(['flat', 'arch'])),
   variant: z.optional(z.string()),
-  hinge: z.optional(z.enum(['a', 'b'])),
-  swing: z.optional(z.enum(['in', 'out'])),
+  hinge: z.optional(openingHingeSchema),
+  swing: z.optional(openingSwingSchema),
   entrance: z.optional(z.boolean()),
 });
 
@@ -418,6 +422,8 @@ export const sceneOpSchema = z.discriminatedUnion('op', [
     dwidth: z.optional(z.number()),
     dsill: z.optional(z.number()),
     dhead: z.optional(z.number()),
+    hinge: z.optional(z.nullable(openingHingeSchema)),
+    swing: z.optional(z.nullable(openingSwingSchema)),
   }),
   z.object({
     op: z.literal('add_opening'),
@@ -430,6 +436,8 @@ export const sceneOpSchema = z.discriminatedUnion('op', [
     id: uuidSchema,
     entrance: z.optional(z.boolean()),
     variant: z.optional(z.string()),
+    hinge: z.optional(openingHingeSchema),
+    swing: z.optional(openingSwingSchema),
   }),
   z.object({ op: z.literal('remove_opening'), openingId: uuidSchema }),
   z.object({

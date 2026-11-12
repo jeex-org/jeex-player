@@ -62,11 +62,16 @@ export const HOST_BUDGET_FAIL_BYTES = 4 * 1024;
  * scene schemas — a good deal of the scene model, but still no `three` and no
  * DOM.
  *
- * The gate is set from a measured size of `jeex-viewer-ops.js` (100,242 gzip
- * bytes, 97.9 KB, from `measureBundle('dist-lib')` right after
+ * The gate is set from a measured size of `jeex-viewer-ops.js` (101,269 gzip
+ * bytes, 98.9 KB, from `measureBundle('dist-lib')` right after
  * `bun run build:lib`) plus 1 KB. Most of the entry is the scene model and its
  * `zod/mini` schemas; the bundled bank's fixed UUID v7 literals (random hex
- * that gzip cannot fold) are a large share. The last raise, from 98,100 bytes
+ * that gzip cannot fold) are a large share. The last raise, from 100,242 bytes
+ * (2026-11-12, +1,027 bytes), is a door's hinge jamb and swing side
+ * (`Opening.hinge`, `Opening.swing`: their schemas, the `set_opening` and
+ * `add_opening` fields and refusals), with the swing a batch writes kept on
+ * its physical side across a later shell edit, all applied by a host
+ * server-side. The raise before it, from 98,100 bytes
  * measured on the main branch (2026-11-11, +2,142 bytes), is the commit-time
  * step after a shell edit (`scene/shell-settle.ts`: painted faces and door
  * swings re-read on the new plan, a zone attached again, a moved placement
@@ -93,7 +98,7 @@ export const HOST_BUDGET_FAIL_BYTES = 4 * 1024;
  * `npm pack` time; the fix is to re-measure and update this comment, never to
  * raise the number from memory.
  */
-export const OPS_BUDGET_FAIL_BYTES = 100_242 + 1024;
+export const OPS_BUDGET_FAIL_BYTES = 101_269 + 1024;
 
 /**
  * Hard limit for the `jeex-viewer/lighting` entry, gzip bytes. It carries the
