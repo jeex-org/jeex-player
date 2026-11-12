@@ -123,6 +123,7 @@ const PURE_MODULES = [
   'layout/rules/bedroom',
   'layout/rules/hall',
   'layout/free-space',
+  'layout/door-leaf',
   'materials/material-catalogue',
   'ui/messages',
   'materials/texture-noise',

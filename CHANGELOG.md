@@ -9,6 +9,12 @@ as described under [Versioning](#versioning).
 
 ### Added
 
+- **`jeex-viewer/ops` answers a door's hinge and swing.** `doorLeaf(scene,
+  openingId, plan?)` (type `DoorLeaf`) gives the jamb and side a door's leaf
+  shows, explicit or derived, and whether the document names each, read off
+  the same rule the plan drawing and the 3D leaf use, so a host's door panel
+  can say which side an automatic door opens to without re-implementing the
+  derivation. It answers `null` for a window, a passage or an unknown id.
 - **`add_opening` and `set_opening` carry a door's `hinge` and `swing`.**
   `add_opening` takes `hinge` (`'a'` or `'b'`) and `swing` (`'in'` or
   `'out'`); `set_opening` takes the same words or `null`, which removes the

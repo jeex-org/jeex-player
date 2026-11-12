@@ -83,6 +83,11 @@
  * placement filter the clear zones the linter checks, so the filter never
  * sizes a door's zone itself.
  *
+ * And `doorLeaf` (type `DoorLeaf`) for a host's door panel: the hinge and swing
+ * a door shows, resolved by the same rule the plan drawing and the 3D leaf
+ * use, with whether the document names each — "automatic (now: left)" without
+ * the host restating the derivation.
+ *
  * A name that is not re-exported here is not public, whatever module it lives
  * in — the same façade rule the library's other entries follow. Widening it is
  * one more named export, never an `export *`.
@@ -214,6 +219,10 @@ export type { PlanCaveat } from '../plan/floor-ownership.js';
 export { lintLayout, countIssues, describeIssues, doorClearZones } from '../layout/layout-lint.js';
 export type { DoorClearZone, LayoutIssue, LayoutRule, LayoutIssueCounts } from '../layout/layout-lint.js';
 export type { LayoutLinter } from '../layout/layout-issue.js';
+// `door-swing` and `opening-frame` are already in the entry graph through
+// `lintLayout`; the only new module is `layout/door-leaf.ts`.
+export { doorLeaf } from '../layout/door-leaf.js';
+export type { DoorLeaf } from '../layout/door-leaf.js';
 
 /**
  * The free-space helper: a pure QUERY, not an operation — the host gets a pose
