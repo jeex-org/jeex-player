@@ -491,6 +491,19 @@ describe('what the frame announces', () => {
     expect(embed.player).toBe('1.2.3');
   });
 
+  test('the method list cannot be changed through the handle or a `ready` listener', async () => {
+    const embed = make();
+    let heard: readonly string[] | undefined;
+    embed.on('ready', (info) => {
+      heard = info.methods;
+    });
+    fromFrame(frameEvent('ready', { sceneId: DEMO.scene, methods: ['play'] }));
+    await embed.ready;
+    expect(() => (embed.methods as string[]).push('dispose')).toThrow(TypeError);
+    expect(() => (heard as string[]).push('dispose')).toThrow(TypeError);
+    expect(embed.methods).toEqual(['play']);
+  });
+
   test('a frame that announces nothing (an older one of this protocol) leaves both null', async () => {
     const embed = make();
     fromFrame(frameEvent('ready', { sceneId: DEMO.scene }));

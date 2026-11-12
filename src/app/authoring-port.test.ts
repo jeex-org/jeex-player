@@ -296,6 +296,19 @@ describe('an edit tool on a document loaded without its revision', () => {
     expect(warnings(h)).toHaveLength(2);
   });
 
+  test('a load with a revision re-arms the warning: the same document without one again warns again', () => {
+    const h = harness();
+    h.port.setPlanTool(true);
+    h.port.document(SCENE_A, false);
+    h.port.document(SCENE_A, true);
+    h.port.document(SCENE_A, false);
+    expect(warnings(h)).toHaveLength(2);
+    // Unbinding the tools re-arms it too.
+    h.port.unbind();
+    h.port.document(SCENE_A, false);
+    expect(warnings(h)).toHaveLength(3);
+  });
+
   test('no tool armed, no warning: the checkpoint overlay is not an edit of the plan or the furniture', () => {
     const h = harness();
     h.port.document(SCENE_A, false);

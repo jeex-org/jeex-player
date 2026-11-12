@@ -378,7 +378,7 @@ export const readyPayloadSchema = z.object(
     // Optional: a frame of this protocol older than the announcement sends neither.
     player: z.optional(wireString),
     // Strings, not this build's method names: a newer frame may answer a method this module has never heard of.
-    methods: z.optional(z.array(wireString, { error: 'must be a list of method names' })),
+    methods: z.optional(z.readonly(z.array(wireString, { error: 'must be a list of method names' }))),
   },
   {
     error: 'must be an object naming a `sceneId`',

@@ -8,6 +8,7 @@ import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { apartmentScene } from '../demo/scene-data.js';
 import { DocumentSource } from './document-source.js';
+import { resolveViewerOptions } from './viewer-options.js';
 
 const LAMP_DIR = join(import.meta.dirname, '..', '..', 'tests', 'fixtures', 'project-lamps');
 const QUIET = { warn: () => {}, error: () => {} };
@@ -26,6 +27,17 @@ describe('DocumentSource', () => {
     const booted = await documents.boot();
     expect(booted.model.rev).toBe(9);
     expect(documents.project()?.baseUrl).toBe(library.baseUrl);
+  });
+
+  test("a mount's `scene.revision` survives the option resolver: the first document starts at it, as given", async () => {
+    const options = resolveViewerOptions({ scene: { document: apartmentScene, revision: 7 } });
+    const booted = await new DocumentSource(options.scene, QUIET).boot();
+    expect([booted.model.rev, booted.revisionGiven]).toEqual([7, true]);
+  });
+
+  test('a mount with a revision that is not a whole number of 0 or more is refused, as `loadScene` refuses it', async () => {
+    const options = resolveViewerOptions({ scene: { document: apartmentScene, revision: -1 } });
+    await expect(new DocumentSource(options.scene, QUIET).boot()).rejects.toMatchObject({ code: 'bad-params' });
   });
 
   test('a loaded document says whether its source named a revision, which the edit tools warn about', async () => {

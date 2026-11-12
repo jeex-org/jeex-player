@@ -465,7 +465,8 @@ export class SceneMount {
       return;
     }
     // Same scene, same library key: the same manifest, so the same mark.
-    const committed = current.replaceDocument(loaded.model);
+    // The host's revision, when it named one, is the one the next edit is based on.
+    const committed = current.replaceDocument(loaded.model, loaded.revisionGiven ? loaded.model.rev : undefined);
     if (committed === null || !SceneBuilder.needsRebuild(committed.touched)) this.deps.onDocument(current);
   }
 

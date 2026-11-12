@@ -26,11 +26,12 @@ const END = '<!-- delivery-forms:end -->';
 
 const code = (names: readonly string[]): string => names.map((name) => `\`${name}\``).join(', ');
 
-/** Every handle member that is a method a host calls, `tour.*` and `capture.*` spelled out. */
+/** Every handle member that is a method a host calls (its row is no `PropertyRow`), `tour.*` and `capture.*` spelled out. */
 function moduleMethods(): string[] {
-  const properties = new Set(['element', 'options', 'slots', 'ready']);
   return [
-    ...Object.keys(HANDLE_MEMBERS).filter((name) => !properties.has(name)),
+    ...Object.entries(HANDLE_MEMBERS)
+      .filter(([, row]) => !('property' in row))
+      .map(([name]) => name),
     ...Object.keys(TOUR_MEMBERS).map((name) => `tour.${name}`),
     ...Object.keys(CAPTURE_MEMBERS).map((name) => `capture.${name}`),
   ];

@@ -243,7 +243,7 @@ function settled(): Promise<void> {
 function sendCommand(
   method: string,
   params?: Record<string, unknown>,
-  over: Partial<{ origin: string; source: unknown; viewerId: string; channel: string; version: number }> = {},
+  over: Partial<{ origin: string; source: unknown; viewerId: string; channel: string; version: number; id: string }> = {},
 ): void {
   frameWindow.receive({
     origin: over.origin ?? HOST_ORIGIN,
@@ -253,7 +253,7 @@ function sendCommand(
       version: over.version ?? PROTOCOL_VERSION,
       viewerId: over.viewerId ?? VIEWER_ID,
       kind: 'command',
-      id: 'c1',
+      id: over.id ?? 'c1',
       method,
       ...(params ? { params } : {}),
     },
@@ -261,7 +261,7 @@ function sendCommand(
 }
 
 /** Everything the bridge posted back, replies and events alike. */
-function replies(): Array<{ ok: boolean; result?: unknown; error?: { code: string; message: string }; origin: string }> {
+function replies(): Array<{ id: string; ok: boolean; result?: unknown; error?: { code: string; message: string }; origin: string }> {
   return hostWindow.posted
     .filter((entry) => entry.message.kind === 'reply')
     .map((entry) => ({ ...(entry.message as { ok: boolean }), origin: entry.origin }) as never);
@@ -333,8 +333,6 @@ describe('who the bridge answers', () => {
   test('other postMessage traffic on the page is not ours', async () => {
     const { calls } = bridge();
     sendCommand('play', undefined, { channel: 'some-other-widget' });
-    // Another version of this channel is not ours either; its one answer is the next block's.
-    sendCommand('play', undefined, { channel: 'some-other-widget', version: 2 });
     frameWindow.receive({ origin: HOST_ORIGIN, source: hostWindow, data: 'hello' });
     frameWindow.receive({ origin: HOST_ORIGIN, source: hostWindow, data: null });
     await settled();
@@ -500,6 +498,17 @@ describe('a host speaking another protocol version', () => {
     sendCommand('play');
     await settled();
     expect(calls.tour).toEqual(['play']);
+  });
+
+  test("the helper's own `context` does not spend the answer: the first real command gets it", async () => {
+    bridge();
+    const foreign = PROTOCOL_VERSION + 1;
+    sendCommand('context', { context: {} }, { version: foreign, id: 'h1' });
+    sendCommand('getScene', undefined, { version: foreign, id: 'h2' });
+    await settled();
+    expect(replies().map((reply) => [reply.id, reply.error])).toEqual([
+      ['h2', { code: 'unknown-method', message: `protocol ${PROTOCOL_VERSION}` }],
+    ]);
   });
 
   test('the answer does not wait for the first scene', async () => {

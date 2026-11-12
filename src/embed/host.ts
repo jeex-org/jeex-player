@@ -192,9 +192,10 @@ function readyPayload(payload: unknown): EmbedReady | null {
   const { sceneId, player, methods } = payload as Record<string, unknown>;
   // The value that travels on is the one the frame sent, not a copy: a host
   // reading `options` must see the object the viewer actually mounted with.
+  // Its method list is frozen: what one listener reads, `embed.methods` advertises.
   return typeof sceneId === 'string' &&
     (player === undefined || typeof player === 'string') &&
-    (methods === undefined || (Array.isArray(methods) && methods.every((method) => typeof method === 'string')))
+    (methods === undefined || (Array.isArray(methods) && Object.freeze(methods).every((method) => typeof method === 'string')))
     ? (payload as EmbedReady)
     : null;
 }
@@ -442,7 +443,7 @@ export function embedViewer(container: HTMLElement, options: EmbedOptions): Jeex
         log({
           level: 'error',
           code: 'ready-invalid',
-          message: 'jeex embed: the frame reported ready without a sceneId',
+          message: 'jeex embed: the frame sent an invalid ready',
           detail: data.payload,
         });
         return;

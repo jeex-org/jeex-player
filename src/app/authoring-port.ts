@@ -93,7 +93,7 @@ export type AuthoringPort = Omit<Authoring, 'debug' | 'dispose'> & {
    * `revision`. Without one the model counts from 0, so every `baseRev` the
    * plan tool and the asset tool emit is a revision the host never had: armed
    * on such a document, either tool warns `edit-without-revision`, once per
-   * document.
+   * document until it is loaded with its revision or the tools are unbound.
    */
   document(sceneId: string, revisionGiven: boolean): void;
   debug(): AuthoringDebug & { readonly loaded: boolean };
@@ -190,6 +190,8 @@ export function authoringPort<S, M>(deps: AuthoringPortDeps<S, M>): AuthoringPor
     },
     document(sceneId, revisionGiven) {
       current = { sceneId, revisionGiven };
+      // A load with its revision re-arms the warning: a later one without it loses revisions again.
+      if (revisionGiven && warnedFor === sceneId) warnedFor = null;
       checkRevision();
     },
     revertPlanEdit: () => call(undefined, (tools) => tools.revertPlanEdit()),
@@ -198,9 +200,13 @@ export function authoringPort<S, M>(deps: AuthoringPortDeps<S, M>): AuthoringPor
       if (loading !== null) await loading;
       bind();
     },
-    unbind,
+    unbind() {
+      warnedFor = null;
+      unbind();
+    },
     dispose() {
       disposed = true;
+      warnedFor = null;
       unbind();
     },
     addCheckpoint: (id) => call(false, (tools) => tools.addCheckpoint(id)),

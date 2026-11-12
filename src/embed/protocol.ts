@@ -179,7 +179,7 @@ export type EmbedEventMap = {
    * wire's `METHOD_LIST`) let a host feature-detect; a frame older than the
    * announcement sends neither.
    */
-  ready: { options: unknown; sceneId: string; player?: string; methods?: string[] };
+  ready: { options: unknown; sceneId: string; player?: string; methods?: readonly string[] };
   /** `fatal`: the boot failed and the viewer is down; only `loadScene` brings a scene back. */
   error: { code: ErrorCode; message: string; fatal?: true };
   scene: { sceneId: string; rev: number };

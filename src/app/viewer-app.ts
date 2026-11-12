@@ -257,6 +257,7 @@ export class ViewerApp {
         this.messages = messages;
         this.telemetry.localeChanged(messages.locale);
       },
+      log: this.log,
     });
   }
 

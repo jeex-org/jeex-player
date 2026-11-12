@@ -42,7 +42,12 @@ as described under [Versioning](#versioning).
   revision the host loaded the document with, and from 0 without one, so a
   host that keeps its own revisions refused each batch as a conflict. The
   README and the `baseRev` documentation now say to pass the stored revision
-  to `loadScene` or the scene source.
+  to `loadScene` or the scene source. A `loadScene` of the scene on screen
+  with a `revision` now takes that revision; before, it counted on from its
+  own, and the next edit was refused as a conflict; the same document again
+  at a new revision takes it too. A mount's `scene.revision` (module and
+  element) is honoured as well: the option resolver dropped it, so the first
+  document started at 0.
 - **The iframe form steps cameras and sets the quality tier.** The wire
   carries `stepCamera {to}` (answered with whether a step started) and
   `setQuality {quality}`, both validated like every other command, and the

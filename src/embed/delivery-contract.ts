@@ -11,7 +11,8 @@
  * two carry, and the places that build them are checked against it:
  *
  * - every row is required: the tables are `satisfies Record<keyof …>`, so a
- *   member or an event added to the handle without a row fails `tsc`;
+ *   member or an event added to the handle without a row fails `tsc`, and
+ *   a value member takes a `PropertyRow` where a method cannot;
  * - the wire method list (`METHOD_LIST`, `CommandMethod`) equals the methods
  *   the rows name, in both directions, checked below;
  * - the host handle (`JeexEmbed`) has one member per wire method, and no
@@ -41,13 +42,24 @@ import type { CommandMethod, EventName, METHOD_LIST } from './protocol.js';
 import type { JeexEmbed } from './host-handle.js';
 
 /** A member the iframe host cannot call, or the wire method that calls it. */
-export type MemberRow = { readonly wire: false } | { readonly wire: true; readonly method: CommandMethod };
+export type MemberRow = { readonly wire: false; readonly property?: never } | { readonly wire: true; readonly method: CommandMethod };
+
+/** A member that is a value, not a method: off the wire, and not in a form's list of methods. */
+export type PropertyRow = { readonly wire: false; readonly property: true };
 
 /** Whether an event crosses the iframe wire, and whether the element re-emits it as a DOM event. */
 export type EventRow = { readonly wire: boolean; readonly element: boolean };
 
-/** Every handle member but the two that are tables of their own (`tour`, `capture`). */
-export type HandleMemberTable = Record<Exclude<keyof ViewerHandle, symbol | 'tour' | 'capture'>, MemberRow>;
+/**
+ * Every handle member but the two that are tables of their own (`tour`,
+ * `capture`): a method takes a `MemberRow`, a value must take a `PropertyRow`,
+ * so a new property cannot be listed as a method.
+ */
+export type HandleMemberTable = {
+  [K in Exclude<keyof ViewerHandle, symbol | 'tour' | 'capture'>]: ViewerHandle[K] extends (...args: never[]) => unknown
+    ? MemberRow
+    : PropertyRow;
+};
 export type TourMemberTable = Record<keyof TourControls, MemberRow>;
 export type CaptureMemberTable = Record<keyof CaptureCommands, MemberRow>;
 export type ViewerEventTable = Record<ViewerEventName, EventRow>;
@@ -55,15 +67,16 @@ export type ViewerEventTable = Record<ViewerEventName, EventRow>;
 export type TourEventTable = Record<'progress' | 'state' | 'ended', EventRow>;
 
 const OFF = { wire: false } as const;
+const PROPERTY = { wire: false, property: true } as const;
 /** The same member on the wire, under the wire method's name. */
 const on = <M extends CommandMethod>(method: M): { readonly wire: true; readonly method: M } => ({ wire: true, method });
 
 export const HANDLE_MEMBERS = {
-  element: OFF,
-  options: OFF,
-  slots: OFF,
+  element: PROPERTY,
+  options: PROPERTY,
+  slots: PROPERTY,
   // The frame's readiness travels as the `ready` event; the host helper keeps its own promise.
-  ready: OFF,
+  ready: PROPERTY,
   loadScene: on('loadScene'),
   setMode: on('setMode'),
   getMode: on('getMode'),

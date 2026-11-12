@@ -379,13 +379,15 @@ export function installFrameBridge(handle: ViewerHandle, options: FrameBridgeOpt
    * answered once, before `ready` too, with the version this frame speaks, so
    * the host names the cause instead of timing out. The reply carries the
    * HOST's version, the one it can read; nothing of the command is performed,
-   * and every later foreign message is dropped.
+   * and every later foreign message is dropped. The helper's own `context`
+   * is not that command: nobody waits on its answer, so the first real one
+   * gets it.
    */
   const answerForeign = (data: unknown): void => {
     const version = answeredForeign ? null : foreignVersion(data);
     if (version === null) return;
-    const { kind, id, viewerId: addressed } = data as Record<string, unknown>;
-    if (kind !== 'command' || typeof id !== 'string' || addressed !== viewerId) return;
+    const { kind, id, method, viewerId: addressed } = data as Record<string, unknown>;
+    if (kind !== 'command' || method === 'context' || typeof id !== 'string' || addressed !== viewerId) return;
     answeredForeign = true;
     const refusal = commandReply(viewerId, id, { ok: false, error: { code: 'unknown-method', message: `protocol ${PROTOCOL_VERSION}` } });
     post({ ...refusal, version });
