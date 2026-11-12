@@ -140,9 +140,9 @@ export function rebaseShellOrigins(shell: THREE.Object3D, plan: SolvedPlan, ceil
 
 /**
  * Moves the frame parts of one interior door group `FRAME_SHIFT_M` off the
- * wall centreline, square to the wall, towards the side its leaf
- * opens into; a door on an exterior wall and an opening without a leaf are
- * left alone. Idempotent: a part remembers that it moved.
+ * wall centreline, square to the wall at the opening's centre, towards the
+ * side its leaf opens into; a door on an exterior wall and an opening without
+ * a leaf are left alone. Idempotent: a part remembers that it moved.
  */
 export function rebaseOpeningFrames(group: THREE.Object3D): void {
   const leaf = group.children.find((child) => child.userData['isDoorLeaf'] === true);

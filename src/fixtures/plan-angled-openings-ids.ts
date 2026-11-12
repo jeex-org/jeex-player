@@ -43,3 +43,35 @@ export const ANGLED = {
     study: '01a1cf96-ecef-706b-b144-f270ae10c711',
   },
 } as const;
+
+/**
+ * Ids of the reversed-partition plan of `plan-angled-openings.ts`: a box cut
+ * by a partition at 60° that is drawn from its north end to its south end.
+ */
+export const REVERSED = {
+  scene: '01a1cfcc-5d0f-7667-aa5e-cda26b61e838',
+  node: {
+    southWest: '01a1cfcc-5d0f-7668-a82e-683ea04c68fc',
+    southMid: '01a1cfcc-5d0f-7669-a059-b0ed9a90da28',
+    southEast: '01a1cfcc-5d0f-766a-8d20-8715ef2f2e7d',
+    northEast: '01a1cfcc-5d0f-766b-a55a-902924e84a39',
+    northMid: '01a1cfcc-5d0f-766c-bae1-6d74b6b90aec',
+    northWest: '01a1cfcc-5d0f-766d-8590-75c3af8e04b4',
+  },
+  wall: {
+    southWest: '01a1cfcc-5d0f-766e-8a6c-8e6e02b65b37',
+    southEast: '01a1cfcc-5d0f-766f-98aa-6c1337bb24e2',
+    east: '01a1cfcc-5d0f-7670-a6bc-b7dd4926fd69',
+    northEast: '01a1cfcc-5d0f-7671-98e5-abdd7fe820bc',
+    northWest: '01a1cfcc-5d0f-7672-931b-12f3610aff67',
+    west: '01a1cfcc-5d0f-7673-9dc5-b3f1d7557114',
+    partition: '01a1cfcc-5d0f-7674-9d03-2a3a32789f59',
+  },
+  opening: {
+    doorPartition: '01a1cfcc-c2bc-70c1-b5a6-c36985e9a559',
+  },
+  room: {
+    west: '01a1cfcc-c2c0-74bf-aba4-ff4e4842ce34',
+    east: '01a1cfcc-c2c4-704a-9133-48d2fe93fba5',
+  },
+} as const;

@@ -8,8 +8,8 @@ import { OpeningBuilder } from './opening-builder.js';
 import { FRAME_SHIFT_M, rebaseOpeningFrames, rebaseShellOrigins, SHELL_ORIGIN_OFFSET_M } from './shell-origins.js';
 import { SceneBuilder } from './scene-builder.js';
 import { Dollhouse } from './dollhouse.js';
-import { angledOpeningsPlan } from '../fixtures/plan-angled-openings.js';
-import { ANGLED } from '../fixtures/plan-angled-openings-ids.js';
+import { reversedPartitionPlan } from '../fixtures/plan-angled-openings.js';
+import { REVERSED } from '../fixtures/plan-angled-openings-ids.js';
 import { pointAt, resolveDoorSwing } from '../plan/door-swing.js';
 import { openingFrameWidth } from '../assets/opening-frame.js';
 
@@ -194,18 +194,17 @@ describe('rebaseOpeningFrames', () => {
     }
   });
 
-  test('on a diagonal wall moves the frames square to the wall, towards the side the leaf opens into', () => {
-    const angled = angledOpeningsPlan;
+  test('on a diagonal partition moves the frames square to the wall, towards the side the leaf opens into', () => {
+    const angled = reversedPartitionPlan;
     const angledPlan = solvePlan(angled);
     const root = new THREE.Group();
     new OpeningBuilder(createBuilderContext(angled, angledPlan)).build(root);
     root.updateMatrixWorld(true);
-    const group = root.children.find((child) => child.name === ANGLED.opening.doorDiagonal)!;
-    // The 30° door is an entrance, which the pass leaves alone; taken as an
-    // interior door, it shows which way the pass moves a frame.
-    group.children.find((child) => child.userData['isDoorLeaf'] === true)!.userData['isExteriorWall'] = false;
-    const wall = angled.walls.find((candidate) => candidate.id === ANGLED.wall.diagonal)!;
-    const opening = wall.openings!.find((candidate) => candidate.id === ANGLED.opening.doorDiagonal)!;
+    // An interior door on a 60° partition drawn from `b` to `a`.
+    const group = root.children.find((child) => child.name === REVERSED.opening.doorPartition)!;
+    expect(group.children.find((child) => child.userData['isDoorLeaf'] === true)!.userData['isExteriorWall']).toBe(false);
+    const wall = angled.walls.find((candidate) => candidate.id === REVERSED.wall.partition)!;
+    const opening = wall.openings!.find((candidate) => candidate.id === REVERSED.opening.doorPartition)!;
     const { tangent } = pointAt(angled, wall, opening.center);
     const { open } = resolveDoorSwing(angled, angledPlan, wall, opening, openingFrameWidth);
     const parts = group.children.filter(

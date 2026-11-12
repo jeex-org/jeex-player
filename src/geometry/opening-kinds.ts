@@ -16,11 +16,11 @@
  *  - on an arc the FRAME follows the wall, chord by chord, while the leaf —
  *    one rigid panel — keeps its flat rectangle on the tangent at the opening
  *    centre (documented limitation, curved leaves are out of scope);
- *  - every flat part (jamb, head, rail, pane, bar, leaf, track, pick box) is
- *    measured out in the wall's own frame and enters the group through
- *    `onWall` (`opening-wall-frame.ts`): the group's local `x` is the wall's
- *    tangent mirrored, so a part placed at a raw local `x` stands off any wall
- *    that runs along no axis;
+ *  - every flat part (jamb, head, rail, pane, bar, leaf, track, pick box,
+ *    sill board) is measured out in the wall's own frame and mapped into the
+ *    group by `onWall` / `fromWall` (`opening-wall-frame.ts`): the group's
+ *    local `x` is the wall's tangent mirrored, so a part placed at a raw
+ *    group-frame `x` stands off any wall that runs along no axis;
  *  - a leaf records HOW it moves (`closedAngle`, `restAngle`, `hingeSign`,
  *    `openSign`, plus `slide` / `slideBase` when it slides), so
  *    `door-animator.ts` can shut it without re-deriving the swing. Leaves are
@@ -288,7 +288,8 @@ function flatPickBox(c: OpeningBuildContext, width: number, height: number, dept
 /**
  * Window group for one variant: frame from `variant.frame`, glazing split by
  * `paneLayout`, glass tinted by `variant.glazing.tint`, optional sill board.
- * The group sits on the wall centreline with local `+x` along the wall.
+ * The group sits on the wall centreline; its flat parts are laid out in the
+ * wall frame, `+x` along the wall (`opening-wall-frame.ts`).
  */
 function buildWindow(c: OpeningBuildContext): OpeningBuild {
   const { sill, head } = c.placement;
@@ -320,7 +321,7 @@ function buildWindow(c: OpeningBuildContext): OpeningBuild {
     return { group, materials };
   }
 
-  // Jambs, then sill and head rails, all flush with the wall centreline.
+  // Jambs, then sill and head rails, all flush with the wall centreline, measured in the wall frame.
   const frame = wallFrame(c.placement);
   group.add(onWall(frame, frameBox(c, frameWidth, height, frameDepth, frameMaterial, -width / 2 + frameWidth / 2, sill + height / 2, 0)));
   group.add(onWall(frame, frameBox(c, frameWidth, height, frameDepth, frameMaterial, width / 2 - frameWidth / 2, sill + height / 2, 0)));
@@ -445,7 +446,7 @@ function buildDoor(c: OpeningBuildContext): OpeningBuild {
   const frame = wallFrame(placement);
   const hingeSign = Math.sign(toWall(placement, frame, swing.pivot).x) || -1;
   const openSign = Math.sign(toWallVector(placement, frame, swing.open).z) || 1;
-  /** Local `x` direction the leaf runs in from its hinge, towards the far jamb. */
+  /** Wall-frame `x` direction the leaf runs in from its hinge, towards the far jamb. */
   const leafRun: 1 | -1 = hingeSign < 0 ? 1 : -1;
   const clear = width - frameWidth * 2;
   const leafHeight = head - frameWidth - LEAF_HEAD_GAP_M;
@@ -541,8 +542,8 @@ function tagLeaf(
 }
 
 /**
- * One door leaf hinged at the group origin, extending `direction * width`
- * along local `x`. Panelled leaves get inset panels on both faces, glass
+ * One door leaf hinged at its own origin, extending `direction * width`
+ * along its own `x`. Panelled leaves get inset panels on both faces, glass
  * leaves a tinted insert inside a stile-and-rail ring.
  */
 function doorLeaf(

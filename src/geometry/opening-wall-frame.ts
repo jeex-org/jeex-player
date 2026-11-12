@@ -11,12 +11,14 @@
  *    inverse of the group's transform). The chorded parts of an arc are placed
  *    this way, each with the `localRotation` of its own chord;
  *  - the WALL frame, `x` along the wall line and `z` across it, which is how
- *    every flat part (jamb, head, rail, pane, bar, leaf, track, pick box) is
- *    measured out. It is the group frame turned by `WallFrame.angle`, and
- *    `onWall` is the only way a flat part enters the group.
+ *    every flat part (jamb, head, rail, pane, bar, leaf, track, pick box, sill
+ *    board) is measured out. It is the group frame turned by
+ *    `WallFrame.angle`; a part is mapped into the group by `onWall` (its
+ *    position and its turn), a pick box by `fromWall` plus that turn, never
+ *    placed at a raw group-frame `x`.
  *
  * The wall frame's turn is `localRotation` of the tangent, `-2 * angleY`, taken
- * modulo a half turn into `(-π/2, π/2]`: its `x` may run either way along the
+ * modulo a half turn into `[-π/2, π/2)`: its `x` may run either way along the
  * wall (a leaf reads its hinge end out of the frame, never assumes it), and on
  * an axis-aligned wall the turn is exactly zero, so such a wall builds the same
  * numbers it always has.

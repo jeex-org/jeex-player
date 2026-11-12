@@ -25,7 +25,7 @@
 
 import { FINISH } from '../materials/finish-ids.js';
 import type { SceneData } from '../scene/types.js';
-import { ANGLED } from './plan-angled-openings-ids.js';
+import { ANGLED, REVERSED } from './plan-angled-openings-ids.js';
 
 const N = ANGLED.node;
 const W = ANGLED.wall;
@@ -89,4 +89,66 @@ export const angledOpeningsPlan: SceneData = {
   roomCameras: {},
   navigation: { points: [{ x: 2, y: 0, z: 1.5 }] },
   autotour: { speed: 1.2, path: [{ x: 2, y: 1.6, z: 1.5 }], gaze: [], zones: [] },
+};
+
+/**
+ * A 6 × 5 box cut in two by an interior partition at 60° to the x axis, drawn
+ * from its NORTH end to its SOUTH end, so its tangent points down and to the
+ * west (−120°): the wall frame's `x` runs against the tangent here. Facades
+ * are 0.30 thick, the partition 0.10.
+ *
+ *      z=0   SW(0,0)      SM(2,0)                SE(6,0)
+ *             +-------------+-----------------------+
+ *             |              \                      |
+ *             |    west       \  partition (b←a)    |
+ *             |                \       east         |
+ *             +-----------------+--------------------+
+ *      z=5   NW(0,5)          NM(2+5/√3, 5)        NE(6,5)
+ *
+ * Its door (centre 2.9 of the partition's 5.77 m, 0.8 wide) is an interior
+ * door, which the light-bake pass moves its frame for. No door authors a
+ * swing: the plan decides it.
+ */
+const R = REVERSED.node;
+const RW = REVERSED.wall;
+
+export const reversedPartitionPlan: SceneData = {
+  schemaVersion: '2.2',
+  units: 'm',
+  id: REVERSED.scene,
+  name: 'Reversed partition test plan',
+  ceilingHeight: 2.7,
+  nodes: [
+    { id: R.southWest, p: { x: 0, z: 0 } },
+    { id: R.southMid, p: { x: 2, z: 0 } },
+    { id: R.southEast, p: { x: 6, z: 0 } },
+    { id: R.northEast, p: { x: 6, z: 5 } },
+    { id: R.northMid, p: { x: 2 + 5 / Math.sqrt(3), z: 5 } },
+    { id: R.northWest, p: { x: 0, z: 5 } },
+  ],
+  walls: [
+    { id: RW.southWest, a: R.southWest, b: R.southMid, thickness: 0.3, role: 'facade' },
+    { id: RW.southEast, a: R.southMid, b: R.southEast, thickness: 0.3, role: 'facade' },
+    { id: RW.east, a: R.southEast, b: R.northEast, thickness: 0.3, role: 'facade' },
+    { id: RW.northEast, a: R.northEast, b: R.northMid, thickness: 0.3, role: 'facade' },
+    { id: RW.northWest, a: R.northMid, b: R.northWest, thickness: 0.3, role: 'facade' },
+    { id: RW.west, a: R.northWest, b: R.southWest, thickness: 0.3, role: 'facade' },
+    {
+      id: RW.partition,
+      a: R.northMid,
+      b: R.southMid,
+      thickness: 0.1,
+      role: 'partition',
+      openings: [{ id: REVERSED.opening.doorPartition, type: 'door', center: 2.9, width: 0.8, sill: 0, head: 2.1 }],
+    },
+  ],
+  rooms: [
+    { id: REVERSED.room.west, name: 'West room', anchor: { x: 1, z: 2.5 }, floorMaterial: FINISH.oak },
+    { id: REVERSED.room.east, name: 'East room', anchor: { x: 5, z: 2.5 }, floorMaterial: FINISH.oak },
+  ],
+  assets: [],
+  presentationCamera: { position: { x: 3, y: 8, z: 10 }, target: { x: 3, y: 1, z: 2.5 } },
+  roomCameras: {},
+  navigation: { points: [{ x: 1, y: 0, z: 2.5 }] },
+  autotour: { speed: 1.2, path: [{ x: 1, y: 1.6, z: 2.5 }], gaze: [], zones: [] },
 };

@@ -10,9 +10,11 @@
  * numbers, which is how a leaf could stand half a metre off a diagonal wall
  * while every local-frame test still passed.
  *
- * The plan is `plan-angled-openings.ts`: a door and a window on a 30° wall,
- * a door on an arc and an axis-aligned control door, whose world matrices are
- * pinned exactly as they were before openings learned their wall's frame.
+ * The plans are in `plan-angled-openings.ts`: a door and a window on a 30°
+ * wall, a door on an arc and an axis-aligned control door, whose world
+ * matrices are pinned exactly as they were before openings learned their
+ * wall's frame; and an interior door on a 60° partition drawn from `b` to `a`,
+ * where the wall frame's `x` runs against the tangent.
  */
 
 import { afterAll, beforeAll, describe, expect, test } from 'bun:test';
@@ -20,14 +22,14 @@ import * as THREE from 'three';
 import { SceneBuilder } from './scene-builder.js';
 import { solvePlan } from '../plan/plan-solver.js';
 import { ARC_TOL, arcFromChord, type ArcDef } from '../plan/plan-geometry.js';
-import { pointAt, resolveDoorSwing, LEAF_THICKNESS_M } from '../plan/door-swing.js';
+import { interiorSideOf, pointAt, resolveDoorSwing, LEAF_THICKNESS_M } from '../plan/door-swing.js';
 import { openingFrameWidth } from '../assets/opening-frame.js';
 import { DOOR_VARIANTS, ENTRY_DOOR_VARIANTS, findOpeningVariant, type OpeningVariant } from '../assets/opening-variants.js';
 import { OPENING_VARIANT } from '../assets/catalogue-ids.js';
 import { FINISH } from '../materials/finish-ids.js';
 import { applyToLeaf, doorLeavesOf } from '../doors/door-animator.js';
-import { angledOpeningsPlan } from '../fixtures/plan-angled-openings.js';
-import { ANGLED } from '../fixtures/plan-angled-openings-ids.js';
+import { angledOpeningsPlan, reversedPartitionPlan } from '../fixtures/plan-angled-openings.js';
+import { ANGLED, REVERSED } from '../fixtures/plan-angled-openings-ids.js';
 import { apartmentScene } from '../demo/scene-data.js';
 import { DEMO } from '../demo/demo-ids.js';
 import type { SceneData, Vec2 } from '../scene/types.js';
@@ -36,8 +38,10 @@ import type { SceneData, Vec2 } from '../scene/types.js';
 const MM = 1e-3;
 /** How far a part's own `x` axis may lean off the wall's tangent (a sine). */
 const PARALLEL = 1e-9;
+/** How far past the room face of its wall the builder sets a window's sill board, in metres. */
+const SILL_BOARD_OFFSET_M = 0.07;
 
-/** A sliding door variant the bank does not ship, put at the head of both door sets while its tests run. */
+/** A sliding door variant the bank does not ship, put at the head of the door sets while its tests run. */
 const SLIDING: OpeningVariant = {
   id: '01a1cfb4-2b3e-7c1d-9f60-5a7e2d4c8b19',
   slug: 'test-door-sliding',
@@ -49,6 +53,23 @@ const SLIDING: OpeningVariant = {
 };
 
 type Style = 'single' | 'double' | 'sliding';
+
+/**
+ * Puts `SLIDING` at the head of `sets` (where `defaultOpeningVariant` picks a
+ * door's variant) for the tests of the enclosing `describe`, and takes it out
+ * of them again afterwards, by identity, so no production array keeps it.
+ */
+function withSlidingVariant(...sets: OpeningVariant[][]): void {
+  beforeAll(() => {
+    for (const set of sets) set.unshift(SLIDING);
+  });
+  afterAll(() => {
+    for (const set of sets) {
+      const at = set.indexOf(SLIDING);
+      if (at >= 0) set.splice(at, 1);
+    }
+  });
+}
 
 /** The plan's own answer to "where is this opening": its centre, the tangent there, and the wall's arc. */
 type WallLine = { centre: Vec2; tangent: Vec2; arc: ArcDef | null; thickness: number; width: number };
@@ -148,26 +169,47 @@ function jambReach(line: WallLine, variant: OpeningVariant): number {
   return line.width / 2 - Math.min(variant.frame.width, line.width / 4);
 }
 
-const DOORS = {
-  'the door on the 30° wall': ANGLED.opening.doorDiagonal,
-  'the door on the arc': ANGLED.opening.doorArc,
-  'the axis-aligned control door': ANGLED.opening.doorControl,
-} as const;
+type Door = { scene: SceneData; id: string };
+
+const DOORS: Record<string, Door> = {
+  'the door on the 30° wall': { scene: angledOpeningsPlan, id: ANGLED.opening.doorDiagonal },
+  'the door on the arc': { scene: angledOpeningsPlan, id: ANGLED.opening.doorArc },
+  'the axis-aligned control door': { scene: angledOpeningsPlan, id: ANGLED.opening.doorControl },
+  'the door on the 60° partition drawn from b to a': { scene: reversedPartitionPlan, id: REVERSED.opening.doorPartition },
+};
 
 /** The door built in one leaf style, shut, with what the plan says about it. */
-function shutDoor(id: string, style: Style) {
-  const builder = build();
+function shutDoor({ scene, id }: Door, style: Style) {
+  const builder = build(scene);
   if (style === 'double') expect(builder.rebuildOpening(id, OPENING_VARIANT.door_white_double)).toBe(true);
   const variant = style === 'sliding' ? SLIDING : findOpeningVariant(builder.getOpeningVariant(id)!)!;
   const group = groupOf(builder, id);
   const leaves = doorLeavesOf(group);
+  // The sliding tests must build a sliding leaf, not fall back to whatever variant is first.
+  for (const leaf of leaves) expect(leaf.userData['slide'] !== undefined).toBe(style === 'sliding');
   for (const leaf of leaves) applyToLeaf(leaf, 0);
   group.updateWorldMatrix(true, true);
-  const scene = angledOpeningsPlan;
   const wall = scene.walls.find((candidate) => candidate.openings?.some((opening) => opening.id === id))!;
   const opening = wall.openings!.find((candidate) => candidate.id === id)!;
-  const swing = resolveDoorSwing(scene, solvePlan(scene), wall, opening, openingFrameWidth);
+  // The swing of the variant the door now wears: a double rebuilt over an entrance hangs on its own, narrower frame.
+  const wornId = builder.getOpeningVariant(id);
+  const worn = wornId ? { ...opening, variant: wornId } : opening;
+  const swing = resolveDoorSwing(scene, solvePlan(scene), wall, worn, openingFrameWidth);
   return { group, leaves, variant, line: lineOf(scene, id), swing };
+}
+
+/**
+ * World centre of a leaf's slab: the box over its panel, stiles, rails and
+ * insert, without the handles, which stand on one edge only.
+ */
+function slabCentre(leaf: THREE.Object3D): THREE.Vector3 {
+  const box = new THREE.Box3();
+  for (const part of leaf.children) {
+    if (!(part instanceof THREE.Mesh)) continue;
+    if (part.geometry instanceof THREE.CylinderGeometry || part.geometry instanceof THREE.SphereGeometry) continue;
+    box.expandByObject(part);
+  }
+  return box.getCenter(new THREE.Vector3());
 }
 
 function hingeOf(leaf: THREE.Object3D): THREE.Vector3 {
@@ -175,9 +217,9 @@ function hingeOf(leaf: THREE.Object3D): THREE.Vector3 {
 }
 
 function leafChecks(style: Style): void {
-  for (const [name, id] of Object.entries(DOORS)) {
+  for (const [name, door] of Object.entries(DOORS)) {
     test(`${name}, ${style}: every shut leaf hangs on the wall line at its jamb`, () => {
-      const { leaves, variant, line, swing } = shutDoor(id, style);
+      const { leaves, variant, line, swing } = shutDoor(door, style);
       expect(leaves.length).toBe(style === 'double' ? 2 : 1);
       const reach = jambReach(line, variant);
       const hinges = leaves.map((leaf) => offsets(line, hingeOf(leaf)));
@@ -195,7 +237,7 @@ function leafChecks(style: Style): void {
     });
 
     test(`${name}, ${style}: every shut leaf lies along the wall`, () => {
-      const { leaves, line } = shutDoor(id, style);
+      const { leaves, line } = shutDoor(door, style);
       for (const leaf of leaves) {
         expect(leanOff(leaf, line.tangent)).toBeLessThan(PARALLEL);
         // Shut, the far edge of the leaf is on the line too, not only its hinge.
@@ -206,7 +248,8 @@ function leafChecks(style: Style): void {
     });
 
     test(`${name}, ${style}: the open leaf stands on the side the swing decides`, () => {
-      const { leaves, line, swing } = shutDoor(id, style);
+      const { leaves, line, swing } = shutDoor(door, style);
+      const pivot = offsets(line, new THREE.Vector3(swing.pivot.x, 0, swing.pivot.z));
       for (const leaf of leaves) {
         const shut = hingeOf(leaf);
         applyToLeaf(leaf, 1);
@@ -221,11 +264,40 @@ function leafChecks(style: Style): void {
           const moved = offsets(line, hingeOf(leaf));
           expect(Math.abs(moved.across - offsets(line, shut).across)).toBeLessThan(MM);
           expect(Math.sign(centre.across)).toBe(side);
+          // It parks past the hinge jamb, by the length of the leaf.
+          const parked = moved.along - offsets(line, shut).along;
+          expect(Math.sign(parked)).toBe(Math.sign(pivot.along));
+          expect(Math.abs(Math.abs(parked) - swing.leaf)).toBeLessThan(MM);
         } else {
           expect(side * (centre.across - offsets(line, shut).across)).toBeGreaterThan(0.05);
         }
       }
     });
+
+    // On an arc the plan's pivot is on the curve while a flat leaf hangs on the
+    // tangent at the opening's centre (a documented limitation), so the exact
+    // place is asserted on straight walls only.
+    if (style !== 'sliding' && door.scene.walls.some((wall) => !wall.arc && wall.openings?.some((opening) => opening.id === door.id))) {
+      test(`${name}, ${style}: the open leaf stands where the plan's swing puts it`, () => {
+        const { leaves, swing } = shutDoor(door, style);
+        // A single leaf is the plan's whole leaf; a double door hangs half of it
+        // on each jamb, the second jamb a whole leaf along from the pivot.
+        const length = style === 'double' ? swing.leaf / 2 : swing.leaf;
+        const jambs =
+          style === 'double'
+            ? [swing.pivot, { x: swing.pivot.x + swing.closed.x * swing.leaf, z: swing.pivot.z + swing.closed.z * swing.leaf }]
+            : [swing.pivot];
+        const expected = jambs.map((jamb) => ({ x: jamb.x + (swing.open.x * length) / 2, z: jamb.z + (swing.open.z * length) / 2 }));
+        expect(leaves.length).toBe(expected.length);
+        for (const leaf of leaves) applyToLeaf(leaf, 1);
+        for (const leaf of leaves) leaf.updateWorldMatrix(true, true);
+        const centres = leaves.map((leaf) => slabCentre(leaf));
+        for (const want of expected) {
+          const nearest = Math.min(...centres.map((centre) => Math.hypot(centre.x - want.x, centre.z - want.z)));
+          expect(nearest).toBeLessThan(MM);
+        }
+      });
+    }
   }
 }
 
@@ -233,22 +305,15 @@ describe('door leaves on angled and curved walls', () => {
   leafChecks('single');
   leafChecks('double');
   describe('sliding', () => {
-    beforeAll(() => {
-      DOOR_VARIANTS.unshift(SLIDING);
-      ENTRY_DOOR_VARIANTS.unshift(SLIDING);
-    });
-    afterAll(() => {
-      DOOR_VARIANTS.shift();
-      ENTRY_DOOR_VARIANTS.shift();
-    });
+    withSlidingVariant(DOOR_VARIANTS, ENTRY_DOOR_VARIANTS);
     leafChecks('sliding');
   });
 });
 
 describe('straight frames on angled walls', () => {
-  for (const [name, id] of Object.entries(DOORS)) {
+  for (const [name, door] of Object.entries(DOORS)) {
     test(`${name}: both jambs stand on the wall line`, () => {
-      const { group, variant, line } = shutDoor(id, 'single');
+      const { group, variant, line } = shutDoor(door, 'single');
       if (line.arc) {
         // The arc's frame is chorded; every jamb chord sits on the arc.
         const jambs = group.children.filter((child) => child.userData['openingPart'] === 'jamb') as THREE.Mesh[];
@@ -288,6 +353,28 @@ describe('straight frames on angled walls', () => {
         expect(offCentreline(line, centreOf(part))).toBeLessThan(MM);
       }
     }
+  });
+
+  test('the sill board of the window on the 30° wall stands on the room side, proud of the face', () => {
+    const id = ANGLED.opening.windowDiagonal;
+    const group = groupOf(build(), id);
+    const line = lineOf(angledOpeningsPlan, id);
+    const wallId = angledOpeningsPlan.walls.find((wall) => wall.openings?.some((opening) => opening.id === id))!.id;
+    const room = interiorSideOf(solvePlan(angledOpeningsPlan), wallId, line.tangent).normal;
+    // The flat sill board is the one box that is neither a frame part nor a pick proxy.
+    const boards = group.children.filter(
+      (child): child is THREE.Mesh =>
+        child instanceof THREE.Mesh &&
+        child.geometry instanceof THREE.BoxGeometry &&
+        child.userData['isParametricWall'] !== true &&
+        !child.name.endsWith('-pick'),
+    );
+    expect(boards.length).toBe(1);
+    const centre = centreOf(boards[0]!);
+    const { along } = offsets(line, centre);
+    const out = (centre.x - line.centre.x) * room.x + (centre.z - line.centre.z) * room.z;
+    expect(Math.abs(along)).toBeLessThan(MM);
+    expect(Math.abs(out - (line.thickness / 2 + SILL_BOARD_OFFSET_M))).toBeLessThan(MM);
   });
 
   test('the pick proxies of the angled door and window lie along their wall', () => {
@@ -347,12 +434,7 @@ describe('the axis-aligned control door builds bit for bit as before', () => {
   });
 
   describe('sliding', () => {
-    beforeAll(() => {
-      DOOR_VARIANTS.unshift(SLIDING);
-    });
-    afterAll(() => {
-      DOOR_VARIANTS.shift();
-    });
+    withSlidingVariant(DOOR_VARIANTS);
     test('sliding leaf, open and shut', () => {
       expect(matrices('sliding')).toEqual(CONTROL_MATRICES.sliding);
     });
