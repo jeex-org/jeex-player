@@ -84,9 +84,9 @@
  * sizes a door's zone itself.
  *
  * And `doorLeaf` (type `DoorLeaf`) for a host's door panel: the hinge and swing
- * a door shows, resolved by the same rule the plan drawing and the 3D leaf
- * use, with whether the document names each — "automatic (now: left)" without
- * the host restating the derivation.
+ * a door shows, resolved by the same rule the plan drawing and the linter use,
+ * with how many leaves it hangs and whether the document names each value —
+ * "automatic (now: a)" without the host restating the derivation.
  *
  * A name that is not re-exported here is not public, whatever module it lives
  * in — the same façade rule the library's other entries follow. Widening it is
