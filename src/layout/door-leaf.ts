@@ -10,7 +10,9 @@
  * `swing` is not read (the opening builder lets it fill a missing swing; every
  * shipped variant says `'in'`). `leaves` comes from
  * `assets/opening-frame.openingLeafCount`, the variant's `leaf.style` the
- * builder reads. It sits in `layout/`, the lowest layer that reaches both.
+ * builder reads. `rooms` comes from the same call: on each side, the room
+ * whose floor the door opens onto, zones included, sampled at the doorway. It
+ * sits in `layout/`, the lowest layer that reaches both.
  *
  * Invariants: `explicit` says only whether the document names the value; the
  * answered `hinge` and `swing` are always the resolved ones. With `leaves: 2`
@@ -25,7 +27,7 @@ import { resolveDoorSwing } from '../plan/door-swing.js';
 import { solvePlan, type SolvedPlan } from '../plan/plan-solver.js';
 import type { SceneData } from '../scene/types.js';
 
-/** A door's resolved hinge and swing, its leaf count, and whether the document carries each value. */
+/** A door's resolved hinge and swing, its leaf count, whether the document carries each value, and the room each side. */
 export type DoorLeaf = {
   /** Jamb the leaf hangs on, named by the wall node it is nearer to; the drawing's jamb when `leaves` is 2. */
   hinge: 'a' | 'b';
@@ -34,6 +36,14 @@ export type DoorLeaf = {
   /** `2` for a double door, whose leaves hang on both jambs; `1` otherwise. */
   leaves: 1 | 2;
   explicit: { hinge: boolean; swing: boolean };
+  /**
+   * Room id on each side of the door, the room whose floor the door opens onto
+   * there (a zone when the doorway lands on one): `in` the one the leaf opens
+   * into with `swing: 'in'`, `out` the one with `swing: 'out'`; `null` where
+   * that side is outside the flat (a facade). `rooms[swing]` is the room it
+   * opens into now.
+   */
+  rooms: { in: string | null; out: string | null };
 };
 
 /**
@@ -54,6 +64,7 @@ export function doorLeaf(scene: SceneData, openingId: string, plan?: SolvedPlan)
       swing: swing.swing,
       leaves: openingLeafCount(opening),
       explicit: { hinge: opening.hinge !== undefined, swing: opening.swing !== undefined },
+      rooms: swing.rooms,
     };
   }
   return null;
