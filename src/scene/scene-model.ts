@@ -1,6 +1,7 @@
 /**
  * The single writable copy of the scene: a deep clone of the loaded document,
- * a monotonic revision, and the only way to change either — a validated,
+ * its revision (one more per committed batch, or the one a host hands back with
+ * the same scene), and the only way to change either — a validated,
  * atomic batch of operations.
  *
  * Atomicity: `apply` validates the base revision, clones the committed scene,

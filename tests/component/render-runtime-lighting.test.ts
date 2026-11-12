@@ -41,9 +41,11 @@ function next(canvas: HTMLCanvasElement, type: string): Promise<void> {
  * first does not prevent it; a canvas without antialiasing never shows it. Every
  * read here comes right after a fresh context (the first one, then the restored
  * one), so a single draw measured that first-use draw, not the environment. It
- * is the same GPU behaviour `src/render/settle-window.ts` answers in the
- * runtime: a picture that brought a new program is not the final one, so the
- * runtime draws on for its settle window, and this probe draws once more.
+ * is of the same family as the settling `src/render/settle-window.ts` answers
+ * in the runtime (there a picture that brought a new program settles over a few
+ * frames; here the first one can be wholly the clear colour): the runtime draws
+ * on for its settle window, so on screen such a frame lasts one refresh at most
+ * before the next draw replaces it, and this probe draws once more.
  */
 function environmentLit(renderer: THREE.WebGLRenderer, environment: THREE.Texture | null): number {
   const scene = new THREE.Scene();
