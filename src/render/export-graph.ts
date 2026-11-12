@@ -27,18 +27,7 @@
 import * as THREE from 'three';
 import type { ElementRow } from '../scene/metadata-table.js';
 import { FaceMap, faceKey, isFaceKey } from '../scene/types.js';
-
-/**
- * A raycast-only helper mesh (`geometry/opening-builder.ts`'s pick proxies):
- * fully transparent, never meant to be seen, and not something an exported
- * asset should carry. Nothing else in the built scene is both `transparent`
- * and `opacity === 0`.
- */
-function isPickProxy(object: THREE.Object3D): boolean {
-  if (!(object instanceof THREE.Mesh)) return false;
-  const material = Array.isArray(object.material) ? object.material[0] : object.material;
-  return material instanceof THREE.Material && material.transparent && material.opacity === 0;
-}
+import { isPickProxy } from '../geometry/pick-proxy.js';
 
 type RowIndex = {
   readonly byFace: FaceMap<number>;

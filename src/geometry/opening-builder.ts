@@ -26,33 +26,49 @@ import {
   OPENING_BUILDERS,
   chordPickBoxes,
   flatPickBox,
-  pickDepth,
   type OpeningBuildContext,
   type PickBox,
 } from './opening-kinds.js';
 import type { OpeningPlacement } from './opening-wall-frame.js';
 import { chordBandBoxes } from '../plan/opening-arc.js';
+import { markPickProxy } from './pick-proxy.js';
 import type { Opening, OpeningType, Vec2, Vec3, Wall } from '../scene/types.js';
 
-/** Height of the cap proxy laid on the wall top over an opening, metres. */
-const PICK_CAP_M = 0.02;
+/** How far the wall-top proxy floats over the wall top, metres: enough to win a ray from above. */
+const PICK_CAP_LIFT_M = 0.005;
 
 /**
- * The opening's share of its wall's top: one thin pick proxy over its span, on
- * the wall top (the ceiling height) and as deep as its other proxies. A ray
- * from above meets the wall standing over an opening before any jamb, head or
- * pane below it, so this cap is what lets a click on the opening from the top
- * view or a high orbit name the opening; beside the span the wall top stays
- * the wall's. It lies wholly above the wall, so no ray from a room reaches it.
+ * The opening's share of its wall's top: one flat pick proxy over its span,
+ * exactly as deep as the wall and floating a few millimetres over its top (the
+ * ceiling height), chorded on an arc. A ray from above meets the wall standing
+ * over an opening before any jamb, head or pane below it, so this cap is what
+ * lets a click on the opening from the top view or a high orbit name the
+ * opening; beside the span the wall top stays the wall's. Hovering that strip
+ * from above in orbit also shows the door's controls, which is intended: seen
+ * from above, the wall top over a door is the door's spot.
+ *
+ * The cap is a quad facing up (`height` 0, built by `pickProxyGeometry`) under
+ * the single-sided proxy material, so only a ray travelling downwards can hit
+ * it: a ray from inside a room, which passes the ceiling (no pick surface) on
+ * its way up, meets only its back face and goes through, even where it grazes
+ * the wall's face above the wall top.
  */
 export function wallTopPickBoxes(c: OpeningBuildContext): PickBox[] {
   const top = c.builder.scene.ceilingHeight;
-  const depth = pickDepth(c);
+  const depth = c.wall.thickness;
   const { arc, t0, t1 } = c.placement;
   if (arc && t0 !== undefined && t1 !== undefined) {
-    return chordPickBoxes(c, chordBandBoxes(arc, 'pick', t0, t1, top, top + PICK_CAP_M, depth));
+    // A band needs a height; its mid-plane, `top + PICK_CAP_LIFT_M`, is where the quads lie.
+    const chords = chordBandBoxes(arc, 'pick', t0, t1, top, top + 2 * PICK_CAP_LIFT_M, depth);
+    return chordPickBoxes(c, chords).map((box) => ({ ...box, height: 0 }));
   }
-  return [flatPickBox(c, c.opening.width, PICK_CAP_M, depth, 0, top + PICK_CAP_M / 2)];
+  return [flatPickBox(c, c.opening.width, 0, depth, 0, top + PICK_CAP_LIFT_M)];
+}
+
+/** A proxy box's geometry: a box, or for a box of no height a quad that faces up. */
+function pickProxyGeometry(box: PickBox): THREE.BufferGeometry {
+  if (box.height > 0) return new THREE.BoxGeometry(box.width, box.height, box.depth);
+  return new THREE.PlaneGeometry(box.width, box.depth).rotateX(-Math.PI / 2);
 }
 
 /** A built opening group plus everything needed to rebuild it in place. */
@@ -161,13 +177,14 @@ export class OpeningBuilder {
       const point = kind.pickLocal(context);
       pickLocal = { x: point.x, y: point.y, z: point.z };
       for (const box of [...kind.pickBoxes(context), ...wallTopPickBoxes(context)]) {
-        const proxy = new THREE.Mesh(new THREE.BoxGeometry(box.width, box.height, box.depth), this.openingPickMaterial);
+        const proxy = new THREE.Mesh(pickProxyGeometry(box), this.openingPickMaterial);
         proxy.name = `${opening.id}-pick`;
         proxy.position.set(box.x, box.y, box.z);
         proxy.rotation.y = box.rotationY;
         proxy.castShadow = false;
         proxy.receiveShadow = false;
         Object.assign(proxy.userData, group.userData);
+        markPickProxy(proxy);
         if (box.part) proxy.userData['openingPart'] = box.part;
         group.add(proxy);
       }

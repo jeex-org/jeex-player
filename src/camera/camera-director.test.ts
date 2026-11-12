@@ -27,7 +27,9 @@ import { FINISH } from '../materials/finish-ids.js';
 import { DOOR_ANIMATION_MS, DoorStates, type DoorCentre } from '../doors/door-state.js';
 import { DoorAnimator } from '../doors/door-animator.js';
 import { pointAt } from '../plan/door-swing.js';
-import type { Dollhouse } from '../geometry/dollhouse.js';
+import { Dollhouse } from '../geometry/dollhouse.js';
+import { SceneBuilder } from '../geometry/scene-builder.js';
+import { TWO_ROOM_ENTRANCE, twoRoomEntrancePlan } from '../fixtures/plan-two-room-entrance.js';
 import type { SceneData } from '../scene/types.js';
 import { EYE_HEIGHT_M, isInDoorway, isNavigable } from '../navigation/navigation.js';
 import { tourNavigation } from '../navigation/tour-legs.js';
@@ -56,7 +58,16 @@ const fakeWindow = fakeWindowHooks();
 beforeEach(fakeWindow.install);
 afterEach(fakeWindow.restore);
 
-function harness(options: { pauseOnInput?: boolean; scene?: SceneData; wireInput?: boolean; assetFacts?: () => AssetFactsSource } = {}) {
+function harness(
+  options: {
+    pauseOnInput?: boolean;
+    scene?: SceneData;
+    wireInput?: boolean;
+    assetFacts?: () => AssetFactsSource;
+    /** A real dollhouse in place of the recording stub, for a suite that picks through it. */
+    dollhouse?: Dollhouse;
+  } = {},
+) {
   let scene = options.scene ?? lShapePlan;
   const camera = new THREE.PerspectiveCamera(55, 4 / 3, 0.1, 200);
   const canvasStub = fakeCanvas();
@@ -113,7 +124,7 @@ function harness(options: { pauseOnInput?: boolean; scene?: SceneData; wireInput
     },
   } satisfies DirectorChrome;
   let keepExteriors = false;
-  const dollhouse = {
+  const stub = {
     setState: (state: string) => {
       shell.push(state);
     },
@@ -121,6 +132,7 @@ function harness(options: { pauseOnInput?: boolean; scene?: SceneData; wireInput
       keepExteriors = keep;
     },
   } as unknown as Dollhouse;
+  const dollhouse = options.dollhouse ?? stub;
   // The plan-mode host as the composition root wires it: one call, and the
   // render camera plus the render switch follow from it (`plan-modes.ts`).
   const runtime = { camera: camera as THREE.Camera, renderEnabled: true };
@@ -531,6 +543,41 @@ describe('the plan modes', () => {
 
     director.setMode('orbit');
     expect(keepExteriors()).toBe(false);
+  });
+
+  test('orbit to plan2d with the facade cut away: the top view picks the entrance door in it', () => {
+    // Built and registered the way `scene-mount.ts` does it, with a real dollhouse over it.
+    const scene = twoRoomEntrancePlan;
+    const plan = solvePlan(scene);
+    const builder = new SceneBuilder(scene, plan);
+    const root = builder.build().root;
+    root.updateMatrixWorld(true);
+    const rect = { left: 0, top: 0, width: 800, height: 500 };
+    const picker = new Picker({ getBoundingClientRect: () => rect });
+    const dollhouse = new Dollhouse(() => picker.exteriors());
+    dollhouse.prepare(plan, root);
+    picker.register(root, (wallId) => dollhouse.isExterior(wallId));
+    const { director, controller, camera } = harness({ scene, dollhouse });
+    // The plan modes' top view over the whole 8 x 5 box, north up.
+    const top = new THREE.OrthographicCamera(-5, 5, 3.125, -3.125, 0.1, 100);
+    top.position.set(4, 40, 2.5);
+    top.up.set(0, 0, -1);
+    top.lookAt(4, 0, 2.5);
+    top.updateProjectionMatrix();
+    top.updateMatrixWorld(true);
+    const entrance = new THREE.Vector3(1.2, scene.ceilingHeight, 0).project(top);
+    const pickEntrance = () => picker.pickSurface(((entrance.x + 1) / 2) * rect.width, ((1 - entrance.y) / 2) * rect.height, top);
+
+    director.setMode('orbit');
+    // South of the facade, so the dollhouse cuts the south wall, entrance and all, away.
+    controller.setPose(new THREE.Vector3(1.2, 6, -8), new THREE.Vector3(4, 1, 2.5));
+    camera.updateMatrixWorld(true);
+    dollhouse.update(camera);
+    expect(pickEntrance()?.openingId).not.toBe(TWO_ROOM_ENTRANCE.opening.entrance);
+
+    director.setMode('plan2d');
+    expect(pickEntrance()).toMatchObject({ surface: 'opening', openingId: TWO_ROOM_ENTRANCE.opening.entrance });
+    builder.dispose();
   });
 
   test('returning to 360 restores the perspective camera and the orbit pose', () => {

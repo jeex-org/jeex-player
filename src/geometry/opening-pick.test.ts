@@ -3,7 +3,8 @@
  * with an entrance in its 0.30 facade and a door in its 0.10 partition.
  *
  * The picks are real raycasts against `SceneBuilder`'s output, registered the
- * way `app/scene-mount.ts` registers it, through the two cameras a selection
+ * way `app/scene-mount.ts` registers it (the facade walls are a dollhouse's
+ * exteriors), through the two cameras a selection
  * is cast with: the plan modes' top view (an orthographic camera straight
  * down, `ui/plan-modes.ts`'s `fitTopView`) and an orbit camera above the
  * facade. From above, the wall standing over a door (its lintel, up to the
@@ -15,19 +16,31 @@ import { describe, expect, test } from 'bun:test';
 import * as THREE from 'three';
 import { SceneBuilder } from './scene-builder.js';
 import { Picker, type SurfacePick } from './picker.js';
+import { Dollhouse } from './dollhouse.js';
 import { solvePlan } from '../plan/plan-solver.js';
+import { EYE_HEIGHT_M } from '../navigation/navigation.js';
 import { TWO_ROOM_ENTRANCE, twoRoomEntrancePlan } from '../fixtures/plan-two-room-entrance.js';
+import { bayPlan } from '../fixtures/plan-l-shape.js';
+import { BAY } from '../fixtures/plan-l-shape-ids.js';
+import type { SceneData } from '../scene/types.js';
 
 const RECT = { left: 0, top: 0, width: 800, height: 500 };
 const O = TWO_ROOM_ENTRANCE.opening;
 const W = TWO_ROOM_ENTRANCE.wall;
 
-function builtPicker(): { picker: Picker; dispose: () => void } {
-  const builder = new SceneBuilder(twoRoomEntrancePlan, solvePlan(twoRoomEntrancePlan));
+/**
+ * `scene` built and registered as `scene-mount.ts` does it: the facade walls
+ * are the dollhouse's exteriors, so a cutaway really takes them out of a pick.
+ */
+function builtPicker(scene: SceneData = twoRoomEntrancePlan): { picker: Picker; dispose: () => void } {
+  const plan = solvePlan(scene);
+  const builder = new SceneBuilder(scene, plan);
   const built = builder.build();
   built.root.updateMatrixWorld(true);
   const picker = new Picker({ getBoundingClientRect: () => RECT });
-  picker.register(built.root, () => false);
+  const dollhouse = new Dollhouse(() => picker.exteriors());
+  dollhouse.prepare(plan, built.root);
+  picker.register(built.root, (wallId) => dollhouse.isExterior(wallId));
   return { picker, dispose: () => builder.dispose() };
 }
 
@@ -87,4 +100,38 @@ describe('a click on a door names the door, beside it the wall', () => {
       dispose();
     });
   }
+});
+
+describe('the wall top over an opening', () => {
+  test('a ray from a walk camera at eye height, aimed at the ceiling 2 cm off the wall over a door, names no opening', () => {
+    const { picker, dispose } = builtPicker();
+    // In the living room, facing the entrance; the facade's inner face is at z = 0.15.
+    const walk = new THREE.PerspectiveCamera(60, RECT.width / RECT.height, 0.05, 100);
+    walk.position.set(1.2, EYE_HEIGHT_M, 2.5);
+    walk.lookAt(1.2, 2, 0.15);
+    walk.updateMatrixWorld(true);
+    const pick = pickAt(picker, walk, 1.2, 0.17, twoRoomEntrancePlan.ceilingHeight);
+    expect(pick?.surface).not.toBe('opening');
+    dispose();
+  });
+
+  test('the top view on a curved wall: the bay window, at the crown of the arc', () => {
+    const { picker, dispose } = builtPicker(bayPlan);
+    // The bay is a half circle of radius 2 about (2, 0), bulging to -z: its
+    // window is centred on the crown, (2, -2).
+    const top = new THREE.OrthographicCamera(-4, 4, 2.5, -2.5, 0.1, 100);
+    top.position.set(2, 40, 1);
+    top.up.set(0, 0, -1);
+    top.lookAt(2, 0, 1);
+    top.updateProjectionMatrix();
+    top.updateMatrixWorld(true);
+    for (const z of [-2, -2.1, -1.9]) {
+      expect(pickAt(picker, top, 2, z, bayPlan.ceilingHeight)).toMatchObject({
+        surface: 'opening',
+        openingId: BAY.opening.windowBay,
+        wallId: BAY.wall.bay,
+      });
+    }
+    dispose();
+  });
 });

@@ -56,6 +56,38 @@ function pickProxies(group: THREE.Object3D, openingId: string): THREE.Mesh[] {
   return group.children.filter((child): child is THREE.Mesh => child instanceof THREE.Mesh && child.name === `${openingId}-pick`);
 }
 
+/** A proxy's bounds in its opening group's frame, where `x` runs along the wall and `z` across it. */
+function localBox(proxy: THREE.Mesh): THREE.Box3 {
+  proxy.updateMatrix();
+  proxy.geometry.computeBoundingBox();
+  return proxy.geometry.boundingBox!.clone().applyMatrix4(proxy.matrix);
+}
+
+/**
+ * Splits an opening's proxies into the kind's own and its share of the wall
+ * top, and checks where that share lies: on the wall top (just over the
+ * ceiling height), over the opening's whole width and as deep as the wall —
+ * a quad facing up, so only a ray from above can hit it.
+ */
+function splitWallTop(proxies: readonly THREE.Mesh[], wallId: string, openingId: string): THREE.Mesh[] {
+  const wall = lShapePlan.walls.find((item) => item.id === wallId)!;
+  const opening = wall.openings!.find((item) => item.id === openingId)!;
+  const ceiling = lShapePlan.ceilingHeight;
+  const onTop = proxies.filter((proxy) => localBox(proxy).min.y >= ceiling);
+  expect(onTop.length).toBe(1);
+  const box = localBox(onTop[0]!);
+  expect(box.min.y).toBeCloseTo(box.max.y, 9);
+  expect(box.min.y).toBeGreaterThan(ceiling);
+  expect(box.min.y).toBeLessThan(ceiling + 0.01);
+  expect(box.min.x).toBeCloseTo(-opening.width / 2, 6);
+  expect(box.max.x).toBeCloseTo(opening.width / 2, 6);
+  expect(box.min.z).toBeCloseTo(-wall.thickness / 2, 6);
+  expect(box.max.z).toBeCloseTo(wall.thickness / 2, 6);
+  const normal = onTop[0]!.geometry.getAttribute('normal');
+  expect(normal.getY(0)).toBeCloseTo(1, 9);
+  return proxies.filter((proxy) => proxy !== onTop[0]);
+}
+
 describe('the opening-kind table', () => {
   test('every opening type has a kind that can build, pick and point', () => {
     expect(OPENING_TYPES.length).toBe(3);
@@ -105,7 +137,7 @@ describe('doors and passages', () => {
       const builder = build(sceneWithOpening(L_SHAPE.wall.wPart, L_SHAPE.opening.doorAb, { type }));
       const proxies = pickProxies(builder.getOpeningGroup(L_SHAPE.opening.doorAb)!, L_SHAPE.opening.doorAb);
       // Two jambs and the head, plus the opening's share of the wall top (`wallTopPickBoxes`).
-      expect({ type, proxies: proxies.length }).toEqual({ type, proxies: 4 });
+      expect({ type, proxies: splitWallTop(proxies, L_SHAPE.wall.wPart, L_SHAPE.opening.doorAb).length }).toEqual({ type, proxies: 3 });
       // None of them spans the whole opening at mid height: that is what
       // lets a click travel through an open doorway.
       const opening = lShapePlan.walls.find((wall) => wall.id === L_SHAPE.wall.wPart)!.openings![0]!;
@@ -138,7 +170,7 @@ describe('windows', () => {
     const builder = build(lShapePlan);
     const proxies = pickProxies(builder.getOpeningGroup(L_SHAPE.opening.windowASouth)!, L_SHAPE.opening.windowASouth);
     // The pane, plus the window's share of the wall top (`wallTopPickBoxes`).
-    expect(proxies.length).toBe(2);
+    expect(splitWallTop(proxies, L_SHAPE.wall.wSA, L_SHAPE.opening.windowASouth).length).toBe(1);
   });
 
   test('an authored window with no sill or head keeps the effectiveOpening defaults', () => {
