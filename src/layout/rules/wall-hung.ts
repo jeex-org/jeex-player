@@ -11,8 +11,9 @@
  */
 
 import {
-  faceLabel,
   faceSpan,
+  issueFace,
+  layoutIssue,
   nearestFace,
   positionOf,
   type LayoutIssue,
@@ -38,10 +39,8 @@ const FACE_END_MARGIN_M = 0.02;
  * at exactly the low edge (1.55 m of a 1.60 ± 0.05 band) fails the second
  * form and passes the first.
  */
-function band(nominal: number): { low: number; high: number; text: string } {
-  const low = nominal - MOUNT_TOL_M;
-  const high = nominal + MOUNT_TOL_M;
-  return { low, high, text: `${low.toFixed(2)}..${high.toFixed(2)}` };
+function band(nominal: number): { low: number; high: number } {
+  return { low: nominal - MOUNT_TOL_M, high: nominal + MOUNT_TOL_M };
 }
 
 function ruleWallHung(ctx: LintContext, out: LayoutIssue[]): void {
@@ -55,62 +54,62 @@ function itemWallHung(ctx: LintContext, item: LintItem, out: LayoutIssue[]): voi
   if (!near) return;
   const gap = near.distance - item.dims[2] / 2;
   if (gap < -WALL_HUNG_SINK_M || gap > WALL_HUNG_GAP_M) {
-    out.push({
-      rule: 'wall-hung',
-      severity: 'error',
-      ids: [item.placement.id, near.face.wallId],
-      message: `${item.placement.id} hangs ${gap.toFixed(3)} m off ${faceLabel(near.face)} (allowed 0..${WALL_HUNG_GAP_M})`,
-      at: centre,
-    });
+    out.push(
+      layoutIssue(
+        'wall_hung_off_face',
+        { placement: item.placement.id, face: issueFace(near.face), gap, maxGap: WALL_HUNG_GAP_M },
+        { severity: 'error', ids: [item.placement.id, near.face.wallId], at: centre },
+      ),
+    );
   }
 
   const [t0, t1] = faceSpan(item, near.face, centre);
   if (t0 < FACE_END_MARGIN_M || t1 > near.face.length - FACE_END_MARGIN_M) {
-    out.push({
-      rule: 'wall-hung',
-      severity: 'error',
-      ids: [item.placement.id, near.face.wallId],
-      message: `${item.placement.id} runs off the end of ${faceLabel(near.face)} (${t0.toFixed(2)}..${t1.toFixed(2)} of ${near.face.length.toFixed(2)} m)`,
-      at: centre,
-    });
+    out.push(
+      layoutIssue(
+        'wall_hung_past_face_end',
+        { placement: item.placement.id, face: issueFace(near.face), from: t0, to: t1, length: near.face.length },
+        { severity: 'error', ids: [item.placement.id, near.face.wallId], at: centre },
+      ),
+    );
   }
   const low = item.y - item.dims[1] / 2;
   const high = item.y + item.dims[1] / 2;
   for (const opening of near.face.openings) {
     if (opening.head <= low || opening.sill >= high) continue;
     if (opening.t1 <= t0 || opening.t0 >= t1) continue;
-    out.push({
-      rule: 'wall-hung',
-      severity: 'error',
-      ids: [item.placement.id, opening.id],
-      message: `${item.placement.id} hangs across opening ${opening.id}`,
-      at: centre,
-    });
+    out.push(
+      layoutIssue(
+        'wall_hung_across_opening',
+        { placement: item.placement.id, opening: opening.id },
+        { severity: 'error', ids: [item.placement.id, opening.id], at: centre },
+      ),
+    );
   }
 
   const mount = item.layout?.mount;
   if (mount?.centre !== undefined) {
     const allowed = band(mount.centre);
     if (item.y < allowed.low || item.y > allowed.high) {
-      out.push({
-        rule: 'wall-hung',
-        severity: 'error',
-        ids: [item.placement.id],
-        message: `${item.placement.id} hangs at ${item.y.toFixed(2)} m; ${item.archetype} centres belong in ${allowed.text} m`,
-        at: centre,
-      });
+      out.push(
+        layoutIssue(
+          'wall_hung_centre_height',
+          { placement: item.placement.id, archetype: item.archetype, height: item.y, low: allowed.low, high: allowed.high },
+          { severity: 'error', ids: [item.placement.id], at: centre },
+        ),
+      );
     }
   }
   if (mount?.bottom !== undefined) {
     const allowed = band(mount.bottom);
     if (low < allowed.low || low > allowed.high) {
-      out.push({
-        rule: 'wall-hung',
-        severity: 'error',
-        ids: [item.placement.id],
-        message: `${item.placement.id} has its bottom at ${low.toFixed(2)} m; ${item.archetype} belongs in ${allowed.text} m`,
-        at: centre,
-      });
+      out.push(
+        layoutIssue(
+          'wall_hung_bottom_height',
+          { placement: item.placement.id, archetype: item.archetype, bottom: low, low: allowed.low, high: allowed.high },
+          { severity: 'error', ids: [item.placement.id], at: centre },
+        ),
+      );
     }
   }
 }

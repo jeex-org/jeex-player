@@ -9,6 +9,18 @@ as described under [Versioning](#versioning).
 
 ### Added
 
+- **Every layout issue carries a stable `code` and typed `params`.** A host
+  that shows the linter's issues in another language translates the code and
+  fills in the params instead of an English sentence. `params` is a union
+  keyed by `code`, so checking the code narrows the params; they hold ids,
+  wall faces as `{ wall, side }`, catalogue archetype ids and anchors, and
+  unrounded metres and degrees, never English words. `message` is unchanged
+  and is now rendered from the code and params by `renderLayoutIssue`.
+  `jeex-viewer/ops` exports the vocabulary `LAYOUT_ISSUE_CODES`, the renderer
+  and the types `LayoutIssueCode`, `LayoutIssueParams`, `LayoutIssueDetail`
+  and `LayoutIssueFace`; README «Layout issue codes» lists every code with its
+  params and an example sentence. The codes are public API: adding one is a
+  minor change, renaming or removing one, or changing its params, is breaking.
 - **`doorLeaf` names the room on each side of a door.** Its answer carries
   `rooms: { in, out }`: the room id the leaf opens into with `swing: 'in'` and
   with `swing: 'out'`, `null` where that side is outside the flat (a facade),
@@ -1387,7 +1399,9 @@ the embed bridge (`src/embed/protocol.ts`):
 - the set or meaning of `ViewerOptions` keys consumed by
   `mountViewer`/`<jeex-viewer>` (removing a key, changing its default, or
   changing what a value means — additions are minor);
-- `schemaVersion` on the scene document format.
+- `schemaVersion` on the scene document format;
+- the layout issue codes (`LAYOUT_ISSUE_CODES`): renaming or removing a
+  code, or changing its params, is breaking; adding a code is minor.
 
 Not every major bump touches `PROTOCOL_VERSION` — a `ViewerHandle` or
 `ViewerOptions` change local to the in-page API, with no postMessage

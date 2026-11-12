@@ -19,9 +19,10 @@
  * scene SCHEMA, which the plan solver and everything above it may read, while
  * `scene/`'s behaviour (the model, the ops, the validator) sits far higher.
  *
- * `layout/issue` is the same split inside `layout/`: `layout-issue.ts` is the
- * VOCABULARY of a layout issue (the rule names, the issue record, the linter's
- * signature), which `scene/scene-model.ts` reports for a batch
+ * `layout/issue` is the same split inside `layout/`: `layout-issue.ts` and
+ * `layout-issue-codes.ts` are the VOCABULARY of a layout issue (the rule names,
+ * the issue codes with their params and English sentences, the issue record,
+ * the linter's signature), which `scene/scene-model.ts` reports for a batch
  * (`ApplyBatch.lint`), while the linter that produces one reads the object bank
  * and stays in `layout`, three layers above `scene`. The function itself is
  * injected, never imported — the same move registries make.
@@ -90,15 +91,15 @@ const KNOWN_VIOLATIONS = {};
 function layerPath(layer) {
   if (layer === 'scene/types') return '^src/scene/types(\\.schema|\\.finishes|\\.site|\\.plan)?\\.ts$';
   if (layer === 'scene') return '^src/scene/(?!types(\\.schema|\\.finishes|\\.site|\\.plan)?\\.ts$)';
-  if (layer === 'layout/issue') return '^src/layout/layout-issue\\.ts$';
-  if (layer === 'layout') return '^src/layout/(?!layout-issue\\.ts$)';
+  if (layer === 'layout/issue') return '^src/layout/layout-issue(-codes)?\\.ts$';
+  if (layer === 'layout') return '^src/layout/(?!layout-issue(-codes)?\\.ts$)';
   return `^src/${layer}/`;
 }
 
 /** Which layer a `KNOWN_VIOLATIONS` key belongs to. */
 function layerOf(modulePath) {
   if (modulePath.startsWith('scene/types')) return 'scene/types';
-  if (modulePath === 'layout/layout-issue.ts') return 'layout/issue';
+  if (modulePath === 'layout/layout-issue.ts' || modulePath === 'layout/layout-issue-codes.ts') return 'layout/issue';
   return modulePath.split('/')[0];
 }
 

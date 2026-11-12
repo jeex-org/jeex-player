@@ -62,11 +62,16 @@ export const HOST_BUDGET_FAIL_BYTES = 4 * 1024;
  * scene schemas — a good deal of the scene model, but still no `three` and no
  * DOM.
  *
- * The gate is set from a measured size of `jeex-viewer-ops.js` (101,269 gzip
- * bytes, 98.9 KB, from `measureBundle('dist-lib')` right after
+ * The gate is set from a measured size of `jeex-viewer-ops.js` (103,103 gzip
+ * bytes, 100.7 KB, from `measureBundle('dist-lib')` right after
  * `bun run build:lib`) plus 1 KB. Most of the entry is the scene model and its
  * `zod/mini` schemas; the bundled bank's fixed UUID v7 literals (random hex
- * that gzip cannot fold) are a large share. The last raise, from 100,242 bytes
+ * that gzip cannot fold) are a large share. The last raise, from 101,269 bytes
+ * (2026-11-12, +1,834 bytes), is the layout issue codes: the public code
+ * vocabulary (`LAYOUT_ISSUE_CODES`), the code-to-rule table and the English
+ * renderer every rule now builds its message through
+ * (`layout/layout-issue-codes.ts`), so a host translates an issue by its code
+ * and params. The raise before it, from 100,242 bytes
  * (2026-11-12, +1,027 bytes), is a door's hinge jamb and swing side
  * (`Opening.hinge`, `Opening.swing`: their schemas, the `set_opening` and
  * `add_opening` fields and refusals), with the swing a batch writes kept on
@@ -98,7 +103,7 @@ export const HOST_BUDGET_FAIL_BYTES = 4 * 1024;
  * `npm pack` time; the fix is to re-measure and update this comment, never to
  * raise the number from memory.
  */
-export const OPS_BUDGET_FAIL_BYTES = 101_269 + 1024;
+export const OPS_BUDGET_FAIL_BYTES = 103_103 + 1024;
 
 /**
  * Hard limit for the `jeex-viewer/lighting` entry, gzip bytes. It carries the

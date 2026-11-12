@@ -12,8 +12,9 @@
 
 import { dist, dot, sub } from '../../plan/plan-geometry.js';
 import {
-  faceLabel,
   faceSpan,
+  issueFace,
+  layoutIssue,
   nearestFace,
   positionOf,
   type LayoutIssue,
@@ -60,13 +61,13 @@ function ruleKitchen(ctx: LintContext, out: LayoutIssue[]): void {
       else merged.push([...run]);
     }
     if (merged.some(([t0, t1]) => span.t0 >= t0 - CABINET_SLACK_M && span.t1 <= t1 + CABINET_SLACK_M)) continue;
-    out.push({
-      rule: 'kitchen-run',
-      severity: 'warning',
-      ids: [item.placement.id],
-      message: `${item.placement.id} (${span.t0.toFixed(2)}..${span.t1.toFixed(2)} on ${faceLabel(span.face)}) is not inside the base run`,
-      at: positionOf(item),
-    });
+    out.push(
+      layoutIssue(
+        'wall_cabinet_outside_base_run',
+        { placement: item.placement.id, face: issueFace(span.face), from: span.t0, to: span.t1 },
+        { severity: 'warning', ids: [item.placement.id], at: positionOf(item) },
+      ),
+    );
   }
 
   for (const hood of ctx.items.filter((item) => item.archetype === ARCHETYPE.hood_extractor)) {
@@ -82,13 +83,13 @@ function ruleKitchen(ctx: LintContext, out: LayoutIssue[]): void {
     const along = { x: -hood.front.z, z: hood.front.x };
     const sideways = Math.abs(dot(sub(hobAt, hoodAt), along));
     if (sideways <= HOOD_OFFSET_M) continue;
-    out.push({
-      rule: 'kitchen-run',
-      severity: 'warning',
-      ids: [hood.placement.id, hob.placement.id],
-      message: `${hood.placement.id} sits ${sideways.toFixed(2)} m off the centre of ${hob.placement.id} (total ${offset.toFixed(2)} m)`,
-      at: hoodAt,
-    });
+    out.push(
+      layoutIssue(
+        'hood_off_hob_centre',
+        { placement: hood.placement.id, hob: hob.placement.id, sideways, total: offset },
+        { severity: 'warning', ids: [hood.placement.id, hob.placement.id], at: hoodAt },
+      ),
+    );
   }
 }
 

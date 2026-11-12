@@ -15,6 +15,7 @@ import { overlapDepth, quadCentre } from '../layout-geometry.js';
 import {
   TOUCH_TOL_M,
   apart,
+  layoutIssue,
   sideZone,
   type DoorZone,
   type LayoutIssue,
@@ -83,13 +84,11 @@ function bandIssue(band: WindowBand, item: LintItem): LayoutIssue | null {
   const height = item.layout?.blockingHeight ?? item.dims[1];
   if (!item.quad || height <= TALL_M) return null;
   if (apart(item.quad, band.quad) || overlapDepth(item.quad, band.quad) <= TOUCH_TOL_M) return null;
-  return {
-    rule: 'window-clearance',
-    severity: 'error',
-    ids: [band.openingId, item.placement.id],
-    message: `${item.placement.id} is ${height.toFixed(2)} m tall and blocks window ${band.openingId}`,
-    at: quadCentre(band.quad),
-  };
+  return layoutIssue(
+    'window_blocked',
+    { placement: item.placement.id, opening: band.openingId, height },
+    { severity: 'error', ids: [band.openingId, item.placement.id], at: quadCentre(band.quad) },
+  );
 }
 
 function ruleWindows(ctx: LintContext, out: LayoutIssue[]): void {

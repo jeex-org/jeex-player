@@ -9,11 +9,25 @@
  * reaching up to the module that computes them — the function itself is handed
  * in, the way registries are.
  *
+ * Every issue carries a stable `code` and typed `params`
+ * (`layout-issue-codes.ts`, the same layer), and every rule builds its issue
+ * through `layoutIssue`, which takes the rule from the code and renders the
+ * English `message` from the code and params.
+ *
  * Pure module: no `three`, no DOM.
  */
 
 import type { SolvedPlan } from '../plan/plan-solver.js';
 import type { SceneData, Vec2 } from '../scene/types.js';
+import {
+  circulationSentence,
+  renderLayoutIssue,
+  type LayoutIssueCode,
+  type LayoutIssueDetail,
+  type LayoutIssueParams,
+} from './layout-issue-codes.js';
+
+export { circulationSentence };
 
 /**
  * What a layout issue is ABOUT, named rather than numbered.
@@ -95,6 +109,11 @@ export function layoutRuleOrder(rule: LayoutRule): number {
   return (LAYOUT_RULE_IDS as readonly LayoutRule[]).indexOf(rule);
 }
 
+/**
+ * One issue. `code` and `params` say WHAT it is in values a host can translate
+ * (`layout-issue-codes.ts`); `message` is the English sentence rendered from
+ * them, never written by hand.
+ */
 export type LayoutIssue = {
   rule: LayoutRule;
   severity: 'error' | 'warning';
@@ -102,7 +121,70 @@ export type LayoutIssue = {
   ids: string[];
   message: string;
   at: Vec2;
-};
+} & LayoutIssueDetail;
+
+/** The rule each code belongs to: a code says what is wrong, the rule which check found it. */
+const RULE_OF_CODE = {
+  object_inside_wall: 'inside-a-wall',
+  objects_overlap: 'no-interpenetration',
+  mounted_objects_overlap: 'no-interpenetration',
+  door_clear_zone_blocked: 'door-clear-zone',
+  door_leaf_hits_wall: 'door-swing-path',
+  door_leaf_hits_object: 'door-swing-path',
+  wall_hung_off_face: 'wall-hung',
+  wall_hung_past_face_end: 'wall-hung',
+  wall_hung_across_opening: 'wall-hung',
+  wall_hung_centre_height: 'wall-hung',
+  wall_hung_bottom_height: 'wall-hung',
+  door_no_free_floor: 'circulation',
+  doors_not_connected: 'circulation',
+  main_zone_unreachable: 'circulation',
+  window_blocked: 'window-clearance',
+  raised_without_support: 'on-floor',
+  floor_object_outside_rooms: 'on-floor',
+  floor_object_crosses_room: 'on-floor',
+  ceiling_object_outside_rooms: 'ceiling-hung',
+  ceiling_object_without_ceiling: 'ceiling-hung',
+  ceiling_object_out_of_band: 'ceiling-hung',
+  object_taller_than_ceiling: 'height-fit',
+  wall_object_out_of_height: 'height-fit',
+  wall_object_turned: 'wall-facing',
+  case_good_off_wall: 'case-goods-on-a-wall',
+  wall_cabinet_outside_base_run: 'kitchen-run',
+  hood_off_hob_centre: 'kitchen-run',
+  sofa_tv_distance: 'seating-group',
+  floor_lamp_inside_seat: 'seating-group',
+  chair_tuck_distance: 'dining-tuck',
+  chair_not_facing_table: 'dining-tuck',
+  bed_head_off_wall: 'bedroom',
+  double_bed_nightstands: 'bedroom',
+  nightstands_out_of_line: 'bedroom',
+  wardrobe_front_blocked: 'bedroom',
+  coat_rack_in_door_swing: 'hall',
+  mirror_off_host_centre: 'hall',
+  entrance_axis_blocked: 'hall',
+} as const satisfies Record<LayoutIssueCode, LayoutRule>;
+
+/**
+ * The one way a rule builds an issue: its code and params, with the rule taken
+ * from the code and the message rendered from both, so neither can disagree
+ * with the code.
+ */
+export function layoutIssue<C extends LayoutIssueCode>(
+  code: C,
+  params: LayoutIssueParams[C],
+  where: Pick<LayoutIssue, 'severity' | 'ids' | 'at'>,
+): LayoutIssue {
+  const detail = { code, params } as LayoutIssueDetail;
+  return {
+    rule: RULE_OF_CODE[code],
+    severity: where.severity,
+    ids: where.ids,
+    message: renderLayoutIssue(code, params),
+    at: where.at,
+    ...detail,
+  };
+}
 
 /**
  * The linter as its CALLERS see it: a scene and its solved plan in, issues out.
@@ -115,18 +197,6 @@ export type LayoutIssue = {
  * review them.
  */
 export type LayoutLinter = (scene: SceneData, plan: SolvedPlan) => readonly LayoutIssue[];
-
-/**
- * Rule 6's three sentences (`rules/circulation.ts` writes them through these),
- * so a reader that tells them apart (`scene/issue-heirs.ts`) reads exactly the
- * words the rule writes, and the two cannot drift apart.
- */
-export const circulationSentence = {
-  noFloor: (opening: string, width: string, room: string): string =>
-    `${opening} has no ${width} m of free floor in front of it inside ${room}`,
-  noPath: (from: string, to: string, width: string, room: string): string => `no ${width} m path from ${from} to ${to} across ${room}`,
-  mainZone: (room: string, opening: string): string => `the main zone of ${room} is not reachable on a 0.80 m path from ${opening}`,
-} as const;
 
 /** Which of rule 6's sentences `issue` is, or `null` for any other issue. */
 export function circulationSentenceOf(issue: Pick<LayoutIssue, 'rule' | 'message'>): 'no-floor' | 'no-path' | 'main-zone' | null {

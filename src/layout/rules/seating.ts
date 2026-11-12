@@ -18,6 +18,7 @@ import { dist, dot, norm, sub } from '../../plan/plan-geometry.js';
 import {
   boxCentre,
   boxGap,
+  layoutIssue,
   pointToBox,
   positionOf,
   support,
@@ -41,25 +42,25 @@ function ruleSeating(ctx: LintContext, out: LayoutIssue[]): void {
     if (!tv) continue;
     const gap = dist(positionOf(sofa), positionOf(tv));
     if (gap >= SOFA_TV_M[0] && gap <= SOFA_TV_M[1]) continue;
-    out.push({
-      rule: 'seating-group',
-      severity: 'warning',
-      ids: [sofa.placement.id, tv.placement.id],
-      message: `${sofa.placement.id} is ${gap.toFixed(2)} m from ${tv.placement.id}; keep ${SOFA_TV_M[0]}..${SOFA_TV_M[1]} m`,
-      at: positionOf(sofa),
-    });
+    out.push(
+      layoutIssue(
+        'sofa_tv_distance',
+        { placement: sofa.placement.id, tv: tv.placement.id, distance: gap, min: SOFA_TV_M[0], max: SOFA_TV_M[1] },
+        { severity: 'warning', ids: [sofa.placement.id, tv.placement.id], at: positionOf(sofa) },
+      ),
+    );
   }
   const seats = ctx.items.filter((item) => item.box && (item.archetype === ARCHETYPE.sofa_3s || item.archetype === ARCHETYPE.armchair));
   for (const lamp of ctx.items.filter((item) => item.archetype === ARCHETYPE.lamp_floor && item.box)) {
     for (const seat of seats) {
       if (pointToBox(seat.box!, boxCentre(lamp.box!)) > 0) continue;
-      out.push({
-        rule: 'seating-group',
-        severity: 'warning',
-        ids: [lamp.placement.id, seat.placement.id],
-        message: `${lamp.placement.id} stands inside ${seat.placement.id}; a floor lamp belongs beside the arm`,
-        at: boxCentre(lamp.box!),
-      });
+      out.push(
+        layoutIssue(
+          'floor_lamp_inside_seat',
+          { placement: lamp.placement.id, seat: seat.placement.id },
+          { severity: 'warning', ids: [lamp.placement.id, seat.placement.id], at: boxCentre(lamp.box!) },
+        ),
+      );
     }
   }
 }
@@ -76,22 +77,22 @@ function ruleDining(ctx: LintContext, out: LayoutIssue[]): void {
     const gap = dot(sub(tableAt, chairAt), chair.front) - support(chair.box!, chair.front) - support(table.box!, chair.front);
     const deepest = -chair.surfaces.tuck!.depth;
     if (gap < deepest - TOUCH_TOL_M || gap > CHAIR_TUCK_MAX_M) {
-      out.push({
-        rule: 'dining-tuck',
-        severity: 'warning',
-        ids: [chair.placement.id, table.placement.id],
-        message: `${chair.placement.id} sits ${gap.toFixed(2)} m from ${table.placement.id}; tuck it to ${deepest.toFixed(2)}..${CHAIR_TUCK_MAX_M} m`,
-        at: chairAt,
-      });
+      out.push(
+        layoutIssue(
+          'chair_tuck_distance',
+          { placement: chair.placement.id, table: table.placement.id, gap, deepest, furthest: CHAIR_TUCK_MAX_M },
+          { severity: 'warning', ids: [chair.placement.id, table.placement.id], at: chairAt },
+        ),
+      );
     }
     if (dot(chair.front, norm(sub(tableAt, chairAt))) < FACING_COS) {
-      out.push({
-        rule: 'dining-tuck',
-        severity: 'warning',
-        ids: [chair.placement.id, table.placement.id],
-        message: `${chair.placement.id} does not face ${table.placement.id}`,
-        at: chairAt,
-      });
+      out.push(
+        layoutIssue(
+          'chair_not_facing_table',
+          { placement: chair.placement.id, table: table.placement.id },
+          { severity: 'warning', ids: [chair.placement.id, table.placement.id], at: chairAt },
+        ),
+      );
     }
   }
 }
