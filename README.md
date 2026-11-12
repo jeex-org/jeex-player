@@ -1206,6 +1206,8 @@ None of these is a failure; all of them arrive through `onLog` (see [Logging](#l
 | `texture-too-large`, `texture-budget`, `texture-deadline` | A library map hit one of the [texture limits](#library-materials); the surfaces still waiting keep their flat colours |
 | `unknown-generator:<kind>` | A material named a parametric texture this build does not have; it is drawn flat in the entry's own `tone` |
 | `offers-invalid` | The [offers](#offers) library could not be fetched or is not valid, or its `id` is the project library's; the scene opens without it and the bundled bank is offered |
+| `authoring-chunk` | The authoring tools (the checkpoint overlay, the asset move tool, the plan tool) did not load; the tool stays off, and turning it on again retries the load |
+| `edit-without-revision` | The plan tool or the asset move tool was armed on a document loaded without a `revision`; edits count their `baseRev` from 0. Said once per document |
 
 ## Scene operations entry (`jeex-viewer/ops`)
 
