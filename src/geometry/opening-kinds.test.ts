@@ -12,8 +12,13 @@ import { describe, expect, test } from 'bun:test';
 import * as THREE from 'three';
 import { SceneBuilder } from './scene-builder.js';
 import { solvePlan } from '../plan/plan-solver.js';
-import { lShapePlan } from '../fixtures/plan-l-shape.js';
-import { L_SHAPE } from '../fixtures/plan-l-shape-ids.js';
+import { bayPlan, lShapePlan } from '../fixtures/plan-l-shape.js';
+import { BAY, L_SHAPE } from '../fixtures/plan-l-shape-ids.js';
+import { buildPlanDrawing, type PlanPrimitive } from '../plan/plan-drawing.js';
+import { doorSymbolAt } from '../plan/door-symbol-hit.js';
+import { planDrawingInputs } from '../assets/plan-fixtures.js';
+import { resolveDoorSwing } from '../plan/door-swing.js';
+import { openingFrameWidth } from '../assets/opening-frame.js';
 import { effectiveOpening } from '../plan/plan-openings.js';
 import { OPENING_BUILDERS, openingMaterialFacts } from './opening-kinds.js';
 import { createBuilderContext } from './builder-context.js';
@@ -228,5 +233,57 @@ describe('a graphite metal window frame', () => {
       expect(openingMaterialFacts.get(frame)?.finish).toBe('01a16f65-52cd-7066-8e5f-4ffbd54a7290');
       expect((frame as THREE.MeshStandardMaterial).color.getHexString(THREE.SRGBColorSpace)).toBe('6a6862');
     }
+  });
+});
+
+describe('a double door on a curved wall', () => {
+  /** The bay window's opening, made a door here. */
+  const DOOR = BAY.opening.windowBay;
+  /** The bay fixture with its arc-wall window swapped for a 0.9 m double door, off the arc's middle. */
+  const scene: SceneData = {
+    ...bayPlan,
+    walls: bayPlan.walls.map((wall) =>
+      wall.id === BAY.wall.bay
+        ? {
+            ...wall,
+            openings: [
+              { id: DOOR, type: 'door', center: Math.PI - 0.6, width: 0.9, sill: 0, head: 2.1, variant: OPENING_VARIANT.door_white_double },
+            ],
+          }
+        : wall,
+    ),
+  };
+
+  test('the plan draws both hinges where the builder places them, and the hit test follows the drawing', () => {
+    const builder = build(scene);
+    const group = builder.getOpeningGroup(DOOR)!;
+    expect(leavesOf(group).length).toBe(2);
+    // The builder sets each hinge `width / 2 - frame` either way of the
+    // opening's centre along the tangent there: the group's position and its
+    // turn (`angleY = atan2(tangent.z, tangent.x)`).
+    const plan = solvePlan(scene);
+    const wall = scene.walls.find((candidate) => candidate.id === BAY.wall.bay)!;
+    const swing = resolveDoorSwing(scene, plan, wall, wall.openings![0]!, openingFrameWidth);
+    const tangent = { x: Math.cos(group.rotation.y), z: Math.sin(group.rotation.y) };
+    const across = { x: -tangent.z, z: tangent.x };
+    const side = Math.sign(across.x * swing.open.x + across.z * swing.open.z);
+    const open = { x: across.x * side, z: across.z * side };
+    const hinges = [1, -1].map((sign) => ({
+      x: group.position.x + tangent.x * sign * (swing.leaf / 2),
+      z: group.position.z + tangent.z * sign * (swing.leaf / 2),
+    }));
+
+    const drawing = buildPlanDrawing(plan, scene, planDrawingInputs(scene));
+    const drawn = drawing.primitives.filter(
+      (p): p is Extract<PlanPrimitive, { kind: 'leaf' }> => p.kind === 'leaf' && p.door.openingId === DOOR,
+    );
+    expect(drawn.length).toBe(2);
+    for (const hinge of hinges) {
+      expect(Math.min(...drawn.map((line) => Math.hypot(line.from.x - hinge.x, line.from.z - hinge.z)))).toBeLessThan(0.001);
+      // Halfway along that open leaf, a click names the door.
+      const middle = { x: hinge.x + open.x * (swing.leaf / 4), z: hinge.z + open.z * (swing.leaf / 4) };
+      expect(doorSymbolAt(drawing, middle)?.openingId).toBe(DOOR);
+    }
+    builder.dispose();
   });
 });

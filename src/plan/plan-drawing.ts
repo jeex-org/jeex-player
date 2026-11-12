@@ -245,20 +245,28 @@ export function buildPlanDrawing(plan: SolvedPlan, scene: SceneData, options: Pl
  * The leaves and arcs of one door. A single door hangs its whole leaf on the
  * hinge jamb; a double door hangs half of it on each jamb, the second one
  * closing back along `-closed`, so the two meet at the centre when shut.
+ *
+ * A double door's two hinges are placed as the 3D builder places them: half
+ * the clear width either way of the opening's centre along the tangent there,
+ * both leaves opening square to that tangent. On a straight wall those are the
+ * two jambs; on a curved one they sit on that tangent line, just off the arc.
  */
 function doorSymbol(swing: DoorSwing, leaves: number): PlanPrimitive[] {
   const door: PlanDoorRef = { openingId: swing.openingId, wallId: swing.wallId, centre: copy(swing.centre) };
+  const half = swing.leaf / 2;
+  const across = leftN(swing.closed);
+  const squareOpen = dot(across, swing.open) >= 0 ? across : mul(across, -1);
   const hangs =
     leaves >= 2
       ? [
-          { pivot: swing.pivot, closed: swing.closed, length: swing.leaf / 2 },
-          { pivot: add(swing.pivot, mul(swing.closed, swing.leaf)), closed: mul(swing.closed, -1), length: swing.leaf / 2 },
+          { pivot: add(swing.centre, mul(swing.closed, -half)), closed: swing.closed, open: squareOpen, length: half },
+          { pivot: add(swing.centre, mul(swing.closed, half)), closed: mul(swing.closed, -1), open: squareOpen, length: half },
         ]
-      : [{ pivot: swing.pivot, closed: swing.closed, length: swing.leaf }];
+      : [{ pivot: swing.pivot, closed: swing.closed, open: swing.open, length: swing.leaf }];
   const out: PlanPrimitive[] = [];
   for (const hang of hangs) {
-    out.push({ kind: 'leaf', from: copy(hang.pivot), to: add(hang.pivot, mul(swing.open, hang.length)), door });
-    const a0 = angleOf(swing.open);
+    out.push({ kind: 'leaf', from: copy(hang.pivot), to: add(hang.pivot, mul(hang.open, hang.length)), door });
+    const a0 = angleOf(hang.open);
     out.push({ kind: 'swing', centre: copy(hang.pivot), radius: hang.length, a0, a1: unwrapNear(angleOf(hang.closed), a0), door });
   }
   return out;

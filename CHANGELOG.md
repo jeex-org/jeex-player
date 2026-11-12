@@ -294,10 +294,12 @@ as described under [Versioning](#versioning).
   and `plan2d` keeps the facade walls standing for its picks.
 - **A click on a door's drawn leaf or swing arc in `plan2d` selected the floor.**
   It now selects the door, as a click on its gap does; where two door symbols
-  overlap, the door with the nearer centre wins.
+  overlap, the door with the nearer centre wins. Only the drawn lines take
+  the click, with a few pixels of grace: the empty floor inside the swing
+  still selects the room, the furniture or the wall under the pointer.
 - **A double door was drawn with one leaf on the 2D plan.** It is drawn with
-  a leaf and a swing arc from each jamb, each half the opening's width, as
-  the 3D builder hangs them.
+  a leaf and a swing arc from each jamb, each half the opening's width, with
+  both hinges where the 3D builder places them, on a curved wall too.
 - **A swipe over an untouched viewer on a phone scrolls the page.** Touch
   follows the wheel's engagement rule: until the viewer is engaged (a tap,
   focus inside it, fullscreen, or a page that cannot scroll) its canvas takes

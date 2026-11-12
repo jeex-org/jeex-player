@@ -34,7 +34,7 @@ import {
   type PlanDrawing,
   type PlanTransform,
 } from '../plan/plan-drawing.js';
-import { doorSymbolAt, type DoorSymbolHit } from '../plan/door-symbol-hit.js';
+import { DOOR_HIT_SLOP_PX, doorSymbolAt, type DoorSymbolHit } from '../plan/door-symbol-hit.js';
 import { selectionMark, type PlanSelectionMark, type PlanSelectionTarget } from '../plan/plan-selection.js';
 import { planDrawingInputs } from '../assets/plan-fixtures.js';
 import { PLAN_PADDING, fitCanvasToBox, paintPlan, type PlanCameraMarker } from '../plan/plan-canvas.js';
@@ -55,9 +55,6 @@ export const PLAN_CANVAS_NAME = 'plan-canvas';
 
 /** Which of the plan's labels, dimension chains and camera marker `plan2d` draws (`app/viewer-options.ts`'s `plan.*`). */
 export type PlanModeOptions = { labels: boolean; dimensions: boolean; camera: boolean };
-
-/** Pointer grace around a drawn door symbol, CSS pixels: the leaf line is about one pixel wide. */
-const DOOR_HIT_SLOP_PX = 3;
 
 /** All three on, matching `DEFAULT_VIEWER_OPTIONS.plan` — the drawing gains nothing when a caller never wires `deps.options`. */
 const DEFAULT_PLAN_MODE_OPTIONS: PlanModeOptions = { labels: true, dimensions: true, camera: true };
@@ -254,7 +251,7 @@ export class PlanModes {
   }
 
   /**
-   * The door whose drawn leaf or swing sector is under a client point in
+   * The door whose drawn leaf or swing arc is under a client point in
    * `plan2d` (the draft's drawing while one is shown), with the plan point;
    * `null` in any other mode, before a document, or off every door symbol.
    * The 3D pick cannot answer this: cast from above, it lands on the floor

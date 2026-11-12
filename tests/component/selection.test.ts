@@ -10,7 +10,7 @@ import type { ViewerHandle } from '../../src/app/viewer-handle.js';
 import type { ViewerSelection } from '../../src/app/selection.js';
 import type { SceneData, Vec2 } from '../../src/scene/types.js';
 import { closeContainers, demoScene, openContainer, until } from './support.js';
-import { buildPlanDrawing, planPoint, type PlanPrimitive } from '../../src/plan/plan-drawing.js';
+import { buildPlanDrawing, planPoint, roomAt, type PlanPrimitive } from '../../src/plan/plan-drawing.js';
 import { solvePlan } from '../../src/plan/plan-solver.js';
 import { planDrawingInputs } from '../../src/assets/plan-fixtures.js';
 import { TWO_ROOM_ENTRANCE, twoRoomEntrancePlan } from '../../src/fixtures/plan-two-room-entrance.js';
@@ -115,12 +115,13 @@ describe('select in plan2d: the drawn door symbols', () => {
   type Swing = Extract<PlanPrimitive, { kind: 'swing' }>;
   const plan = twoRoomEntrancePlan;
 
-  /** A point halfway out along the partition door's swing sector, in plan metres. */
-  function insidePartitionSwing(): Vec2 {
+  /** The partition door's drawing and a point at `fraction` of its swing radius along the bisector, in plan metres. */
+  function alongPartitionSwing(fraction: number): { drawing: ReturnType<typeof buildPlanDrawing>; point: Vec2 } {
     const drawing = buildPlanDrawing(solvePlan(plan), plan, planDrawingInputs(plan));
     const swing = drawing.primitives.find((p): p is Swing => p.kind === 'swing' && p.door.openingId === TWO_ROOM_ENTRANCE.opening.inner)!;
     const angle = (swing.a0 + swing.a1) / 2;
-    return { x: swing.centre.x + Math.cos(angle) * swing.radius * 0.5, z: swing.centre.z + Math.sin(angle) * swing.radius * 0.5 };
+    const reach = swing.radius * fraction;
+    return { drawing, point: { x: swing.centre.x + Math.cos(angle) * reach, z: swing.centre.z + Math.sin(angle) * reach } };
   }
 
   /** A real click at the pixel the 2D plan draws `point` at. */
@@ -138,14 +139,22 @@ describe('select in plan2d: the drawn door symbols', () => {
     return seen.at(-1)!;
   }
 
-  test('a click inside a door’s swing arc selects the door, not the floor under it', async () => {
-    const selection = await clickPlanPoint(insidePartitionSwing());
+  test('a click on a door’s swing arc selects the door, not the floor under it', async () => {
+    const selection = await clickPlanPoint(alongPartitionSwing(1).point);
     expect({ kind: selection.kind, id: selection.id, wallId: selection.wallId, mode: selection.mode }).toEqual({
       kind: 'opening',
       id: TWO_ROOM_ENTRANCE.opening.inner,
       wallId: TWO_ROOM_ENTRANCE.wall.partition,
       mode: 'plan2d',
     });
+  });
+
+  test('a click on the empty floor inside the swing selects the room there', async () => {
+    const { drawing, point } = alongPartitionSwing(0.5);
+    const room = roomAt(drawing, point);
+    expect(room).not.toBeNull();
+    const selection = await clickPlanPoint(point);
+    expect({ kind: selection.kind, id: selection.id }).toEqual({ kind: 'room', id: room });
   });
 
   test('a click on the room away from every door still selects the room', async () => {
