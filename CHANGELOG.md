@@ -45,9 +45,10 @@ as described under [Versioning](#versioning).
   to `loadScene` or the scene source. A `loadScene` of the scene on screen
   with a `revision` now takes that revision; before, it counted on from its
   own, and the next edit was refused as a conflict; the same document again
-  at a new revision takes it too. A mount's `scene.revision` (module and
-  element) is honoured as well: the option resolver dropped it, so the first
-  document started at 0.
+  at a new revision takes it too. A module mount's `scene.revision` is
+  honoured as well: the option resolver dropped it, so the first document
+  started at 0. The element has no attribute for it; an element host passes
+  the revision through `element.viewer.loadScene({ …, revision })`.
 - **The iframe form steps cameras and sets the quality tier.** The wire
   carries `stepCamera {to}` (answered with whether a step started) and
   `setQuality {quality}`, both validated like every other command, and the
@@ -364,6 +365,13 @@ as described under [Versioning](#versioning).
 
 ### Changed
 
+- **An invalid `scene.revision` fails the boot.** A mount whose
+  `scene.revision` is not a non-negative integer now fails with
+  `bad-params`, as the same value in `loadScene` does; before, the option
+  resolver dropped it and the viewer booted at revision 0.
+- **The authoring tools log through the viewer's logger.** Their entries
+  (`authoring-chunk`, `edit-without-revision`) now reach the host's `onLog`;
+  before, they went to the console only.
 - **The authoring tools load on demand, as one chunk.** The tour-camera
   overlay with its preview card and look-through, the asset move tool and the
   plan tool load with the first `setCheckpointOverlay(true)`,
