@@ -81,8 +81,9 @@ export class Dollhouse {
    *
    * Seen from straight above a wall hides nothing, so the dollhouse's "the
    * camera is outside this wall" rule has no work to do — and it would answer
-   * arbitrarily for a camera hovering over the middle of the plan. The 3D mode
-   * sets this while it owns the render camera.
+   * arbitrarily for a camera hovering over the middle of the plan. Both plan
+   * modes set it: `plan3d` draws through the top view and `plan2d` picks
+   * through it, while the perspective rig stays frozen wherever orbit left it.
    */
   setKeepExteriors(keep: boolean, camera?: THREE.Camera): void {
     if (this.keepExteriors === keep) return;

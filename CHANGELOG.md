@@ -288,6 +288,10 @@ as described under [Versioning](#versioning).
   along the wall, and a door still opens to the side the plan gives it. On a
   curved wall a flat leaf hangs on the wall's tangent at the opening's
   centre. Walls along an axis build exactly as before.
+- **A click on a door or window from above selected its wall.** In `plan2d`,
+  `plan3d` and a high orbit the wall standing over an opening up to the
+  ceiling took the pick; every opening now owns the wall top over its span,
+  and `plan2d` keeps the facade walls standing for its picks.
 - **A swipe over an untouched viewer on a phone scrolls the page.** Touch
   follows the wheel's engagement rule: until the viewer is engaged (a tap,
   focus inside it, fullscreen, or a page that cannot scroll) its canvas takes

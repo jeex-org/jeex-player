@@ -453,7 +453,9 @@ export class CameraDirector {
   private applyPlanMode(mode: ViewerMode): void {
     this.deps.planModes?.setMode(mode);
     this.deps.ui.setPlanMode(mode);
-    this.deps.dollhouse.setKeepExteriors(mode === 'plan3d', this.deps.camera());
+    // Both plan modes pick through the top view (`PlanModes.pickCamera`), so
+    // both keep the facade standing; the frozen rig would cut walls away.
+    this.deps.dollhouse.setKeepExteriors(mode === 'plan3d' || mode === 'plan2d', this.deps.camera());
   }
 
   /**

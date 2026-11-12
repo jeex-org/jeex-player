@@ -22,9 +22,38 @@ import type { ArcDef } from '../plan/plan-geometry.js';
 import { EPS, arcFromChord, arcLength, arcPointAt, arcTangent, dot, leftN, norm, sub } from '../plan/plan-geometry.js';
 import { clamp } from '../shared/math.js';
 import { defaultOpeningVariant, findOpeningVariant, variantFamily, type OpeningVariant } from '../assets/opening-variants.js';
-import { OPENING_BUILDERS, type OpeningBuildContext } from './opening-kinds.js';
+import {
+  OPENING_BUILDERS,
+  chordPickBoxes,
+  flatPickBox,
+  pickDepth,
+  type OpeningBuildContext,
+  type PickBox,
+} from './opening-kinds.js';
 import type { OpeningPlacement } from './opening-wall-frame.js';
+import { chordBandBoxes } from '../plan/opening-arc.js';
 import type { Opening, OpeningType, Vec2, Vec3, Wall } from '../scene/types.js';
+
+/** Height of the cap proxy laid on the wall top over an opening, metres. */
+const PICK_CAP_M = 0.02;
+
+/**
+ * The opening's share of its wall's top: one thin pick proxy over its span, on
+ * the wall top (the ceiling height) and as deep as its other proxies. A ray
+ * from above meets the wall standing over an opening before any jamb, head or
+ * pane below it, so this cap is what lets a click on the opening from the top
+ * view or a high orbit name the opening; beside the span the wall top stays
+ * the wall's. It lies wholly above the wall, so no ray from a room reaches it.
+ */
+export function wallTopPickBoxes(c: OpeningBuildContext): PickBox[] {
+  const top = c.builder.scene.ceilingHeight;
+  const depth = pickDepth(c);
+  const { arc, t0, t1 } = c.placement;
+  if (arc && t0 !== undefined && t1 !== undefined) {
+    return chordPickBoxes(c, chordBandBoxes(arc, 'pick', t0, t1, top, top + PICK_CAP_M, depth));
+  }
+  return [flatPickBox(c, c.opening.width, PICK_CAP_M, depth, 0, top + PICK_CAP_M / 2)];
+}
 
 /** A built opening group plus everything needed to rebuild it in place. */
 type OpeningRecord = {
@@ -126,11 +155,12 @@ export class OpeningBuilder {
     });
     // Invisible pick proxies, in the group's own frame: each kind decides
     // where a click may land on it (a window over its pane, a doorway only on
-    // its jambs and head, so a click travels through the opening).
+    // its jambs and head, so a click travels through the opening), plus its
+    // share of the wall top, which is all a ray from above meets first.
     if (opening.width > EPS && height > EPS) {
       const point = kind.pickLocal(context);
       pickLocal = { x: point.x, y: point.y, z: point.z };
-      for (const box of kind.pickBoxes(context)) {
+      for (const box of [...kind.pickBoxes(context), ...wallTopPickBoxes(context)]) {
         const proxy = new THREE.Mesh(new THREE.BoxGeometry(box.width, box.height, box.depth), this.openingPickMaterial);
         proxy.name = `${opening.id}-pick`;
         proxy.position.set(box.x, box.y, box.z);

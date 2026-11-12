@@ -492,8 +492,9 @@ describe('openings on curved walls', () => {
       vertexCount += object.geometry.getAttribute('position').count;
       expect(object.userData['openingPart']).toBeUndefined();
     });
-    expect(meshCount).toBe(9);
-    expect(vertexCount).toBe(320);
+    // Nine meshes as before plus the flat wall-top pick cap (`wallTopPickBoxes`).
+    expect(meshCount).toBe(10);
+    expect(vertexCount).toBe(344);
   });
 });
 
@@ -505,12 +506,15 @@ describe('straight walls keep the flat single-rectangle path', () => {
    * boxes were re-captured when the leaf rest angle became a quarter turn
    * (`door-swing.LEAF_REST_ANGLE_RAD`), which is what keeps a leaf inside its
    * own opening span instead of swinging past the jamb into the next wall.
+   * Every group then gained one invisible box, its share of the wall top
+   * (`wallTopPickBoxes`): one mesh and 24 vertices more, and a top at the
+   * ceiling (3.15) plus the cap's 0.02.
    */
   const BEFORE: Record<string, { meshes: number; vertices: number; min: [number, number, number]; max: [number, number, number] }> = {
-    [L_SHAPE.opening.doorEntry]: { meshes: 9, vertices: 320, min: [0.75, 0, -0.19], max: [1.75, 2.15, 0.86] },
-    [L_SHAPE.opening.windowASouth]: { meshes: 9, vertices: 176, min: [3.09, 0.82, -0.19], max: [5.21, 2.35, 0.31] },
-    [L_SHAPE.opening.windowBEast]: { meshes: 9, vertices: 176, min: [9.69, 0.82, 1.64], max: [10.19, 2.35, 3.36] },
-    [L_SHAPE.opening.doorAb]: { meshes: 9, vertices: 320, min: [5.22, 0, 2.0445], max: [6.09, 2.1, 2.95] },
+    [L_SHAPE.opening.doorEntry]: { meshes: 10, vertices: 344, min: [0.75, 0, -0.19], max: [1.75, 3.17, 0.86] },
+    [L_SHAPE.opening.windowASouth]: { meshes: 10, vertices: 200, min: [3.09, 0.82, -0.19], max: [5.21, 3.17, 0.31] },
+    [L_SHAPE.opening.windowBEast]: { meshes: 10, vertices: 200, min: [9.69, 0.82, 1.64], max: [10.19, 3.17, 3.36] },
+    [L_SHAPE.opening.doorAb]: { meshes: 10, vertices: 344, min: [5.22, 0, 2.0445], max: [6.09, 3.17, 2.95] },
   };
 
   test('mesh counts, vertex counts and bounding boxes are unchanged', () => {
@@ -769,7 +773,12 @@ describe('openings are built to the same heights the wall was cut to', () => {
     expect(cut!.head).toBeCloseTo(1.95, 10);
     const group = builder.getOpeningGroup(L_SHAPE.opening.doorAb);
     expect(group).not.toBeNull();
-    expect(new THREE.Box3().setFromObject(group!).max.y).toBeCloseTo(cut!.head, 6);
+    // The built parts only: the invisible pick proxies include the wall-top cap, which sits on the ceiling.
+    const built = new THREE.Box3();
+    group!.traverse((object) => {
+      if (object instanceof THREE.Mesh && !object.name.endsWith('-pick')) built.expandByObject(object, true);
+    });
+    expect(built.max.y).toBeCloseTo(cut!.head, 6);
   });
 
   test('every opening the builder lists is centred on its own cut', () => {

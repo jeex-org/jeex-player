@@ -13,6 +13,8 @@
  *    the handle stock is shared and belongs to the caller;
  *  - a window is picked over its whole pane, a door and a passage only over
  *    their jamb bands and head, so a click still travels through the doorway;
+ *  - every opening also owns the wall top over its span (`wallTopPickBoxes`
+ *    in `opening-builder.ts`), which is all a ray from above meets first;
  *  - on an arc the FRAME follows the wall, chord by chord, while the leaf —
  *    one rigid panel — keeps its flat rectangle on the tangent at the opening
  *    centre (documented limitation, curved leaves are out of scope);
@@ -104,7 +106,7 @@ export type OpeningBuildContext = {
 };
 
 /** One invisible pick proxy, already in the opening group's local frame. */
-type PickBox = {
+export type PickBox = {
   width: number;
   height: number;
   depth: number;
@@ -249,7 +251,7 @@ function curvedBox(c: OpeningBuildContext, box: CurvedBox, material: THREE.Mater
 
 /* --------------------------------------------------------- pick geometry */
 
-function pickDepth(c: OpeningBuildContext): number {
+export function pickDepth(c: OpeningBuildContext): number {
   return Math.max(PICK_DEPTH_MIN_M, c.wall.thickness + PICK_DEPTH_MARGIN_M);
 }
 
@@ -260,7 +262,7 @@ function pickBand(c: OpeningBuildContext): number {
 }
 
 /** A chorded pick band converted into local-frame proxy boxes. */
-function chordPickBoxes(c: OpeningBuildContext, boxes: CurvedBox[]): PickBox[] {
+export function chordPickBoxes(c: OpeningBuildContext, boxes: CurvedBox[]): PickBox[] {
   return boxes.map((box) => {
     const local = toLocal(c.placement, box.centre);
     return {
@@ -277,7 +279,7 @@ function chordPickBoxes(c: OpeningBuildContext, boxes: CurvedBox[]): PickBox[] {
 }
 
 /** A flat proxy box on the wall centreline, `x` along the wall, in the wall frame. */
-function flatPickBox(c: OpeningBuildContext, width: number, height: number, depth: number, x: number, y: number): PickBox {
+export function flatPickBox(c: OpeningBuildContext, width: number, height: number, depth: number, x: number, y: number): PickBox {
   const frame = wallFrame(c.placement);
   const at = fromWall(frame, x, 0);
   return { width, height, depth, x: at.x, y, z: at.z, rotationY: frame.angle };

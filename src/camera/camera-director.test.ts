@@ -523,6 +523,16 @@ describe('the plan modes', () => {
     expect(runtime.renderEnabled).toBe(true);
   });
 
+  test('plan2d keeps every facade wall standing for the picks cast through its top view', () => {
+    const { director, keepExteriors } = harness();
+
+    director.setMode('plan2d');
+    expect(keepExteriors()).toBe(true);
+
+    director.setMode('orbit');
+    expect(keepExteriors()).toBe(false);
+  });
+
   test('returning to 360 restores the perspective camera and the orbit pose', () => {
     const { director, controller, camera, runtime, keepExteriors } = harness();
     director.setMode('orbit');

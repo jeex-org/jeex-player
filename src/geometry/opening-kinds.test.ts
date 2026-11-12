@@ -104,8 +104,9 @@ describe('doors and passages', () => {
     for (const type of ['door', 'passage'] as const) {
       const builder = build(sceneWithOpening(L_SHAPE.wall.wPart, L_SHAPE.opening.doorAb, { type }));
       const proxies = pickProxies(builder.getOpeningGroup(L_SHAPE.opening.doorAb)!, L_SHAPE.opening.doorAb);
-      expect({ type, proxies: proxies.length }).toEqual({ type, proxies: 3 });
-      // None of the three spans the whole opening at mid height: that is what
+      // Two jambs and the head, plus the opening's share of the wall top (`wallTopPickBoxes`).
+      expect({ type, proxies: proxies.length }).toEqual({ type, proxies: 4 });
+      // None of them spans the whole opening at mid height: that is what
       // lets a click travel through an open doorway.
       const opening = lShapePlan.walls.find((wall) => wall.id === L_SHAPE.wall.wPart)!.openings![0]!;
       const spanning = proxies.filter((proxy) => {
@@ -136,7 +137,8 @@ describe('windows', () => {
   test('a window is picked over its whole pane', () => {
     const builder = build(lShapePlan);
     const proxies = pickProxies(builder.getOpeningGroup(L_SHAPE.opening.windowASouth)!, L_SHAPE.opening.windowASouth);
-    expect(proxies.length).toBe(1);
+    // The pane, plus the window's share of the wall top (`wallTopPickBoxes`).
+    expect(proxies.length).toBe(2);
   });
 
   test('an authored window with no sill or head keeps the effectiveOpening defaults', () => {
