@@ -151,11 +151,26 @@ export interface WrittenSwingSides {
   after(index: number, draft: Draft<SceneData>): void;
 }
 
+/** The opening whose swing `op` writes, or `undefined`: a `set_opening` or an `add_opening` naming a `swing`. */
+function swingWrittenBy(op: SceneOp): string | undefined {
+  if (op.op === 'set_opening') return op.swing === undefined ? undefined : op.openingId;
+  if (op.op === 'add_opening') return op.swing === undefined ? undefined : op.id;
+  return undefined;
+}
+
+/** The opening whose earlier recorded side `op` ends: a new swing or wall, a removal, an opening added under the id. */
+function openingReplacedBy(op: SceneOp): string | undefined {
+  if (op.op === 'set_opening') return op.swing === undefined && op.wallId === undefined ? undefined : op.openingId;
+  if (op.op === 'add_opening') return op.id;
+  return op.op === 'remove_opening' ? op.openingId : undefined;
+}
+
 /**
- * Records, as the batch applies, the side each swing a `set_opening` writes
- * opens to on the wall as it stands at that moment, when a shell edit follows
- * it in the batch: the settle step then keeps that side on the final plan.
- * `undefined` for a batch with no such `set_opening`, which costs nothing more.
+ * Records, as the batch applies, the side each swing a `set_opening` or an
+ * `add_opening` writes opens to on the wall as it stands at that moment, when a
+ * shell edit follows it in the batch: the settle step then keeps that side on
+ * the final plan. `undefined` for a batch with no such operation, which costs
+ * nothing more.
  * The plan of the moment is the committed one until the first shell edit, and
  * is solved from the draft after it; a draft that does not solve there records
  * nothing, and the word stays as written.
@@ -164,16 +179,18 @@ export function writtenSwingSides(ops: readonly SceneOp[], committedPlan: Solved
   const shellAt = ops.flatMap((op, index) => (SHELL_EDITS.has(op.op) ? [index] : []));
   const firstShell = shellAt[0] ?? ops.length;
   const lastShell = shellAt.at(-1) ?? -1;
-  const writesBefore = (op: SceneOp, index: number) => op.op === 'set_opening' && op.swing !== undefined && index < lastShell;
+  const writesBefore = (op: SceneOp, index: number) => swingWrittenBy(op) !== undefined && index < lastShell;
   if (!ops.some((op, index) => writesBefore(op, index))) return undefined;
   const sides = new Map<string, Vec2>();
   return {
     sides,
     after(index, draft) {
       const op = ops[index]!;
-      // A later swing, or a move to another wall, is read where it is written: the earlier side no longer holds.
-      if (op.op !== 'set_opening' || (op.swing === undefined && op.wallId === undefined)) return;
-      sides.delete(op.openingId);
+      // A later swing, a move to another wall, a removal or a new opening under the id is read where it is
+      // written: the earlier side no longer holds.
+      const id = openingReplacedBy(op);
+      if (id === undefined) return;
+      sides.delete(id);
       if (!writesBefore(op, index)) return;
       let plan = committedPlan;
       if (index > firstShell) {
@@ -184,9 +201,9 @@ export function writtenSwingSides(ops: readonly SceneOp[], committedPlan: Solved
         }
       }
       for (const wall of draft.walls) {
-        const opening = (wall.openings ?? []).find((candidate) => candidate.id === op.openingId);
+        const opening = (wall.openings ?? []).find((candidate) => candidate.id === id);
         const side = opening === undefined ? undefined : physicalSide(draft, plan, wall, opening);
-        if (side !== undefined) sides.set(op.openingId, side);
+        if (side !== undefined) sides.set(id, side);
       }
     },
   };
@@ -195,10 +212,10 @@ export function writtenSwingSides(ops: readonly SceneOp[], committedPlan: Solved
 /**
  * Rewrites every explicit door swing whose wall's interior side turned round
  * between two plans, so the leaf keeps the physical side it opened to. The
- * side is read on the committed plan, or, for a swing a `set_opening` of the
- * batch wrote before a later shell edit, on the wall as it stood when that op
- * applied (`swingSides`). A swing written after the batch's last shell edit is
- * kept as written. A door moved onto an unrelated wall (`set_opening` naming
+ * side is read on the committed plan, or, for a swing a `set_opening` or an
+ * `add_opening` of the batch wrote before a later shell edit, on the wall as
+ * it stood when that op applied (`swingSides`). A swing written after the
+ * batch's last shell edit is kept as written. A door moved onto an unrelated wall (`set_opening` naming
  * another `wallId`) is the caller's: its swing is read on the wall it joined,
  * so it is left as written too.
  */
@@ -212,7 +229,7 @@ function keepSwingSides(
 ): TouchedEntity[] {
   const touched: TouchedEntity[] = [];
   const ancestorsOf = ancestry(ops);
-  const written = new Set(ops.flatMap((op) => (op.op === 'set_opening' && op.swing !== undefined ? [op.openingId] : [])));
+  const written = new Set(ops.flatMap((op) => swingWrittenBy(op) ?? []));
   // Found by OPENING id: a split in the same batch carries a door onto a new wall id.
   const doorsBefore = new Map(
     committed.walls.flatMap((wall) => (wall.openings ?? []).map((opening) => [opening.id, { wall, opening }] as const)),

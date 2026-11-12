@@ -285,6 +285,50 @@ describe('a swing set_opening writes is read on the wall as it stands when the o
   });
 });
 
+describe('a swing add_opening writes is read on the wall as it stands when the op applies', () => {
+  const northOf = (data: SceneData) => data.walls.find((wall) => wall.id === ZONED.wall.north)!;
+  /** The balcony wall with no door yet: the batch adds it. */
+  const bareWall = (): SceneData => {
+    const scene = balconyDoor('in');
+    return { ...scene, walls: scene.walls.map((wall) => (wall.id === ZONED.wall.north ? { ...wall, openings: [] } : wall)) };
+  };
+  const addDoor = (swing: 'in' | 'out'): SceneOp => ({
+    op: 'add_opening',
+    wallId: ZONED.wall.north,
+    id: NEW.door,
+    type: 'door',
+    center: 5,
+    width: 0.9,
+    swing,
+  });
+
+  test('added before a room is built outside the wall, the leaf keeps the side it was added to: the stored word turns', () => {
+    const model = commit(bareWall(), [addDoor('in'), ...LOGGIA]);
+    const door = northOf(model.scene).openings![0]!;
+    expect(door.swing).toBe('out');
+    expect(resolveDoorSwing(model.scene, model.plan, northOf(model.scene), door, () => 0).roomId).toBe(LIVING);
+  });
+
+  test('added after the room is built, the word is kept as written and read on the new wall', () => {
+    const model = commit(bareWall(), [...LOGGIA, addDoor('in')]);
+    const door = northOf(model.scene).openings![0]!;
+    expect(door.swing).toBe('in');
+    expect(resolveDoorSwing(model.scene, model.plan, northOf(model.scene), door, () => 0).roomId).toBe(NEW.loggia);
+  });
+
+  test('a door removed and added again under its id is read on its new word, not on the swing set before the removal', () => {
+    const model = commit(balconyDoor('out'), [
+      { op: 'set_opening', openingId: NEW.door, swing: 'in' },
+      { op: 'remove_opening', openingId: NEW.door },
+      addDoor('out'),
+      ...LOGGIA,
+    ]);
+    const door = northOf(model.scene).openings![0]!;
+    expect(door.swing).toBe('in');
+    expect(resolveDoorSwing(model.scene, model.plan, northOf(model.scene), door, () => 0).roomId).toBe(NEW.loggia);
+  });
+});
+
 describe('a door carried onto a split wall keeps its side too', () => {
   test('split the balcony wall and build a balcony against the half with the door, in one batch: the leaf stays in the living room', () => {
     const base = livingRoom();
