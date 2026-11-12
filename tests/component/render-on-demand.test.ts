@@ -449,8 +449,8 @@ describe('the editing modes draw on demand', { timeout: MOUNT_TIMEOUT_MS }, () =
    * The skipped-draw verifier: with the view at rest and animation time frozen,
    * the picture the compositor kept must equal a frame forced through the same
    * main-plus-inset path. A difference is a visible change nothing asked to draw.
-   * Ticks after the forced frame, on the frozen clock, draw nothing: no main
-   * frame and no inset.
+   * Ticks after the forced frame and its steady draw, on the frozen clock, draw
+   * nothing: no main frame and no inset.
    *
    * `tail` is the share of pixels allowed to differ after a camera motion: the
    * rig's easing ends below the pose tolerance (`POSE_TOLERANCE`), by design
@@ -489,7 +489,8 @@ describe('the editing modes draw on demand', { timeout: MOUNT_TIMEOUT_MS }, () =
         if (counters().draws !== kept || (demandOf() as unknown as { dirty: boolean }).dirty) continue;
         const start = counters();
         demandOf().invalidate();
-        await until(() => counters().draws > start.draws, `${what}: the forced frame`, TICKS_TIMEOUT_MS);
+        // The forced frame and the steady draw it owes (`RenderDemand.commit`), as every change draws.
+        await until(() => counters().draws > start.draws + 1, `${what}: the forced frame`, TICKS_TIMEOUT_MS);
         await nextFrame();
         const forced = await canvasShot();
         const share = await unexplainedShare(retained, forced);

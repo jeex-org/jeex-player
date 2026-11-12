@@ -11,9 +11,11 @@ function camera(): THREE.PerspectiveCamera {
   return live;
 }
 
-/** A demand that has displayed `live` once in `mode`, clean afterwards. */
+/** A demand that has displayed `live` in `mode` (its first picture and the steady one after it), clean afterwards. */
 function displayed(live: THREE.Camera, mode = 'walk'): RenderDemand {
   const demand = new RenderDemand();
+  expect(demand.shouldDraw(live, mode)).toBe(true);
+  demand.commit(live);
   expect(demand.shouldDraw(live, mode)).toBe(true);
   demand.commit(live);
   return demand;
@@ -49,6 +51,9 @@ describe('RenderDemand', () => {
       demand.invalidate();
       expect(demand.shouldDraw(live, mode)).toBe(true);
       // No commit (the draw threw): the demand stays.
+      expect(demand.shouldDraw(live, mode)).toBe(true);
+      demand.commit(live);
+      // The steady draw of the same inputs, then nothing.
       expect(demand.shouldDraw(live, mode)).toBe(true);
       demand.commit(live);
       expect(demand.shouldDraw(live, mode)).toBe(false);
@@ -94,6 +99,22 @@ describe('RenderDemand', () => {
     });
   });
 
+  test('a draw that answered a change draws once more with the same inputs, then rests', () => {
+    // The first picture of a changed scene is not always the steady one: on ANGLE's OpenGL
+    // backend on NVIDIA its antialiased edges sometimes resolve differently from the next draw
+    // of identical inputs, and a resting view would keep that picture until the next change.
+    const live = camera();
+    const demand = displayed(live, 'orbit');
+    demand.invalidate();
+    const drawn: boolean[] = [];
+    for (let tick = 0; tick < 4; tick += 1) {
+      const draws = demand.shouldDraw(live, 'orbit');
+      drawn.push(draws);
+      if (draws) demand.commit(live);
+    }
+    expect(drawn).toEqual([true, true, false, false]);
+  });
+
   test('a draw with another camera object draws once more on the next tick, then rests', () => {
     // The first picture after the render camera changes is not the steady one (measured: the
     // top view's first frame differed from the next, identical-input frame in 7 runs of 10).
@@ -122,13 +143,13 @@ describe('RenderDemand', () => {
     const demand = displayed(live);
     demand.shouldDraw(live, 'walk');
     demand.shouldDraw(live, 'walk');
-    expect(demand.counters()).toEqual({ ticks: 3, draws: 1, insetDraws: 0 });
+    expect(demand.counters()).toEqual({ ticks: 4, draws: 2, insetDraws: 0 });
   });
 
   test('counts inset draws apart from display draws', () => {
     const live = camera();
     const demand = displayed(live, 'orbit');
     demand.insetDrawn();
-    expect(demand.counters()).toEqual({ ticks: 1, draws: 1, insetDraws: 1 });
+    expect(demand.counters()).toEqual({ ticks: 2, draws: 2, insetDraws: 1 });
   });
 });

@@ -24,6 +24,10 @@
  * snapshot and the demand are committed only after a draw succeeded
  * (`commit`): a draw that throws leaves the demand for the next tick.
  *
+ * The first picture of a change is not always the steady one, so a draw that
+ * answered `invalidate` or a switch of camera object is followed by exactly
+ * one more draw of the same inputs before the view rests (`commit`).
+ *
  * Pure: no `three` and no DOM; the camera is read through its matrices.
  */
 
@@ -57,6 +61,10 @@ export type DemandCounters = { readonly ticks: number; readonly draws: number; r
 
 export class RenderDemand {
   private dirty = true;
+  /** One more draw of unchanged inputs is owed: the last draw answered a change (`commit`). */
+  private steady = false;
+  /** Whether the draw `shouldDraw` last allowed answers `invalidate`. */
+  private answering = false;
   private shown: Shown | null = null;
   /** The mode of the last `shouldDraw`, which `commit` records. */
   private asked: string | undefined;
@@ -79,7 +87,8 @@ export class RenderDemand {
     if (mode === undefined || !ON_DEMAND_MODES.has(mode)) return true;
     camera.updateMatrixWorld();
     const shown = this.shown;
-    if (this.dirty || shown === null) return true;
+    this.answering = this.dirty;
+    if (this.dirty || this.steady || shown === null) return true;
     return (
       shown.camera !== camera ||
       shown.mode !== mode ||
@@ -92,16 +101,25 @@ export class RenderDemand {
   /**
    * The tick drew successfully with `camera`: that is the picture on screen now.
    *
-   * The first picture after the render camera itself changed (a mode switch to
-   * or from the top view) is not the steady one: in a real browser the top
-   * view's first frame differed on wall tops and glazing from the next frame
-   * drawn from identical inputs, in 7 runs of 10. So a draw with another camera
-   * object leaves the demand set for exactly one more frame, which converges.
+   * The first picture of a change is not always the steady one. After the
+   * render camera itself changed (a mode switch to or from the top view) the
+   * top view's first frame differed on wall tops and glazing from the next
+   * frame drawn from identical inputs, in 7 runs of 10. After any other change
+   * (`invalidate`) the same happens more rarely: on ANGLE's OpenGL backend on
+   * NVIDIA, about one change in 150 left a first picture whose antialiased
+   * edges (0.1 to 0.3 % of the pixels, up to 50 levels) differed from every
+   * later draw of the same inputs, while the second and every later draw
+   * agreed. A resting view would keep that picture until the next change. So
+   * a draw that answered either leaves exactly one more draw owed, and that
+   * steady draw owes nothing. A camera move is not followed by one: its
+   * sub-tolerance tail is not redrawn either.
    */
   commit(camera: DemandCamera): void {
     this.draws += 1;
     const switched = this.shown !== null && this.shown.camera !== camera;
-    this.dirty = switched;
+    this.steady = switched || this.answering;
+    this.answering = false;
+    this.dirty = false;
     this.shown = {
       camera,
       world: Array.from(camera.matrixWorld.elements),
