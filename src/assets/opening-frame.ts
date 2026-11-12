@@ -33,7 +33,11 @@ export function openingFrameWidth(opening: Opening): number {
   return variantOf(opening).frame.width;
 }
 
-/** Leaves the variant this opening wears hangs: two for a `'double'` leaf style, else one. */
+/**
+ * How many hinged leaves the builder hangs in this opening: two for a
+ * `'double'` leaf style (one on each jamb), one otherwise. The 2D plan draws
+ * that many leaves and swing arcs (`plan/plan-drawing.LeafCountOf`).
+ */
 export function openingLeafCount(opening: Opening): 1 | 2 {
   return variantOf(opening).leaf?.style === 'double' ? 2 : 1;
 }

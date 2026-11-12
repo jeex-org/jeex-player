@@ -60,6 +60,13 @@ const TRANSFORM: PlanTransform = { scale: 10, ox: 0, oy: 0 };
 /** The one room of `DRAWING`. */
 const ROOM_ID = '01a12ff3-e150-7620-ab3b-4aaec2b6a5f2';
 
+/** The door the leaf and the arc of `DRAWING` belong to. */
+const DOOR = {
+  openingId: '01a1cf25-e6d7-73a0-ba4e-ec172d47e39a',
+  wallId: '01a1cf25-e6da-77c0-9b61-2f6b8ce5f162',
+  centre: { x: 0.5, z: 0 },
+};
+
 /** One primitive of every painted kind, plus a `room` primitive to prove the highlight pre-pass does not disturb the order. */
 const DRAWING: PlanDrawing = {
   bounds: { min: { x: 0, z: 0 }, max: { x: 10, z: 10 } },
@@ -98,8 +105,8 @@ const DRAWING: PlanDrawing = {
         { x: 1, z: 1 },
       ],
     },
-    { kind: 'leaf', from: { x: 0, z: 0 }, to: { x: 1, z: 1 } },
-    { kind: 'swing', centre: { x: 0, z: 0 }, radius: 1, a0: 0, a1: Math.PI / 2 },
+    { kind: 'leaf', from: { x: 0, z: 0 }, to: { x: 1, z: 1 }, door: DOOR },
+    { kind: 'swing', centre: { x: 0, z: 0 }, radius: 1, a0: 0, a1: Math.PI / 2, door: DOOR },
     {
       kind: 'fixture',
       polygon: [

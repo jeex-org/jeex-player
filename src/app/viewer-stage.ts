@@ -342,6 +342,7 @@ export class ViewerStage {
       // The plan modes swap the camera a pick is cast with; the rig is the
       // answer everywhere else (`plan-modes.pickCamera`).
       camera: () => this.planModes.pickCamera(),
+      planDoorAt: (clientX, clientY) => this.planModes.doorAt(clientX, clientY),
       mode: () => this.mode,
       emit: deps.selection.emit,
       // `interaction: 'none'` puts `pointer-events: none` on the canvas and

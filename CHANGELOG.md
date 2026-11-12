@@ -292,6 +292,12 @@ as described under [Versioning](#versioning).
   `plan3d` and a high orbit the wall standing over an opening up to the
   ceiling took the pick; every opening now owns the wall top over its span,
   and `plan2d` keeps the facade walls standing for its picks.
+- **A click on a door's drawn leaf or swing arc in `plan2d` selected the floor.**
+  It now selects the door, as a click on its gap does; where two door symbols
+  overlap, the door with the nearer centre wins.
+- **A double door was drawn with one leaf on the 2D plan.** It is drawn with
+  a leaf and a swing arc from each jamb, each half the opening's width, as
+  the 3D builder hangs them.
 - **A swipe over an untouched viewer on a phone scrolls the page.** Touch
   follows the wheel's engagement rule: until the viewer is engaged (a tap,
   focus inside it, fullscreen, or a page that cannot scroll) its canvas takes

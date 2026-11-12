@@ -16,8 +16,12 @@
  * - one `wall` body per wall plus one per joint core, i.e. exactly the solids
  *   the shell extrudes, so the drawing and the 3D walls cannot drift apart;
  * - one `opening` cut per authored opening, of the wall's true thickness;
- * - one `leaf` and one `swing` per hinged door, taken from `door-swing.ts`, so
- *   the arc on paper is the sector the layout linter keeps clear;
+ * - one `leaf` and one `swing` per hinged door leaf, taken from `door-swing.ts`,
+ *   so the arc on paper is the sector the layout linter keeps clear; a door
+ *   with two leaves (`PlanDrawingOptions.leafCountOf`) gets one from each jamb,
+ *   each half the clear width, both opening to the same side;
+ * - every `leaf` and `swing` names its door (`PlanDoorRef`), so a click on the
+ *   symbol can select it (`door-symbol-hit.ts`);
  * - `roomAt` answers with the same room ids the solver assigned.
  *
  * What this module does NOT do is ask the object bank anything: which
@@ -33,10 +37,13 @@
 import { EPS, add, dist, dot, leftN, mul, norm, polylineSlice, sub } from './plan-geometry.js';
 import { clamp } from '../shared/math.js';
 import { jointCores } from './plan-joints.js';
-import { doorSwings, type FrameWidthOf } from './door-swing.js';
+import { resolveDoorSwing, type DoorSwing, type FrameWidthOf } from './door-swing.js';
 import { facadeDimensions, roomLabels, type PlanDimension, type PlanLabel } from './plan-dimensions.js';
 import type { SolvedPlan } from './plan-solver.js';
-import type { OpeningType, SceneData, Vec2 } from '../scene/types.js';
+import type { Opening, OpeningType, SceneData, Vec2 } from '../scene/types.js';
+
+/** The door a leaf or a swing arc belongs to: its opening, its wall and its centre on the wall centreline. */
+export type PlanDoorRef = { readonly openingId: string; readonly wallId: string; readonly centre: Vec2 };
 
 /** One thing to draw, in plan metres. */
 export type PlanPrimitive =
@@ -45,9 +52,9 @@ export type PlanPrimitive =
   /** White cut through the wall body where an opening is. */
   | { kind: 'opening'; quad: Vec2[]; type: OpeningType }
   /** Door leaf at its rest angle: `pivot -> pivot + open * leaf`. */
-  | { kind: 'leaf'; from: Vec2; to: Vec2 }
+  | { kind: 'leaf'; from: Vec2; to: Vec2; door: PlanDoorRef }
   /** Quarter arc from the open leaf back to the closed one; `a0`/`a1` radians. */
-  | { kind: 'swing'; centre: Vec2; radius: number; a0: number; a1: number }
+  | { kind: 'swing'; centre: Vec2; radius: number; a0: number; a1: number; door: PlanDoorRef }
   /** Thin double line inside a window cut. */
   | { kind: 'window'; quad: Vec2[] }
   /** Bath or kitchen fixture footprint, outlined. */
@@ -74,6 +81,9 @@ export type PlanFixture = {
   readonly category: string;
 };
 
+/** Hinged leaves the builder hangs in a door opening: 1, or 2 for a double door. */
+export type LeafCountOf = (opening: Opening) => number;
+
 export type PlanDrawingOptions = {
   /**
    * Frame rebate per opening, metres — what the leaf and its swing arc are
@@ -81,6 +91,12 @@ export type PlanDrawingOptions = {
    * (`assets/opening-frame.openingFrameWidth`).
    */
   readonly frameWidthOf: FrameWidthOf;
+  /**
+   * Hinged leaves per door, the builder's count: 2 hangs one leaf on each
+   * jamb. Handed in for the same reason as `frameWidthOf`
+   * (`assets/opening-frame.openingLeafCount`); omitted draws one leaf per door.
+   */
+  readonly leafCountOf?: LeafCountOf;
   /**
    * The fixtures to outline. Omitted draws NONE: which placements count as
    * fixtures and how big they are is a catalogue question, and this module
@@ -200,11 +216,13 @@ export function buildPlanDrawing(plan: SolvedPlan, scene: SceneData, options: Pl
     }
   }
 
-  for (const swing of doorSwings(scene, plan, options.frameWidthOf)) {
-    if (swing.leaf <= EPS) continue;
-    primitives.push({ kind: 'leaf', from: copy(swing.pivot), to: add(swing.pivot, mul(swing.open, swing.leaf)) });
-    const a0 = angleOf(swing.open);
-    primitives.push({ kind: 'swing', centre: copy(swing.pivot), radius: swing.leaf, a0, a1: unwrapNear(angleOf(swing.closed), a0) });
+  for (const wall of scene.walls) {
+    for (const opening of wall.openings ?? []) {
+      if (opening.type !== 'door') continue;
+      const swing = resolveDoorSwing(scene, plan, wall, opening, options.frameWidthOf);
+      if (swing.leaf <= EPS) continue;
+      primitives.push(...doorSymbol(swing, options.leafCountOf?.(opening) ?? 1));
+    }
   }
 
   for (const fixture of options.fixtures ?? []) {
@@ -221,6 +239,29 @@ export function buildPlanDrawing(plan: SolvedPlan, scene: SceneData, options: Pl
     },
     primitives,
   };
+}
+
+/**
+ * The leaves and arcs of one door. A single door hangs its whole leaf on the
+ * hinge jamb; a double door hangs half of it on each jamb, the second one
+ * closing back along `-closed`, so the two meet at the centre when shut.
+ */
+function doorSymbol(swing: DoorSwing, leaves: number): PlanPrimitive[] {
+  const door: PlanDoorRef = { openingId: swing.openingId, wallId: swing.wallId, centre: copy(swing.centre) };
+  const hangs =
+    leaves >= 2
+      ? [
+          { pivot: swing.pivot, closed: swing.closed, length: swing.leaf / 2 },
+          { pivot: add(swing.pivot, mul(swing.closed, swing.leaf)), closed: mul(swing.closed, -1), length: swing.leaf / 2 },
+        ]
+      : [{ pivot: swing.pivot, closed: swing.closed, length: swing.leaf }];
+  const out: PlanPrimitive[] = [];
+  for (const hang of hangs) {
+    out.push({ kind: 'leaf', from: copy(hang.pivot), to: add(hang.pivot, mul(swing.open, hang.length)), door });
+    const a0 = angleOf(swing.open);
+    out.push({ kind: 'swing', centre: copy(hang.pivot), radius: hang.length, a0, a1: unwrapNear(angleOf(hang.closed), a0), door });
+  }
+  return out;
 }
 
 /**
