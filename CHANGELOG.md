@@ -9,6 +9,17 @@ as described under [Versioning](#versioning).
 
 ### Added
 
+- **`jeex-viewer/ops` answers a door's hinge and swing.** `doorLeaf(scene,
+  openingId, plan?)` (type `DoorLeaf`) gives the jamb and side a door's leaf
+  shows, explicit or derived, how many leaves it has (`leaves: 2` for a double
+  variant, whose leaves hang on both jambs; a panel then shows "both jambs"
+  and offers no hinge choice) and whether the document names each value, read
+  off the same rule the plan drawing and the linter use, so a host's door
+  panel can say which side an automatic door opens to without re-implementing
+  the derivation. Like them it reads the document only, not a variant's own
+  swing. It answers `null` for a window, a passage or an unknown id. Without
+  `plan` a scene whose plan does not solve throws a `ViewerLibError` of code
+  `scene-invalid`: validate the scene first, or catch it.
 - **`add_opening` and `set_opening` carry a door's `hinge` and `swing`.**
   `add_opening` takes `hinge` (`'a'` or `'b'`) and `swing` (`'in'` or
   `'out'`); `set_opening` takes the same words or `null`, which removes the
