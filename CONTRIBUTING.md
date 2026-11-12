@@ -160,7 +160,9 @@ versioning rules at the end of `CHANGELOG.md`.
 - The theming custom properties (`THEME_PROPERTIES`) and the shadow parts
   (`SHELL_PARTS`).
 - The `userData` keys the scene builder writes and `window.__viewerDebug`,
-  which the browser tests read.
+  which the browser tests read. `userData.pickProxy` marks an opening's
+  invisible click areas (`src/geometry/pick-proxy.ts`): anything that reads an
+  opening's meshes as its shape skips the marked ones through `isPickProxy`.
 
 ## Issues and pull requests
 

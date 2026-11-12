@@ -445,7 +445,8 @@ describe('the axis-aligned control door builds bit for bit as before', () => {
  * The control door's world matrices as the builder made them before openings
  * learned their wall's frame (each object of the group in traversal order:
  * its type, then `matrixWorld.elements`). Built is the open pose the scene
- * shows; shut is after `applyToLeaf(leaf, 0)`.
+ * shows; shut is after `applyToLeaf(leaf, 0)`. The pick cap over the wall top
+ * was added later, at the place the same mapping gives it.
  */
 const CONTROL_MATRICES = {
   single: {
@@ -461,6 +462,8 @@ const CONTROL_MATRICES = {
       'Mesh 2.220446049250313e-16 0 -1 0 0 1 0 0 1 0 2.220446049250313e-16 0 4.5 1.05 2.79 1',
       'Mesh 2.220446049250313e-16 0 -1 0 0 1 0 0 1 0 2.220446049250313e-16 0 4.5 1.05 2.21 1',
       'Mesh 2.220446049250313e-16 0 -1 0 0 1 0 0 1 0 2.220446049250313e-16 0 4.5 1.99 2.5 1',
+      // The opening's pick cap over the wall top.
+      'Mesh 2.220446049250313e-16 0 -1 0 0 1 0 0 1 0 2.220446049250313e-16 0 4.5 2.705 2.5 1',
     ],
     closed: [
       'Group 2.220446049250313e-16 0 -1 0 0 1 0 0 1 0 2.220446049250313e-16 0 4.5 0 2.5 1',
@@ -474,6 +477,8 @@ const CONTROL_MATRICES = {
       'Mesh 2.220446049250313e-16 0 -1 0 0 1 0 0 1 0 2.220446049250313e-16 0 4.5 1.05 2.79 1',
       'Mesh 2.220446049250313e-16 0 -1 0 0 1 0 0 1 0 2.220446049250313e-16 0 4.5 1.05 2.21 1',
       'Mesh 2.220446049250313e-16 0 -1 0 0 1 0 0 1 0 2.220446049250313e-16 0 4.5 1.99 2.5 1',
+      // The opening's pick cap over the wall top.
+      'Mesh 2.220446049250313e-16 0 -1 0 0 1 0 0 1 0 2.220446049250313e-16 0 4.5 2.705 2.5 1',
     ],
   },
   double: {
@@ -493,6 +498,8 @@ const CONTROL_MATRICES = {
       'Mesh 2.220446049250313e-16 0 -1 0 0 1 0 0 1 0 2.220446049250313e-16 0 4.5 1.05 2.79 1',
       'Mesh 2.220446049250313e-16 0 -1 0 0 1 0 0 1 0 2.220446049250313e-16 0 4.5 1.05 2.21 1',
       'Mesh 2.220446049250313e-16 0 -1 0 0 1 0 0 1 0 2.220446049250313e-16 0 4.5 1.99 2.5 1',
+      // The opening's pick cap over the wall top.
+      'Mesh 2.220446049250313e-16 0 -1 0 0 1 0 0 1 0 2.220446049250313e-16 0 4.5 2.705 2.5 1',
     ],
     closed: [
       'Group 2.220446049250313e-16 0 -1 0 0 1 0 0 1 0 2.220446049250313e-16 0 4.5 0 2.5 1',
@@ -510,6 +517,8 @@ const CONTROL_MATRICES = {
       'Mesh 2.220446049250313e-16 0 -1 0 0 1 0 0 1 0 2.220446049250313e-16 0 4.5 1.05 2.79 1',
       'Mesh 2.220446049250313e-16 0 -1 0 0 1 0 0 1 0 2.220446049250313e-16 0 4.5 1.05 2.21 1',
       'Mesh 2.220446049250313e-16 0 -1 0 0 1 0 0 1 0 2.220446049250313e-16 0 4.5 1.99 2.5 1',
+      // The opening's pick cap over the wall top.
+      'Mesh 2.220446049250313e-16 0 -1 0 0 1 0 0 1 0 2.220446049250313e-16 0 4.5 2.705 2.5 1',
     ],
   },
   sliding: {
@@ -526,6 +535,8 @@ const CONTROL_MATRICES = {
       'Mesh 2.220446049250313e-16 0 -1 0 0 1 0 0 1 0 2.220446049250313e-16 0 4.5 1.05 2.79 1',
       'Mesh 2.220446049250313e-16 0 -1 0 0 1 0 0 1 0 2.220446049250313e-16 0 4.5 1.05 2.21 1',
       'Mesh 2.220446049250313e-16 0 -1 0 0 1 0 0 1 0 2.220446049250313e-16 0 4.5 1.99 2.5 1',
+      // The opening's pick cap over the wall top.
+      'Mesh 2.220446049250313e-16 0 -1 0 0 1 0 0 1 0 2.220446049250313e-16 0 4.5 2.705 2.5 1',
     ],
     closed: [
       'Group 2.220446049250313e-16 0 -1 0 0 1 0 0 1 0 2.220446049250313e-16 0 4.5 0 2.5 1',
@@ -540,6 +551,8 @@ const CONTROL_MATRICES = {
       'Mesh 2.220446049250313e-16 0 -1 0 0 1 0 0 1 0 2.220446049250313e-16 0 4.5 1.05 2.79 1',
       'Mesh 2.220446049250313e-16 0 -1 0 0 1 0 0 1 0 2.220446049250313e-16 0 4.5 1.05 2.21 1',
       'Mesh 2.220446049250313e-16 0 -1 0 0 1 0 0 1 0 2.220446049250313e-16 0 4.5 1.99 2.5 1',
+      // The opening's pick cap over the wall top.
+      'Mesh 2.220446049250313e-16 0 -1 0 0 1 0 0 1 0 2.220446049250313e-16 0 4.5 2.705 2.5 1',
     ],
   },
 } satisfies Record<Style, { built: string[]; closed: string[] }>;
