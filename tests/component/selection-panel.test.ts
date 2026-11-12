@@ -200,6 +200,21 @@ describe('relabelling in place', () => {
     expect(document.activeElement).toBe(swatches()[1]);
   });
 
+  test('refresh keeps the swatch list where it was scrolled', () => {
+    const many = Array.from({ length: 60 }, (_, index) => ({
+      ...ITEMS[index % ITEMS.length]!,
+      id: `${ITEMS[index % ITEMS.length]!.id}-${index}`,
+    }));
+    harness.panel.open(request({ items: many }));
+    const list = harness.shell.roots.byName('finish-swatches');
+    expect(list.scrollHeight).toBeGreaterThan(list.clientHeight);
+    list.scrollTop = 120;
+    const scrolled = list.scrollTop;
+    expect(scrolled).toBeGreaterThan(0);
+    harness.panel.refresh(request({ title: 'Finition du mur', items: many }));
+    expect(list.scrollTop).toBe(scrolled);
+  });
+
   test('refresh leaves a closed panel closed', () => {
     harness.panel.refresh(request());
     expect(harness.panel.isOpen()).toBe(false);

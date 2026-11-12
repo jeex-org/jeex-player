@@ -373,7 +373,7 @@ export class ViewerChrome {
     this.retryButton.classList.toggle('is-hidden', !retry);
     this.errorState.classList.remove('is-hidden');
     if (keepCanvas || retry) return;
-    const adopted = adoptFallbackCanvas(this.deps.roots.canvas, 'scene-canvas', this.messages.t('canvas.fallbackLabel'));
+    const adopted = adoptFallbackCanvas(this.deps.roots.canvas, 'scene-canvas', this.messages);
     // The shell's own reference follows the replacement, as it does a Retry's fresh canvas (`ViewerApp.retry`).
     this.deps.roots.canvas = adopted.canvas;
     if (adopted.context) paintWebglFallback(adopted.canvas, adopted.context, this.deps.viewport);

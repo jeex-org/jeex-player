@@ -11,7 +11,7 @@ import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest';
 import { userEvent } from 'vitest/browser';
 import { ViewerChrome, type ChromeCommands, type ViewerChromeDeps } from '../../src/ui/viewer-chrome.js';
 import { FullscreenController } from '../../src/ui/fullscreen-controller.js';
-import { createMessages } from '../../src/ui/messages.js';
+import { applyDomMessages, createMessages } from '../../src/ui/messages.js';
 import type { ViewerMode } from '../../src/scene/types.js';
 import { canvasHasInk, closeContainers, openShell, type Shell } from './support.js';
 
@@ -120,6 +120,14 @@ describe('shell states', () => {
     expect(canvas!.className).toBe(taken.className);
     expect(canvas!.getAttribute('aria-label')).toBe(harness.shell.messages.t('canvas.fallbackLabel'));
     expect(canvasHasInk(canvas!)).toBe(true);
+  });
+
+  test('the stand-in’s name follows the shell’s translation sweep (`setLocale`)', () => {
+    expect(harness.shell.roots.canvas.getContext('webgl2')).not.toBeNull();
+    harness.chrome.showError('Boot failed', 'the scene did not build', false);
+    const fr = createMessages('fr');
+    applyDomMessages(harness.shell.roots.root, fr);
+    expect(harness.shell.roots.canvas.getAttribute('aria-label')).toBe(fr.t('canvas.fallbackLabel'));
   });
 
   test('showError leaves the canvas untouched when Retry is offered, so a retried buildStage can still take WebGL', () => {

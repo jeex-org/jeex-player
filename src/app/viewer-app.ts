@@ -87,10 +87,9 @@ export class ViewerApp {
     mount: () => this.mount,
     shell: () => this.shell,
     tour: this.tour,
-    messages: () => this.messages,
     director: () => this.stage?.director,
     handle: () => this.handle,
-    onFullscreenUnavailable: (message) => this.ui.setHint(message),
+    onFullscreenUnavailable: (text) => this.ui.setHint(text),
     usage: this.usage,
   });
   private readonly ui: ViewerUI;
