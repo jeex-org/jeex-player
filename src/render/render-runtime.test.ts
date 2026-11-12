@@ -11,6 +11,7 @@ import { describe, expect, test } from 'bun:test';
 import * as THREE from 'three';
 import { KEEP_WARM_MS, RenderRuntime, createRenderRuntime } from './render-runtime.js';
 import { NEW_RESOURCES_SETTLE_MS } from './settle-window.js';
+import { STEADY_AFTER_IDLE_TICKS } from './render-demand.js';
 import { measureEntry } from './viewport-box.js';
 import { stubLighting, stubRuntime } from '../fixtures/stubs.js';
 import { apartmentEnvironmentIntensity, LIGHTING_STANDARD } from '../lighting/lighting-standard.js';
@@ -305,6 +306,11 @@ describe('drawing switched off (plan2d) keeps the scene warm', () => {
   });
 });
 
+/** The ticks after a change's draw up to and including its steady draw (`RenderDemand`), 16 ms each. */
+function untilSteady(tick: (ms: number) => void): void {
+  for (let at = 0; at < STEADY_AFTER_IDLE_TICKS; at += 1) tick(16);
+}
+
 describe('drawing on demand in walk, tour, orbit and plan3d', () => {
   /** A runtime in `mode` with a camera, started and past its first (drawn) frame. */
   function resting(mode = 'walk') {
@@ -315,6 +321,11 @@ describe('drawing on demand in walk, tour, orbit and plan3d', () => {
     rig.runtime.start();
     rig.tick(16);
     expect(rig.stub.renders).toBe(1);
+    // The first picture owes its steady draw (`RenderDemand.commit`); the flat plan draws on every tick anyway.
+    if (mode !== 'plan2d') {
+      untilSteady(rig.tick);
+      expect(rig.stub.renders).toBe(2);
+    }
     return { ...rig, camera, setMode: (next: string | undefined) => (current = next) };
   }
 
@@ -326,21 +337,23 @@ describe('drawing on demand in walk, tour, orbit and plan3d', () => {
     });
     for (let frame = 0; frame < 60; frame += 1) tick(16);
     expect(hooks).toBe(60);
-    expect(stub.renders).toBe(1);
-    expect(runtime.demand.counters()).toEqual({ ticks: 61, draws: 1, insetDraws: 0 });
+    expect(stub.renders).toBe(2);
+    expect(runtime.demand.counters()).toEqual({ ticks: 61 + STEADY_AFTER_IDLE_TICKS, draws: 2, insetDraws: 0 });
     runtime.dispose();
   });
 
-  test('invalidations between ticks coalesce into one draw, and a hook that moves the camera draws', () => {
+  test('invalidations between ticks coalesce into one draw and its steady draw, and a hook that moves the camera draws', () => {
     const { runtime, stub, tick, camera } = resting('tour');
     runtime.demand.invalidate();
     runtime.demand.invalidate();
     tick(16);
+    expect(stub.renders).toBe(3);
+    untilSteady(tick);
     tick(16);
-    expect(stub.renders).toBe(2);
+    expect(stub.renders).toBe(4);
     runtime.addFrameHook(() => (camera.position.x += 0.1));
     tick(16);
-    expect(stub.renders).toBe(3);
+    expect(stub.renders).toBe(5);
     runtime.dispose();
   });
 
@@ -356,9 +369,11 @@ describe('drawing on demand in walk, tour, orbit and plan3d', () => {
     expect(() => tick(16)).toThrow('lost draw');
     fail = false;
     tick(16);
-    expect(stub.renders).toBe(2);
+    expect(stub.renders).toBe(3);
+    // Its steady draw once the view rests, then nothing.
+    untilSteady(tick);
     tick(16);
-    expect(stub.renders).toBe(2);
+    expect(stub.renders).toBe(4);
     runtime.dispose();
   });
 
@@ -369,20 +384,22 @@ describe('drawing on demand in walk, tour, orbit and plan3d', () => {
     viewport.clientWidth = 640;
     runtime.resize();
     tick(16);
-    tick(16);
     runtime.stop();
     runtime.start();
     tick(16);
-    // Into orbit, which draws on demand too: the switch draws once, then it rests.
+    // Into orbit, which draws on demand too: the switch draws, then once more when the view rests.
     setMode('orbit');
     tick(16);
+    untilSteady(tick);
     tick(16);
-    expect(drawn).toEqual([true, false, true, true, false]);
-    expect(stub.renders).toBe(4);
+    // The resize, the resumed loop and the switch each draw at once (each cancelling the steady
+    // draw the one before owed); one steady draw when the view rests; then nothing.
+    expect(drawn).toEqual([true, true, true, ...Array.from({ length: STEADY_AFTER_IDLE_TICKS - 1 }, () => false), true, false]);
+    expect(stub.renders).toBe(6);
     runtime.dispose();
   });
 
-  test('attaching or detaching the post-processing chain draws once', () => {
+  test('attaching or detaching the post-processing chain draws, each with its steady draw', () => {
     const { runtime, stub, tick } = resting();
     const chain: PostProcessor = {
       render: () => undefined,
@@ -393,12 +410,12 @@ describe('drawing on demand in walk, tour, orbit and plan3d', () => {
     };
     runtime.setPostProcessor(chain);
     tick(16);
-    tick(16);
+    untilSteady(tick);
     runtime.setPostProcessor(null);
     tick(16);
-    tick(16);
-    expect(runtime.demand.counters().draws).toBe(3);
-    expect(stub.renders).toBe(2);
+    untilSteady(tick);
+    expect(runtime.demand.counters().draws).toBe(6);
+    expect(stub.renders).toBe(4);
     runtime.dispose();
   });
 
@@ -422,11 +439,11 @@ describe('drawing on demand in walk, tour, orbit and plan3d', () => {
     for (const mode of ['orbit', 'plan3d']) {
       const { runtime, stub, tick } = resting(mode);
       for (let frame = 0; frame < 60; frame += 1) tick(16);
-      expect(stub.renders).toBe(1);
-      expect(runtime.demand.counters()).toEqual({ ticks: 61, draws: 1, insetDraws: 0 });
+      expect(stub.renders).toBe(2);
+      expect(runtime.demand.counters()).toEqual({ ticks: 61 + STEADY_AFTER_IDLE_TICKS, draws: 2, insetDraws: 0 });
       runtime.demand.invalidate();
       tick(16);
-      expect(stub.renders).toBe(2);
+      expect(stub.renders).toBe(3);
       runtime.dispose();
     }
   });
@@ -445,7 +462,7 @@ describe('drawing on demand in walk, tour, orbit and plan3d', () => {
     const { runtime, stub, tick } = resting();
     tick(KEEP_WARM_MS + 1);
     tick(KEEP_WARM_MS + 1);
-    expect(stub.renders).toBe(1);
+    expect(stub.renders).toBe(2);
     runtime.dispose();
   });
 });
@@ -514,8 +531,10 @@ describe('the first picture waits for asynchronous shader compilation', () => {
     finish();
     await settle();
     tick(16);
+    untilSteady(tick);
     tick(16);
-    expect(stub.renders).toBe(1);
+    // The first picture and its steady draw.
+    expect(stub.renders).toBe(2);
     runtime.dispose();
   });
 
@@ -832,7 +851,7 @@ describe('visibility', () => {
     };
   }
 
-  test('a resting walk draws once when the tab comes back', () => {
+  test('a resting walk draws again when the tab comes back, with its steady draw', () => {
     const original = (globalThis as { document?: unknown }).document;
     const fake = fakeDocument();
     (globalThis as { document?: unknown }).document = fake.document;
@@ -841,12 +860,14 @@ describe('visibility', () => {
       runtime.setCamera(new THREE.PerspectiveCamera());
       runtime.start();
       tick(16);
-      tick(16);
+      untilSteady(tick);
+      expect(stub.renders).toBe(2);
       fake.setHidden(true);
       fake.setHidden(false);
       tick(16);
+      untilSteady(tick);
       tick(16);
-      expect(stub.renders).toBe(2);
+      expect(stub.renders).toBe(4);
       runtime.dispose();
     } finally {
       (globalThis as { document?: unknown }).document = original;
@@ -1019,25 +1040,63 @@ describe('WebGL context loss', () => {
     runtime.setCamera(new THREE.PerspectiveCamera());
     runtime.start();
     tick(16);
+    untilSteady(tick);
     tick(16);
-    expect(stub.renders).toBe(1);
+    // The first picture and its steady draw.
+    expect(stub.renders).toBe(2);
     // A change that brought a new texture: its picture opens the window.
     memory.textures += 1;
     runtime.demand.invalidate();
     tick(16);
-    expect(stub.renders).toBe(2);
+    expect(stub.renders).toBe(3);
     const inside = Math.floor((NEW_RESOURCES_SETTLE_MS - 1) / 16);
     for (let i = 0; i < inside; i += 1) tick(16);
-    expect(stub.renders).toBe(2 + inside);
+    expect(stub.renders).toBe(3 + inside);
+    // The window's draws repeat the change's inputs: they are its steady draws, and the view rests after them.
     tick(NEW_RESOURCES_SETTLE_MS);
+    untilSteady(tick);
     tick(16);
+    expect(stub.renders).toBe(3 + inside);
+    // Nothing new: a change draws, with its steady draw, and rests.
+    runtime.demand.invalidate();
     tick(16);
-    expect(stub.renders).toBe(2 + inside);
-    // Nothing new: a change draws once and rests.
+    untilSteady(tick);
+    tick(16);
+    expect(stub.renders).toBe(5 + inside);
+    runtime.dispose();
+  });
+
+  test('resources uploaded after a settle window without asking for a draw are not drawn until something asks', () => {
+    // The walk lighting's bake uploads one target after another while its result is not on
+    // screen yet. A view at rest after a settle window must not wake up for them: no draw
+    // follows the window, so none counts them and reopens it.
+    const { runtime, stub, tick } = harness({ mode: () => 'walk' });
+    const memory = (runtime.renderer.info as unknown as { memory: { textures: number; geometries: number } }).memory;
+    runtime.setCamera(new THREE.PerspectiveCamera());
+    runtime.start();
+    tick(16);
+    untilSteady(tick);
+    tick(16);
+    expect(stub.renders).toBe(2);
+    memory.textures += 1;
+    runtime.demand.invalidate();
+    tick(16);
+    const inside = Math.floor((NEW_RESOURCES_SETTLE_MS - 1) / 16);
+    for (let i = 0; i < inside; i += 1) tick(16);
+    tick(NEW_RESOURCES_SETTLE_MS);
+    const afterWindow = stub.renders;
+    expect(afterWindow).toBe(3 + inside);
+    // A bake: a new texture every other tick, nobody asks for a draw.
+    for (let i = 0; i < 60; i += 1) {
+      if (i % 2 === 0) memory.textures += 1;
+      tick(16);
+    }
+    expect(stub.renders).toBe(afterWindow);
+    // Something asks: the change draws them, and that picture opens the window, so the next tick draws again.
     runtime.demand.invalidate();
     tick(16);
     tick(16);
-    expect(stub.renders).toBe(3 + inside);
+    expect(stub.renders).toBe(afterWindow + 2);
     runtime.dispose();
   });
 
@@ -1061,7 +1120,9 @@ describe('WebGL context loss', () => {
     const inside = Math.floor((NEW_RESOURCES_SETTLE_MS - 1) / 16);
     for (let i = 0; i < inside; i += 1) tick(16);
     expect(stub.renders).toBe(settled + 1 + inside);
+    // The window's draws repeat the restored picture: they are its steady draws, and the view rests.
     tick(NEW_RESOURCES_SETTLE_MS);
+    untilSteady(tick);
     tick(16);
     expect(stub.renders).toBe(settled + 1 + inside);
     runtime.dispose();

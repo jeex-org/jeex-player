@@ -635,7 +635,8 @@ export class RenderRuntime {
     // removed itself must not skip the NEXT one, and a throwing hook must not
     // abort the frame (the render with it) with nothing reported.
     this.hooks.emit(delta, now);
-    if (this.settle.holds(now)) this.demand.invalidate();
+    // The settle window repeats the picture on screen: a repeat, not a change (`RenderDemand.repeat`).
+    if (this.settle.holds(now)) this.demand.repeat();
     // Committed only after the draw returned: a throwing draw keeps the demand.
     const camera = this.camera;
     // While the first-picture gate holds, the tick is counted and nothing commits or counts as drawn.

@@ -269,6 +269,16 @@ as described under [Versioning](#versioning).
 
 ### Fixed
 
+- **The picture a resting view keeps is a settled one.** On some GPUs the
+  first picture drawn after a change can resolve its antialiased edges
+  differently from every later picture of the same view, and a view drawn on
+  demand kept that first picture until the next change. Now a change is
+  drawn, and drawn once more when the view has rested for three frames; a
+  change of the camera's layers or projection counts as a change, a camera
+  move does not. A resting view still draws nothing. The cost is one extra
+  draw per change, once for a whole drag of an object, not once per frame of
+  it. The draws a new model's or texture's settle window makes already draw
+  the change again and count as its second picture, so they add nothing.
 - **Everything the viewer shows follows `setLocale`, including text already
   on screen.** After a locale switch, `describeSelection`, the viewer's own
   Replace, finish, opening and interior panels, the Replace popup and the door
@@ -522,11 +532,13 @@ as described under [Versioning](#versioning).
   should be made again.
 
 - **Orbit and the top view draw on demand.** Like walk and tour, orbit and
-  the 3D top view now draw a frame only when something on screen changes: the
-  camera, the scene, a selection, an overlay or the lighting. A view at rest
-  keeps ticking without drawing, which saves battery and GPU time on every
-  device. The flat 2D plan keeps its half-second heartbeat. Telemetry measures
-  frame times only between two drawn frames, so a view that never moves
+  the 3D top view now draw a frame when something on screen changes: the
+  camera, the scene, a selection, an overlay or the lighting. A change is
+  drawn, and drawn once more when the view has rested for three frames, so
+  the picture kept on screen is a settled one. A view at rest keeps ticking
+  without drawing, which saves battery and GPU time on every device. The
+  flat 2D plan keeps its half-second heartbeat. Telemetry measures frame
+  times only between two drawn frames, so a view that never moves
   reports none.
 
 - **Reflection probes keep clear of furniture.** A room's reflection probe
@@ -927,7 +939,8 @@ as described under [Versioning](#versioning).
   new picture only when something on screen can have changed (the camera,
   an edit or rebuild, a door or furniture animation, a model or texture that
   arrived, the selection, the floor cursor, the sun's shadow, the room
-  lighting, a resize, a canvas shown again or a restored GPU context); a
+  lighting, a resize, a canvas shown again or a restored GPU context), and
+  draws a change once more when the view has rested for three frames; a
   resting view keeps its last picture and draws nothing. Editing modes are
   unchanged and nothing changes in the public API. The telemetry `fps`
   shares now count only the time between two consecutive drawn frames, so a
