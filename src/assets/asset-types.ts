@@ -174,9 +174,14 @@ export type SurfaceTop = { readonly y: number };
 export type KneeSpace = { readonly height: number; readonly sides: readonly KneeSide[]; readonly depth?: number };
 /** How far a seat goes under a knee space (`depth`), and how high what goes under reaches (`height`). */
 export type TuckFacts = { readonly depth: number; readonly height: number };
-/** The four facts together, as `LayoutFacts` and `LintItem` carry them. */
+/**
+ * The facts together, as `LayoutFacts` and `LintItem` carry them. `overHost`
+ * is a ceiling piece's: it hangs only over a host's `top`, as a long-drop
+ * dining pendant does.
+ */
 export type SurfaceFacts = {
   readonly onSurface?: true;
+  readonly overHost?: true;
   readonly top?: SurfaceTop;
   readonly kneeSpace?: KneeSpace;
   readonly tuck?: TuckFacts;
@@ -192,9 +197,10 @@ export function surfacesAt(facts: SurfaceFacts, base: readonly number[], dims: r
 
 /** `facts` with every height times `h` and every depth times `d`. */
 export function scaleSurfaces(facts: SurfaceFacts, h: number, d: number): SurfaceFacts {
-  const { onSurface, top, kneeSpace, tuck } = facts;
+  const { onSurface, overHost, top, kneeSpace, tuck } = facts;
   return {
     ...(onSurface ? { onSurface } : {}),
+    ...(overHost ? { overHost } : {}),
     ...(top ? { top: { y: top.y * h } } : {}),
     ...(kneeSpace
       ? {
@@ -297,6 +303,8 @@ export type CatalogueObject = {
   mirror?: MirrorFacts;
   /** May stand on a host's `top`. */
   onSurface?: true;
+  /** A ceiling piece that hangs only over a host's `top`; valid with `anchor: 'ceiling'` alone. */
+  overHost?: true;
   /** Holds what stands on it. */
   top?: SurfaceTop;
   /** Lets a `tuck` seat under its top. */

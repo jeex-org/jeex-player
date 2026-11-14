@@ -9,6 +9,24 @@ as described under [Versioning](#versioning).
 
 ### Added
 
+- **A ceiling piece may hang only over a host's top.** The asset fact
+  `overHost: true` (optional, like `onSurface`; a baked project's
+  `ProjectObject` accepts it, and its schema refuses it on an object whose
+  `anchor` is not `'ceiling'`) says a piece such as a long-drop dining pendant
+  belongs over a table, island or counter. The new hard layout rule
+  `over-host` holds such a piece to it: its plan centre lies over the top of a
+  floor piece that states `top`, at that piece's scale and pose and 0.02 m
+  inside its edge, with code `ceiling_object_not_over_host`
+  (`{ placement }`) when it does not, and its lowest point stays at least
+  0.45 m above that top, with code `ceiling_object_too_close_to_host`
+  (`{ placement, host, gap, min }`) when it does not. Like every hard rule it
+  refuses a drag and a `strict` edit. A piece without the fact hangs wherever
+  it hung before.
+- **Head room under a ceiling piece in the open.** The new soft layout rule
+  `head-room` warns, with code `ceiling_object_low_head_room`
+  (`{ placement, lowest, min }`), about every ceiling piece whose plan centre
+  is over no host's top and whose lowest point is under 2.0 m above the
+  floor. It is a warning: it refuses no edit and no drag.
 - **Every layout issue carries a stable `code` and typed `params`.** A host
   that shows the linter's issues in another language translates the code and
   fills in the params instead of an English sentence. `params` is a union

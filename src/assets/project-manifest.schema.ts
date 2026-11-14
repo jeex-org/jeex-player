@@ -192,6 +192,7 @@ const layoutSchema = z.strictObject({
 /** Surfaces and tucking: optional, absent means not allowed. */
 const surfaceFactsShape = {
   onSurface: z.optional(z.literal(true)),
+  overHost: z.optional(z.literal(true)),
   top: z.optional(z.strictObject({ y: z.number() })),
   kneeSpace: z.optional(z.strictObject({ height: z.number(), sides: z.array(z.enum(KNEE_SIDES)), depth: z.optional(z.number()) })),
   tuck: z.optional(z.strictObject({ depth: z.number(), height: z.number() })),
@@ -245,8 +246,8 @@ const variantSchema = z.strictObject({
   lights: z.optional(z.array(lampLightSchema).check(z.minLength(1), z.maxLength(LAMP_MAX_LIGHTS))),
 });
 
-/** `ProjectObject`: an archetype of the bake. `model` is required; `builder` is not a field a bake has. */
-const objectSchema = z.strictObject({
+/** `ProjectObject`'s fields: `model` is required; `builder` is not a field a bake has. */
+const objectFields = z.strictObject({
   id: uuidSchema,
   name: z.string(),
   category: z.string(),
@@ -269,6 +270,18 @@ const objectSchema = z.strictObject({
   mirror: z.optional(z.strictObject({ x: z.boolean(), y: z.boolean(), z: z.boolean() })),
   ...surfaceFactsShape,
 });
+
+/**
+ * `ProjectObject`: an archetype of the bake. `overHost` says a piece hangs over
+ * a host's top, so it is a ceiling piece's fact: on a floor or a wall piece it
+ * is refused, at its own path.
+ */
+const objectSchema = objectFields.check(
+  z.refine((object) => object.overHost === undefined || object.anchor === 'ceiling', {
+    error: "is a ceiling fact: valid only with anchor 'ceiling'",
+    path: ['overHost'],
+  }),
+);
 
 /* ---------------------------------------------------- library materials --- */
 

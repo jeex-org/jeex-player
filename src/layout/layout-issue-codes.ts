@@ -19,7 +19,7 @@
  *   them exactly as the sentence always has (two decimals, three for a
  *   wall-hung gap, one for an angle), and the rule's own limits (`maxGap`,
  *   `min`, `max`, `furthest`, `depth` of a wardrobe front) are printed as
- *   the numbers they are.
+ *   the numbers they are, as are `OVER_HOST_GAP_M` and `HEAD_ROOM_M` (`min`).
  *
  * The codes are public (`jeex-viewer/ops`): adding one is a minor change,
  * renaming or removing one, or changing its params, is a breaking change. So
@@ -57,6 +57,8 @@ export const LAYOUT_ISSUE_CODES = [
   'ceiling_object_outside_rooms',
   'ceiling_object_without_ceiling',
   'ceiling_object_out_of_band',
+  'ceiling_object_not_over_host',
+  'ceiling_object_too_close_to_host',
   'object_taller_than_ceiling',
   'wall_object_out_of_height',
   'wall_object_turned',
@@ -74,6 +76,7 @@ export const LAYOUT_ISSUE_CODES = [
   'coat_rack_in_door_swing',
   'mirror_off_host_centre',
   'entrance_axis_blocked',
+  'ceiling_object_low_head_room',
 ] as const;
 
 export type LayoutIssueCode = (typeof LAYOUT_ISSUE_CODES)[number];
@@ -128,6 +131,10 @@ export type LayoutIssueParams = {
   ceiling_object_without_ceiling: { placement: string; room: string };
   /** Rule 7b: `placement` spans `low`..`high`; it must hang between `lowest` and the `ceiling`. */
   ceiling_object_out_of_band: { placement: string; low: number; high: number; lowest: number; ceiling: number };
+  /** Rule 7e: `placement`, which hangs only over a host's top, is over none. */
+  ceiling_object_not_over_host: { placement: string };
+  /** Rule 7e: the lowest point of `placement` is `gap` above the top of `host`; it needs `min`. */
+  ceiling_object_too_close_to_host: { placement: string; host: string; gap: number; min: number };
   /** Rule 7c: `placement`, `height` tall, does not fit under the `ceiling`. */
   object_taller_than_ceiling: { placement: string; height: number; ceiling: number };
   /** Rule 7c: wall-mounted `placement` spans `low`..`high`, outside 0..`ceiling`. */
@@ -162,6 +169,8 @@ export type LayoutIssueParams = {
   mirror_off_host_centre: { placement: string; host: string; offset: number };
   /** Rule 14: `placement` stands on the axis from entrance door `opening` into `room`. */
   entrance_axis_blocked: { placement: string; opening: string; room: string };
+  /** Rule 15: `placement`, over no host's top, hangs down to `lowest` above the floor; keep `min`. */
+  ceiling_object_low_head_room: { placement: string; lowest: number; min: number };
 };
 
 /** One issue's code with its params: `issue.code === 'x'` narrows `issue.params`. */
@@ -196,6 +205,8 @@ const TEMPLATES: { readonly [C in LayoutIssueCode]: (params: LayoutIssueParams[C
   ceiling_object_without_ceiling: (p) => `${p.placement} hangs in ${p.room}, which has no ceiling`,
   ceiling_object_out_of_band: (p) =>
     `${p.placement} spans ${m(p.low)}..${m(p.high)} m; it must hang between ${m(p.lowest)} m and the ${m(p.ceiling)} m ceiling`,
+  ceiling_object_not_over_host: (p) => `${p.placement} must hang over a table, island or counter`,
+  ceiling_object_too_close_to_host: (p) => `${p.placement} hangs ${m(p.gap)} m above ${p.host}; it needs ${p.min} m`,
   object_taller_than_ceiling: (p) => `${p.placement} is ${m(p.height)} m tall and does not fit under the ${m(p.ceiling)} m ceiling`,
   wall_object_out_of_height: (p) => `${p.placement} spans ${m(p.low)}..${m(p.high)} m, outside the wall's 0..${m(p.ceiling)} m`,
   wall_object_turned: (p) => `${p.placement} is turned ${p.degrees.toFixed(1)}° away from ${face(p.face)}`,
@@ -213,6 +224,7 @@ const TEMPLATES: { readonly [C in LayoutIssueCode]: (params: LayoutIssueParams[C
   coat_rack_in_door_swing: (p) => `${p.placement} stands ${m(p.distance)} m from the swing of ${p.opening}`,
   mirror_off_host_centre: (p) => `${p.placement} is ${m(p.offset)} m off the centre of ${p.host}`,
   entrance_axis_blocked: (p) => `${p.placement} stands on the axis from ${p.opening} into ${p.room}`,
+  ceiling_object_low_head_room: (p) => `${p.placement} hangs down to ${m(p.lowest)} m; keep ${p.min} m of head room`,
 };
 
 /**

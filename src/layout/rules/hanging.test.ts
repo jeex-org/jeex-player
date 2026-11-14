@@ -14,6 +14,7 @@ import { lShapePlan } from '../../fixtures/plan-l-shape.js';
 import { apartmentScene } from '../../demo/scene-data.js';
 import { solvePlan } from '../../plan/plan-solver.js';
 import { CATALOGUE_REGISTRIES } from '../../assets/catalogue-registries.js';
+import { ARCHETYPE } from '../../assets/catalogue-ids.js';
 import { SceneModel, isApplyOk } from '../../scene/scene-model.js';
 import { lintContext, lintLayout, projectLayoutCatalogue, shippedFacts, type LayoutCatalogue } from '../layout-lint.js';
 import { layoutRuleOrder, type LayoutIssue } from './context.js';
@@ -32,6 +33,8 @@ const ID = {
 
 /** Room A's ceiling in the L-shape plan, metres. */
 const CEILING = lShapePlan.ceilingHeight;
+/** A drop that keeps head room even in the open floor: the lowest point is 2.05 m up. */
+const DROP = 1.1;
 /** Where the dining table stands in room A, unturned: 1.75 × 0.95, top at 0.75. */
 const TABLE = { x: 3, z: 4 };
 
@@ -112,23 +115,23 @@ describe('over-host: a pendant that says overHost hangs over a host top', () => 
 
   test("over the inset top's corner it passes; just past its edge it fails", () => {
     const top = insetTop(room([table()]));
-    expect(codes(room([table(), pendant(top.maxX, top.maxZ)]), pendantBank(1.5))).toEqual([]);
-    expect(codes(room([table(), pendant(top.maxX + 0.001, TABLE.z)]), pendantBank(1.5))).toEqual(['ceiling_object_not_over_host']);
-    expect(codes(room([table(), pendant(TABLE.x, top.minZ - 0.001)]), pendantBank(1.5))).toEqual(['ceiling_object_not_over_host']);
+    expect(codes(room([table(), pendant(top.maxX, top.maxZ)]), pendantBank(DROP))).toEqual([]);
+    expect(codes(room([table(), pendant(top.maxX + 0.001, TABLE.z)]), pendantBank(DROP))).toEqual(['ceiling_object_not_over_host']);
+    expect(codes(room([table(), pendant(TABLE.x, top.minZ - 0.001)]), pendantBank(DROP))).toEqual(['ceiling_object_not_over_host']);
   });
 
   test('a mirrored, turned host holds it where its turned top lies', () => {
     // Turned a quarter, the table's long side runs along z: z = 4.7 lies on it, and off the unturned one.
     const turned = table({ rotationY: Math.PI / 2, mirror: { x: true, z: true } });
-    expect(codes(room([turned, pendant(TABLE.x, 4.7)]), pendantBank(1.5))).toEqual([]);
-    expect(codes(room([table(), pendant(TABLE.x, 4.7)]), pendantBank(1.5))).toEqual(['ceiling_object_not_over_host']);
+    expect(codes(room([turned, pendant(TABLE.x, 4.7)]), pendantBank(DROP))).toEqual([]);
+    expect(codes(room([table(), pendant(TABLE.x, 4.7)]), pendantBank(DROP))).toEqual(['ceiling_object_not_over_host']);
   });
 
   test('a scaled host holds it over its scaled top, and its top rises with the scale', () => {
     const scaled = table({ scale: 1.4 });
     // x = 4.0 is past the unscaled top's edge (3.855) and inside the scaled one's (4.205).
-    expect(codes(room([scaled, pendant(4, TABLE.z)]), pendantBank(1.5))).toEqual([]);
-    expect(codes(room([table(), pendant(4, TABLE.z)]), pendantBank(1.5))).toEqual(['ceiling_object_not_over_host']);
+    expect(codes(room([scaled, pendant(4, TABLE.z)]), pendantBank(DROP))).toEqual([]);
+    expect(codes(room([table(), pendant(4, TABLE.z)]), pendantBank(DROP))).toEqual(['ceiling_object_not_over_host']);
     // The scaled top stands at 1.05: a 1.7 m drop ends 0.40 above it, 0.70 above an unscaled one.
     const close = lint(room([scaled, pendant(TABLE.x, TABLE.z)]), pendantBank(1.7)).find((issue) => issue.rule === 'over-host')!;
     if (close.code !== 'ceiling_object_too_close_to_host') throw new Error(`expected a gap issue, got ${close.code}`);
@@ -168,7 +171,12 @@ describe('head-room: a ceiling piece in the open warns under 2.0 m, and never re
       return facts && placement.id === ID.fan ? { ...facts, dims: [1.2, drop, 1.2] } : facts;
     };
   }
-  const fan = (x: number, z: number): DemoAsset => ({ id: ID.fan, type: 'ceiling_light', position: { x, y: 0, z } });
+  const fan = (x: number, z: number): DemoAsset => ({
+    id: ID.fan,
+    type: ARCHETYPE.ceiling_light,
+    asset: ARCHETYPE.ceiling_light,
+    position: { x, y: 0, z },
+  });
   const LOW = { ceilingHeight: 2.4 };
 
   test('a 0.405 m fan under a 2.4 m ceiling reaches 1.995 m: a warning, with the unrounded lowest point', () => {

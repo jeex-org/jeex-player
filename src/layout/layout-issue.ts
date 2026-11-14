@@ -42,12 +42,14 @@ import { renderLayoutIssue, type LayoutIssueCode, type LayoutIssueDetail, type L
  * | 7b | `ceiling-hung` |
  * | 7c | `height-fit` |
  * | 7d | `wall-facing` |
+ * | 7e | `over-host` |
  * | 8 | `case-goods-on-a-wall` |
  * | 9 | `kitchen-run` |
  * | 10 | `seating-group` |
  * | 11 | `dining-tuck` |
  * | 12 | `bedroom` |
  * | 14 | `hall` |
+ * | 15 | `head-room` |
  */
 export type LayoutRule =
   | 'inside-a-wall'
@@ -59,6 +61,7 @@ export type LayoutRule =
   | 'window-clearance'
   | 'on-floor'
   | 'ceiling-hung'
+  | 'over-host'
   | 'height-fit'
   | 'wall-facing'
   | 'case-goods-on-a-wall'
@@ -66,7 +69,8 @@ export type LayoutRule =
   | 'seating-group'
   | 'dining-tuck'
   | 'bedroom'
-  | 'hall';
+  | 'hall'
+  | 'head-room';
 
 /**
  * Every rule id, in report order (hard rules first, then the soft ones).
@@ -86,6 +90,7 @@ export const LAYOUT_RULE_IDS = [
   'window-clearance',
   'on-floor',
   'ceiling-hung',
+  'over-host',
   'height-fit',
   'wall-facing',
   'case-goods-on-a-wall',
@@ -94,6 +99,7 @@ export const LAYOUT_RULE_IDS = [
   'dining-tuck',
   'bedroom',
   'hall',
+  'head-room',
 ] as const satisfies readonly LayoutRule[];
 
 /** Report position of a rule id; `LAYOUT_RULE_IDS` is the order. */
@@ -138,6 +144,8 @@ const RULE_OF_CODE = {
   ceiling_object_outside_rooms: 'ceiling-hung',
   ceiling_object_without_ceiling: 'ceiling-hung',
   ceiling_object_out_of_band: 'ceiling-hung',
+  ceiling_object_not_over_host: 'over-host',
+  ceiling_object_too_close_to_host: 'over-host',
   object_taller_than_ceiling: 'height-fit',
   wall_object_out_of_height: 'height-fit',
   wall_object_turned: 'wall-facing',
@@ -155,6 +163,7 @@ const RULE_OF_CODE = {
   coat_rack_in_door_swing: 'hall',
   mirror_off_host_centre: 'hall',
   entrance_axis_blocked: 'hall',
+  ceiling_object_low_head_room: 'head-room',
 } as const satisfies Record<LayoutIssueCode, LayoutRule>;
 
 /**
