@@ -11,7 +11,9 @@
  * single draw of that frame: straight to the screen, or through the post-
  * processing chain attached with `setPostProcessor` (walk and tour). In every
  * mode but `plan2d` the draw happens only on demand (`render-demand.ts`,
- * `demand`); `plan2d` draws its keep-warm heartbeat.
+ * `demand`); `plan2d` draws its keep-warm heartbeat. A resting walk or tour
+ * draws the attached chain's rest frames (`PostProcessor.restFrames`) and
+ * then rests.
  *
  * First-picture invariant: a started loop draws its first picture only once
  * the scene's programs were compiled asynchronously, or the bound passed
@@ -642,7 +644,7 @@ export class RenderRuntime {
     // While the first-picture gate holds, the tick is counted and nothing commits or counts as drawn.
     if (
       camera &&
-      this.demand.shouldDraw(camera, this.mode()) &&
+      this.demand.shouldDraw(camera, this.mode(), this.post?.restFrames) &&
       this.gate.open &&
       (this.renderEnabled || now - this.keptWarm >= KEEP_WARM_MS)
     ) {
@@ -667,7 +669,7 @@ export class RenderRuntime {
    */
   private draw(camera: THREE.Camera, delta: number): void {
     if (this.post) {
-      this.post.render(this.scene, camera, delta);
+      this.post.render(this.scene, camera, delta, this.demand.restFrame());
       return;
     }
     withScenePass(this.renderer, { target: null, scene: this.scene, camera }, () => this.renderer.render(this.scene, camera));

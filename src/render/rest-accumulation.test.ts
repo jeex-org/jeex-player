@@ -1,14 +1,6 @@
 import { describe, expect, test } from 'bun:test';
 import * as THREE from 'three';
-import {
-  accumulatesIn,
-  halton,
-  jitterProjection,
-  restJitter,
-  restNoiseAngle,
-  rotateNoise,
-  runningMean,
-} from './rest-accumulation.js';
+import { accumulatesIn, halton, jitterProjection, restJitter, restNoiseAngle, rotateNoise, restMeanWeight } from './rest-accumulation.js';
 
 describe('the rest frames accumulate in walk and tour only', () => {
   test('walk and tour accumulate; orbit, plan3d, plan2d and an unknown mode do not', () => {
@@ -89,32 +81,35 @@ describe('jitterProjection', () => {
   });
 });
 
-describe('runningMean', () => {
-  test('frame 0 is the sample itself', () => {
-    expect(runningMean(123, 0.75, 0)).toBe(0.75);
+describe('restMeanWeight', () => {
+  /** The mean after `samples` as the accumulation mixes them: `mean + (sample - mean) * weight`, per frame. */
+  function mean(samples: readonly number[]): number[] {
+    const means: number[] = [];
+    let value = Number.NaN;
+    samples.forEach((sample, frame) => {
+      value = frame === 0 ? sample : value + (sample - value) * restMeanWeight(frame);
+      means.push(value);
+    });
+    return means;
+  }
+
+  test('frame 0 weighs 1: it starts the mean again', () => {
+    expect(restMeanWeight(0)).toBe(1);
   });
 
   test('a constant input converges to itself, exactly at every step', () => {
-    let mean = 0;
-    for (let frame = 0; frame < 32; frame += 1) {
-      mean = runningMean(mean, 0.4, frame);
-      expect(mean).toBeCloseTo(0.4, 12);
-    }
+    for (const value of mean(Array.from({ length: 32 }, () => 0.4))) expect(value).toBeCloseTo(0.4, 12);
   });
 
   test('two alternating inputs converge to their average', () => {
-    let mean = 0;
-    for (let frame = 0; frame < 32; frame += 1) mean = runningMean(mean, frame % 2 === 0 ? 0.2 : 1.4, frame);
-    expect(mean).toBeCloseTo(0.8, 12);
+    expect(mean(Array.from({ length: 32 }, (_, frame) => (frame % 2 === 0 ? 0.2 : 1.4))).at(-1)).toBeCloseTo(0.8, 12);
   });
 
   test('is the arithmetic mean of every sample so far', () => {
     const samples = [0.1, 3, 0.5, 2.25, 0, 7];
-    let mean = 0;
-    samples.forEach((sample, frame) => {
-      mean = runningMean(mean, sample, frame);
+    mean(samples).forEach((value, frame) => {
       const prefix = samples.slice(0, frame + 1);
-      expect(mean).toBeCloseTo(prefix.reduce((sum, value) => sum + value, 0) / prefix.length, 12);
+      expect(value).toBeCloseTo(prefix.reduce((sum, sample) => sum + sample, 0) / prefix.length, 12);
     });
   });
 });

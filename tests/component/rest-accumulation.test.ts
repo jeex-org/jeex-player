@@ -16,6 +16,12 @@ import { scenePassOf } from '../../src/shared/scene-pass.js';
 import { closeContainers, openContainer } from './support.js';
 
 const WIDTH = 160;
+/**
+ * How far a 32-frame mean on half-float targets may sit from the exact one,
+ * linear: each blend rounds to half precision (a step of 2^-11 just under 1),
+ * and 31 roundings add up to about 0.006 at worst for values around 1.
+ */
+const HALF_FLOAT_MEAN = 0.01;
 const HEIGHT = 120;
 
 const disposers: Array<() => void> = [];
@@ -79,10 +85,14 @@ describe('the running mean on the GPU', () => {
 
   test('a constant input converges to itself, highlights above 1 included', () => {
     const gl = renderer();
-    const mean = accumulate(gl, Array.from({ length: 32 }, () => [0.4, 2.5, 0.05] as const));
-    expect(mean[0]).toBeCloseTo(0.4, 2);
-    expect(mean[1]).toBeCloseTo(2.5, 1);
-    expect(mean[2]).toBeCloseTo(0.05, 3);
+    const mean = accumulate(
+      gl,
+      Array.from({ length: 32 }, () => [0.4, 2.5, 0.05] as const),
+    );
+    // Constant input: every blend reads back the value it mixes in, so no rounding builds up.
+    expect(Math.abs(mean[0] - 0.4)).toBeLessThan(0.001);
+    expect(Math.abs(mean[1] - 2.5)).toBeLessThan(0.002);
+    expect(Math.abs(mean[2] - 0.05)).toBeLessThan(0.0001);
   });
 
   test('two alternating inputs converge to their average', () => {
@@ -91,9 +101,9 @@ describe('the running mean on the GPU', () => {
       gl,
       Array.from({ length: 32 }, (_, frame) => (frame % 2 === 0 ? ([0.2, 1, 0] as const) : ([1.4, 0, 0.6] as const))),
     );
-    expect(mean[0]).toBeCloseTo(0.8, 2);
-    expect(mean[1]).toBeCloseTo(0.5, 2);
-    expect(mean[2]).toBeCloseTo(0.3, 2);
+    expect(Math.abs(mean[0] - 0.8)).toBeLessThan(HALF_FLOAT_MEAN);
+    expect(Math.abs(mean[1] - 0.5)).toBeLessThan(HALF_FLOAT_MEAN);
+    expect(Math.abs(mean[2] - 0.3)).toBeLessThan(HALF_FLOAT_MEAN);
   });
 
   test('frame 0 starts the mean again: what came before it is forgotten', () => {
@@ -142,7 +152,12 @@ function mirrorRoom(gl: THREE.WebGLRenderer): { scene: THREE.Scene; camera: THRE
 }
 
 async function chainOn(gl: THREE.WebGLRenderer, scene: THREE.Scene, camera: THREE.Camera): Promise<WalkPost> {
-  const tier = { aoResolutionScale: 1, denoise: { depthPhi: 0.05, normalPhi: 8, lumaPhi: 10, radius: 6, samples: 16 }, gtaoSamples: 16, restFrames: 8 };
+  const tier = {
+    aoResolutionScale: 1,
+    denoise: { depthPhi: 0.05, normalPhi: 8, lumaPhi: 10, radius: 6, samples: 16 },
+    gtaoSamples: 16,
+    restFrames: 8,
+  };
   const chain = await createWalkPost(gl, scene, camera, { tier });
   disposers.push(() => chain.dispose());
   return chain;

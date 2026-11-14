@@ -498,9 +498,11 @@ export class ViewerStage {
     // tick drew (`lastDrawnAt` is this tick's own reading) and runs after the
     // draw, outside the frame's GL state. A skipped tick breaks the interval
     // instead of stretching it: demand said "no draw", never that the device
-    // was slow, so sporadic draws read as no motion, not as slow motion.
+    // was slow, so sporadic draws read as no motion, not as slow motion. A
+    // rest frame of a resting walk or tour is not motion either: it breaks
+    // the interval like a skipped tick.
     this.runtime.addPostRenderHook((_delta, now) => {
-      if (this.runtime.lastDrawnAt === now) this.quality.drawn(now);
+      if (this.runtime.lastDrawnAt === now && this.runtime.demand.restFrame() === null) this.quality.drawn(now);
       else this.quality.skipped();
     });
     this.runtime.start();

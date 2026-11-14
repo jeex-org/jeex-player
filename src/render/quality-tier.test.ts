@@ -6,7 +6,14 @@
  */
 
 import { describe, expect, test } from 'bun:test';
-import { QUALITY_TIERS, QualityTierMachine, REST_ACCUMULATION, restFramesFor, startingTier, walkLightingOverridesFor } from './quality-tier.js';
+import {
+  QUALITY_TIERS,
+  QualityTierMachine,
+  REST_ACCUMULATION,
+  restFramesFor,
+  startingTier,
+  walkLightingOverridesFor,
+} from './quality-tier.js';
 import { WALK_POST_DEFAULT_TIER, WALK_POST_TUNING } from './walk-post.js';
 import { WALK_LIGHTING_TUNING as T } from './walk-lighting/walk-lighting-tuning.js';
 

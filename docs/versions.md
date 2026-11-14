@@ -94,3 +94,20 @@ pass on it.
 | ----------- | -------- | -------- | -------------------------------------------------------- |
 | `glob`      | `14.0.4` | `13.0.6` | `npm view glob dist-tags`, `npm view ts-json-schema-generator version dependencies.glob` |
 | `minimatch` | `11.0.5` | `10.2.6` | `npm view minimatch dist-tags`, `npm view glob@14.0.4 dependencies` |
+
+## 2026-11-14: three stays on the 0.186 line
+
+`npm view three version` and `npm view @types/three version` both returned `0.187.0` (r187).
+The project keeps `three` 0.186.1 (peer range `~0.186.1`, dev pin `0.186.1`) and
+`@types/three` 0.186.0 on purpose. r187 replaces the storage of the PMREM cube-UV maps and
+makes light-probe grids per-fragment lights, and the walk lighting's room probes
+(`src/render/walk-lighting/room-probes.ts`, their atlas of PMREM tiles) and its probe grids
+(`src/render/walk-lighting/box-probe-patch.ts`, which rewrites the r186 shader chunks those
+grids are lit through) are built on both. The upgrade waits for a redesign of that lighting
+on r187's terms; until then the anchors the patch rewrites and the engine defines it tests are
+pinned by `src/render/walk-lighting/box-probe-patch.test.ts`, so a bump fails there first.
+
+| Package        | Version   | Was       | Command                            |
+| -------------- | --------- | --------- | ---------------------------------- |
+| `three`        | `0.186.1` | unchanged | `npm view three version`           |
+| `@types/three` | `0.186.0` | unchanged | `npm view @types/three version`    |

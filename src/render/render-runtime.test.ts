@@ -1514,13 +1514,16 @@ describe('a resting walk or tour draws the chain`s rest frames', () => {
     return { ...rig, drawn, setMode: (next: string) => (current = next) };
   }
 
-  test.each(['walk', 'tour'])('in %s every tick draws a rest frame, numbered from 0, until the chain`s count, then nothing', async (mode) => {
-    const { runtime, tick, drawn } = await chained(mode, 4);
-    for (let at = 0; at < 12; at += 1) tick(16);
-    expect(drawn).toEqual([0, 1, 2, 3]);
-    expect(runtime.demand.counters().draws).toBe(5);
-    runtime.dispose();
-  });
+  test.each(['walk', 'tour'])(
+    'in %s every tick draws a rest frame, numbered from 0, until the chain`s count, then nothing',
+    async (mode) => {
+      const { runtime, tick, drawn } = await chained(mode, 4);
+      for (let at = 0; at < 12; at += 1) tick(16);
+      expect(drawn).toEqual([0, 1, 2, 3]);
+      expect(runtime.demand.counters().draws).toBe(5);
+      runtime.dispose();
+    },
+  );
 
   test('in orbit the chain`s count asks for nothing: the steady draw of today and no rest frame', async () => {
     const { runtime, tick, drawn } = await chained('orbit', 4);
@@ -1563,7 +1566,7 @@ describe('a resting walk or tour draws the chain`s rest frames', () => {
     for (let at = 0; at < inside; at += 1) tick(16);
     tick(NEW_RESOURCES_SETTLE_MS);
     for (let at = 0; at < 6; at += 1) tick(16);
-    expect(drawn).toEqual([0, 1, ...Array<null>(1 + inside).fill(null), 0, 1, 2]);
+    expect(drawn).toEqual([0, 1, ...Array.from({ length: 1 + inside }, () => null), 0, 1, 2]);
     runtime.dispose();
   });
 

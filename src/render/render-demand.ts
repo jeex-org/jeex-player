@@ -34,8 +34,19 @@
  * `repeat` (the settle window drawing the picture again) is such a second draw
  * of unchanged inputs: it pays the debt instead of adding one.
  *
+ * Rest frames (`walk` and `tour` only, `rest-accumulation.ts`): when the
+ * caller asks for them, a view that rests draws that many more pictures of the
+ * same inputs on consecutive ticks, numbered from 0 (`restFrame`), and then
+ * rests. Any draw that is not a rest frame (a change, a camera move beyond the
+ * tolerance, a settle-window repeat, another mode or projection) starts the
+ * count again, so the next rest starts at frame 0. A rest frame draws the same
+ * inputs again: it pays the steady draw a change owes. Asked for none, the
+ * gate is exactly what it was without them.
+ *
  * Pure: no `three` and no DOM; the camera is read through its matrices.
  */
+
+import { accumulatesIn } from './rest-accumulation.js';
 
 /**
  * Ticks with nothing to draw before the steady draw of a change: the third
@@ -82,6 +93,10 @@ export class RenderDemand {
   private answering = false;
   /** The next tick draws the unchanged inputs again (`repeat`). */
   private repeating = false;
+  /** The rest frame the draw `shouldDraw` last allowed is, or `null` when it is not one. */
+  private resting: number | null = null;
+  /** Rest frames drawn since the last draw that was not one. */
+  private rested = 0;
   private shown: Shown | null = null;
   /** The mode of the last `shouldDraw`, which `commit` records. */
   private asked: string | undefined;
@@ -107,9 +122,10 @@ export class RenderDemand {
    * Whether this tick draws, with `camera` in `mode`. Called once per tick,
    * after the frame hooks; brings the camera's world matrix up to date first.
    */
-  shouldDraw(camera: DemandCamera, mode: string | undefined): boolean {
+  shouldDraw(camera: DemandCamera, mode: string | undefined, restFrames = 0): boolean {
     this.ticks += 1;
     this.asked = mode;
+    this.resting = null;
     if (mode === undefined || !ON_DEMAND_MODES.has(mode)) {
       this.answering = false;
       return true;
@@ -124,9 +140,23 @@ export class RenderDemand {
       shown.layers !== camera.layers.mask ||
       !within(shown.projection, camera.projectionMatrix.elements, 0) ||
       !within(shown.world, camera.matrixWorld.elements, POSE_TOLERANCE);
-    if (changed || !this.steady) return changed;
+    if (changed) return true;
+    if (accumulatesIn(mode) && this.rested < restFrames) {
+      this.resting = this.rested;
+      return true;
+    }
+    if (!this.steady) return false;
     this.idle += 1;
     return this.idle >= STEADY_AFTER_IDLE_TICKS;
+  }
+
+  /**
+   * The rest frame the draw `shouldDraw` last allowed is, from 0; `null` when
+   * it is not one (it answers a change, or nothing was allowed). Read until
+   * the next `shouldDraw`, so a post-render hook can tell the two apart.
+   */
+  restFrame(): number | null {
+    return this.resting;
   }
 
   /**
@@ -157,7 +187,8 @@ export class RenderDemand {
         shown.mode !== this.asked ||
         shown.layers !== camera.layers.mask ||
         !within(shown.projection, camera.projectionMatrix.elements, 0));
-    this.steady = switched || this.answering;
+    this.steady = this.resting === null && (switched || this.answering);
+    this.rested = this.resting === null ? 0 : this.resting + 1;
     this.idle = 0;
     this.answering = false;
     this.repeating = false;

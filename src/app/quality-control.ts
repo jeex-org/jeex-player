@@ -26,6 +26,7 @@
 import { requireQuality } from './quality-check.js';
 import {
   QUALITY_TIERS,
+  restFramesFor,
   QualityTierMachine,
   type QualityDebug,
   type QualityMode,
@@ -56,6 +57,7 @@ function postInputs(tier: QualityTierName): WalkPostTierInputs {
     aoResolutionScale: settings.aoResolutionScale,
     denoise: { ...settings.denoise },
     gtaoSamples: settings.gtaoSamples,
+    restFrames: restFramesFor(tier),
   };
 }
 

@@ -7,17 +7,20 @@
  * trades drawing-buffer resolution for frame rate on a slow device. The
  * settings below are the drawing buffer's pixel-ratio cap, the occlusion
  * buffer's resolution, the GTAO ray count, the denoise's samples and radius,
- * and the probes' bake pace; today the tiers differ in the cap and the bake
- * pace only, the occlusion being the same on both. The tone curve, the exposure, the
- * sun and its 2048-texel shadow, the lamp occlusion, the sky, SMAA and the
+ * the probes' bake pace and the rest frames a resting walk or tour view
+ * accumulates; today the tiers differ in the cap, the bake pace and the rest
+ * frames, the occlusion being the same on both. The tone curve, the exposure,
+ * the sun and its 2048-texel shadow, the lamp occlusion, the sky, SMAA and the
  * half-float targets are identical on every tier — and so is the probes'
  * capture edge, which the probe atlas pins (see `probeSize` below).
  *
  * The machine is fed one interval per DRAWN frame — the time between two
  * consecutive drawn frames, in milliseconds, tracked by the caller that owns
  * the frame clock. Walk and tour draw only when the camera moves
- * (render-on-demand), so drawn frames ARE motion frames; a gap too long to be
- * a frame interval is the camera resting, and feeds nothing. Start-up
+ * (render-on-demand), so drawn frames ARE motion frames; the rest frames of
+ * a resting view are not, and the caller treats them as skipped ticks
+ * (`app/viewer-stage.ts`). A gap too long to be a frame interval is the
+ * camera resting, and feeds nothing. Start-up
  * (compile, decode, probe capture, bake) is excluded the same way, one level
  * up: sampling arms only once the room lighting is live
  * (`app/quality-control.ts`, the same gate `dev/meter.ts` waits on).
@@ -53,6 +56,8 @@ export const QUALITY_TIERS = Object.freeze({
     probeSize: 128,
     /** Grid probes baked per frame (`walk-lighting-tuning.ts`). */
     probesPerFrame: 6,
+    /** Rest frames a resting walk or tour view averages (`rest-accumulation.ts`): edges, occlusion noise and fine detail settle within about half a second. */
+    restFrames: 32,
   }),
   low: Object.freeze({
     /** A quarter less fill in each direction; the largest single win on a phone GPU. */
@@ -76,8 +81,21 @@ export const QUALITY_TIERS = Object.freeze({
     probeSize: 128,
     /** Two thirds of the bake pace: the bake takes longer, the direct look covers it. */
     probesPerFrame: 4,
+    /** A quarter of high's: on a slow device each rest frame is a whole frame of GPU time, and eight already take the edges and the occlusion noise most of the way. */
+    restFrames: 8,
   }),
 });
+
+/**
+ * The switch for the rest frames: off, a resting walk or tour view draws its
+ * one steady picture and rests, exactly as before they existed.
+ */
+export const REST_ACCUMULATION = Object.freeze({ on: true });
+
+/** The rest frames a resting walk or tour view on `tier` accumulates; none while the switch is off. */
+export function restFramesFor(tier: QualityTierName, on: boolean = REST_ACCUMULATION.on): number {
+  return on ? QUALITY_TIERS[tier].restFrames : 0;
+}
 
 /** The tier a session starts on: `auto` begins on the full look and earns its way down. */
 export function startingTier(quality: QualityOption): QualityTierName {

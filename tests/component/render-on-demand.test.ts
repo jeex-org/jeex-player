@@ -68,7 +68,7 @@ type FollowedDraw = { at: number; kind: DrawKind };
 type Followed = { ticks: number; draws: number; drawn: FollowedDraw[] };
 
 /** The gate's own state before a commit, read for the kind of the draw (`RenderDemand`). */
-type GateState = { dirty: boolean; repeating: boolean; idle: number; resting: boolean };
+type GateState = { dirty: boolean; repeating: boolean; idle: number; resting: number | null };
 
 /**
  * Runs `change` on a resting view and follows the draws it caused until the
@@ -86,11 +86,11 @@ async function follow(change: () => void): Promise<Followed> {
       ? 'change'
       : gate.repeating
         ? 'repeat'
-        : gate.resting
-          ? 'rest'
-          : gate.idle >= STEADY_AFTER_IDLE_TICKS
+        : gate.resting === null
+          ? gate.idle >= STEADY_AFTER_IDLE_TICKS
             ? 'steady'
-            : 'change';
+            : 'change'
+          : 'rest';
     commit.call(this, live);
     drawn.push({ at: this.counters().ticks - start.ticks, kind });
   });
@@ -144,7 +144,8 @@ function expectMotionDrawn(what: string, motion: Followed): void {
     `${what}: no steady draw inside the motion`,
   ).toEqual([]);
   if (steady) expect(steady.at - drawnAt.at(-1)!, `${what}: the steady draw, after the view rested`).toBe(STEADY_AFTER_IDLE_TICKS);
-  else if (rests.length === 0) expect(drawn.at(-1)!.kind, `${what}: a motion with no steady draw ends on a settle-window repeat`).toBe('repeat');
+  else if (rests.length === 0)
+    expect(drawn.at(-1)!.kind, `${what}: a motion with no steady draw ends on a settle-window repeat`).toBe('repeat');
   else expect(steady, `${what}: the rest frames pay the steady draw`).toBeUndefined();
 }
 
@@ -228,9 +229,9 @@ describe('walk and tour draw on demand', { timeout: MOUNT_TIMEOUT_MS }, () => {
     hasRing = () => shows.mock.contexts.length > 0;
     // The live camera, as the gate reads it.
     const shouldDraw = Object.getOwnPropertyDescriptor(RenderDemand.prototype, 'shouldDraw')!.value as RenderDemand['shouldDraw'];
-    vi.spyOn(RenderDemand.prototype, 'shouldDraw').mockImplementation(function (this: RenderDemand, live, mode) {
+    vi.spyOn(RenderDemand.prototype, 'shouldDraw').mockImplementation(function (this: RenderDemand, live, mode, restFrames) {
       camera = live as unknown as THREE.Camera;
-      return shouldDraw.call(this, live, mode);
+      return shouldDraw.call(this, live, mode, restFrames);
     });
     container = openContainer(480, 320);
     handle = mountViewer(container, {
@@ -252,6 +253,8 @@ describe('walk and tour draw on demand', { timeout: MOUNT_TIMEOUT_MS }, () => {
   });
 
   test('a change in a resting walk draws, then the rest frames of the tier on consecutive ticks, then nothing', async () => {
+    // The rest frames are the chain's: the walk draws directly until it is attached.
+    await until(() => debug().walkPost() === 'on', 'the walk chain attached', TICKS_TIMEOUT_MS);
     const motion = await follow(() => debug().toggleDoor(debug().doors()[0]!.id));
     const rests = motion.drawn.filter((draw) => draw.kind === 'rest');
     // As many as the tier in force asks for (`QUALITY_TIERS`).
@@ -628,9 +631,9 @@ describe('the editing modes draw on demand', { timeout: MOUNT_TIMEOUT_MS }, () =
       return addFrameHook.call(this, hook);
     });
     const shouldDraw = Object.getOwnPropertyDescriptor(RenderDemand.prototype, 'shouldDraw')!.value as RenderDemand['shouldDraw'];
-    vi.spyOn(RenderDemand.prototype, 'shouldDraw').mockImplementation(function (this: RenderDemand, live, mode) {
+    vi.spyOn(RenderDemand.prototype, 'shouldDraw').mockImplementation(function (this: RenderDemand, live, mode, restFrames) {
       demandOf = () => this;
-      return shouldDraw.call(this, live, mode);
+      return shouldDraw.call(this, live, mode, restFrames);
     });
     const updateGlows = Object.getOwnPropertyDescriptor(ViewerEditor.prototype, 'updateGlows')!.value as ViewerEditor['updateGlows'];
     vi.spyOn(ViewerEditor.prototype, 'updateGlows').mockImplementation(function (this: ViewerEditor, now) {

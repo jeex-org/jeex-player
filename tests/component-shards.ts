@@ -98,6 +98,8 @@ export const COMPONENT_FILE_COST_S: Readonly<Record<string, number>> = {
   // Not run on the hosted runners (skipped whole on a software rasteriser, as room-white-balance): the floor.
   'quality-low-look.test.ts': 1,
   'render-on-demand.test.ts': 582,
+  // Measured on an NVIDIA GPU with one worker (2026-11-14): 3.4 s; the software rasteriser not yet measured.
+  'rest-accumulation.test.ts': 4,
   'render-runtime-lighting.test.ts': 2,
   'replace-popup.test.ts': 5,
   // Not run on the hosted runners (skipped whole on a software rasteriser, as walk-glossy): the floor.

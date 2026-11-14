@@ -272,7 +272,7 @@ describe('RenderDemand rest frames (a resting walk or tour converges)', () => {
 
   test.each(['walk', 'tour'])('in %s a resting view draws N rest frames on consecutive ticks, numbered from 0, then rests', (mode) => {
     const live = camera();
-    expect(rest(first(live, mode), live, N + 10, mode)).toEqual([0, 1, 2, 3, 4, 5, ...Array<null>(10).fill(null)]);
+    expect(rest(first(live, mode), live, N + 10, mode)).toEqual([0, 1, 2, 3, 4, 5, ...Array.from({ length: 10 }, () => null)]);
   });
 
   test.each(['orbit', 'plan3d'])('in %s a resting view draws today`s steady draw and nothing more', (mode) => {
@@ -290,7 +290,7 @@ describe('RenderDemand rest frames (a resting walk or tour converges)', () => {
       const live = camera();
       const drawn = rest(first(live), live, count + 20, 'walk', count);
       expect(drawn.filter((draw) => typeof draw === 'number')).toEqual(Array.from({ length: count }, (_, index) => index));
-      expect(drawn.slice(count)).toEqual(Array<null>(20).fill(null));
+      expect(drawn.slice(count)).toEqual(Array.from({ length: 20 }, () => null));
     }
   });
 
@@ -320,7 +320,10 @@ describe('RenderDemand rest frames (a resting walk or tour converges)', () => {
 
   describe('every change resets: its draw is not a rest frame, and the next rest starts again at 0', () => {
     const causes: Array<[string, (demand: RenderDemand, live: THREE.PerspectiveCamera) => string | undefined]> = [
-      ['invalidate (an edit, a texture, a light bake, a door, a selection, a resize, a context restore)', (demand) => (demand.invalidate(), 'walk')],
+      [
+        'invalidate (an edit, a texture, a light bake, a door, a selection, a resize, a context restore)',
+        (demand) => (demand.invalidate(), 'walk'),
+      ],
       ['a camera move beyond the tolerance', (_demand, live) => ((live.position.x += POSE_TOLERANCE * 2), 'walk')],
       ['a settle-window repeat', (demand) => (demand.repeat(), 'walk')],
       ['a mode change', () => 'tour'],

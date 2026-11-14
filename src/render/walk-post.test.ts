@@ -158,7 +158,7 @@ describe('WalkPost per-tier inputs', () => {
     expect(disposed).toBe(0);
     expect(post.occlusion).toBe(original);
     expect(post.composer.passes[1]).toBe(post.occlusion);
-    expect(post.composer.passes.length).toBe(4);
+    expect(post.composer.passes.length).toBe(5);
     expect(post.occlusion.gtaoMaterial.defines['SAMPLES']!).toBe(8);
     expect(post.occlusion.pdMaterial.uniforms['radius']!.value).toBe(4);
     // The scale applies at once, without waiting for a resize...
@@ -172,7 +172,12 @@ describe('WalkPost per-tier inputs', () => {
   test('applyTier with the same ray count keeps the pass; applying the same tier twice changes nothing twice over', () => {
     const post = tierChain();
     const original = post.occlusion;
-    const sameSamples: WalkPostTierInputs = { aoResolutionScale: 1, denoise: { ...WALK_POST_TUNING.denoise, radius: 4 }, gtaoSamples: 16 };
+    const sameSamples: WalkPostTierInputs = {
+      aoResolutionScale: 1,
+      denoise: { ...WALK_POST_TUNING.denoise, radius: 4 },
+      gtaoSamples: 16,
+      restFrames: 0,
+    };
     post.applyTier(sameSamples);
     expect(post.occlusion).toBe(original);
     expect(original.pdMaterial.uniforms['radius']!.value).toBe(4);
@@ -308,6 +313,12 @@ describe('WalkPost rest frames', () => {
     post.render(new THREE.Scene(), camera, 0, 5);
     const capture = view();
     post.renderTo(new THREE.WebGLRenderTarget(64, 36), new THREE.Scene(), capture, 640, 360);
-    expect(seen[1]).toEqual({ accumulate: false, frame: seen[1]!.frame, smaa: true, projection: [...camera.projectionMatrix.elements], noise: base });
+    expect(seen[1]).toEqual({
+      accumulate: false,
+      frame: seen[1]!.frame,
+      smaa: true,
+      projection: [...camera.projectionMatrix.elements],
+      noise: base,
+    });
   });
 });

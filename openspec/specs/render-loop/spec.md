@@ -82,6 +82,30 @@ A change SHALL be drawn, and drawn once more when the view has rested for three 
 - **WHEN** a display draw throws in `orbit`
 - **THEN** the demand stays pending and the next tick draws again
 
+### Requirement: A resting walk or tour view converges
+
+In `walk` and `tour`, once the view rests (nothing to draw by the rule above), the loop SHALL draw up to the quality tier's number of rest frames (32 on `high`, 8 on `low`) on consecutive ticks and SHALL then rest; the rest frames SHALL be counted display draws. Rest frame 0 SHALL be the picture drawn today; every later rest frame SHALL move the projection by a sub-pixel offset of a low-discrepancy sequence, inside one pixel, without moving the camera pose the gate compares, and SHALL turn the ambient-occlusion noise by another angle; the sun and its cached shadow map SHALL stay as they are. Each rest frame's linear high-dynamic-range picture SHALL be added to a running mean on a half-float target, and the screen SHALL show that mean through the unchanged output pass (white balance, tone mapping, exposure); SMAA SHALL not run on rest frames after frame 0. Any draw that is not a rest frame (a change, a camera move beyond the tolerance, a resize or pixel-ratio change, a mode change, a context restore, a settle-window repeat after new GPU resources) SHALL start the count again, and its picture SHALL be the one drawn today. A rest frame SHALL pay the second draw a change owes. A mirror SHALL capture once per rest frame, inside the beauty pass. Stills and video frames SHALL render on their own paths, as one picture each, and SHALL leave the mean as it was. With the switch off, or in `orbit`, `plan3d` and `plan2d`, drawing SHALL be as without rest frames.
+
+#### Scenario: A resting walk converges, then rests
+- **WHEN** a door finishes opening in `walk` on the `high` tier and nothing else changes
+- **THEN** the last frame of the motion draws, 32 rest frames draw on the following ticks, and the view then draws nothing while ticks keep advancing
+
+#### Scenario: A change starts the mean again
+- **WHEN** the camera moves beyond the tolerance, or the canvas is resized, during the rest frames
+- **THEN** that draw is the picture of today without jitter, and the rest frames that follow count from frame 0 again
+
+#### Scenario: The settle window holds the rest frames back
+- **WHEN** a picture in `walk` brings new GPU resources
+- **THEN** the settle window's draws repeat that picture, and the rest frames start once the window has closed
+
+#### Scenario: Editing modes do not accumulate
+- **WHEN** the view rests in `orbit` or `plan3d`
+- **THEN** it draws its one second draw and no rest frame
+
+#### Scenario: A still between rest frames
+- **WHEN** a still is captured while a walk draws its rest frames
+- **THEN** the still is the same picture as a still taken without them, and the mean the screen shows next is the one it would have been without the still
+
 ### Requirement: Scene changes redraw the editing modes
 
 In `orbit` and `plan3d` a display draw SHALL follow every visible change of the scene: edits, finishes, variants and rebuilds; loaded models and textures; a light bake arriving or dropping; furniture and door animation up to the final frame; cutaways and shell state; selection set, cleared, recoloured or fading; the light temperature.

@@ -18,8 +18,15 @@ import type { ViewerMode } from '../scene/types.js';
 
 /** A post-processing chain the runtime renders its frame through. */
 export type PostProcessor = {
-  /** Draws one frame of `scene` seen by `camera` to the screen; `delta` in seconds. */
-  render(scene: THREE.Scene, camera: THREE.Camera, delta: number): void;
+  /**
+   * Draws one frame of `scene` seen by `camera` to the screen; `delta` in
+   * seconds. `rest` is the rest frame this draw is (`render-demand.ts`), from
+   * 0: the chain shows the mean of rest frames 0 to `rest`; absent or `null`
+   * for a draw that answers a change, which is drawn as one picture.
+   */
+  render(scene: THREE.Scene, camera: THREE.Camera, delta: number, rest?: number | null): void;
+  /** How many rest frames a resting walk or tour view draws through this chain; none when absent. */
+  readonly restFrames?: number;
   /**
    * Draws one display-referred picture of `scene` into the caller's 8-bit
    * `target` at `width` x `height` device pixels and puts the renderer's
