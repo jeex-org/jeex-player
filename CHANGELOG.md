@@ -38,8 +38,8 @@ as described under [Versioning](#versioning).
   draws nothing, as before. The first picture after any change (a camera move,
   a resize, an edit, a door, a selection, a mode change) is exactly the one
   drawn before this change, so motion looks the same. The burst is 32 frames on
-  the `high` quality tier and 8 on `low`; `orbit`, the top view and the flat
-  plan draw as before. Stills and video frames are not averaged. The sun's
+  the `high` quality tier and none on `low` for now (its cost on a phone GPU is
+  not measured yet); `orbit`, the top view and the flat plan draw as before. Stills and video frames are not averaged. The sun's
   shadow map is not redrawn for the burst; the shadow edges on screen
   converge in the average like every other edge.
 - **Every layout issue carries a stable `code` and typed `params`.** A host

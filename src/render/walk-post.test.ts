@@ -261,8 +261,8 @@ describe('WalkPost rest frames', () => {
   test('the count comes from the tier and a tier switch retunes it; a chain built without a tier has none', () => {
     const { post } = restChain(view(), 32);
     expect(post.restFrames).toBe(32);
-    post.applyTier({ ...QUALITY_TIERS.low, denoise: { ...QUALITY_TIERS.low.denoise }, restFrames: 8 });
-    expect(post.restFrames).toBe(8);
+    post.applyTier({ ...QUALITY_TIERS.low, denoise: { ...QUALITY_TIERS.low.denoise } });
+    expect(post.restFrames).toBe(0);
     const bare = new WalkPost(post.composer.renderer, new THREE.Scene(), view());
     expect(bare.restFrames).toBe(0);
   });

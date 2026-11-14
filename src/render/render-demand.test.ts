@@ -1,5 +1,6 @@
 import { describe, expect, test } from 'bun:test';
 import * as THREE from 'three';
+import { QUALITY_TIERS } from './quality-tier.js';
 import { POSE_TOLERANCE, RenderDemand, STEADY_AFTER_IDLE_TICKS } from './render-demand.js';
 
 /** The modes that draw on demand. */
@@ -301,13 +302,20 @@ describe('RenderDemand rest frames (a resting walk or tour converges)', () => {
     ]);
   });
 
-  test('stops at the count it is given: 32 and 8', () => {
-    for (const count of [32, 8]) {
+  test('stops at the count it is given: high`s 32 and a short 3', () => {
+    for (const count of [QUALITY_TIERS.high.restFrames, 3]) {
       const live = camera();
       const drawn = rest(first(live), live, count + 20, 'walk', count);
       expect(drawn.filter((draw) => typeof draw === 'number')).toEqual(Array.from({ length: count }, (_, index) => index));
       expect(drawn.slice(WAIT.length + count)).toEqual(Array.from({ length: 20 - WAIT.length }, () => null));
     }
+  });
+
+  test('on the low tier a resting walk draws exactly today`s steady draw and no burst', () => {
+    const live = camera();
+    expect(QUALITY_TIERS.low.restFrames).toBe(0);
+    const drawn = rest(first(live), live, 40, 'walk', QUALITY_TIERS.low.restFrames);
+    expect(drawn).toEqual([...WAIT, 'change', ...Array.from({ length: 40 - WAIT.length - 1 }, () => null)]);
   });
 
   test('asked for no rest frames, a walk draws as it did without them: its changes and their steady draws, none a rest frame', () => {

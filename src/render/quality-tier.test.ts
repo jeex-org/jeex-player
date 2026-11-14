@@ -43,7 +43,8 @@ describe('QUALITY_TIERS', () => {
       // (`walk-lighting/room-probes.ts`); only the bake pace below is the tier's.
       probeSize: 128,
       probesPerFrame: 4,
-      restFrames: 8,
+      // No rest burst until its cost on the phone tier is measured.
+      restFrames: 0,
     });
     // A reduced occlusion buffer leaves stair-stepped halos on door and table
     // edges: the blend's bilinear upsampling crosses depth (`walk-post.ts`).

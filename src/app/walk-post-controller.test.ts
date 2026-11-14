@@ -255,7 +255,7 @@ describe('applyTierInputs', () => {
     aoResolutionScale: 0.75,
     denoise: { depthPhi: 0.05, normalPhi: 8, lumaPhi: 10, radius: 4, samples: 8 },
     gtaoSamples: 8,
-    restFrames: 8,
+    restFrames: 0,
   };
   const HIGH = {
     aoResolutionScale: 1,

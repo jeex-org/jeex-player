@@ -81,8 +81,8 @@ export const QUALITY_TIERS = Object.freeze({
     probeSize: 128,
     /** Two thirds of the bake pace: the bake takes longer, the direct look covers it. */
     probesPerFrame: 4,
-    /** A quarter of high's: on a slow device each rest frame is a whole frame of GPU time, and eight already take the edges and the occlusion noise most of the way. */
-    restFrames: 8,
+    /** None: each rest frame is a whole frame of GPU time on the phone tier, and that cost is not measured yet; off until it is. */
+    restFrames: 0,
   }),
 });
 

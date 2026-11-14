@@ -13,6 +13,7 @@ import { RestAccumulatePass } from '../../src/render/rest-accumulate-pass.js';
 import { createWalkPost, type WalkPost } from '../../src/render/walk-post.js';
 import { mainPassOnly } from '../../src/assets/mirror-capture.js';
 import { scenePassOf } from '../../src/shared/scene-pass.js';
+import { QUALITY_TIERS } from '../../src/render/quality-tier.js';
 import { RenderDemand } from '../../src/render/render-demand.js';
 import { gpuResources } from '../../src/render/settle-window.js';
 import { closeContainers, openContainer } from './support.js';
@@ -174,10 +175,10 @@ function canvasPixels(gl: THREE.WebGLRenderer): Uint8Array {
 }
 
 describe('rest frames through the chain', () => {
-  test('a chain with no rest frames, drawn as the gate draws a resting walk, shows render(…, null) byte for byte', async () => {
+  test('a chain on the low tier (no rest frames), drawn as the gate draws a resting walk, shows render(…, null) byte for byte', async () => {
     const gl = renderer();
     const { scene, camera } = mirrorRoom(gl);
-    const chain = await chainOn(gl, scene, camera, 0);
+    const chain = await chainOn(gl, scene, camera, QUALITY_TIERS.low.restFrames);
     const demand = new RenderDemand();
     const rests: Array<number | null> = [];
     let resting: Uint8Array | null = null;

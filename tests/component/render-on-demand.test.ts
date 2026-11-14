@@ -198,6 +198,7 @@ describe('walk and tour draw on demand', { timeout: MOUNT_TIMEOUT_MS }, () => {
   let hasRing = (): boolean => false;
   /** Every draw from the mount to the first rest with the walk chain attached. */
   const entry: FollowedDraw[] = [];
+  /** The burst of the `high` tier this mount is pinned to: the `low` tier draws none (`QUALITY_TIERS`). */
   const tierRestFrames = (): number => QUALITY_TIERS[debug().quality().tier].restFrames;
 
   beforeAll(async () => {
@@ -217,9 +218,12 @@ describe('walk and tour draw on demand', { timeout: MOUNT_TIMEOUT_MS }, () => {
       scene: { repository: new InlineSceneRepository(demoScene()) },
       tour: { mode: 'off' },
       doors: { autoOpen: false },
+      // The burst under test is high's; an `auto` session dropped to `low` would draw none.
+      quality: 'high',
       debug: true,
     });
     await handle.ready;
+    expect(debug().quality()).toEqual({ mode: 'fixed', tier: 'high' });
     handle.setMode('walk');
     await until(() => debug().walkLighting().state === 'live', 'room lighting live', MOUNT_TIMEOUT_MS - 60_000);
     try {
