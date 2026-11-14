@@ -217,7 +217,15 @@ describe('projectManifestIssues — what a bake must look like', () => {
       expect(issues.map((issue) => issue.path.join('.'))).toEqual(['library.objects.0.overHost']);
     }
     expect(projectManifestIssues(anchored('ceiling'))).toEqual([]);
-    expect(projectManifestIssues(broken((manifest) => void (firstObject(manifest)['overHost'] = false)))).not.toEqual([]);
+    // Only the literal `true`: `false` is refused on a ceiling object too, where the anchor would allow the fact.
+    const off = projectManifestIssues(
+      broken((manifest) => {
+        const object = firstObject(manifest);
+        object['anchor'] = 'ceiling';
+        object['overHost'] = false;
+      }),
+    );
+    expect(off.map((issue) => issue.path.join('.'))).toEqual(['library.objects.0.overHost']);
   });
 
   test('the producer mark is an http(s) link and nothing else', () => {

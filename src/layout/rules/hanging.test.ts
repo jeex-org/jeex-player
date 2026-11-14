@@ -10,6 +10,8 @@
  */
 
 import { describe, expect, test } from 'bun:test';
+import * as THREE from 'three';
+import { AssetLoader } from '../../geometry/asset-loader.js';
 import { lShapePlan } from '../../fixtures/plan-l-shape.js';
 import { apartmentScene } from '../../demo/scene-data.js';
 import { solvePlan } from '../../plan/plan-solver.js';
@@ -17,8 +19,7 @@ import { CATALOGUE_REGISTRIES } from '../../assets/catalogue-registries.js';
 import { ARCHETYPE } from '../../assets/catalogue-ids.js';
 import { SceneModel, isApplyOk } from '../../scene/scene-model.js';
 import { lintContext, lintLayout, projectLayoutCatalogue, shippedFacts, type LayoutCatalogue } from '../layout-lint.js';
-import { layoutRuleOrder, type LayoutIssue } from './context.js';
-import { LAYOUT_RULES } from './index.js';
+import type { LayoutIssue } from './context.js';
 import { HEAD_ROOM_M, OVER_HOST_GAP_M } from './hanging.js';
 import type { DemoAsset, SceneData } from '../../scene/types.js';
 
@@ -26,6 +27,7 @@ import type { DemoAsset, SceneData } from '../../scene/types.js';
 const ID = {
   pendant: '01a18c00-0e11-7a00-8000-0000000000a1',
   table: '01a18c00-0e11-7a00-8000-0000000000a2',
+  cabinet: '01a18c00-0e11-7a00-8000-0000000000a4',
   fan: '01a18c00-0e11-7a00-8000-0000000000a3',
   archetype: '01a18c00-0e11-7a00-8000-0000000000b1',
   variant: '01a18c00-0e11-7a00-8000-0000000000b2',
@@ -107,6 +109,28 @@ describe('over-host: a pendant that says overHost hangs over a host top', () => 
     expect(issue.params.min).toBe(OVER_HOST_GAP_M);
   });
 
+  test('over two tops, the higher one is the host and the gap is measured to it', () => {
+    // A shoe cabinet's 1.10 m top stands inside the table's 0.75 m one: 0.30 m above it, 0.65 m above the table.
+    const cabinet: DemoAsset = {
+      id: ID.cabinet,
+      type: ARCHETYPE.cabinet_shoe,
+      asset: ARCHETYPE.cabinet_shoe,
+      position: { x: TABLE.x, y: 0, z: TABLE.z },
+    };
+    const drop = CEILING - 1.1 - 0.3;
+    for (const assets of [
+      [table(), cabinet],
+      [cabinet, table()],
+    ]) {
+      const issue = lint(room([...assets, pendant(TABLE.x, TABLE.z)]), pendantBank(drop)).find(
+        (candidate) => candidate.rule === 'over-host',
+      )!;
+      if (issue?.code !== 'ceiling_object_too_close_to_host') throw new Error(`expected a gap issue, got ${issue?.code}`);
+      expect(issue.params.host).toBe(ID.cabinet);
+      expect(issue.params.gap).toBeCloseTo(0.3, 12);
+    }
+  });
+
   test(`a gap of exactly ${OVER_HOST_GAP_M} m passes; a millimetre less fails`, () => {
     const exact = CEILING - 0.75 - OVER_HOST_GAP_M;
     expect(codes(room([table(), pendant(TABLE.x, TABLE.z)]), pendantBank(exact))).toEqual([]);
@@ -127,6 +151,35 @@ describe('over-host: a pendant that says overHost hangs over a host top', () => 
     expect(codes(room([table(), pendant(TABLE.x, 4.7)]), pendantBank(DROP))).toEqual(['ceiling_object_not_over_host']);
   });
 
+  test('at an eighth of a turn the host holds it over its rendered top, not over the top reflected', () => {
+    const turned = table({ rotationY: Math.PI / 4 });
+    // The top as three.js draws it: its highest vertices, read in the table's own frame.
+    const loader = new AssetLoader([], { ceilingHeight: CEILING });
+    const { group } = loader.load(turned);
+    group.updateMatrixWorld(true);
+    const corners: THREE.Vector3[] = [];
+    group.traverse((node) => {
+      const position = (node as THREE.Mesh).isMesh ? (node as THREE.Mesh).geometry.getAttribute('position') : undefined;
+      for (let i = 0; i < (position?.count ?? 0); i += 1)
+        corners.push(new THREE.Vector3().fromBufferAttribute(position!, i).applyMatrix4(node.matrixWorld));
+    });
+    loader.dispose();
+    const height = Math.max(...corners.map((corner) => corner.y));
+    const top = corners.filter((corner) => corner.y > height - 0.01).map((corner) => group.worldToLocal(corner.clone()));
+    const reach = { x: Math.max(...top.map((corner) => Math.abs(corner.x))), z: Math.max(...top.map((corner) => Math.abs(corner.z))) };
+    const onRenderedTop = (x: number, z: number): boolean => {
+      const local = group.worldToLocal(new THREE.Vector3(x, height, z));
+      return Math.abs(local.x) <= reach.x - 0.02 && Math.abs(local.z) <= reach.z - 0.02;
+    };
+    // 0.85 m out along the long side as it is drawn; the reflected point is 0.85 m off the short side.
+    const drawn = { x: TABLE.x + 0.6, z: TABLE.z - 0.6 };
+    const reflected = { x: TABLE.x + 0.6, z: TABLE.z + 0.6 };
+    expect(height).toBeCloseTo(0.75, 2);
+    expect([onRenderedTop(drawn.x, drawn.z), onRenderedTop(reflected.x, reflected.z)]).toEqual([true, false]);
+    expect(codes(room([turned, pendant(drawn.x, drawn.z)]), pendantBank(DROP))).toEqual([]);
+    expect(codes(room([turned, pendant(reflected.x, reflected.z)]), pendantBank(DROP))).toEqual(['ceiling_object_not_over_host']);
+  });
+
   test('a scaled host holds it over its scaled top, and its top rises with the scale', () => {
     const scaled = table({ scale: 1.4 });
     // x = 4.0 is past the unscaled top's edge (3.855) and inside the scaled one's (4.205).
@@ -144,23 +197,8 @@ describe('over-host: a pendant that says overHost hangs over a host top', () => 
   });
 });
 
-describe('a document without the fact lints exactly as before', () => {
-  /** The rules that existed before these two, run the way `lintLayout` runs every rule. */
-  function lintBefore(scene: SceneData, catalogue: LayoutCatalogue): LayoutIssue[] {
-    const ctx = lintContext(scene, solvePlan(scene), catalogue);
-    const issues: LayoutIssue[] = [];
-    for (const rule of LAYOUT_RULES) if (rule.id !== 'over-host' && rule.id !== 'head-room') rule.run(ctx, issues);
-    return issues.sort((a, b) => layoutRuleOrder(a.rule) - layoutRuleOrder(b.rule) || a.ids.join().localeCompare(b.ids.join()));
-  }
-
-  test('the demo flat, its pendant over the dining table', () => {
-    expect(lint(apartmentScene, shippedFacts)).toEqual(lintBefore(apartmentScene, shippedFacts));
-  });
-
-  test('a pendant in the open floor with head room to spare', () => {
-    const scene = room([table(), pendant(1, 1.5)]);
-    expect(lint(scene, pendantBank(1, false))).toEqual(lintBefore(scene, pendantBank(1, false)));
-  });
+test('the demo flat raises neither new rule', () => {
+  expect(codes(apartmentScene, shippedFacts)).toEqual([]);
 });
 
 describe('head-room: a ceiling piece in the open warns under 2.0 m, and never refuses', () => {

@@ -19,7 +19,7 @@
 import { shippedAssetFacts, type AssetFactsSource } from './asset-facts.js';
 import { footprintOf } from './asset-footprint.js';
 import { openingFrameWidth, openingLeafCount } from './opening-frame.js';
-import { obbQuad } from '../plan/plan-geometry.js';
+import { obbQuad, yawBox } from '../plan/plan-geometry.js';
 import { isPlanFixtureCategory, type PlanDrawingOptions, type PlanFixture } from '../plan/plan-drawing.js';
 import { effectiveAsset, type SceneData } from '../scene/types.js';
 
@@ -36,13 +36,7 @@ export function planFixtures(scene: SceneData, source: AssetFactsSource = shippe
     const footprint = footprintOf(placement, source);
     if (!footprint) continue;
     const asset = effectiveAsset(placement);
-    const polygon = obbQuad({
-      x: asset.position.x,
-      z: asset.position.z,
-      hx: footprint.hx,
-      hz: footprint.hz,
-      angle: asset.rotationY,
-    });
+    const polygon = obbQuad(yawBox(asset.position.x, asset.position.z, footprint.hx, footprint.hz, asset.rotationY));
     fixtures.push({ polygon, category: facts.category });
   }
   return fixtures;

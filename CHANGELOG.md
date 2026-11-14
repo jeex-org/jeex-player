@@ -20,8 +20,11 @@ as described under [Versioning](#versioning).
   (`{ placement }`) when it does not, and its lowest point stays at least
   0.45 m above that top, with code `ceiling_object_too_close_to_host`
   (`{ placement, host, gap, min }`) when it does not. Like every hard rule it
-  refuses a drag and a `strict` edit. A piece without the fact hangs wherever
-  it hung before.
+  refuses a drag and a `strict` edit, from both sides: a drag or a key nudge
+  or turn of the piece itself, and one of its host that would leave a piece
+  passing before off the top or too close to it (a piece that already fails
+  refuses no move of a host). A piece without the fact hangs wherever it hung
+  before.
 - **Head room under a ceiling piece in the open.** The new soft layout rule
   `head-room` warns, with code `ceiling_object_low_head_room`
   (`{ placement, lowest, min }`), about every ceiling piece whose plan centre
@@ -304,6 +307,15 @@ as described under [Versioning](#versioning).
 
 ### Fixed
 
+- **A placement turned by other than a quarter turn is judged where it is
+  drawn.** The layout linter, the drag's legality field and settle, the
+  free-space probe and the plan's fixture outlines built a placement's
+  footprint turned the opposite way from the rendered body and the walk's
+  collision box, so at a yaw such as 45° every rule read the rectangle
+  reflected across the placement's axes (a quarter or half turn hides it: the
+  reflected rectangle is the same one). Every footprint built from a
+  placement's `rotationY` now goes through one conversion, so the rules, the
+  walk and the picture agree.
 - **The picture a resting view keeps is a settled one.** On some GPUs the
   first picture drawn after a change can resolve its antialiased edges
   differently from every later picture of the same view, and a view drawn on

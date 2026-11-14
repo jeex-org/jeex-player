@@ -17,7 +17,7 @@ import { mask, type LegalityMask } from '../layout/asset-mask.js';
 import { proposePose } from '../layout/asset-pose.js';
 import { pointInPolygon } from '../plan/plan-geometry.js';
 import { nearestFace } from '../layout/rules/context.js';
-import { shippedFacts, type LayoutCatalogue } from '../layout/layout-lint.js';
+import { lintLayout, shippedFacts, type LayoutCatalogue } from '../layout/layout-lint.js';
 import {
   AssetMoveTool,
   HEIGHT_M_PER_PX,
@@ -383,6 +383,43 @@ describe('a ceiling move', () => {
     drag(tool, home, centre);
     expect(host.edits).toEqual([]);
     expect(host.refusals[0]!.issues.map((issue) => issue.rule)).toEqual(['ceiling-hung']);
+  });
+});
+
+describe('the host side of over-host', () => {
+  /** The shipped bank with the dining pendant saying `overHost`, `drop` metres long when given. */
+  function overHostBank(drop?: number): LayoutCatalogue {
+    return (asset) => {
+      const facts = shippedFacts(asset);
+      if (!facts || asset.id !== DEMO.asset.livingPendant) return facts;
+      const dims = drop === undefined ? facts.dims : ([facts.dims[0], drop, facts.dims[2]] as const);
+      return { ...facts, dims, surfaces: { ...facts.surfaces, overHost: true } };
+    };
+  }
+
+  /** The dining table dragged to a spot it may stand at without the fact, judged against `bank`. */
+  function dragTable(bank: LayoutCatalogue): FakeHost {
+    const judged = Object.assign(new FakeHost(), { layoutCatalogue: () => bank });
+    judged.selection = DEMO.asset.livingTable;
+    drag(new AssetMoveTool(judged), placement(DEMO.asset.livingTable).position, legalSpot(DEMO.asset.livingTable, 1.5, 'floor'));
+    return judged;
+  }
+
+  test('the dining table, dragged off from under an overHost pendant, is refused by the over-host rule', () => {
+    const judged = dragTable(overHostBank());
+    expect(judged.edits).toEqual([]);
+    expect(judged.refusals[0]!.issues.map((issue) => issue.rule)).toEqual(['over-host']);
+    expect(judged.refusals[0]!.issues[0]!.ids).toEqual([DEMO.asset.livingPendant]);
+  });
+
+  test('a pendant already too close to the table does not refuse the table’s drag', () => {
+    // 0.30 m above the 0.75 m top: broken before the table moves, so the move breaks nothing.
+    const bank = overHostBank(apartmentScene.ceilingHeight - 0.75 - 0.3);
+    const before = lintLayout(apartmentScene, plan, bank).filter((issue) => issue.rule === 'over-host');
+    expect(before.map((issue) => issue.code)).toEqual(['ceiling_object_too_close_to_host']);
+    const judged = dragTable(bank);
+    expect(judged.refusals).toEqual([]);
+    expect(judged.edits).toHaveLength(1);
   });
 });
 

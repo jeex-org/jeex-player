@@ -150,10 +150,12 @@ function reaches(poly: readonly Vec2[], box: Bounds): boolean {
  * against the same few neighbours, and a settle hundreds of poses around one
  * point, so each narrows once. Doors are kept whole when any of their zones
  * could reach (their zones are cached per door list, so a narrowed list builds
- * its own once).
+ * its own once). Every `overHost` pendant is kept wherever it hangs: a host
+ * dragged away from under one is judged by it (`rules/hanging.ts`).
  */
 export function narrowContext(ctx: LintContext, box: Bounds): LintContext {
   const items = ctx.items.filter((other) => {
+    if (other.surfaces.overHost) return true;
     const body = other.quad ?? other.mount?.quad;
     return body !== undefined && reaches(body, box);
   });

@@ -21,7 +21,7 @@
 import { add, mul, norm, sub } from '../plan/plan-geometry.js';
 import { roomOf } from '../plan/plan-rooms.js';
 import { polylineSlabs } from './layout-geometry.js';
-import { obbQuad, polylineSlice, type Obb } from '../plan/plan-geometry.js';
+import { obbQuad, polylineSlice, yawBox, type Obb } from '../plan/plan-geometry.js';
 import { resolveDoorSwing } from '../plan/door-swing.js';
 import { openingFrameWidth } from '../assets/opening-frame.js';
 import { projectAssetFacts, shippedAssetFacts, type AssetFactsSource } from '../assets/asset-facts.js';
@@ -180,9 +180,7 @@ export function lintItemOf(placement: DemoAsset, facts: LayoutFacts, plan: Solve
   const angle = effectiveAsset(placement).rotationY;
   const facing = angle + facts.yaw;
   const footprint = facts.footprint;
-  const box: Obb | null = footprint
-    ? { x: placement.position.x, z: placement.position.z, hx: footprint.hx, hz: footprint.hz, angle }
-    : null;
+  const box: Obb | null = footprint ? yawBox(placement.position.x, placement.position.z, footprint.hx, footprint.hz, angle) : null;
   const dims: [number, number, number] = [facts.dims[0] * scale, facts.dims[1] * scale, facts.dims[2] * scale];
   const y = facts.anchor === 'ceiling' && placement.position.y <= 0 ? ceilingHeight : placement.position.y;
   return {
@@ -216,7 +214,7 @@ function mountOf(
   y: number,
 ): LintItem['mount'] {
   if (anchor === 'floor') return null;
-  const quad = obbQuad({ x: placement.position.x, z: placement.position.z, hx: dims[0] / 2, hz: dims[2] / 2, angle });
+  const quad = obbQuad(yawBox(placement.position.x, placement.position.z, dims[0] / 2, dims[2] / 2, angle));
   return anchor === 'wall' ? { quad, low: y - dims[1] / 2, high: y + dims[1] / 2 } : { quad, low: y - dims[1], high: y };
 }
 
