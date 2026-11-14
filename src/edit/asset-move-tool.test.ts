@@ -17,6 +17,7 @@ import { mask, type LegalityMask } from '../layout/asset-mask.js';
 import { proposePose } from '../layout/asset-pose.js';
 import { pointInPolygon } from '../plan/plan-geometry.js';
 import { nearestFace } from '../layout/rules/context.js';
+import { shippedFacts, type LayoutCatalogue } from '../layout/layout-lint.js';
 import {
   AssetMoveTool,
   HEIGHT_M_PER_PX,
@@ -357,6 +358,22 @@ describe('a ceiling move', () => {
       expect(host.masks[0]!.count).toBeGreaterThan(100);
     });
   }
+
+  test('a pendant that says overHost, dragged off the dining table, is refused by the over-host rule', () => {
+    // The shipped pendant names no host; this bank says it hangs only over one, as a project's long drop may.
+    const overHost: LayoutCatalogue = (asset) => {
+      const facts = shippedFacts(asset);
+      return facts && asset.id === DEMO.asset.livingPendant ? { ...facts, surfaces: { ...facts.surfaces, overHost: true } } : facts;
+    };
+    const judged = Object.assign(new FakeHost(), { layoutCatalogue: () => overHost });
+    const judging = new AssetMoveTool(judged);
+    judged.selection = DEMO.asset.livingPendant;
+    const home = placement(DEMO.asset.livingPendant).position;
+    // A spot the pendant may hang at without the fact, far from the table.
+    drag(judging, home, legalSpot(DEMO.asset.livingPendant, 2, 'ceiling'));
+    expect(judged.edits).toEqual([]);
+    expect(judged.refusals[0]!.issues.map((issue) => issue.rule)).toEqual(['over-host']);
+  });
 
   test('into the loggia it is refused: no ceiling there', () => {
     host.selection = DEMO.asset.livingPendant;
