@@ -345,9 +345,7 @@ describe('every layout issue has a code', () => {
   test('the vocabulary is snake_case', () => {
     for (const code of LAYOUT_ISSUE_CODES) expect(code).toMatch(/^[a-z]+(_[a-z]+)*$/);
   });
-});
 
-describe('the message is rendered from the code and the params', () => {
   test('every raised issue reads what the renderer makes of it', () => {
     for (const { issue } of RAISED) expect(issue.message).toBe(renderLayoutIssue(issue));
   });
