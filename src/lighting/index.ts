@@ -4,7 +4,7 @@
  * review, store previews and the player.
  *
  * It imports no three.js and touches no DOM: the caller passes its own
- * three.js namespace (revision 186) and renderer to `createLightingContext`,
+ * three.js namespace (revision 187) and renderer to `createLightingContext`,
  * and every object is built with them.
  */
 

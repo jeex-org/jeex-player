@@ -4,20 +4,24 @@
  * physical material, with one program key, driven by uniforms every patched
  * material shares. It rewrites the composer's expanded lighting chunks.
  *
- * What it changes in three r186's lighting chunks:
+ * What it changes in three r187's lighting chunks:
  * - the environment's diffuse term is scaled by `jeexDiffuse` inside the room
  *   boxes (1 in the editing modes, 0 while baking and in walk and tour) and
  *   left on outside them, so facades and the ground keep the editing look;
- * - inside a room with the environment's diffuse off, the room grid's
- *   irradiance takes the environment's place in three's image-based path, so
- *   rough metals keep their multiple-scattering energy and nothing is counted
- *   twice;
+ * - with the grids on (`jeexGridOn`: walk, tour and the bake's captures), the
+ *   fragment's irradiance gains the light-probe grid of the room box its
+ *   lookup point lies in, read from the packed grid atlas (`room-grid.ts`),
+ *   or the exterior block outside every box; inside a room with the
+ *   environment's diffuse off, that irradiance takes the environment's place
+ *   in three's image-based path, so rough metals keep their
+ *   multiple-scattering energy and nothing is counted twice;
  * - direct light from the directional lights (the sun; the fill is off in
  *   walk) is scaled by `jeexSun` inside the room boxes: 1 in the editing and
  *   capture states, the walk sun factor in walk and tour, so a sunlit floor
  *   keeps its texture under the walk exposure while facades keep their sun;
  * - with `jeexBoxProbes` on (walk and tour), specular and clearcoat
- *   reflections come from the room probes in one shared atlas, box-projected
+ *   reflections come from the room probes in one 2D array (six faces a
+ *   room, each with a one-texel border, `room-probes.ts`), box-projected
  *   onto the room box chosen per fragment (lookup point pushed along the
  *   normal), blended across `blendM` at a shared box face; a fragment of the
  *   band that lies beyond a box never ends a ray on the face it stands
@@ -38,7 +42,9 @@
  * switching the uniforms never recompiles: the program key is constant.
  *
  * The chunk texts it rewrites are pinned by `ENGINE_CHUNK_ANCHORS`; the
- * lighting standard already refuses any other three.js revision.
+ * lighting standard already refuses any other three.js revision. The patch
+ * runs where three r187 samples a PMREM (`ENVMAP_TYPE_PMREM`), and defines
+ * `JEEX_GRIDS` there for its own grid lookup.
  */
 
 import * as THREE from 'three';
@@ -48,18 +54,20 @@ import { WALK_LIGHTING_TUNING as T } from './walk-lighting-tuning.js';
 import { installLightDrawHook, LIGHT_UNIFORMS } from '../light-uniforms.js';
 
 /** The patch's transform: one program variant, whatever the state; the version changes with the shader text. */
-export const WALK_TRANSFORM = Object.freeze({ id: WALK_TRANSFORM_ID, version: 6 });
-/** Edge of an atlas tile: the PMREM layout of a 128 px cube (and of the studio environment). */
-export const TILE = Object.freeze({ width: 384, height: 512 });
-/** The largest mip of a probe's cube-UV layout: `log2(TILE.height) - 2`, as three derives `CUBEUV_MAX_MIP`. */
-const PROBE_MAX_MIP = Math.log2(TILE.height) - 2;
-/** Tiles per atlas column. */
-const ROWS_MAX = 8;
+export const WALK_TRANSFORM = Object.freeze({ id: WALK_TRANSFORM_ID, version: 7 });
+/**
+ * The last level of a room probe's PMREM: three r187 prefilters a probe into a
+ * cube of at least 256 texels a face with mips down to 8 texels, and the probe
+ * array holds its levels 1 to 5 (`room-probes.ts`).
+ */
+export const PROBE_PMREM_MAX_LOD = 5;
+/** Levels of the probe array. */
+const PROBE_LEVELS = PROBE_PMREM_MAX_LOD;
 
-/** The exact r186 lines the patch replaces, per chunk. */
+/** The exact r187 lines the patch replaces or anchors on, per chunk. */
 export const ENGINE_CHUNK_ANCHORS = Object.freeze({
   lights_fragment_begin: [
-    'irradiance += getLightProbeGridIrradiance( probeWorldPos, probeWorldNormal );',
+    '#if NUM_LIGHT_PROBE_GRIDS > 0',
     'DirectionalLight directionalLight;',
     'getDirectionalLightInfo( directionalLight, directLight );',
     'getPointLightInfo( pointLight, geometryPosition, directLight );',
@@ -69,10 +77,7 @@ export const ENGINE_CHUNK_ANCHORS = Object.freeze({
     'vec3 iblRadiance = getIBLRadiance( geometryViewDir, geometryNormal, material.roughness );',
     'clearcoatRadiance += getIBLRadiance( geometryViewDir, geometryClearcoatNormal, material.clearcoatRoughness );',
   ],
-  cube_uv_reflection_fragment: [
-    'highp vec2 uv = getUV( direction, face ) * ( faceSize - 2.0 ) + 1.0;',
-    'uv.y += 4.0 * ( exp2( CUBEUV_MAX_MIP ) - faceSize );',
-  ],
+  envmap_common_pars_fragment: ['return ENVMAP_MAX_LOD * r * ( 2.0 - r );'],
 } as const);
 
 /** The uniforms every patched material shares. */
@@ -91,9 +96,20 @@ export type WalkUniforms = {
   jeexBoxMin: { value: THREE.Vector3[] };
   jeexBoxMax: { value: THREE.Vector3[] };
   jeexProbe: { value: THREE.Vector3[] };
-  jeexTile: { value: THREE.Vector2[] };
-  jeexAtlas: { value: THREE.Texture };
-  jeexAtlasTexel: { value: THREE.Vector2 };
+  /** The room probes' array: six layers a room (`room-probes.ts`). */
+  jeexProbes: { value: THREE.Texture };
+  /** 1 while the grids light the scene (walk, tour, the bake's bounce and the probe captures), 0 otherwise. */
+  jeexGridOn: { value: number };
+  /** The packed grid atlas (`room-grid.ts`). */
+  jeexGrids: { value: THREE.Texture };
+  /** Per room box, then the exterior: the grid volume's minimum and its block's x origin in the atlas. */
+  jeexGridMin: { value: THREE.Vector4[] };
+  /** Per room box, then the exterior: the grid volume's maximum and its block's y origin in the atlas. */
+  jeexGridMax: { value: THREE.Vector4[] };
+  /** Per room box, then the exterior: probes along each axis. */
+  jeexGridRes: { value: THREE.Vector3[] };
+  /** The packed atlas's size, texels. */
+  jeexGridSize: { value: THREE.Vector3 };
   jeexBlend: { value: number };
   jeexPush: { value: number };
   /** 1 while walk or tour shows the room lighting or bakes it (the lamp gate on), 0 in the editing modes. */
@@ -107,12 +123,22 @@ export type UniformState = 'editing' | 'capture' | 'walk';
 
 const vectors = (): THREE.Vector3[] => Array.from({ length: T.maxBoxes }, () => new THREE.Vector3());
 
-/** A black 1 x 1 texture the atlas sampler holds until the probes exist. */
-function placeholder(): THREE.Texture {
-  const texture = new THREE.DataTexture(new Uint8Array(4), 1, 1);
+/** A black one-texel array the probe sampler holds until the probes exist. */
+function probePlaceholder(): THREE.Texture {
+  const texture = new THREE.DataArrayTexture(new Uint8Array(4), 1, 1, 1);
   texture.needsUpdate = true;
   return texture;
 }
+
+/** A black one-texel 3D texture the grid sampler holds until the grids exist. */
+function gridPlaceholder(): THREE.Texture {
+  const texture = new THREE.Data3DTexture(new Uint8Array(4), 1, 1, 1);
+  texture.needsUpdate = true;
+  return texture;
+}
+
+/** One entry per room box and one for the exterior block. */
+const GRID_ENTRIES = T.maxBoxes + 1;
 
 export function createWalkUniforms(): WalkUniforms {
   return {
@@ -127,9 +153,13 @@ export function createWalkUniforms(): WalkUniforms {
     jeexBoxMin: { value: vectors() },
     jeexBoxMax: { value: vectors() },
     jeexProbe: { value: vectors() },
-    jeexTile: { value: Array.from({ length: T.maxBoxes }, () => new THREE.Vector2()) },
-    jeexAtlas: { value: placeholder() },
-    jeexAtlasTexel: { value: new THREE.Vector2(1, 1) },
+    jeexProbes: { value: probePlaceholder() },
+    jeexGridOn: { value: 0 },
+    jeexGrids: { value: gridPlaceholder() },
+    jeexGridMin: { value: Array.from({ length: GRID_ENTRIES }, () => new THREE.Vector4()) },
+    jeexGridMax: { value: Array.from({ length: GRID_ENTRIES }, () => new THREE.Vector4()) },
+    jeexGridRes: { value: Array.from({ length: GRID_ENTRIES }, () => new THREE.Vector3(1, 1, 1)) },
+    jeexGridSize: { value: new THREE.Vector3(1, 1, 1) },
     jeexBlend: { value: T.blendM / 2 },
     jeexPush: { value: T.normalPushM },
     jeexLampScope: { value: 0 },
@@ -165,22 +195,10 @@ export function setUniformState(uniforms: WalkUniforms, state: UniformState): vo
   uniforms.jeexEmissiveCap.value = state === 'editing' ? UNCAPPED : T.walkEmissiveCap / T.walkExposure;
 }
 
-/** Where each room's tile sits in the atlas, and the atlas size. */
-export type AtlasLayout = { columns: number; rows: number; width: number; height: number; tiles: { x: number; y: number }[] };
-
-/** One column of up to eight tiles, more columns beyond: at most 4096 texels high. */
-export function atlasLayout(rooms: number): AtlasLayout {
-  const count = Math.max(1, rooms);
-  const columns = Math.ceil(count / ROWS_MAX);
-  const rows = Math.ceil(count / columns);
-  const tiles = Array.from({ length: count }, (_, i) => ({ x: Math.floor(i / rows) * TILE.width, y: (i % rows) * TILE.height }));
-  return { columns, rows, width: columns * TILE.width, height: rows * TILE.height, tiles };
-}
-
 const put = (target: THREE.Vector3, p: { x: number; y: number; z: number }): THREE.Vector3 => target.set(p.x, p.y, p.z);
 
-/** Fills the box arrays: each box with its room's probe point and tile. */
-export function setRoomBoxes(uniforms: WalkUniforms, boxes: readonly RoomBox[], probes: readonly RoomProbe[], layout: AtlasLayout): void {
+/** Fills the box arrays: each box with its room's probe point and room index (its probe layers start at six times it). */
+export function setRoomBoxes(uniforms: WalkUniforms, boxes: readonly RoomBox[], probes: readonly RoomProbe[]): void {
   const index = new Map(probes.map((probe, i) => [probe.roomId, i]));
   boxes.forEach((box, i) => {
     const probe = index.get(box.roomId) ?? 0;
@@ -189,18 +207,18 @@ export function setRoomBoxes(uniforms: WalkUniforms, boxes: readonly RoomBox[], 
     put(uniforms.jeexBoxMin.value[i]!, box.projection.min);
     put(uniforms.jeexBoxMax.value[i]!, box.projection.max);
     put(uniforms.jeexProbe.value[i]!, probes[probe]!.position);
-    uniforms.jeexTile.value[i]!.set(layout.tiles[probe]!.x, layout.tiles[probe]!.y);
     uniforms.jeexBoxRoom.value[i] = probe;
   });
   uniforms.jeexBoxCount.value = boxes.length;
-  uniforms.jeexAtlasTexel.value.set(1 / layout.width, 1 / layout.height);
 }
 
 const PARS = /* glsl */ `
-#if defined( USE_ENVMAP ) && defined( ENVMAP_TYPE_CUBE_UV )
+#if defined( USE_ENVMAP ) && defined( ENVMAP_TYPE_PMREM )
 #define JEEX_MAX_BOXES ${T.maxBoxes}
-// The atlas's own largest mip, whatever size the scene's environment is (an HDRI is larger than the studio's).
-#define JEEX_PROBE_MAX_MIP ${PROBE_MAX_MIP}.0
+#define JEEX_GRIDS
+// The probes' own PMREM levels, whatever size the scene's environment is (an HDRI is larger than the studio's).
+#define JEEX_PROBE_MAX_LOD ${PROBE_PMREM_MAX_LOD}.0
+#define JEEX_PROBE_LEVELS ${PROBE_LEVELS}.0
 uniform float jeexDiffuse;
 uniform float jeexOutside;
 uniform float jeexSun;
@@ -212,9 +230,13 @@ uniform vec3 jeexSelMax[ JEEX_MAX_BOXES ];
 uniform vec3 jeexBoxMin[ JEEX_MAX_BOXES ];
 uniform vec3 jeexBoxMax[ JEEX_MAX_BOXES ];
 uniform vec3 jeexProbe[ JEEX_MAX_BOXES ];
-uniform vec2 jeexTile[ JEEX_MAX_BOXES ];
-uniform sampler2D jeexAtlas;
-uniform vec2 jeexAtlasTexel;
+uniform highp sampler2DArray jeexProbes;
+uniform float jeexGridOn;
+uniform highp sampler3D jeexGrids;
+uniform vec4 jeexGridMin[ JEEX_MAX_BOXES + 1 ];
+uniform vec4 jeexGridMax[ JEEX_MAX_BOXES + 1 ];
+uniform vec3 jeexGridRes[ JEEX_MAX_BOXES + 1 ];
+uniform vec3 jeexGridSize;
 uniform float jeexBlend;
 uniform float jeexPush;
 uniform float jeexLampScope;
@@ -229,6 +251,8 @@ float jeexInRoom = 0.0;
 // The receiver's room (-1 outside every box) and how far inside it the point pushed once more lies.
 float jeexRoom = -1.0;
 float jeexAhead = 0.0;
+// The room box that owns the receiver (-1 outside every box): its grid lights the fragment.
+int jeexBox = -1;
 
 float jeexInside( const in vec3 p, const in int i ) {
 	vec3 d = min( p - jeexSelMin[ i ], jeexSelMax[ i ] - p );
@@ -242,6 +266,7 @@ void jeexLocate( const in vec3 viewPosition, const in vec3 viewNormal ) {
 	jeexInRoom = 0.0;
 	jeexRoom = -1.0;
 	jeexAhead = 0.0;
+	jeexBox = -1;
 	for ( int i = 0; i < JEEX_MAX_BOXES; i ++ ) {
 		if ( i >= jeexBoxCount ) break;
 		if ( jeexInside( jeexLookup, i ) > 0.0 ) jeexInRoom = 1.0;
@@ -253,6 +278,7 @@ void jeexLocate( const in vec3 viewPosition, const in vec3 viewNormal ) {
 			if ( jeexRoom < 0.0 || ahead > jeexAhead || ( ahead == jeexAhead && jeexBoxRoom[ i ] < jeexRoom ) ) {
 				jeexRoom = jeexBoxRoom[ i ];
 				jeexAhead = ahead;
+				jeexBox = i;
 			}
 		}
 	}
@@ -265,34 +291,87 @@ float jeexLampGate( const in float room ) {
 	return ( room > -0.5 && abs( room - jeexRoom ) < 0.5 ) ? 1.0 : 0.0;
 }
 
-vec3 jeexBilinear( vec3 direction, float mipInt, vec2 tile ) {
-	float face = getFace( direction );
-	float filterInt = max( cubeUV_minMipLevel - mipInt, 0.0 );
-	mipInt = max( mipInt, cubeUV_minMipLevel );
-	float faceSize = exp2( mipInt );
-	highp vec2 uv = getUV( direction, face ) * ( faceSize - 2.0 ) + 1.0;
-	if ( face > 2.0 ) {
-		uv.y += faceSize;
-		face -= 3.0;
+// A direction's cube face (0 +x, 1 -x, 2 +y, 3 -y, 4 +z, 5 -z) and its point on that face's plane, each
+// coordinate in [-1, 1]; the probe array's copy pass writes the faces with the same parameterisation.
+float jeexFace( const in vec3 d, out vec2 st ) {
+	vec3 a = abs( d );
+	if ( a.x >= a.y && a.x >= a.z ) {
+		st = d.zy / a.x;
+		return d.x > 0.0 ? 0.0 : 1.0;
 	}
-	uv.x += face * faceSize;
-	uv.x += filterInt * 3.0 * cubeUV_minTileSize;
-	uv.y += 4.0 * ( exp2( JEEX_PROBE_MAX_MIP ) - faceSize );
-	uv = ( uv + tile ) * jeexAtlasTexel;
-	#ifdef texture2DGradEXT
-		return texture2DGradEXT( jeexAtlas, uv, vec2( 0.0 ), vec2( 0.0 ) ).rgb;
-	#else
-		return texture2D( jeexAtlas, uv ).rgb;
-	#endif
+	if ( a.y >= a.z ) {
+		st = d.xz / a.y;
+		return d.y > 0.0 ? 2.0 : 3.0;
+	}
+	st = d.xy / a.z;
+	return d.z > 0.0 ? 4.0 : 5.0;
 }
 
-vec3 jeexProbeSample( vec3 direction, float roughness, vec2 tile ) {
-	float mip = clamp( roughnessToMip( roughness ), cubeUV_m0, JEEX_PROBE_MAX_MIP );
+// One level of a room's probe: the face's interior is its inner ( faceSize - 2 ) texels, so a bilinear read at a
+// face edge takes the one-texel border, which holds the neighbouring face's light.
+vec3 jeexProbeLevel( const in vec3 direction, const in float level, const in float layers ) {
+	vec2 st;
+	float face = jeexFace( direction, st );
+	float faceSize = exp2( 7.0 - level );
+	vec2 uv = ( ( st * 0.5 + 0.5 ) * ( faceSize - 2.0 ) + 1.0 ) / faceSize;
+	return textureLod( jeexProbes, vec3( uv, layers + face ), level ).rgb;
+}
+
+// r187's roughness to PMREM level over the probe's own levels; the array starts at the PMREM's level 1.
+vec3 jeexProbeSample( const in vec3 direction, const in float roughness, const in float layers ) {
+	float r = clamp( roughness, 0.0, 1.0 );
+	float mip = clamp( JEEX_PROBE_MAX_LOD * r * ( 2.0 - r ) - 1.0, 0.0, JEEX_PROBE_LEVELS - 1.0 );
 	float mipF = fract( mip );
 	float mipInt = floor( mip );
-	vec3 lower = jeexBilinear( direction, mipInt, tile );
+	vec3 lower = jeexProbeLevel( direction, mipInt, layers );
 	if ( mipF == 0.0 ) return lower;
-	return mix( lower, jeexBilinear( direction, mipInt + 1.0, tile ), mipF );
+	return mix( lower, jeexProbeLevel( direction, mipInt + 1.0, layers ), mipF );
+}
+
+// The irradiance of grid entry g of the packed atlas, as three r187's getLightProbeGridIrradiance computes it:
+// sampled half a cell along the normal, clamped to the outermost probes, the seven SH sub-volumes stacked
+// along y in the grid's block, each with a one-texel border.
+vec3 jeexGridIrradianceAt( const in int g, const in vec3 worldPos, const in vec3 worldNormal ) {
+	vec3 lo = jeexGridMin[ g ].xyz;
+	vec3 res = jeexGridRes[ g ];
+	vec3 range = jeexGridMax[ g ].xyz - lo;
+	vec3 samplePos = worldPos + worldNormal * ( range / res ) * 0.5;
+	vec3 cell = clamp( ( samplePos - lo ) / range, 0.5 / res, 1.0 - 0.5 / res ) * res;
+	vec3 base = vec3( jeexGridMin[ g ].w + 1.0, jeexGridMax[ g ].w + 1.0, 1.0 ) + cell;
+	vec3 rowStep = vec3( 0.0, res.y + 2.0, 0.0 );
+	vec4 s0 = texture( jeexGrids, base / jeexGridSize );
+	vec4 s1 = texture( jeexGrids, ( base + rowStep ) / jeexGridSize );
+	vec4 s2 = texture( jeexGrids, ( base + 2.0 * rowStep ) / jeexGridSize );
+	vec4 s3 = texture( jeexGrids, ( base + 3.0 * rowStep ) / jeexGridSize );
+	vec4 s4 = texture( jeexGrids, ( base + 4.0 * rowStep ) / jeexGridSize );
+	vec4 s5 = texture( jeexGrids, ( base + 5.0 * rowStep ) / jeexGridSize );
+	vec4 s6 = texture( jeexGrids, ( base + 6.0 * rowStep ) / jeexGridSize );
+	vec3 c0 = s0.xyz;
+	vec3 c1 = vec3( s0.w, s1.xy );
+	vec3 c2 = vec3( s1.zw, s2.x );
+	vec3 c3 = s2.yzw;
+	vec3 c4 = s3.xyz;
+	vec3 c5 = vec3( s3.w, s4.xy );
+	vec3 c6 = vec3( s4.zw, s5.x );
+	vec3 c7 = s5.yzw;
+	vec3 c8 = s6.xyz;
+	float x = worldNormal.x, y = worldNormal.y, z = worldNormal.z;
+	vec3 result = c0 * 0.886227;
+	result += c1 * 2.0 * 0.511664 * y;
+	result += c2 * 2.0 * 0.511664 * z;
+	result += c3 * 2.0 * 0.511664 * x;
+	result += c4 * 2.0 * 0.429043 * x * y;
+	result += c5 * 2.0 * 0.429043 * y * z;
+	result += c6 * ( 0.743125 * z * z - 0.247708 );
+	result += c7 * 2.0 * 0.429043 * x * z;
+	result += c8 * 0.429043 * ( x * x - y * y );
+	return max( result, vec3( 0.0 ) );
+}
+
+// The grids' irradiance on the receiver: its room box's grid, the exterior block outside every box.
+vec3 jeexGridLight( ) {
+	if ( jeexGridOn < 0.5 ) return vec3( 0.0 );
+	return jeexGridIrradianceAt( jeexBox >= 0 ? jeexBox : JEEX_MAX_BOXES, jeexWorldPos, jeexPushDir );
 }
 
 vec3 jeexRadiance( const in vec3 viewDir, const in vec3 normal, const in float roughness ) {
@@ -317,7 +396,7 @@ vec3 jeexRadiance( const in vec3 viewDir, const in vec3 normal, const in float r
 		exits += step( 1e-4, abs( jeexWorldPos - from ) ) * step( exits, vec3( 1e-4 ) ) * 1e4;
 		float travel = max( min( min( exits.x, exits.y ), exits.z ), 0.0 );
 		vec3 direction = from + reflectVec * travel - jeexProbe[ i ];
-		sum += weight * jeexProbeSample( direction, roughness, jeexTile[ i ] );
+		sum += weight * jeexProbeSample( direction, roughness, jeexBoxRoom[ i ] * 6.0 );
 		total += weight;
 	}
 	return total > 0.0 ? sum / total : studio;
@@ -332,27 +411,32 @@ vec3 jeexRadiance( const in vec3 viewDir, const in vec3 normal, const in float r
  * declared inside it.
  */
 const LOCATE = /* glsl */ `vec3 jeexGridIrradiance = vec3( 0.0 );
-#if defined( USE_ENVMAP ) && defined( ENVMAP_TYPE_CUBE_UV )
+#if defined( USE_ENVMAP ) && defined( ENVMAP_TYPE_PMREM )
 	jeexLocate( - vViewPosition, normal );
 #endif
 `;
 
 /** The sun factor inside the rooms, declared where the directional loop needs it; 1 without a room lookup. */
 const SUN_SCALE = /* glsl */ `DirectionalLight directionalLight;
-	#if defined( USE_ENVMAP ) && defined( ENVMAP_TYPE_CUBE_UV )
+	#if defined( USE_ENVMAP ) && defined( ENVMAP_TYPE_PMREM )
 	float jeexSunScale = mix( 1.0, jeexSun, jeexInRoom );
 	#else
 	float jeexSunScale = 1.0;
 	#endif`;
 
-/** The grid's irradiance kept apart in `jeexGridIrradiance`; a baked surface does not sample the grid. */
-const GRID = /* glsl */ `#ifndef JEEX_BAKED_SURFACE
-		jeexGridIrradiance = getLightProbeGridIrradiance( probeWorldPos, probeWorldNormal );
-		irradiance += jeexGridIrradiance;
-		#endif`;
+/**
+ * The grids' irradiance kept apart in `jeexGridIrradiance`, ahead of three's
+ * own grid block (never compiled: no grid is in the scene); a baked surface
+ * does not sample the grids.
+ */
+const GRID = /* glsl */ `#if defined( JEEX_GRIDS ) && ! defined( JEEX_BAKED_SURFACE )
+	jeexGridIrradiance = jeexGridLight( );
+	irradiance += jeexGridIrradiance;
+	#endif
+	`;
 
 /** The environment's diffuse scale inside the rooms; 1 on a baked surface, whose specular multiple scattering needs it whole. */
-const DIFFUSE_SCALE = /* glsl */ `#if defined( USE_ENVMAP ) && defined( ENVMAP_TYPE_CUBE_UV ) && ! defined( JEEX_BAKED_SURFACE )
+const DIFFUSE_SCALE = /* glsl */ `#if defined( USE_ENVMAP ) && defined( ENVMAP_TYPE_PMREM ) && ! defined( JEEX_BAKED_SURFACE )
 	float jeexDiffuseScale = mix( 1.0, jeexDiffuse, jeexInRoom );
 #else
 	float jeexDiffuseScale = 1.0;
@@ -361,14 +445,14 @@ const DIFFUSE_SCALE = /* glsl */ `#if defined( USE_ENVMAP ) && defined( ENVMAP_T
 
 /** The grid hand-over after the maps chunk: inside a room with the environment's diffuse off, the grid takes its place. */
 const HAND_OVER = /* glsl */ `
-#if defined( USE_ENVMAP ) && defined( ENVMAP_TYPE_CUBE_UV ) && defined( RE_IndirectDiffuse ) && defined( USE_LIGHT_PROBES_GRID ) && defined( STANDARD ) && ! defined( JEEX_BAKED_SURFACE )
+#if defined( USE_ENVMAP ) && defined( ENVMAP_TYPE_PMREM ) && defined( RE_IndirectDiffuse ) && defined( JEEX_GRIDS ) && defined( STANDARD ) && ! defined( JEEX_BAKED_SURFACE )
 	float jeexMove = jeexInRoom * ( 1.0 - jeexDiffuse );
 	iblIrradiance += jeexGridIrradiance * jeexMove;
 	irradiance -= jeexGridIrradiance * jeexMove;
 #endif`;
 
 /** A radiance line through the room probes where the atlas exists, three's own elsewhere. */
-const viaProbes = (line: string, probes: string): string => `#if defined( ENVMAP_TYPE_CUBE_UV )
+const viaProbes = (line: string, probes: string): string => `#if defined( ENVMAP_TYPE_PMREM )
 		${probes}
 		#else
 		${line}
@@ -376,7 +460,7 @@ const viaProbes = (line: string, probes: string): string => `#if defined( ENVMAP
 
 /** The lamp gate, right after three computes a point light's term and before it is applied. */
 const LAMP_GATE = /* glsl */ `
-		#if defined( USE_ENVMAP ) && defined( ENVMAP_TYPE_CUBE_UV )
+		#if defined( USE_ENVMAP ) && defined( ENVMAP_TYPE_PMREM )
 		directLight.color *= jeexLampGate( jeexPointRoom[ i ] );
 		#endif`;
 
@@ -385,7 +469,7 @@ function rewriteBegin(text: string): string {
   const [grid, declare, directional, point] = ENGINE_CHUNK_ANCHORS.lights_fragment_begin;
   const begin = chunkMarker('lights_fragment_begin', 'begin');
   let out = replaceAnchor(text, begin, LOCATE + begin, WALK_TRANSFORM_ID);
-  out = replaceAnchor(out, grid, GRID, WALK_TRANSFORM_ID);
+  out = replaceAnchor(out, grid, GRID + grid, WALK_TRANSFORM_ID);
   out = replaceAnchor(out, declare, SUN_SCALE, WALK_TRANSFORM_ID);
   out = replaceAnchor(out, point, point + LAMP_GATE, WALK_TRANSFORM_ID);
   return replaceAnchor(out, directional, `${directional}\n\t\tdirectLight.color *= jeexSunScale;`, WALK_TRANSFORM_ID);
@@ -415,7 +499,7 @@ function rewriteMaps(text: string): string {
 
 /** Light outside the rooms scaled against the walk exposure, just before three writes the fragment. */
 const OUTSIDE = /* glsl */ `
-#if defined( USE_ENVMAP ) && defined( ENVMAP_TYPE_CUBE_UV )
+#if defined( USE_ENVMAP ) && defined( ENVMAP_TYPE_PMREM )
 	outgoingLight *= mix( jeexOutside, 1.0, jeexInRoom );
 #endif
 #include <opaque_fragment>`;
@@ -435,7 +519,7 @@ export function patchFragmentShader(source: string): string {
   return rewriteMaps(rewriteBegin(out));
 }
 
-/** The line of three r186's bump perturbation that normalises the perturbed normal. */
+/** The line of three r187's bump perturbation that normalises the perturbed normal. */
 const BUMP_NORMALISE = 'return normalize( abs( fDet ) * surf_norm - vGrad );';
 
 /**
@@ -468,7 +552,7 @@ const UNCAPPED = 1e9;
  * chroma; a term under the cap passes as it is.
  */
 const EMISSIVE_CAP = /* glsl */ `
-#if defined( USE_ENVMAP ) && defined( ENVMAP_TYPE_CUBE_UV )
+#if defined( USE_ENVMAP ) && defined( ENVMAP_TYPE_PMREM )
 	totalEmissiveRadiance *= min( 1.0, jeexEmissiveCap / max( max( totalEmissiveRadiance.r, totalEmissiveRadiance.g ), max( totalEmissiveRadiance.b, 1e-6 ) ) );
 #endif`;
 

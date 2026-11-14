@@ -194,6 +194,20 @@ describe('roomVolumes', () => {
     expect(T.gridLayers).toBe(3);
   });
 
+  test('gives each grid one cell per probe, so three r187’s cell-centre probes sit on the sampling box’s lattice', () => {
+    const result = roomVolumes(input);
+    if (!result.ok) throw new Error(result.error);
+    const { sampling, grid, resolution } = result.volumes.boxes[0]!;
+    for (const axis of ['x', 'y', 'z'] as const) {
+      const n = resolution[axis];
+      const cell = (grid.max[axis] - grid.min[axis]) / n;
+      // The first and last cell centres are the sampling box's faces, the cells as wide as the probe spacing on the sampling box.
+      expect(grid.min[axis] + cell / 2).toBeCloseTo(sampling.min[axis], 9);
+      expect(grid.max[axis] - cell / 2).toBeCloseTo(sampling.max[axis], 9);
+      expect(cell).toBeCloseTo((sampling.max[axis] - sampling.min[axis]) / (n - 1), 9);
+    }
+  });
+
   test('grows each selection side to its own wall: a thick facade and thin partitions', () => {
     // A 3 x 3 room: the facade on z = 0 is 0.3 m thick, the three partitions 0.1 m.
     const result = roomVolumes({

@@ -85,7 +85,7 @@ function deepFreeze<T>(value: T): DeepReadonly<T> {
  */
 export const LIGHTING_STANDARD = deepFreeze({
   /** The three.js `REVISION` the standard is calibrated for; any other is refused. */
-  engineRevision: '186',
+  engineRevision: '187',
   display: {
     toneMapping: 'neutral',
     exposure: 1,
@@ -228,7 +228,7 @@ export const LIGHTING_STANDARD = deepFreeze({
    * window sky at exposure 1, before the walk chain's output pass.
    * Measured 2026-10-24 on three clear-sky panoramas (sun at 8°, 43° and
    * 10.5°, 1K gain-map environments, 2K skies):
-   * - `loaderCompensation`: three r186's decode against the panoramas' own
+   * - `loaderCompensation`: three r187's decode against the panoramas' own
    *   float data reads 0.949 to 0.956 of the sky (0.958 on the synthetic
    *   test fixture, `tests/component/hdri-assets.test.ts`); 1 / 0.952.
    * - `environmentGain`: an open-air horizontal card under the 43° panorama

@@ -20,17 +20,15 @@ import { WalkLighting } from '../../src/render/walk-post.js';
 import { markBakedSurface, setBakedLightMode, setLampBaked } from '../../src/render/baked-surface.js';
 import { LIGHTING_STANDARD } from '../../src/lighting/lighting-standard.js';
 import {
-  atlasLayout,
   createWalkUniforms,
   installWalkPatch,
   setRoomBoxes,
   setUniformState,
-  TILE,
   type UniformState,
   type WalkUniforms,
 } from '../../src/render/walk-lighting/box-probe-patch.js';
-import { packAtlas, type Rgb } from '../../src/render/walk-lighting/exterior-sh.js';
-import { RoomGrid } from '../../src/render/walk-lighting/room-grid.js';
+import { GridAtlas, RoomGrid } from '../../src/render/walk-lighting/room-grid.js';
+import { constantGrids, constantProbes } from './walk-grids.js';
 import type { RoomBox } from '../../src/render/walk-lighting/room-volumes.js';
 import { WALK_LIGHTING_TUNING as T } from '../../src/render/walk-lighting/walk-lighting-tuning.js';
 import { closeContainers, demoScene, nextFrame, openContainer, until } from './support.js';
@@ -122,25 +120,10 @@ const room = (min: number, max: number): RoomBox => ({
   roomId: 'room',
   projection: cube(min, max),
   sampling: cube(min + 0.5, max - 0.5),
+  grid: cube(min, max),
   selection: cube(min - 0.2, max + 0.2),
   resolution: { x: 2, y: 2, z: 2 },
 });
-
-/** A constant-irradiance grid over `box`. */
-function constantGrid(box: RoomBox, level: number): RoomGrid {
-  const grid = new RoomGrid(box);
-  const coefficients: Rgb[] = Array.from({ length: 9 }, () => [0, 0, 0] as Rgb);
-  coefficients[0] = [level / 0.886227, level / 0.886227, level / 0.886227];
-  const atlas = packAtlas(coefficients, 2);
-  const texture = new THREE.Data3DTexture(atlas.data, 2, 2, atlas.depth);
-  texture.type = THREE.FloatType;
-  texture.minFilter = THREE.NearestFilter;
-  texture.magFilter = THREE.NearestFilter;
-  texture.needsUpdate = true;
-  grid.texture = texture;
-  grid.resolution.set(2, 2, 2);
-  return grid;
-}
 
 /** A scene with a studio-like environment (or a black one), walk uniforms over one room box, the patch installed. */
 function walkScene(
@@ -155,7 +138,7 @@ function walkScene(
   scene.environment = pmrem.fromScene(source, 0).texture;
   pmrem.dispose();
   const uniforms = createWalkUniforms();
-  setRoomBoxes(uniforms, [box], [{ roomId: box.roomId, position: { x: 0, y: 0, z: 0 } }], atlasLayout(1));
+  setRoomBoxes(uniforms, [box], [{ roomId: box.roomId, position: { x: 0, y: 0, z: 0 } }]);
   return { scene, uniforms };
 }
 
@@ -170,7 +153,8 @@ describe('the lightmap of a baked surface in walk', () => {
     const gl = renderer();
     const box = room(-3, 3);
     const { scene, uniforms } = walkScene(gl, box);
-    scene.add(plane(baked(0.05)), constantGrid(box, 0.4));
+    scene.add(plane(baked(0.05)));
+    constantGrids(uniforms, [{ box: box, colour: [0.4, 0.4, 0.4] }]);
     installWalkPatch(scene, uniforms);
     const view = camera();
     enter(scene, uniforms, 'editing');
@@ -192,7 +176,8 @@ describe('the lightmap of a baked surface in walk', () => {
     // A live wall lit by a room grid of the irradiance the baked wall's lightmap carries in walk.
     const read = (material: THREE.Material, level: number): number => {
       const { scene, uniforms } = walkScene(gl, box);
-      scene.add(plane(material), constantGrid(box, level));
+      scene.add(plane(material));
+      constantGrids(uniforms, [{ box: box, colour: [level, level, level] }]);
       installWalkPatch(scene, uniforms);
       enter(scene, uniforms, 'walk');
       return luminance(centre(gl, scene, camera()));
@@ -210,7 +195,8 @@ describe('the lightmap of a baked surface in walk', () => {
     const gl = renderer();
     const box = room(-3, 3);
     const { scene, uniforms } = walkScene(gl, box);
-    scene.add(plane(grey({ lightMap: lightmap(0.5), lightMapIntensity: 1 })), constantGrid(box, 0.4));
+    scene.add(plane(grey({ lightMap: lightmap(0.5), lightMapIntensity: 1 })));
+    constantGrids(uniforms, [{ box: box, colour: [0.4, 0.4, 0.4] }]);
     installWalkPatch(scene, uniforms);
     setUniformState(uniforms, 'walk');
     setBakedLightMode(scene, 'editing');
@@ -223,7 +209,8 @@ describe('the lightmap of a baked surface in walk', () => {
     const gl = renderer();
     const box = room(-3, 3);
     const { scene, uniforms } = walkScene(gl, box);
-    scene.add(plane(baked(0.05), 10), constantGrid(room(7, 13), 0.4));
+    scene.add(plane(baked(0.05), 10));
+    constantGrids(uniforms, [{ box: box, colour: [0.4, 0.4, 0.4] }]);
     installWalkPatch(scene, uniforms);
     const view = camera(10);
     enter(scene, uniforms, 'editing');
@@ -262,15 +249,15 @@ describe('the lightmap of a baked surface in walk', () => {
     const box = room(-3, 3);
     const readWith = (material: THREE.Material, level: number): number => {
       const { scene, uniforms } = walkScene(gl, box);
-      scene.add(plane(material), constantGrid(box, level));
+      scene.add(plane(material));
+      constantGrids(uniforms, [{ box: box, colour: [level, level, level] }]);
       installWalkPatch(scene, uniforms);
       setUniformState(uniforms, 'walk');
       return luminance(centre(gl, scene, camera()));
     };
-    const floor = baked(0.3);
-    expect(near(readWith(floor, 0.8), readWith(floor, 0.4))).toBe(true);
-    const card = grey();
-    expect(readWith(card, 0.8)).toBeGreaterThan(1.5 * readWith(card, 0.4));
+    // A fresh material per read: a patched material keeps the uniforms (and so the grids) it was first compiled with.
+    expect(near(readWith(baked(0.3), 0.8), readWith(baked(0.3), 0.4))).toBe(true);
+    expect(readWith(grey(), 0.8)).toBeGreaterThan(1.5 * readWith(grey(), 0.4));
   });
 });
 
@@ -302,12 +289,10 @@ describe('reflections on a baked surface in walk', () => {
     const gl = renderer();
     const box = room(-3, 3);
     const glossy = { color: 0x000000, roughness: 0.2, specularIntensity: 1, clearcoat: 1, clearcoatRoughness: 0.1 };
-    const atlas = new THREE.DataTexture(new Float32Array(TILE.width * TILE.height * 4).fill(0.5), TILE.width, TILE.height);
-    atlas.type = THREE.FloatType;
-    atlas.needsUpdate = true;
+    const atlas = constantProbes(0.5);
     const readIn = (material: THREE.Material, probes: boolean): number => {
       const { scene, uniforms } = walkScene(gl, box, { blackEnvironment: true });
-      uniforms.jeexAtlas.value = atlas;
+      uniforms.jeexProbes.value = atlas;
       scene.add(plane(material));
       installWalkPatch(scene, uniforms);
       setUniformState(uniforms, 'walk');
@@ -332,15 +317,20 @@ describe('a real grid capture', () => {
       const shell = new THREE.Mesh(new THREE.BoxGeometry(4, 4, 4), walls);
       scene.add(shell);
       const grid = new RoomGrid(box);
-      scene.add(grid);
+      const atlas = new GridAtlas(gl, [grid], LIGHTING_STANDARD.apartment);
+      atlas.setUniforms(uniforms, [box]);
       installWalkPatch(scene, uniforms);
       enter(scene, uniforms, state);
       grid.bake(gl, scene, { start: 0, count: 8, pass: 0, cubemapSize: 8 });
+      atlas.copyGrid(0);
+      uniforms.jeexGridOn.value = 1;
       enter(scene, uniforms, 'editing');
       shell.visible = false;
       const card = plane(grey());
       card.scale.setScalar(0.25);
       scene.add(card);
+      // The card is lit by the packed grids through the walk patch, as every material in walk is.
+      installWalkPatch(scene, uniforms);
       return luminance(centre(gl, scene, camera()));
     };
     const side = { side: THREE.BackSide };

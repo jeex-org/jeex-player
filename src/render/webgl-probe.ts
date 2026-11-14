@@ -10,7 +10,7 @@
  */
 
 /**
- * The context attributes `defaultRenderer` ends up asking for: three r186
+ * The context attributes `defaultRenderer` ends up asking for: three r187
  * always requests `alpha: true` and fills the rest from its defaults. A canvas
  * ignores the attributes of every `getContext` after the first, so the probe
  * asks with exactly these and the renderer gets the context it would have made.
@@ -27,7 +27,7 @@ export const RENDERER_CONTEXT_ATTRIBUTES: Readonly<WebGLContextAttributes> = {
 };
 
 /**
- * Whether this browser gives the viewer a WebGL 2 context (three r186 has no
+ * Whether this browser gives the viewer a WebGL 2 context (three r187 has no
  * WebGL 1 path), decided once per process. The probe takes the context on the
  * viewer's OWN canvas and keeps it: the renderer then finds it there instead
  * of making a second one. Later viewers and every Retry skip the probe. The

@@ -8,7 +8,7 @@ const baked = <T extends THREE.Light>(light: T, value = true): T => {
   return light;
 };
 
-describe('lightMasks (three r186.1 WebGLLights order)', () => {
+describe('lightMasks (three r187 WebGLLights order)', () => {
   test('points and spots: 0 baked, 1 live or unmarked, in traversal order', () => {
     const scene = new THREE.Scene();
     scene.add(baked(new THREE.PointLight()), new THREE.PointLight(), baked(new THREE.PointLight(), false));

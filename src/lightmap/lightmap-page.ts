@@ -5,7 +5,7 @@
  * The page's levels were filtered from decoded linear light by the bake, so
  * the browser must never build mips from RGBM bytes: the texture carries the
  * prepared levels 0 to the contract's mip limit and generates none. three
- * r186 allocates `mipmaps.length` immutable levels, so sampling stops at the
+ * r187 allocates `mipmaps.length` immutable levels, so sampling stops at the
  * limit without any renderer internals. Each image is decoded with
  * premultiplication and colour conversion off (M is a straight alpha, the
  * bytes are linear and not colour), and the texture is in no colour space,

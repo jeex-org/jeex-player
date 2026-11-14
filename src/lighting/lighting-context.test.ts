@@ -115,7 +115,7 @@ describe('creation', () => {
       expect((error as LightingError).code).toBe('engine-revision');
       message = (error as Error).message;
     }
-    expect(message).toContain('186');
+    expect(message).toContain('187');
     expect(message).toContain('185');
     expect(ledger.textures.length + ledger.targets.length + ledger.generators).toBe(0);
     expect(renderer.toneMapping).toBe(THREE.ACESFilmicToneMapping);

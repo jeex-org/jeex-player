@@ -41,7 +41,7 @@ describe('WalkLighting', () => {
     expect(lighting.phase).toBe('empty');
     lighting.frame(true);
     expect(lighting.rig.state).toBe('editing');
-    expect(scene.getObjectByName('walk-lighting-grids')!.children).toHaveLength(0);
+    expect(lighting.uniforms.jeexGridOn.value).toBe(0);
     lighting.dispose();
   });
 

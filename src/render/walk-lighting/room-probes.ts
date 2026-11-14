@@ -1,40 +1,47 @@
 /**
  * The rooms' reflection probes: one capture per room at its probe point,
- * prefiltered by three's PMREM and copied into one shared atlas the patch
- * samples (`box-probe-patch.ts`), one room per frame.
+ * prefiltered by three's PMREM into a cube and copied into one 2D array the
+ * patch samples (`box-probe-patch.ts`), six layers a room, one room per
+ * frame.
  *
  * A probe is captured after the grids are baked, in the rig's capture state:
  * box probes off (so no probe sees an earlier probe), the environment's
- * diffuse off inside the rooms, every room grid and the exterior grid visible
- * (the room is lit as it will be on screen, and every program the walk draws
- * with is compiled here, before the swap), the mirrors hidden.
+ * diffuse off inside the rooms, the grids on (the room is lit as it will be
+ * on screen, and every program the walk draws with is compiled here, before
+ * the swap), the mirrors hidden.
  *
- * Layout invariant: a 128 px probe's PMREM output is exactly one atlas tile
- * (`TILE`), and the patch samples it with the atlas's own largest mip
- * (`JEEX_PROBE_MAX_MIP`), whatever the size of the scene's environment;
- * `step` fails loudly when a capture's layout differs from the tile.
+ * Layout invariant: a 128 px probe's PMREM is a cube of 256 texels a face
+ * with mips down to 8 (`PROBE_PMREM_MAX_LOD`), whatever the size of the
+ * scene's environment; the array holds its levels 1 to 5 (128 to 8 texels)
+ * and `step` fails loudly when a capture's cube differs. Each array face
+ * carries a one-texel border written from the extended face plane, so a
+ * bilinear read at a face edge takes the neighbouring face's light and a
+ * rough reflection shows no seam.
  */
 
 import { ViewerLibError } from '../../shared/errors.js';
 import * as THREE from 'three';
-import { TILE, type AtlasLayout, type UniformState } from './box-probe-patch.js';
+import { PROBE_PMREM_MAX_LOD, type UniformState } from './box-probe-patch.js';
 import type { RoomProbe, Vec3 } from './room-volumes.js';
 import { WALK_LIGHTING_TUNING as T } from './walk-lighting-tuning.js';
+import { probeArrayLayout } from './probe-layout.js';
 
-/** One prefiltered capture: its texture, its size and its release. */
-export type CapturedProbe = { texture: THREE.Texture; width: number; height: number; dispose(): void };
+/** One prefiltered capture: its cube texture, its face size and its release. */
+export type CapturedProbe = { texture: THREE.Texture; size: number; dispose(): void };
 /** Captures the scene around `position` and prefilters it. */
 export type ProbeCapture = (position: Vec3) => CapturedProbe;
-/** Copies a capture into the atlas at `tile` (texels from the atlas's lower left corner). */
-export type ProbeCopy = (source: THREE.Texture, tile: { x: number; y: number }) => void;
+/** Copies a capture into the array's layers of room `room`. */
+export type ProbeCopy = (source: THREE.Texture, room: number) => void;
+
+/** The face size of a probe's PMREM cube: its last level is 8 texels. */
+const PMREM_FACE = 8 << PROBE_PMREM_MAX_LOD;
 
 export type RoomProbesDeps = {
   probes: readonly RoomProbe[];
-  layout: AtlasLayout;
   rig: { setState(state: UniformState): void };
   mirrors: () => readonly { visible: boolean }[];
-  grids: readonly { visible: boolean }[];
-  exterior: { visible: boolean };
+  /** The grids' switch (`jeexGridOn`). */
+  grids: { visible: boolean };
   capture: ProbeCapture;
   copy: ProbeCopy;
 };
@@ -65,30 +72,28 @@ export class RoomProbes {
   step(): boolean {
     const index = this.queue[0];
     if (index === undefined) return true;
-    const { rig, mirrors, grids, exterior, layout } = this.deps;
+    const { rig, mirrors, grids } = this.deps;
     const hidden = mirrors().filter((mirror) => mirror.visible);
     const started = performance.now();
     rig.setState('capture');
     for (const mirror of hidden) mirror.visible = false;
-    for (const grid of grids) grid.visible = true;
-    exterior.visible = true;
+    grids.visible = true;
     try {
       const probe = this.deps.capture(this.deps.probes[index]!.position);
       try {
-        if (probe.width !== TILE.width || probe.height !== TILE.height) {
+        if (probe.size !== PMREM_FACE) {
           throw new ViewerLibError(
             'internal',
-            `a room probe's cube-UV layout is ${probe.width} x ${probe.height}; the atlas tile is ${TILE.width} x ${TILE.height}`,
+            `a room probe's PMREM layout has ${probe.size} texel faces; the probe array copies ${PMREM_FACE}`,
           );
         }
-        this.deps.copy(probe.texture, layout.tiles[index]!);
+        this.deps.copy(probe.texture, index);
       } finally {
         probe.dispose();
       }
       this.queue.shift();
     } finally {
-      for (const grid of grids) grid.visible = false;
-      exterior.visible = false;
+      grids.visible = false;
       for (const mirror of hidden) mirror.visible = true;
       rig.setState('editing');
       this.stats.frames += 1;
@@ -98,13 +103,30 @@ export class RoomProbes {
   }
 }
 
-/** Copies one tile with exact texels: the atlas is filled tile by tile and never cleared. */
+/**
+ * Writes one face of one level: every texel, border included, is the PMREM
+ * cube read at the direction through the texel's centre on the face plane,
+ * extended past the face's edge for the border (`jeexFace` in the patch is
+ * the inverse).
+ */
 const COPY_SHADER = {
   vertexShader: /* glsl */ `void main() { gl_Position = vec4( position.xy, 0.0, 1.0 ); }`,
   fragmentShader: /* glsl */ `
-    uniform sampler2D source;
-    uniform vec2 tile;
-    void main() { gl_FragColor = texelFetch( source, ivec2( gl_FragCoord.xy - tile ), 0 ); }
+    uniform samplerCube source;
+    uniform int face;
+    uniform float level;
+    uniform float faceSize;
+    void main() {
+      vec2 st = ( ( gl_FragCoord.xy - 1.0 ) / ( faceSize - 2.0 ) ) * 2.0 - 1.0;
+      vec3 d;
+      if ( face == 0 ) d = vec3( 1.0, st.y, st.x );
+      else if ( face == 1 ) d = vec3( -1.0, st.y, st.x );
+      else if ( face == 2 ) d = vec3( st.x, 1.0, st.y );
+      else if ( face == 3 ) d = vec3( st.x, -1.0, st.y );
+      else if ( face == 4 ) d = vec3( st.x, st.y, 1.0 );
+      else d = vec3( st.x, st.y, -1.0 );
+      gl_FragColor = vec4( textureLod( source, d, level + 1.0 ).rgb, 1.0 );
+    }
   `,
 };
 
@@ -133,9 +155,9 @@ export class ProbeCamera {
   }
 }
 
-/** The GPU side: the atlas target, the PMREM capture and the tile copy. */
-export class ProbeAtlas {
-  readonly target: THREE.WebGLRenderTarget;
+/** The GPU side: the probe array, the PMREM capture and the copy pass. */
+export class ProbeArray {
+  readonly target: THREE.WebGLArrayRenderTarget;
   private readonly renderer: THREE.WebGLRenderer;
   private readonly scene: THREE.Scene;
   private readonly cube: ProbeCamera;
@@ -143,24 +165,28 @@ export class ProbeAtlas {
   private readonly quad: THREE.Mesh<THREE.PlaneGeometry, THREE.ShaderMaterial>;
   private readonly camera = new THREE.OrthographicCamera(-1, 1, 1, -1, 0, 1);
 
-  constructor(renderer: THREE.WebGLRenderer, scene: THREE.Scene, layout: AtlasLayout, cube: ProbeCamera) {
+  constructor(renderer: THREE.WebGLRenderer, scene: THREE.Scene, rooms: number, cube: ProbeCamera) {
     this.renderer = renderer;
     this.scene = scene;
     this.cube = cube;
-    this.target = new THREE.WebGLRenderTarget(layout.width, layout.height, {
+    const { faceSize, levels, layers } = probeArrayLayout(rooms);
+    this.target = new THREE.WebGLArrayRenderTarget(faceSize, faceSize, layers, {
       type: THREE.HalfFloatType,
       depthBuffer: false,
       generateMipmaps: false,
-      minFilter: THREE.LinearFilter,
+      minFilter: THREE.LinearMipmapLinearFilter,
       magFilter: THREE.LinearFilter,
     });
-    this.target.texture.name = 'WalkLighting.probeAtlas';
+    // Placeholders: three allocates one level per entry and limits sampling to them.
+    for (let level = 0; level < levels; level += 1)
+      this.target.texture.mipmaps.push({ width: faceSize >> level, height: faceSize >> level } as never);
+    this.target.texture.name = 'WalkLighting.probeArray';
     this.pmrem = new THREE.PMREMGenerator(renderer);
     this.quad = new THREE.Mesh(
       new THREE.PlaneGeometry(2, 2),
       new THREE.ShaderMaterial({
         ...COPY_SHADER,
-        uniforms: { source: { value: null }, tile: { value: new THREE.Vector2() } },
+        uniforms: { source: { value: null }, face: { value: 0 }, level: { value: 0 }, faceSize: { value: 0 } },
         depthTest: false,
         depthWrite: false,
       }),
@@ -181,26 +207,36 @@ export class ProbeAtlas {
       this.renderer.autoClear = autoClear;
     }
     const target = this.pmrem.fromCubemap(cube.texture);
-    return { texture: target.texture, width: target.width, height: target.height, dispose: () => target.dispose() };
+    return { texture: target.texture, size: target.width, dispose: () => target.dispose() };
   };
 
-  readonly copy: ProbeCopy = (source, tile) => {
+  readonly copy: ProbeCopy = (source, room) => {
     const renderer = this.renderer;
     const previous = renderer.getRenderTarget();
+    const previousFace = renderer.getActiveCubeFace();
+    const previousLevel = renderer.getActiveMipmapLevel();
     const autoClear = renderer.autoClear;
-    const material = this.quad.material;
-    material.uniforms['source']!.value = source;
-    (material.uniforms['tile']!.value as THREE.Vector2).set(tile.x, tile.y);
-    const image = source.image as { width: number; height: number };
-    this.target.viewport.set(tile.x, tile.y, image.width, image.height);
+    const uniforms = this.quad.material.uniforms;
+    uniforms['source']!.value = source;
+    const levels = this.target.texture.mipmaps.length;
     try {
       renderer.autoClear = false;
-      renderer.setRenderTarget(this.target);
-      renderer.render(this.quad, this.camera);
+      for (let level = 0; level < levels; level += 1) {
+        const size = this.target.width >> level;
+        this.target.viewport.set(0, 0, size, size);
+        uniforms['level']!.value = level;
+        uniforms['faceSize']!.value = size;
+        for (let face = 0; face < 6; face += 1) {
+          uniforms['face']!.value = face;
+          renderer.setRenderTarget(this.target, room * 6 + face, level);
+          renderer.render(this.quad, this.camera);
+        }
+      }
     } finally {
+      this.target.viewport.set(0, 0, this.target.width, this.target.height);
       renderer.autoClear = autoClear;
-      renderer.setRenderTarget(previous);
-      material.uniforms['source']!.value = null;
+      renderer.setRenderTarget(previous, previousFace, previousLevel);
+      uniforms['source']!.value = null;
     }
   };
 

@@ -3,7 +3,7 @@
  * live on `SHADOW_ONLY_LAYER` and nowhere else (the closed ceiling slabs, the
  * walls the dollhouse cuts away).
  *
- * The engine detail it rests on (three r186, `WebGLShadowMap.renderObject`):
+ * The engine detail it rests on (three r187, `WebGLShadowMap.renderObject`):
  * the shadow pass skips `visible === false` and tests `object.layers` against
  * the VIEW camera handed to `shadowMap.render`, not against the shadow camera.
  * So a caster off layer 0 casts only if the view camera has its layer, and the

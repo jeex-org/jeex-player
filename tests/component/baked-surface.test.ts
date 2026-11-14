@@ -135,6 +135,7 @@ function addGrid(scene: THREE.Scene): void {
     roomId: 'grid',
     projection: { min: { x: -3, y: -3, z: -3 }, max: { x: 3, y: 3, z: 3 } },
     sampling: { min: { x: -3, y: -3, z: -3 }, max: { x: 3, y: 3, z: 3 } },
+    grid: { min: { x: -3, y: -3, z: -3 }, max: { x: 3, y: 3, z: 3 } },
     selection: { min: { x: -3, y: -3, z: -3 }, max: { x: 3, y: 3, z: 3 } },
     resolution: { x: 2, y: 2, z: 2 },
   };

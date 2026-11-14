@@ -32,7 +32,7 @@ function world() {
   };
   const sky = new HdriSky({ scene, renderer, exterior: () => exterior, sun: () => sun });
   const environment = new THREE.Texture();
-  environment.mapping = THREE.CubeUVReflectionMapping;
+  environment.mapping = THREE.CubeReflectionMapping;
   const display = new THREE.Texture();
   const content: HdriContent = {
     environment: { texture: environment, gain: 1.4, sunIntensity: 7 },

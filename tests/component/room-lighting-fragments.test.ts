@@ -135,8 +135,9 @@ describe('room lighting decided per fragment', { timeout: TIMEOUT_MS }, () => {
     const A: Rect = { x0: 0, x1: 4, z0: 0, z1: 4 };
     const w = world([{ id: '019a8b3c-1f00-7000-8000-00000000000a', rect: A }], [], (scene) => {
       shell(scene, A);
-      // A warm panel under half of the ceiling: the probe's upper face differs strongly from its side faces.
-      panel(scene, [4, 1.2, 0.6], [0, HEIGHT_M - 0.03, 0], [2, HEIGHT_M - 0.01, 4]);
+      // A warm panel under the far half of the ceiling: across the edge read below, the probe's light falls
+      // steeply from its upper face to its side face, so a seam would show as a step.
+      panel(scene, [4, 1.2, 0.6], [2.05, HEIGHT_M - 0.03, 0], [4, HEIGHT_M - 0.01, 4]);
       const floor = new THREE.Mesh(
         new THREE.PlaneGeometry(4, 4),
         new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 1, metalness: 1 }),
@@ -152,16 +153,16 @@ describe('room lighting decided per fragment', { timeout: TIMEOUT_MS }, () => {
     const { camera, at } = w.shoot(
       { x: edgeX, y: 1.2, z: probe.z },
       { x: edgeX, y: 0, z: probe.z },
-      { fov: 30, up: { x: 0, y: 0, z: -1 } },
+      { fov: 10, up: { x: 0, y: 0, z: -1 } },
     );
     const pixel = (x: number): { px: number; py: number } => {
       const p = new THREE.Vector3(x, 0, probe.z).project(camera);
       return { px: Math.round(((p.x + 1) / 2) * w.size.w), py: Math.round(((p.y + 1) / 2) * w.size.h) };
     };
     const edge = pixel(edgeX);
-    // Two pixels either side of the edge, a few millimetres of floor apart.
-    const before = at(edge.px - 2, edge.py);
-    const after = at(edge.px + 2, edge.py);
+    // The pixels either side of the edge, about a millimetre of floor apart.
+    const before = at(edge.px - 1, edge.py);
+    const after = at(edge.px + 1, edge.py);
     const mean = (luminance(before) + luminance(after)) / 2;
     const step = Math.abs(luminance(before) - luminance(after)) / mean;
     // The reflection is the probe's: the warm panel tints it, which the studio environment never does.

@@ -28,12 +28,12 @@
  *   touches it.
  *
  * The anchors are pinned by `BAKED_CHUNK_ANCHORS` against the installed
- * three (r186.1).
+ * three (r187).
  */
 
 import { BAKED_TRANSFORM_ID, chunkMarker, replaceAnchor } from './shader-compose.js';
 
-/** The exact r186 lines the rewrite relies on, per chunk. */
+/** The exact r187 lines the rewrite relies on, per chunk. */
 export const BAKED_CHUNK_ANCHORS = Object.freeze({
   lights_fragment_begin: [
     'getPointLightInfo( pointLight, geometryPosition, directLight );',

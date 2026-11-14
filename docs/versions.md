@@ -95,7 +95,7 @@ pass on it.
 | `glob`      | `14.0.4` | `13.0.6` | `npm view glob dist-tags`, `npm view ts-json-schema-generator version dependencies.glob` |
 | `minimatch` | `11.0.5` | `10.2.6` | `npm view minimatch dist-tags`, `npm view glob@14.0.4 dependencies` |
 
-## 2026-11-14: three stays on the 0.186 line
+## 2026-11-14: three stays on the 0.186 line (ended by the next entry)
 
 `npm view three version` and `npm view @types/three version` both returned `0.187.0` (r187).
 The project keeps `three` 0.186.1 (peer range `~0.186.1`, dev pin `0.186.1`) and
@@ -111,3 +111,22 @@ pinned by `src/render/walk-lighting/box-probe-patch.test.ts`, so a bump fails th
 | -------------- | --------- | --------- | ---------------------------------- |
 | `three`        | `0.186.1` | unchanged | `npm view three version`           |
 | `@types/three` | `0.186.0` | unchanged | `npm view @types/three version`    |
+
+This pin ends with the 0.187 entry below: the room lighting was redesigned on r187's terms.
+
+## 2026-11-14: three 0.187 with the room lighting on r187's terms
+
+Queried on 2026-11-14 at 20:45 UTC: `npm view three version` returned `0.187.0`,
+`npm view three dist-tags` `{ latest: '0.187.0' }`, and `npm view @types/three version`
+`0.187.0` (its `latest` tag). The walk lighting no longer rests on r186's PMREM cube-UV
+atlas or on per-object probe grids: the room probes are one 2D array copied from each room's
+r187 PMREM cube (`src/render/walk-lighting/room-probes.ts`), the grids are baked by
+`LightProbeGridWebGL` but copied into one packed 3D atlas the walk patch samples per fragment
+(`src/render/walk-lighting/room-grid.ts`), and the patch's anchors and engine defines are
+r187's (`src/render/walk-lighting/box-probe-patch.test.ts`). The lighting standard's
+`engineRevision` is `'187'`; the peer range is `~0.187.0`.
+
+| Package        | Version   | Was       | Command                                                 |
+| -------------- | --------- | --------- | ------------------------------------------------------- |
+| `three`        | `0.187.0` | `0.186.1` | `npm view three version`, `npm view three dist-tags`    |
+| `@types/three` | `0.187.0` | `0.186.0` | `npm view @types/three version`                         |

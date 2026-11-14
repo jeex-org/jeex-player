@@ -1,7 +1,7 @@
 /**
  * The lights a light bake takes for a scene (`bakeLights`, recipe
  * `jeex-bake-lights@1`) as a `zod/mini` schema: the contract the bake tool
- * mirrors. Units are three.js r186 physical units in the working colour
+ * mirrors. Units are three.js r187 physical units in the working colour
  * space (linear Rec.709), world axes as glTF (+Y up, metres):
  * - `sun`: `direction` is the unit direction the light TRAVELS (as the
  *   sidecar's `sun`), `sun.color` linear, `strength` the irradiance in W/m² on a

@@ -24,13 +24,7 @@ import { FinishRegistry } from '../../src/assets/asset-finishes.js';
 import type { ResolvedAsset } from '../../src/assets/asset-resolver.js';
 import { ARCHETYPE, VARIANT } from '../../src/assets/catalogue-ids.js';
 import { tintArtificialLights } from '../../src/render/light-temperature.js';
-import {
-  atlasLayout,
-  createWalkUniforms,
-  installWalkPatch,
-  setRoomBoxes,
-  setUniformState,
-} from '../../src/render/walk-lighting/box-probe-patch.js';
+import { createWalkUniforms, installWalkPatch, setRoomBoxes, setUniformState } from '../../src/render/walk-lighting/box-probe-patch.js';
 import { walkUniformsFor } from '../../src/render/walk-lighting/box-probe-patch.js';
 import type { RoomBox } from '../../src/render/walk-lighting/room-volumes.js';
 import { WALK_LIGHTING_TUNING as T } from '../../src/render/walk-lighting/walk-lighting-tuning.js';
@@ -137,7 +131,7 @@ describe('on a bare renderer', () => {
   test('the walk sun factor scales the sun inside a room box only, and never a lamp', () => {
     const gl = renderer();
     const material = new THREE.MeshStandardMaterial({ color: 0x808080, roughness: 1 });
-    // A tiny environment so the patch (which needs a cube-UV environment) is compiled in.
+    // A tiny environment so the patch (which needs a PMREM environment) is compiled in.
     const pmrem = new THREE.PMREMGenerator(gl);
     const environment = pmrem.fromScene(new THREE.Scene(), 0, 0.1, 10).texture;
     // One set of uniforms: a patched material keeps the uniforms it was first compiled with.
@@ -154,10 +148,11 @@ describe('on a bare renderer', () => {
         roomId: 'r',
         projection: { min: { x: -1, y: -1, z: -1 }, max: { x: 1, y: 1, z: 1 } },
         sampling: { min: { x: -1, y: -1, z: -1 }, max: { x: 1, y: 1, z: 1 } },
+        grid: { min: { x: -1, y: -1, z: -1 }, max: { x: 1, y: 1, z: 1 } },
         selection: { min: { x: -1, y: -1, z: -1 }, max: { x: 1, y: 1, z: 1 } },
         resolution: { x: 2, y: 2, z: 2 },
       };
-      setRoomBoxes(uniforms, [box], [{ roomId: 'r', position: { x: 0, y: 0, z: 0 } }], atlasLayout(1));
+      setRoomBoxes(uniforms, [box], [{ roomId: 'r', position: { x: 0, y: 0, z: 0 } }]);
       setUniformState(uniforms, state);
       // The outside scale is the walk exposure's, not this test's subject.
       uniforms.jeexOutside.value = 1;

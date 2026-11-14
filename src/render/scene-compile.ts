@@ -12,7 +12,7 @@
  *
  * A texture background is drawn by three's own background plane, which
  * `compileAsync` never sees; a stand-in plane built the way three builds it
- * (`WebGLBackground`, three r186) is compiled inside the scene, so its
+ * (`WebGLBackground`, three r187) is compiled inside the scene, so its
  * program is linked when the first picture draws the sky. The shadow pass's
  * own depth programs are not reached and still link at the first draw.
  *

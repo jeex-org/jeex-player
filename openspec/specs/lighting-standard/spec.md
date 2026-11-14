@@ -131,7 +131,7 @@ An apartment rig SHALL accept an optional shadow map size: an integer power of t
 
 ### Requirement: Engine revision
 
-A lighting context SHALL be created only for three.js revision 186. For any other revision, creation SHALL fail with the `engine-revision` error naming the expected and the supplied revision, before any resource is allocated.
+A lighting context SHALL be created only for three.js revision 187. For any other revision, creation SHALL fail with the `engine-revision` error naming the expected and the supplied revision, before any resource is allocated.
 
 #### Scenario: Wrong revision
 - **WHEN** a lighting context is requested with a three.js namespace whose revision is "185"

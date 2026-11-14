@@ -19,7 +19,7 @@ The player SHALL answer, for a scene, the lights a light bake of it takes, as on
 
 ### Requirement: Units
 
-The answer SHALL use three.js r186 physical units in the linear Rec.709 working space and glTF world axes (+Y up, metres). The standard's colours SHALL be linearised as three's colour management does, and the answer SHALL fail while colour management is off.
+The answer SHALL use three.js r187 physical units in the linear Rec.709 working space and glTF world axes (+Y up, metres). The standard's colours SHALL be linearised as three's colour management does, and the answer SHALL fail while colour management is off.
 
 #### Scenario: Colour management off
 - **WHEN** three's colour management is off
