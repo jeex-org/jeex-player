@@ -251,8 +251,8 @@ describe('WalkPostController compiles the scene for the chain before attaching i
 
 describe('applyTierInputs', () => {
   /** Reduced inputs no tier ships today, distinct from `HIGH` so a hand-over is visible. */
-  const LOW = { aoResolutionScale: 0.75, denoise: { depthPhi: 0.05, normalPhi: 8, lumaPhi: 10, radius: 4, samples: 8 }, gtaoSamples: 8 };
-  const HIGH = { aoResolutionScale: 1, denoise: { depthPhi: 0.05, normalPhi: 8, lumaPhi: 10, radius: 6, samples: 16 }, gtaoSamples: 16 };
+  const LOW = { aoResolutionScale: 0.75, denoise: { depthPhi: 0.05, normalPhi: 8, lumaPhi: 10, radius: 4, samples: 8 }, gtaoSamples: 8, restFrames: 8 };
+  const HIGH = { aoResolutionScale: 1, denoise: { depthPhi: 0.05, normalPhi: 8, lumaPhi: 10, radius: 6, samples: 16 }, gtaoSamples: 16, restFrames: 32 };
 
   test('hands the per-tier inputs to the built walk chain; false while there is none', async () => {
     const h = harness();

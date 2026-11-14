@@ -101,7 +101,9 @@ describe('QualityControl', () => {
     const low = QUALITY_TIERS.low;
     h.control.set('low');
     expect(h.caps).toEqual([low.pixelRatioCap]);
-    expect(h.tiers).toEqual([{ aoResolutionScale: low.aoResolutionScale, denoise: { ...low.denoise }, gtaoSamples: low.gtaoSamples }]);
+    expect(h.tiers).toEqual([
+      { aoResolutionScale: low.aoResolutionScale, denoise: { ...low.denoise }, gtaoSamples: low.gtaoSamples, restFrames: low.restFrames },
+    ]);
     expect(h.drawnFrames()).toBeGreaterThan(0);
     h.control.set('high');
     expect(h.caps).toEqual([low.pixelRatioCap, QUALITY_TIERS.high.pixelRatioCap]);

@@ -7,6 +7,7 @@ import { describe, expect, test } from 'bun:test';
 import * as THREE from 'three';
 import { quadMaterials, WALK_POST_TUNING, WalkPost, type WalkPostTierInputs } from './walk-post.js';
 import { QUALITY_TIERS } from './quality-tier.js';
+import { restJitter, restNoiseAngle, rotateNoise } from './rest-accumulation.js';
 
 describe('WALK_POST_TUNING', () => {
   test('GTAO at 0.3 m world radius on a full-resolution buffer with depth-aware denoise, half-float targets without multisampling', () => {
@@ -96,6 +97,7 @@ describe('WalkPost per-tier inputs', () => {
     aoResolutionScale: 0.75,
     denoise: { ...QUALITY_TIERS.low.denoise, radius: 4, samples: 8 },
     gtaoSamples: 8,
+    restFrames: 0,
   };
 
   /** The chain over a renderer with no GPU: nothing is drawn, only the sizes are watched. */
@@ -196,5 +198,116 @@ describe('quadMaterials', () => {
     const shown = new THREE.ShaderMaterial();
     const output = { material: shown, enabled: true };
     expect(quadMaterials([{ blur, size: 2 }, { edges }, output], output)).toEqual([blur, edges]);
+  });
+});
+
+describe('WalkPost rest frames', () => {
+  /** What the chain had set up when the composer rendered. */
+  type Seen = { accumulate: boolean; frame: number; smaa: boolean; projection: number[]; noise: number[] };
+
+  /** The chain over a renderer with no GPU, on `camera`, recording what each composer render saw. */
+  function restChain(camera: THREE.PerspectiveCamera, restFrames = 8): { post: WalkPost; seen: Seen[] } {
+    const globals = globalThis as { Image?: unknown };
+    globals.Image ??= class {
+      src = '';
+      onload: (() => void) | null = null;
+      decode(): Promise<void> {
+        return Promise.resolve();
+      }
+    };
+    const renderer = {
+      getPixelRatio: () => 1,
+      getSize: (target: THREE.Vector2) => target.set(800, 450),
+      getDrawingBufferSize: (target: THREE.Vector2) => target.set(800, 450),
+      getRenderTarget: () => null,
+      setRenderTarget: () => undefined,
+    } as unknown as THREE.WebGLRenderer;
+    const tier = { ...QUALITY_TIERS.high, denoise: { ...QUALITY_TIERS.high.denoise }, restFrames };
+    const post = new WalkPost(renderer, new THREE.Scene(), camera, { tier });
+    const seen: Seen[] = [];
+    post.composer.render = () => {
+      seen.push({
+        accumulate: post.accumulate.enabled,
+        frame: post.accumulate.frame,
+        smaa: post.smaa.enabled,
+        projection: [...camera.projectionMatrix.elements],
+        noise: [...(post.occlusion.gtaoNoiseTexture.image.data as Uint8Array)],
+      });
+    };
+    post.output.render = () => undefined;
+    return { post, seen };
+  }
+
+  function view(): THREE.PerspectiveCamera {
+    const camera = new THREE.PerspectiveCamera(60, 800 / 450, 0.05, 100);
+    camera.position.set(1, 1.6, 2);
+    camera.updateMatrixWorld();
+    return camera;
+  }
+
+  test('the count comes from the tier and a tier switch retunes it; a chain built without a tier has none', () => {
+    const { post } = restChain(view(), 32);
+    expect(post.restFrames).toBe(32);
+    post.applyTier({ ...QUALITY_TIERS.low, denoise: { ...QUALITY_TIERS.low.denoise }, restFrames: 8 });
+    expect(post.restFrames).toBe(8);
+    const bare = new WalkPost(post.composer.renderer, new THREE.Scene(), view());
+    expect(bare.restFrames).toBe(0);
+  });
+
+  test('a draw that answered a change is today`s: no accumulation, SMAA, the projection and the noise untouched', () => {
+    const camera = view();
+    const { post, seen } = restChain(camera);
+    const base = [...(post.occlusion.gtaoNoiseTexture.image.data as Uint8Array)];
+    post.render(new THREE.Scene(), camera, 0);
+    post.render(new THREE.Scene(), camera, 0, null);
+    for (const frame of seen) {
+      expect(frame.accumulate).toBe(false);
+      expect(frame.smaa).toBe(true);
+      expect(frame.projection).toEqual([...camera.projectionMatrix.elements]);
+      expect(frame.noise).toEqual(base);
+    }
+  });
+
+  test('rest frame 0 seeds the mean with today`s picture: no jitter, three`s noise, SMAA on', () => {
+    const camera = view();
+    const { post, seen } = restChain(camera);
+    const base = [...(post.occlusion.gtaoNoiseTexture.image.data as Uint8Array)];
+    post.render(new THREE.Scene(), camera, 0, 0);
+    expect(seen[0]).toEqual({ accumulate: true, frame: 0, smaa: true, projection: [...camera.projectionMatrix.elements], noise: base });
+  });
+
+  test('a later rest frame is jittered inside one pixel, turns the noise, skips SMAA, and gives the camera back untouched', () => {
+    const camera = view();
+    const { post, seen } = restChain(camera);
+    const base = Uint8Array.from(post.occlusion.gtaoNoiseTexture.image.data as Uint8Array);
+    const projection = [...camera.projectionMatrix.elements];
+    const inverse = [...camera.projectionMatrixInverse.elements];
+    const world = [...camera.matrixWorld.elements];
+    post.render(new THREE.Scene(), camera, 0, 3);
+    const [dx, dy] = restJitter(3);
+    const jittered = new THREE.Matrix4().fromArray(projection);
+    jittered.elements[8] -= (2 * dx) / 800;
+    jittered.elements[9] -= (2 * dy) / 450;
+    const turned = new Uint8Array(base.length);
+    rotateNoise(base, restNoiseAngle(3), turned);
+    expect(seen[0]!.accumulate).toBe(true);
+    expect(seen[0]!.frame).toBe(3);
+    expect(seen[0]!.smaa).toBe(false);
+    seen[0]!.projection.forEach((value, index) => expect(value).toBeCloseTo(jittered.elements[index]!, 12));
+    expect(seen[0]!.noise).toEqual([...turned]);
+    // What render-demand compares is exactly what it was.
+    expect([...camera.projectionMatrix.elements]).toEqual(projection);
+    expect([...camera.projectionMatrixInverse.elements]).toEqual(inverse);
+    expect([...camera.matrixWorld.elements]).toEqual(world);
+  });
+
+  test('a capture between rest frames is not averaged: no accumulation, no jitter, SMAA and three`s noise', () => {
+    const camera = view();
+    const { post, seen } = restChain(camera);
+    const base = [...(post.occlusion.gtaoNoiseTexture.image.data as Uint8Array)];
+    post.render(new THREE.Scene(), camera, 0, 5);
+    const capture = view();
+    post.renderTo(new THREE.WebGLRenderTarget(64, 36), new THREE.Scene(), capture, 640, 360);
+    expect(seen[1]).toEqual({ accumulate: false, frame: seen[1]!.frame, smaa: true, projection: [...camera.projectionMatrix.elements], noise: base });
   });
 });
