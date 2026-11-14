@@ -205,6 +205,29 @@ describe('projectManifestIssues — what a bake must look like', () => {
     expect(projectManifestIssues(withLayout({ footprint: 0.42, blockingHeight: 0.92 }))).toEqual([]);
   });
 
+  test('overHost is a ceiling fact: refused on a floor and a wall object, accepted on a ceiling one', () => {
+    const anchored = (anchor: string): unknown =>
+      broken((manifest) => {
+        const object = firstObject(manifest);
+        object['anchor'] = anchor;
+        object['overHost'] = true;
+      });
+    for (const anchor of ['floor', 'wall']) {
+      const issues = projectManifestIssues(anchored(anchor));
+      expect(issues.map((issue) => issue.path.join('.'))).toEqual(['library.objects.0.overHost']);
+    }
+    expect(projectManifestIssues(anchored('ceiling'))).toEqual([]);
+    // Only the literal `true`: `false` is refused on a ceiling object too, where the anchor would allow the fact.
+    const off = projectManifestIssues(
+      broken((manifest) => {
+        const object = firstObject(manifest);
+        object['anchor'] = 'ceiling';
+        object['overHost'] = false;
+      }),
+    );
+    expect(off.map((issue) => issue.path.join('.'))).toEqual(['library.objects.0.overHost']);
+  });
+
   test('the producer mark is an http(s) link and nothing else', () => {
     expect(projectManifestIssues(broken((manifest) => void delete manifest['mark']))).toEqual([]);
     expect(projectManifestIssues(broken((manifest) => void (manifest['mark'] = { href: 'http://localhost:8080/owners' })))).toEqual([]);

@@ -19,7 +19,7 @@ import { bathTwoDoorsPlan } from '../fixtures/plan-bath-two-doors.js';
 import { solvePlan } from '../plan/plan-solver.js';
 import { ARCHETYPE } from '../assets/catalogue-ids.js';
 import { ASSET_ANCHORS } from '../assets/asset-types.js';
-import { lintLayout, type LayoutIssue, type LayoutRule } from './layout-lint.js';
+import { lintLayout, shippedFacts, type LayoutCatalogue, type LayoutIssue, type LayoutRule } from './layout-lint.js';
 import { LAYOUT_ISSUE_CODES, renderLayoutIssue, type LayoutIssueCode } from './layout-issue-codes.js';
 import type { DemoAsset, Opening, SceneData, Wall } from '../scene/types.js';
 
@@ -55,12 +55,18 @@ function doorAb(patch: Partial<Opening>): Partial<SceneData> {
   };
 }
 
+/** The shipped bank with every ceiling piece saying `overHost`: the bank names none that does. */
+const OVER_HOST: LayoutCatalogue = (placement) => {
+  const facts = shippedFacts(placement);
+  return facts?.anchor === 'ceiling' ? { ...facts, surfaces: { ...facts.surfaces, overHost: true } } : facts;
+};
+
 /**
  * One case per code, in vocabulary order: the code, its rule (the README
  * table's column), the sentence its issue reads, word for word, and a scene
  * that raises it.
  */
-const CASES: ReadonlyArray<{ code: LayoutIssueCode; rule: LayoutRule; message: string; scene: SceneData }> = [
+const CASES: ReadonlyArray<{ code: LayoutIssueCode; rule: LayoutRule; message: string; scene: SceneData; catalogue?: LayoutCatalogue }> = [
   {
     code: 'object_inside_wall',
     rule: 'inside-a-wall',
@@ -199,6 +205,20 @@ const CASES: ReadonlyArray<{ code: LayoutIssueCode; rule: LayoutRule; message: s
     scene: lShape([asset(ID.a, 'pendant', 3, 4.0, 4)]),
   },
   {
+    code: 'ceiling_object_not_over_host',
+    rule: 'over-host',
+    message: '01a17b10-5c00-7a00-8000-000000000001 must hang over a table, island or counter',
+    scene: lShape([asset(ID.a, 'pendant', 1, 0, 1.5)]),
+    catalogue: OVER_HOST,
+  },
+  {
+    code: 'ceiling_object_too_close_to_host',
+    rule: 'over-host',
+    message: '01a17b10-5c00-7a00-8000-000000000001 hangs 0.20 m above 01a17b10-5c00-7a00-8000-000000000002; it needs 0.45 m',
+    scene: lShape([asset(ID.a, 'pendant', 3, 0, 4), asset(ID.b, 'table', 3, 0, 4)], { ceilingHeight: 2 }),
+    catalogue: OVER_HOST,
+  },
+  {
     code: 'object_taller_than_ceiling',
     rule: 'height-fit',
     message: '01a17b10-5c00-7a00-8000-000000000001 is 2.34 m tall and does not fit under the 1.50 m ceiling',
@@ -306,14 +326,20 @@ const CASES: ReadonlyArray<{ code: LayoutIssueCode; rule: LayoutRule; message: s
       '01a17b10-5c00-7a00-8000-000000000001 stands on the axis from 01a12fe6-aebf-7606-9c9d-3135ba3254fc into 01a12fe6-aec3-734d-bf23-be82cedaff5e',
     scene: lShape([asset(ID.a, 'dresser', 1.25, 0, 0.9)]),
   },
+  {
+    code: 'ceiling_object_low_head_room',
+    rule: 'head-room',
+    message: '01a17b10-5c00-7a00-8000-000000000001 hangs down to 1.35 m; keep 2 m of head room',
+    scene: lShape([asset(ID.a, 'pendant', 1, 0, 1.5)], { ceilingHeight: 2.4 }),
+  },
 ];
 
-function lint(scene: SceneData): LayoutIssue[] {
-  return lintLayout(scene, solvePlan(scene));
+function lint(scene: SceneData, catalogue?: LayoutCatalogue): LayoutIssue[] {
+  return lintLayout(scene, solvePlan(scene), catalogue);
 }
 
 /** Every issue the cases raise, with the scene it came from. */
-const RAISED = CASES.flatMap(({ scene }) => lint(scene).map((issue) => ({ issue, scene })));
+const RAISED = CASES.flatMap(({ scene, catalogue }) => lint(scene, catalogue).map((issue) => ({ issue, scene })));
 
 /** Every entity id a scene names: what an id param may hold. */
 function entityIds(scene: SceneData): Set<string> {
@@ -329,9 +355,9 @@ const ARCHETYPES: ReadonlySet<string> = new Set(Object.values(ARCHETYPE));
 const ANCHORS: ReadonlySet<string> = new Set(ASSET_ANCHORS);
 
 describe('every layout issue has a code', () => {
-  for (const { code, rule, message, scene } of CASES) {
+  for (const { code, rule, message, scene, catalogue } of CASES) {
     test(`${code} is raised by its case, under its rule, with its sentence`, () => {
-      const issue = lint(scene).find((candidate) => candidate.code === code);
+      const issue = lint(scene, catalogue).find((candidate) => candidate.code === code);
       expect({ code: issue?.code, rule: issue?.rule, message: issue?.message }).toEqual({ code, rule, message });
     });
   }

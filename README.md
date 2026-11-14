@@ -494,7 +494,9 @@ Events:
 | `assetEditRefused` | `{ assetId, issues }`: the hard layout issues of the pose a release or a turn asked for; nothing moved |
 | `assetMoveState` | `{ phase: 'idle' \| 'dragging' \| 'nudging' }` on each edge of a drag or a key burst, never per frame |
 
-What may combine with what is a catalogue fact of the asset, never a scene field: `onSurface: true` (may stand on a top), `top: { y }` (holds what stands on it, `y` above its base), `kneeSpace: { height, sides, depth? }` (a seat may go under it from those sides, `front` being the side it faces), `tuck: { depth, height }` (a seat that goes under a knee space by up to `depth`). All are optional, an absent one means "not allowed", and a baked project's `ProjectObject` accepts the same fields. A mirror moves the sides with the object (`x` swaps `left` and `right`, `z` swaps `front` and `back`), and mirroring a host leaves what stands on it in place.
+What may combine with what is a catalogue fact of the asset, never a scene field: `onSurface: true` (may stand on a top), `top: { y }` (holds what stands on it, `y` above its base), `kneeSpace: { height, sides, depth? }` (a seat may go under it from those sides, `front` being the side it faces), `tuck: { depth, height }` (a seat that goes under a knee space by up to `depth`), `overHost: true` (a ceiling piece, such as a long-drop dining pendant, that hangs only over a host's top). All are optional, an absent one means "not allowed" (for `overHost`: the piece hangs anywhere a ceiling piece may), and a baked project's `ProjectObject` accepts the same fields; its schema refuses `overHost` on an object whose `anchor` is not `'ceiling'`. A mirror moves the sides with the object (`x` swaps `left` and `right`, `z` swaps `front` and `back`), and mirroring a host leaves what stands on it in place.
+
+Two layout rules read where a ceiling piece hangs over the floor. `over-host` (an error, so a drag refuses it like any hard rule, both a drag of the piece and a drag of its host that would strand a piece passing before) holds a piece that says `overHost` to a host: its plan centre lies over the top of a floor piece that states `top` (its footprint at its scale and pose, 0.02 m inside the edge, as for what stands on it), and its lowest point stays at least 0.45 m above that top; over two tops the higher one is measured. `head-room` (a warning, which never refuses an edit or a drag) names every ceiling piece whose plan centre is over no host's top and whose lowest point is under 2.0 m above the floor.
 
 ### Editing the plan in `plan2d`
 
@@ -1336,6 +1338,8 @@ The codes are part of the public API: adding a code is a minor change, renaming 
 | `ceiling_object_outside_rooms` | `ceiling-hung` | `placement: string` | {placement} hangs outside every room |
 | `ceiling_object_without_ceiling` | `ceiling-hung` | `placement: string`, `room: string` | {placement} hangs in {room}, which has no ceiling |
 | `ceiling_object_out_of_band` | `ceiling-hung` | `placement: string`, `low: number`, `high: number`, `lowest: number`, `ceiling: number` | {placement} spans 2.95..4.00 m; it must hang between 0.00 m and the 3.15 m ceiling |
+| `ceiling_object_not_over_host` | `over-host` | `placement: string` | {placement} must hang over a table, island or counter |
+| `ceiling_object_too_close_to_host` | `over-host` | `placement: string`, `host: string`, `gap: number`, `min: number` | {placement} hangs 0.20 m above {host}; it needs 0.45 m |
 | `object_taller_than_ceiling` | `height-fit` | `placement: string`, `height: number`, `ceiling: number` | {placement} is 2.34 m tall and does not fit under the 2.70 m ceiling |
 | `wall_object_out_of_height` | `height-fit` | `placement: string`, `low: number`, `high: number`, `ceiling: number` | {placement} spans -0.29..0.49 m, outside the wall's 0..3.15 m |
 | `wall_object_turned` | `wall-facing` | `placement: string`, `face: { wall: string; side: WallSide }`, `degrees: number` | {placement} is turned 17.2° away from side L of wall {face.wall} |
@@ -1353,6 +1357,7 @@ The codes are part of the public API: adding a code is a minor change, renaming 
 | `coat_rack_in_door_swing` | `hall` | `placement: string`, `opening: string`, `distance: number` | {placement} stands 0.75 m from the swing of {opening} |
 | `mirror_off_host_centre` | `hall` | `placement: string`, `host: string`, `offset: number` | {placement} is 0.35 m off the centre of {host} |
 | `entrance_axis_blocked` | `hall` | `placement: string`, `opening: string`, `room: string` | {placement} stands on the axis from {opening} into {room} |
+| `ceiling_object_low_head_room` | `head-room` | `placement: string`, `lowest: number`, `min: number` | {placement} hangs down to 1.35 m; keep 2 m of head room |
 
 ## First picture
 

@@ -20,6 +20,7 @@ import { KITCHEN_RUN } from './kitchen.js';
 import { SEATING_GROUP, DINING_TUCK } from './seating.js';
 import { BEDROOM } from './bedroom.js';
 import { HALL } from './hall.js';
+import { HEAD_ROOM, OVER_HOST } from './hanging.js';
 import type { LayoutRuleModule } from './context.js';
 
 export const LAYOUT_RULES: readonly LayoutRuleModule[] = [
@@ -32,6 +33,7 @@ export const LAYOUT_RULES: readonly LayoutRuleModule[] = [
   WINDOW_CLEARANCE,
   ON_FLOOR,
   CEILING_HUNG,
+  OVER_HOST,
   HEIGHT_FIT,
   WALL_FACING,
   CASE_GOODS_ON_A_WALL,
@@ -40,6 +42,7 @@ export const LAYOUT_RULES: readonly LayoutRuleModule[] = [
   DINING_TUCK,
   BEDROOM,
   HALL,
+  HEAD_ROOM,
 ];
 
 export type { LayoutRuleModule } from './context.js';

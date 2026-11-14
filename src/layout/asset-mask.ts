@@ -28,7 +28,7 @@
  * Pure module: no `three`, no DOM.
  */
 
-import { obbQuad, pointInPolygon, signedArea } from '../plan/plan-geometry.js';
+import { obbQuad, pointInPolygon, signedArea, yawBox } from '../plan/plan-geometry.js';
 import { WALL_SNAP_M, probePose } from './asset-pose.js';
 import { faceFrame, narrowDrag, reachableRooms, type DragContext } from './asset-legality.js';
 import { topHeight } from './rules/surfaces.js';
@@ -310,7 +310,7 @@ function coverOf(item: LintItem): readonly Vec2[] {
   if (item.quad) return item.quad;
   if (item.mount) return item.mount.quad;
   const { x, z } = item.placement.position;
-  return obbQuad({ x, z, hx: item.dims[0] / 2, hz: item.dims[2] / 2, angle: item.angle });
+  return obbQuad(yawBox(x, z, item.dims[0] / 2, item.dims[2] / 2, item.angle));
 }
 
 /** The lattice index of `point` on `grid`'s probe lattice, as a key. */

@@ -208,16 +208,26 @@ export function projectOnPolyline(points: readonly Vec2[], point: Vec2, length?:
   return best;
 }
 
-/** Oriented box in plan: centre, half-extents before rotation, yaw in radians. */
+/**
+ * Oriented box in plan: centre, half-extents before rotation, and `angle`, the
+ * turn that sends its local `+x` to `(cos, sin)` in `(x, z)`. A placement's
+ * `rotationY` turns the other way (`yawBox`).
+ */
 export type Obb = { x: number; z: number; hx: number; hz: number; angle: number };
 
 /**
- * Corners of an oriented box, counter-clockwise in plan.
- *
- * A yaw of `angle` sends the box's local `+x` to `(cos, sin)` in `(x, z)`,
- * matching `navigation.insideObstacle`, so a footprint quad and the walk
- * collision box are the same rectangle.
+ * The box of a body turned by a placement's `rotationY`. The scene's yaw is
+ * three.js's `rotation.y`, which sends local `+x` to `(cos, -sin)`: the
+ * opposite of an `Obb` angle. Every footprint built from a placement goes
+ * through here, so the quad a rule reads, the walk's collision box
+ * (`navigation.insideObstacle`) and the rendered body are one rectangle.
  */
+export function yawBox(x: number, z: number, hx: number, hz: number, rotationY: number): Obb {
+  // `0 - yaw`, not `-yaw`: an unturned body keeps the angle 0, never -0.
+  return { x, z, hx, hz, angle: 0 - rotationY };
+}
+
+/** Corners of an oriented box, counter-clockwise in plan. */
 export function obbQuad(box: Obb): Vec2[] {
   const cos = Math.cos(box.angle);
   const sin = Math.sin(box.angle);

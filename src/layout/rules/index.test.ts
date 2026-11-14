@@ -31,6 +31,7 @@ const EVERY_RULE: Readonly<Record<LayoutRule, 'error' | 'warning'>> = {
   'window-clearance': 'error',
   'on-floor': 'error',
   'ceiling-hung': 'error',
+  'over-host': 'error',
   'height-fit': 'error',
   'wall-facing': 'error',
   'case-goods-on-a-wall': 'warning',
@@ -39,6 +40,7 @@ const EVERY_RULE: Readonly<Record<LayoutRule, 'error' | 'warning'>> = {
   'dining-tuck': 'warning',
   bedroom: 'warning',
   hall: 'warning',
+  'head-room': 'warning',
 };
 
 describe('LAYOUT_RULES', () => {

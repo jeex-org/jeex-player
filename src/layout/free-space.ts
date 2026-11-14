@@ -30,7 +30,7 @@
  * Pure module: no `three`, no DOM.
  */
 
-import { distanceToPolygon, obbQuad, pointInPolygon, signedArea, type Obb } from '../plan/plan-geometry.js';
+import { distanceToPolygon, obbQuad, pointInPolygon, signedArea, yawBox, type Obb } from '../plan/plan-geometry.js';
 import { doorSweepQuads } from '../plan/door-swing.js';
 import { overlapDepth, roomCentroid } from './layout-geometry.js';
 import { lintContext, lintLayout, shippedFacts, type LayoutCatalogue, type LayoutFacts } from './layout-lint.js';
@@ -284,7 +284,7 @@ function sampleCandidates(attempt: Attempt, rng: () => number, tries: number): C
     if (!pointInPolygon(point, attempt.room.polygon)) continue;
     if (distanceToPolygon(point, attempt.room.polygon).distance < reach) continue;
     const rotationY = yawAt(attempt, point);
-    const box: Obb = { x: point.x, z: point.z, hx, hz, angle: rotationY };
+    const box = yawBox(point.x, point.z, hx, hz, rotationY);
     if (crowdsAnItem(attempt.ctx, box, attempt.facts.clearance)) continue;
     const quad = obbQuad(box);
     if (attempt.zones.some((zone) => overlapDepth(quad, zone) > TOUCH_TOL_M)) continue;

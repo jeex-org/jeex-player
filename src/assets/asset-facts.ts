@@ -73,6 +73,7 @@ type FactsObject = {
   readonly layout?: AssetLayout | undefined;
   readonly mirror?: MirrorFacts | undefined;
   readonly onSurface?: true;
+  readonly overHost?: true;
   readonly top?: SurfaceTop;
   readonly kneeSpace?: KneeSpace;
   readonly tuck?: TuckFacts;

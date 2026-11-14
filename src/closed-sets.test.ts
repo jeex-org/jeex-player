@@ -90,6 +90,7 @@ const EVERY_LAYOUT_RULE = {
   'window-clearance': true,
   'on-floor': true,
   'ceiling-hung': true,
+  'over-host': true,
   'height-fit': true,
   'wall-facing': true,
   'case-goods-on-a-wall': true,
@@ -98,6 +99,7 @@ const EVERY_LAYOUT_RULE = {
   'dining-tuck': true,
   bedroom: true,
   hall: true,
+  'head-room': true,
 } satisfies Record<LayoutRule, true>;
 
 /** One row: the union spelled out as keys, and the runtime set that must match it. */
