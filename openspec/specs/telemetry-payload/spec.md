@@ -30,8 +30,8 @@ Every send SHALL carry `schema` (the payload schema semver), `player` (the packa
 
 #### Scenario: View before anything is loaded
 
-- **WHEN** the `view` send leaves at mount, before the scene is fetched
-- **THEN** its `subject` is `{ project: null, bake: null, scene: null }`, and the `view` send is not delayed to fill it
+- **WHEN** the `view` send leaves before anything names the project (the page was hidden or closed, the scene was replaced or the player removed first, or 10 seconds passed)
+- **THEN** its `subject` is `{ project: null, bake: null, scene: null }`, and no later `view` corrects it
 
 #### Scenario: An unshipped locale is not echoed
 

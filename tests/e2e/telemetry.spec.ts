@@ -149,7 +149,7 @@ test('a project mount names its project in view, and a locale set later is the l
   const seen = await capture(context);
   const manifest = (await (await page.request.get(PROJECT)).json()) as { projectId: string; bakeId: string };
   // The page's clock stands still from the start: no frame is drawn, no timer
-  // runs, so `ready` never comes and the 2 s ceiling never fires. `view` can
+  // runs, so `ready` never comes and no timer of `view` fires. `view` can
   // only leave because the boot said its document loaded.
   await page.clock.install();
   await page.clock.pauseAt((await page.evaluate(() => Date.now()).catch(() => Date.now())) + 60_000);

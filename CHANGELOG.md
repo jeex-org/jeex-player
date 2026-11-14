@@ -279,6 +279,13 @@ as described under [Versioning](#versioning).
   draw per change, once for a whole drag of an object, not once per frame of
   it. The draws a new model's or texture's settle window makes already draw
   the change again and count as its second picture, so they add nothing.
+- **A view on a slow connection waits for the project it shows.** The `view`
+  telemetry send left 2 seconds after the mount whether or not the player
+  knew its project yet, so on a slow connection it named none and was not
+  counted, while the later `engaged` of the same visit was. Now, when no
+  project is known by then, `view` waits for the first scene to load or fail,
+  for the visitor to leave, or at most 10 seconds after the mount, and then
+  leaves once with what is known.
 - **Everything the viewer shows follows `setLocale`, including text already
   on screen.** After a locale switch, `describeSelection`, the viewer's own
   Replace, finish, opening and interior panels, the Replace popup and the door

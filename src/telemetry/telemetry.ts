@@ -13,13 +13,16 @@
  * describes), judged by `isTelemetrySend`, and dropped when it fails. No
  * field links two sends beyond that shared context.
  *
- * View invariant: one `view` per mount, held until the first document settles
- * (loaded, failed, or `ready`), at most `CONTEXT_HOLD_MS`, and built with the
- * subject known then (before that, with the subject `viewed` was told how to
- * read). One `engaged` per end of the view (the page hidden, the scene
- * replaced, or the mount disposed), for the engaged time since the last one,
- * under the subject it was gathered for; none for none. It goes through the
- * same iframe hold as `view`, so it never leaves before it.
+ * View invariant: one `view` per mount, never a second to correct the first.
+ * It leaves when the first document settles (loaded, failed, or `ready`) with
+ * the subject known then; earlier only with a subject that names a project
+ * (after `CONTEXT_HOLD_MS`, a manifest already read), or when the view ends or
+ * first flushes, or at `VIEW_SUBJECT_MAX_MS` after `viewed`, with whatever
+ * subject is known then, a project or not. One `engaged` per end of the view
+ * (the page hidden, the scene replaced, or the mount disposed), for the
+ * engaged time since the last one, under the subject it was gathered for;
+ * none for none. It goes through the same iframe hold as `view`, so it never
+ * leaves before it.
  *
  * Page invariant: the page-wide error listeners exist once per page while any
  * telemetry is live, and route each error to the OLDEST live instance, so one
@@ -63,6 +66,14 @@ export const FLUSH_INTERVAL_MS = 5 * 60 * 1000;
  * silent one does not lose the view.
  */
 export const CONTEXT_HOLD_MS = 2000;
+
+/**
+ * The longest `view` waits, from `viewed`, for a subject that names a project,
+ * in ms. `project.json` is a small file read first, so 10 s covers a slow
+ * mobile connection; a visitor who leaves earlier still sends the view on
+ * leaving.
+ */
+export const VIEW_SUBJECT_MAX_MS = 10_000;
 
 /** What telemetry needs of the page it runs on; `browser-host.ts` is the real one. */
 export type TelemetryHost = {
@@ -164,6 +175,8 @@ export class Telemetry {
   /** `view` was asked for and waits for the first document. */
   private viewPending = false;
   private stopViewHold: () => void = () => undefined;
+  /** Cancels the `VIEW_SUBJECT_MAX_MS` bound, armed in `viewed` beside the 2 s timer. */
+  private stopViewBound: () => void = () => undefined;
   /** What `view` names when it leaves before the first document settled. */
   private early: () => TelemetrySubject | null = () => null;
   private disposed = false;
@@ -216,16 +229,22 @@ export class Telemetry {
   }
 
   /**
-   * `view`, once per mount: it leaves when the first document settles, or
-   * earlier (after `CONTEXT_HOLD_MS`, or when the view ends) with the subject
-   * `early` gives then, when it gives one (a manifest already read).
+   * `view`, once per mount: it leaves when the first document settles, with the
+   * subject set then. It leaves earlier after `CONTEXT_HOLD_MS` only when the
+   * subject `early` gives (a manifest already read), or else the one set, names
+   * a project; without one it waits on, and leaves when the view ends or first
+   * flushes, or at `VIEW_SUBJECT_MAX_MS` after this call, with that subject as
+   * it is then.
    */
   viewed(early?: () => TelemetrySubject | null): void {
     if (this.viewSent) return;
     this.viewSent = true;
     this.viewPending = true;
     if (early) this.early = early;
-    this.stopViewHold = this.config.host.after(CONTEXT_HOLD_MS, () => this.sendView(false));
+    this.stopViewHold = this.config.host.after(CONTEXT_HOLD_MS, () => {
+      if (this.earlySubject().project !== null) this.sendView(false);
+    });
+    this.stopViewBound = this.config.host.after(VIEW_SUBJECT_MAX_MS, () => this.sendView(false));
   }
 
   /** The first document settled, loaded or failed: `view` leaves with the subject set now. Idempotent. */
@@ -237,9 +256,15 @@ export class Telemetry {
     if (!this.viewPending) return;
     this.viewPending = false;
     this.stopViewHold();
-    const early = settled ? null : this.early();
-    const subject = early === null ? { ...this.subject } : idsOf(early);
+    this.stopViewBound();
+    const subject = settled ? { ...this.subject } : this.earlySubject();
     this.soon(() => ({ ...this.context(), subject, group: 'lifecycle', event: 'view' }));
+  }
+
+  /** What `view` names before the first document settled: what `early` gives, or else the subject set. */
+  private earlySubject(): TelemetrySubject {
+    const early = this.early();
+    return early === null ? { ...this.subject } : idsOf(early);
   }
 
   /** `ready` for the scene on screen, sent now; `seconds` since the mount or the `loadScene` call. */
