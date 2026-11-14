@@ -9,9 +9,15 @@
  * on, the mean of the pictures of frames 0 to `frame`; frame 0 copies its
  * picture and forgets everything before it. The mean lives in two half-float
  * targets of its own (one read, one written, then swapped), never in the
- * composer's buffers, and they are sized at frame 0 to the picture they
- * average: a capture that resizes the chain (`WalkPost.renderTo`, which runs
- * without this pass) leaves the mean alone.
+ * composer's buffers.
+ *
+ * Allocation invariant: a rest frame allocates nothing. Both targets are sized
+ * and given their GPU textures by `allocate`, which the chain calls on a draw
+ * that answers a change (the first after construction, a live size change),
+ * so the settle window that new GPU resources open (`settle-window.ts`) opens
+ * there and never inside a burst. A capture that resizes the chain
+ * (`WalkPost.renderTo`, which runs without this pass) leaves the targets and
+ * the mean alone.
  *
  * Loaded only with the walk chunk: like `walk-post.ts`, it imports three's
  * post-processing addons.
@@ -51,8 +57,6 @@ export class RestAccumulatePass extends Pass {
   private readonly targets: [THREE.WebGLRenderTarget, THREE.WebGLRenderTarget];
   /** Which of `targets` holds the mean. */
   private current = 0;
-  private width = 1;
-  private height = 1;
   private readonly blend: THREE.ShaderMaterial;
   private readonly copy: THREE.ShaderMaterial;
   private readonly quad = new FullScreenQuad();
@@ -88,16 +92,22 @@ export class RestAccumulatePass extends Pass {
     return this.targets[this.current]!;
   }
 
-  /** The size the next frame 0 starts its mean at; nothing is reallocated before then. */
-  override setSize(width: number, height: number): void {
-    this.width = width;
-    this.height = height;
+  /**
+   * Sizes both targets to `width` x `height` and allocates their textures on
+   * `renderer` now, so the rest frames that follow draw into what exists;
+   * nothing when they already have that size.
+   */
+  allocate(renderer: THREE.WebGLRenderer, width: number, height: number): void {
+    const [first, second] = this.targets;
+    if (first.width === width && first.height === height) return;
+    for (const target of this.targets) target.setSize(width, height);
+    renderer.initRenderTarget(first);
+    renderer.initRenderTarget(second);
   }
 
   override render(renderer: THREE.WebGLRenderer, writeBuffer: THREE.WebGLRenderTarget, readBuffer: THREE.WebGLRenderTarget): void {
     const next = this.targets[1 - this.current]!;
     if (this.frame === 0) {
-      for (const target of this.targets) target.setSize(this.width, this.height);
       this.draw(renderer, this.copy, { tSample: readBuffer.texture }, next);
     } else {
       this.draw(renderer, this.blend, { tMean: this.mean.texture, tSample: readBuffer.texture, weight: restMeanWeight(this.frame) }, next);

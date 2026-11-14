@@ -1543,14 +1543,14 @@ describe('a resting walk or tour draws the chain`s rest frames', () => {
 
   test('a change, a resize and a mode switch reset: their draw is not a rest frame and the count starts again', async () => {
     const { runtime, tick, drawn, viewport, setMode } = await chained('walk', 3);
-    for (let at = 0; at < 2; at += 1) tick(16);
+    for (let at = 0; at < 4; at += 1) tick(16);
     runtime.demand.invalidate();
-    for (let at = 0; at < 6; at += 1) tick(16);
+    for (let at = 0; at < 8; at += 1) tick(16);
     viewport.clientWidth = 640;
     runtime.resize();
-    for (let at = 0; at < 6; at += 1) tick(16);
+    for (let at = 0; at < 8; at += 1) tick(16);
     setMode('tour');
-    for (let at = 0; at < 6; at += 1) tick(16);
+    for (let at = 0; at < 8; at += 1) tick(16);
     expect(drawn).toEqual([0, 1, null, 0, 1, 2, null, 0, 1, 2, null, 0, 1, 2]);
     runtime.dispose();
   });
@@ -1558,7 +1558,7 @@ describe('a resting walk or tour draws the chain`s rest frames', () => {
   test('the settle window after new GPU resources resets: its draws are repeats, the rest frames start when it closes', async () => {
     const { runtime, tick, drawn } = await chained('walk', 3);
     const memory = (runtime.renderer.info as unknown as { memory: { textures: number } }).memory;
-    for (let at = 0; at < 2; at += 1) tick(16);
+    for (let at = 0; at < 4; at += 1) tick(16);
     memory.textures += 1;
     runtime.demand.invalidate();
     tick(16);
@@ -1574,12 +1574,11 @@ describe('a resting walk or tour draws the chain`s rest frames', () => {
     const { runtime, tick } = await chained('walk', 2);
     const seen: Array<number | null | 'skipped'> = [];
     runtime.addPostRenderHook((_delta, now) => seen.push(runtime.lastDrawnAt === now ? runtime.demand.restFrame() : 'skipped'));
-    tick(16);
-    tick(16);
-    tick(16);
+    // Two idle ticks, then the rest frames where the steady draw would come.
+    for (let at = 0; at < 5; at += 1) tick(16);
     runtime.demand.invalidate();
     tick(16);
-    expect(seen).toEqual([0, 1, 'skipped', null]);
+    expect(seen).toEqual(['skipped', 'skipped', 0, 1, 'skipped', null]);
     runtime.dispose();
   });
 });

@@ -13,6 +13,8 @@ import { RestAccumulatePass } from '../../src/render/rest-accumulate-pass.js';
 import { createWalkPost, type WalkPost } from '../../src/render/walk-post.js';
 import { mainPassOnly } from '../../src/assets/mirror-capture.js';
 import { scenePassOf } from '../../src/shared/scene-pass.js';
+import { RenderDemand } from '../../src/render/render-demand.js';
+import { gpuResources } from '../../src/render/settle-window.js';
 import { closeContainers, openContainer } from './support.js';
 
 const WIDTH = 160;
@@ -72,7 +74,7 @@ describe('the running mean on the GPU', () => {
   function accumulate(gl: THREE.WebGLRenderer, inputs: ReadonlyArray<readonly [number, number, number]>): [number, number, number] {
     const pass = new RestAccumulatePass();
     disposers.push(() => pass.dispose());
-    pass.setSize(4, 4);
+    pass.allocate(gl, 4, 4);
     const read = halfFloatTarget();
     const write = halfFloatTarget();
     inputs.forEach((rgb, frame) => {
@@ -110,7 +112,7 @@ describe('the running mean on the GPU', () => {
     const gl = renderer();
     const pass = new RestAccumulatePass();
     disposers.push(() => pass.dispose());
-    pass.setSize(4, 4);
+    pass.allocate(gl, 4, 4);
     const read = halfFloatTarget();
     const write = halfFloatTarget();
     for (const [frame, rgb] of [
@@ -151,19 +153,76 @@ function mirrorRoom(gl: THREE.WebGLRenderer): { scene: THREE.Scene; camera: THRE
   return { scene, camera, scopes };
 }
 
-async function chainOn(gl: THREE.WebGLRenderer, scene: THREE.Scene, camera: THREE.Camera): Promise<WalkPost> {
+async function chainOn(gl: THREE.WebGLRenderer, scene: THREE.Scene, camera: THREE.Camera, restFrames = 8): Promise<WalkPost> {
   const tier = {
     aoResolutionScale: 1,
     denoise: { depthPhi: 0.05, normalPhi: 8, lumaPhi: 10, radius: 6, samples: 16 },
     gtaoSamples: 16,
-    restFrames: 8,
+    restFrames,
   };
   const chain = await createWalkPost(gl, scene, camera, { tier });
   disposers.push(() => chain.dispose());
   return chain;
 }
 
+/** The canvas's pixels now: read in the same task as the draw, before the page presents it. */
+function canvasPixels(gl: THREE.WebGLRenderer): Uint8Array {
+  const context = gl.getContext();
+  const out = new Uint8Array(WIDTH * HEIGHT * 4);
+  context.readPixels(0, 0, WIDTH, HEIGHT, context.RGBA, context.UNSIGNED_BYTE, out);
+  return out;
+}
+
 describe('rest frames through the chain', () => {
+  test('a chain with no rest frames, drawn as the gate draws a resting walk, shows render(…, null) byte for byte', async () => {
+    const gl = renderer();
+    const { scene, camera } = mirrorRoom(gl);
+    const chain = await chainOn(gl, scene, camera, 0);
+    const demand = new RenderDemand();
+    const rests: Array<number | null> = [];
+    let resting: Uint8Array | null = null;
+    // Forty ticks of a walk that rests: the first picture, its steady draw, then nothing.
+    for (let tick = 0; tick < 40; tick += 1) {
+      if (!demand.shouldDraw(camera, 'walk', chain.restFrames)) continue;
+      rests.push(demand.restFrame());
+      chain.render(scene, camera, 0, demand.restFrame());
+      demand.commit(camera);
+      resting = canvasPixels(gl);
+    }
+    expect(rests).toEqual([null, null]);
+    // Nothing was set up for a mean either: its targets keep the size they were made with.
+    expect([chain.accumulate.mean.width, chain.accumulate.mean.height]).toEqual([1, 1]);
+    chain.render(scene, camera, 0, null);
+    const plain = canvasPixels(gl);
+    expect(resting!.length).toBe(plain.length);
+    expect(resting!.every((value, index) => value === plain[index])).toBe(true);
+  });
+
+  test('rest frames bring no GPU resource the settle window counts: the mean comes with the first draw and with a live resize', async () => {
+    const gl = renderer();
+    const { scene, camera } = mirrorRoom(gl);
+    const chain = await chainOn(gl, scene, camera);
+    // As the viewer attaches a chain: its programs compiled first.
+    await chain.compile(scene, camera);
+    /** The settle window's resource count over a draw that answers a change, then over each rest frame. */
+    const burst = (): number[] => {
+      chain.render(scene, camera, 0);
+      const counts = [gpuResources(gl.info)];
+      for (let frame = 0; frame < 8; frame += 1) {
+        chain.render(scene, camera, 0, frame);
+        counts.push(gpuResources(gl.info));
+      }
+      return counts;
+    };
+    const first = burst();
+    expect(first, 'the first rest after construction').toEqual(first.map(() => first[0]));
+    gl.setSize(WIDTH / 2, HEIGHT / 2, false);
+    chain.setSize(WIDTH / 2, HEIGHT / 2, 1);
+    const resized = burst();
+    expect(resized, 'the first rest after a resize').toEqual(resized.map(() => resized[0]));
+    expect([chain.accumulate.mean.width, chain.accumulate.mean.height]).toEqual([WIDTH / 2, HEIGHT / 2]);
+  });
+
   test('a mirror captures once per rest frame, inside the beauty pass and nowhere else', async () => {
     const gl = renderer();
     const { scene, camera, scopes } = mirrorRoom(gl);

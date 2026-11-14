@@ -86,17 +86,6 @@ export const QUALITY_TIERS = Object.freeze({
   }),
 });
 
-/**
- * The switch for the rest frames: off, a resting walk or tour view draws its
- * one steady picture and rests, exactly as before they existed.
- */
-export const REST_ACCUMULATION = Object.freeze({ on: true });
-
-/** The rest frames a resting walk or tour view on `tier` accumulates; none while the switch is off. */
-export function restFramesFor(tier: QualityTierName, on: boolean = REST_ACCUMULATION.on): number {
-  return on ? QUALITY_TIERS[tier].restFrames : 0;
-}
-
 /** The tier a session starts on: `auto` begins on the full look and earns its way down. */
 export function startingTier(quality: QualityOption): QualityTierName {
   return quality === 'low' ? 'low' : 'high';

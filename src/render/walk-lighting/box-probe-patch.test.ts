@@ -35,14 +35,18 @@ describe('the r186 chunks the patch rewrites', () => {
       ...Object.values(THREE.ShaderLib).flatMap((shader) => [shader.vertexShader, shader.fragmentShader]),
     ].join('\n');
     const patched = bakeFragmentShader(patchFragmentShader(THREE.ShaderLib.physical.fragmentShader));
+    // Every identifier of every directive's condition: the operands of `defined( X )` and bare names,
+    // not `defined` itself, numbers or operators.
     const tested = new Set<string>();
-    for (const line of patched.split('\n').filter((text) => /^\s*#\s*(if|ifdef|ifndef|elif)\b/.test(text))) {
-      for (const match of line.matchAll(/defined\s*\(\s*(\w+)\s*\)|#\s*ifn?def\s+(\w+)|#\s*(?:el)?if\s+(\w+)/g)) {
-        const name = match[1] ?? match[2] ?? match[3]!;
-        if (!own.test(name) && !prefixMacros.has(name)) tested.add(name);
-      }
+    for (const line of patched.split('\n')) {
+      const condition = /^\s*#\s*(?:if|ifdef|ifndef|elif)\b(.*)$/.exec(line)?.[1]?.replace(/\/\/.*$/, '');
+      if (condition === undefined) continue;
+      for (const [name] of condition.matchAll(/(?<![\w.])[A-Za-z_]\w*/g)) if (name !== 'defined') tested.add(name);
     }
-    expect(tested.size).toBeGreaterThan(0);
+    // The extractor itself: the defines the patch's own blocks are guarded by are among them.
+    expect(tested).toContain('USE_ENVMAP');
+    expect(tested).toContain('ENVMAP_TYPE_CUBE_UV');
+    for (const name of tested) if (own.test(name) || prefixMacros.has(name)) tested.delete(name);
     const unknown = [...tested].filter((name) => !new RegExp(`\\b${name}\\b`).test(engine));
     expect(unknown).toEqual([]);
   });

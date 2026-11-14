@@ -234,6 +234,8 @@ describe('RenderDemand', () => {
 
 describe('RenderDemand rest frames (a resting walk or tour converges)', () => {
   const N = 6;
+  /** The idle ticks before rest frame 0, which comes where the steady draw would. */
+  const WAIT: null[] = Array.from({ length: STEADY_AFTER_IDLE_TICKS - 1 }, () => null);
 
   /**
    * Ticks `demand` `count` times with `live` in `mode` and `restFrames` asked for, committing every
@@ -272,7 +274,7 @@ describe('RenderDemand rest frames (a resting walk or tour converges)', () => {
 
   test.each(['walk', 'tour'])('in %s a resting view draws N rest frames on consecutive ticks, numbered from 0, then rests', (mode) => {
     const live = camera();
-    expect(rest(first(live, mode), live, N + 10, mode)).toEqual([0, 1, 2, 3, 4, 5, ...Array.from({ length: 10 }, () => null)]);
+    expect(rest(first(live, mode), live, N + 10, mode)).toEqual([...WAIT, 0, 1, 2, 3, 4, 5, ...Array.from({ length: 8 }, () => null)]);
   });
 
   test.each(['orbit', 'plan3d'])('in %s a resting view draws today`s steady draw and nothing more', (mode) => {
@@ -285,37 +287,42 @@ describe('RenderDemand rest frames (a resting walk or tour converges)', () => {
     expect(rest(first(live, 'plan2d'), live, 5, 'plan2d')).toEqual(['change', 'change', 'change', 'change', 'change']);
   });
 
+  test('a walk drag whose camera moves every third tick draws only its changes; the burst follows once the view has rested', () => {
+    const live = camera();
+    const demand = first(live);
+    const drag = rest(demand, live, 30, 'walk', 32, (tick) => {
+      if (tick % 3 === 0) live.position.x += 0.01;
+    });
+    expect(drag).toEqual(Array.from({ length: 30 }, (_, tick) => (tick % 3 === 0 ? 'change' : null)));
+    // The drag's last two ticks were idle; the third idle tick, where the steady draw would come, starts the burst.
+    expect(rest(demand, live, 40, 'walk', 32)).toEqual([
+      ...Array.from({ length: 32 }, (_, index) => index),
+      ...Array.from({ length: 8 }, () => null),
+    ]);
+  });
+
   test('stops at the count it is given: 32 and 8', () => {
     for (const count of [32, 8]) {
       const live = camera();
       const drawn = rest(first(live), live, count + 20, 'walk', count);
       expect(drawn.filter((draw) => typeof draw === 'number')).toEqual(Array.from({ length: count }, (_, index) => index));
-      expect(drawn.slice(count)).toEqual(Array.from({ length: 20 }, () => null));
+      expect(drawn.slice(WAIT.length + count)).toEqual(Array.from({ length: 20 - WAIT.length }, () => null));
     }
   });
 
-  test('off (no rest frames) is today`s behaviour exactly: the same draws on the same ticks, none of them a rest frame', () => {
-    const script = (tick: number, demand: RenderDemand, live: THREE.PerspectiveCamera): void => {
+  test('asked for no rest frames, a walk draws as it did without them: its changes and their steady draws, none a rest frame', () => {
+    const live = camera();
+    const demand = new RenderDemand();
+    const drawn = rest(demand, live, 50, 'walk', 0, (tick) => {
       if (tick === 5 || tick === 6 || tick === 30) demand.invalidate();
       if (tick === 12) live.position.x += 0.01;
       if (tick === 20) demand.repeat();
-    };
-    const today = new RenderDemand();
-    const todayLive = camera();
-    const off = new RenderDemand();
-    const offLive = camera();
-    const expected: boolean[] = [];
-    const actual: Array<number | 'change' | null> = [];
-    for (let tick = 0; tick < 50; tick += 1) {
-      script(tick, today, todayLive);
-      const draws = today.shouldDraw(todayLive, 'walk');
-      expected.push(draws);
-      if (draws) today.commit(todayLive);
-      actual.push(...rest(off, offLive, 1, 'walk', 0, () => script(tick, off, offLive)));
-    }
-    expect(actual.map((draw) => draw !== null)).toEqual(expected);
-    expect(actual.filter((draw) => typeof draw === 'number')).toEqual([]);
-    expect(off.counters()).toEqual(today.counters());
+    });
+    // The first picture and its steady draw; two changes and their one steady draw; a move, which
+    // owes nothing; a repeat alone, which owes nothing; a change and its steady draw.
+    const draws = [0, 3, 5, 6, 9, 12, 20, 30, 33];
+    expect(drawn).toEqual(Array.from({ length: 50 }, (_, tick) => (draws.includes(tick) ? 'change' : null)));
+    expect(demand.counters()).toEqual({ ticks: 50, draws: draws.length, insetDraws: 0 });
   });
 
   describe('every change resets: its draw is not a rest frame, and the next rest starts again at 0', () => {
@@ -339,21 +346,39 @@ describe('RenderDemand rest frames (a resting walk or tour converges)', () => {
     test.each(causes)('%s', (_name, cause) => {
       const live = camera();
       const demand = first(live);
-      expect(rest(demand, live, 3)).toEqual([0, 1, 2]);
+      expect(rest(demand, live, WAIT.length + 3)).toEqual([...WAIT, 0, 1, 2]);
       const mode = cause(demand, live);
-      expect(rest(demand, live, N + 3, mode)).toEqual(['change', 0, 1, 2, 3, 4, 5, null, null]);
+      expect(rest(demand, live, N + 5, mode)).toEqual(['change', ...WAIT, 0, 1, 2, 3, 4, 5, null, null]);
     });
 
     test('a camera drift below the tolerance does not reset the rest frames', () => {
       const live = camera();
       const demand = first(live);
-      expect(rest(demand, live, N + 2, 'walk', N, () => (live.position.x += POSE_TOLERANCE * 0.3))).toEqual([0, 1, 2, 3, 4, 5, null, null]);
+      expect(rest(demand, live, N + 4, 'walk', N, () => (live.position.x += POSE_TOLERANCE * 0.3))).toEqual([
+        ...WAIT,
+        0,
+        1,
+        2,
+        3,
+        4,
+        5,
+        null,
+        null,
+      ]);
     });
 
     test('a settle window that holds draws repeats, not rest frames; the rest frames follow when it closes', () => {
       const live = camera();
       const demand = first(live);
-      expect(rest(demand, live, 6, 'walk', N, (tick) => tick < 3 && demand.repeat())).toEqual(['change', 'change', 'change', 0, 1, 2]);
+      expect(rest(demand, live, 8, 'walk', N, (tick) => tick < 3 && demand.repeat())).toEqual([
+        'change',
+        'change',
+        'change',
+        ...WAIT,
+        0,
+        1,
+        2,
+      ]);
     });
   });
 
@@ -376,6 +401,7 @@ describe('RenderDemand rest frames (a resting walk or tour converges)', () => {
   test('a failed rest frame is drawn again with the same index', () => {
     const live = camera();
     const demand = first(live);
+    expect(rest(demand, live, WAIT.length)).toEqual(WAIT);
     expect(demand.shouldDraw(live, 'walk', N)).toBe(true);
     expect(demand.restFrame()).toBe(0);
     // The draw threw: nothing committed.

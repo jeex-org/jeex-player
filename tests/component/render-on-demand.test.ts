@@ -61,14 +61,57 @@ async function rest(what: string): Promise<void> {
  */
 type DrawKind = 'change' | 'steady' | 'repeat' | 'rest';
 
-/** A draw a followed change made: its tick, counted from the change (the first tick after it is 1), and its kind. */
-type FollowedDraw = { at: number; kind: DrawKind };
+/**
+ * A draw a followed change made: its tick, counted from the change (the first tick after it is 1),
+ * its kind, and for a rest frame its index.
+ */
+type FollowedDraw = { at: number; kind: DrawKind; rest: number | null };
 
 /** What a followed change drew: ticks up to its last draw, its draws, and each draw. */
 type Followed = { ticks: number; draws: number; drawn: FollowedDraw[] };
 
 /** The gate's own state before a commit, read for the kind of the draw (`RenderDemand`). */
 type GateState = { dirty: boolean; repeating: boolean; idle: number; resting: number | null };
+
+/** The kind of the draw the gate is about to commit, read from its own state. */
+function kindOf(demand: RenderDemand): DrawKind {
+  const gate = demand as unknown as GateState;
+  if (gate.dirty) return 'change';
+  if (gate.repeating) return 'repeat';
+  if (gate.resting !== null) return 'rest';
+  return gate.idle >= STEADY_AFTER_IDLE_TICKS ? 'steady' : 'change';
+}
+
+/** Records every committed draw into `drawn`, its tick counted from `start`; answers the spy to restore. */
+function recordDraws(drawn: FollowedDraw[], start: DemandCounters): { mockRestore(): void } {
+  const commit = Object.getOwnPropertyDescriptor(RenderDemand.prototype, 'commit')!.value as RenderDemand['commit'];
+  return vi.spyOn(RenderDemand.prototype, 'commit').mockImplementation(function (this: RenderDemand, live) {
+    const kind = kindOf(this);
+    const frame = this.restFrame();
+    commit.call(this, live);
+    drawn.push({ at: this.counters().ticks - start.ticks, kind, rest: frame });
+  });
+}
+
+/**
+ * The first rest after `drawn` began: exactly `count` rest frames, numbered from 0, on consecutive
+ * ticks, and no settle-window repeat right after any rest frame (a repeat there would mean the burst
+ * itself brought new GPU resources and started itself again).
+ */
+function expectOneBurst(what: string, drawn: readonly FollowedDraw[], count: number): void {
+  const restarts = drawn.filter((draw, index) => draw.kind === 'repeat' && drawn[index - 1]?.kind === 'rest');
+  expect(restarts, `${what}: no settle repeat after a rest frame`).toEqual([]);
+  const last = drawn.findLastIndex((draw) => draw.kind !== 'rest');
+  const burst = drawn.slice(last + 1);
+  expect(
+    burst.map((draw) => draw.rest),
+    `${what}: the rest frames of the tier, numbered from 0`,
+  ).toEqual(Array.from({ length: count }, (_, index) => index));
+  expect(
+    burst.map((draw) => draw.at - burst[0]!.at),
+    `${what}: on consecutive ticks`,
+  ).toEqual(Array.from({ length: count }, (_, index) => index));
+}
 
 /**
  * Runs `change` on a resting view and follows the draws it caused until the
@@ -79,21 +122,7 @@ async function follow(change: () => void): Promise<Followed> {
   await rest('before the change');
   const start = counters();
   const drawn: FollowedDraw[] = [];
-  const commit = Object.getOwnPropertyDescriptor(RenderDemand.prototype, 'commit')!.value as RenderDemand['commit'];
-  const commits = vi.spyOn(RenderDemand.prototype, 'commit').mockImplementation(function (this: RenderDemand, live) {
-    const gate = this as unknown as GateState;
-    const kind: DrawKind = gate.dirty
-      ? 'change'
-      : gate.repeating
-        ? 'repeat'
-        : gate.resting === null
-          ? gate.idle >= STEADY_AFTER_IDLE_TICKS
-            ? 'steady'
-            : 'change'
-          : 'rest';
-    commit.call(this, live);
-    drawn.push({ at: this.counters().ticks - start.ticks, kind });
-  });
+  const commits = recordDraws(drawn, start);
   try {
     change();
     let last = start;
@@ -120,15 +149,15 @@ async function follow(change: () => void): Promise<Followed> {
  * and owes nothing (`RenderDemand`). One skipped draw fails.
  */
 function expectMotionDrawn(what: string, motion: Followed): void {
-  // A resting walk or tour draws its rest frames on the ticks right after the motion, and they pay
-  // the steady draw; without them the motion ends as it always did.
+  // A resting walk or tour draws its rest frames once the view has rested, from the tick the steady
+  // draw would come on, and they pay the steady draw; without them the motion ends as it always did.
   const rests = motion.drawn.filter((draw) => draw.kind === 'rest');
   const moving = motion.drawn.filter((draw) => draw.kind !== 'rest');
   if (rests.length > 0) {
-    const from = moving.at(-1)!.at + 1;
+    const from = moving.at(-1)!.at + STEADY_AFTER_IDLE_TICKS;
     expect(
       rests.map((draw) => draw.at),
-      `${what}: the rest frames follow the motion on consecutive ticks`,
+      `${what}: the rest frames follow the rested motion on consecutive ticks`,
     ).toEqual(Array.from({ length: rests.length }, (_, index) => from + index));
     expect(motion.drawn.at(-1)!.kind, `${what}: nothing but rest frames after the motion`).toBe('rest');
   }
@@ -221,6 +250,9 @@ describe('walk and tour draw on demand', { timeout: MOUNT_TIMEOUT_MS }, () => {
     throw new Error('no floor ring yet');
   };
   let hasRing = (): boolean => false;
+  /** Every draw from the mount to the first rest with the walk chain attached. */
+  const entry: FollowedDraw[] = [];
+  const tierRestFrames = (): number => QUALITY_TIERS[debug().quality().tier].restFrames;
 
   beforeAll(async () => {
     // The walk floor ring, as the camera controller made it: the receiver of its first `show`.
@@ -233,6 +265,7 @@ describe('walk and tour draw on demand', { timeout: MOUNT_TIMEOUT_MS }, () => {
       camera = live as unknown as THREE.Camera;
       return shouldDraw.call(this, live, mode, restFrames);
     });
+    const entryDraws = recordDraws(entry, { ticks: 0, draws: 0, insetDraws: 0 });
     container = openContainer(480, 320);
     handle = mountViewer(container, {
       scene: { repository: new InlineSceneRepository(demoScene()) },
@@ -243,7 +276,14 @@ describe('walk and tour draw on demand', { timeout: MOUNT_TIMEOUT_MS }, () => {
     await handle.ready;
     handle.setMode('walk');
     await until(() => debug().walkLighting().state === 'live', 'room lighting live', MOUNT_TIMEOUT_MS - 60_000);
-    await rest('walk entry');
+    try {
+      await rest('walk entry');
+      // The rest frames are the chain's: the walk draws directly until it is attached.
+      await until(() => debug().walkPost() === 'on', 'the walk chain attached', TICKS_TIMEOUT_MS);
+      await rest('the first rest with the walk chain');
+    } finally {
+      entryDraws.mockRestore();
+    }
   }, MOUNT_TIMEOUT_MS);
 
   afterAll(() => {
@@ -252,13 +292,20 @@ describe('walk and tour draw on demand', { timeout: MOUNT_TIMEOUT_MS }, () => {
     closeContainers();
   });
 
+  test('the first rest after load is exactly the tier`s rest frames on consecutive ticks, no settle repeat among them', async () => {
+    // Loaded: from the last draw that answered a change (the room lighting going live, or later). Before
+    // it, the lighting's bake brings GPU resources of its own while the view rests.
+    const loaded = entry.slice(entry.findLastIndex((draw) => draw.kind === 'change'));
+    expectOneBurst('the first rest after load', loaded, tierRestFrames());
+  });
+
   test('a change in a resting walk draws, then the rest frames of the tier on consecutive ticks, then nothing', async () => {
     // The rest frames are the chain's: the walk draws directly until it is attached.
     await until(() => debug().walkPost() === 'on', 'the walk chain attached', TICKS_TIMEOUT_MS);
     const motion = await follow(() => debug().toggleDoor(debug().doors()[0]!.id));
     const rests = motion.drawn.filter((draw) => draw.kind === 'rest');
     // As many as the tier in force asks for (`QUALITY_TIERS`).
-    expect(rests).toHaveLength(QUALITY_TIERS[debug().quality().tier].restFrames);
+    expect(rests).toHaveLength(tierRestFrames());
     expectMotionDrawn('door, rest frames', motion);
     expect((await ticks(30)).draws).toBe(0);
     await follow(() => debug().toggleDoor(debug().doors()[0]!.id));
@@ -408,8 +455,11 @@ describe('walk and tour draw on demand', { timeout: MOUNT_TIMEOUT_MS }, () => {
       container.style.width = '440px';
     });
     expect(resized.draws).toBeGreaterThanOrEqual(1);
-    container.style.width = '480px';
-    await rest('the resize back');
+    expectOneBurst('the first rest after a resize', resized.drawn, tierRestFrames());
+    const back = await follow(() => {
+      container.style.width = '480px';
+    });
+    expectOneBurst('the first rest after the resize back', back.drawn, tierRestFrames());
   });
 
   test('a still with a redraw pending succeeds and the redraw still happens', async () => {

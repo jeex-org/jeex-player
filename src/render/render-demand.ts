@@ -37,7 +37,9 @@
  * Rest frames (`walk` and `tour` only, `rest-accumulation.ts`): when the
  * caller asks for them, a view that rests draws that many more pictures of the
  * same inputs on consecutive ticks, numbered from 0 (`restFrame`), and then
- * rests. Any draw that is not a rest frame (a change, a camera move beyond the
+ * rests. Frame 0 comes on the `STEADY_AFTER_IDLE_TICKS`th idle tick, where the
+ * steady draw would, after any draw (a camera move included), so the idle
+ * ticks inside a sparse drag still draw nothing. Any draw that is not a rest frame (a change, a camera move beyond the
  * tolerance, a settle-window repeat, another mode or projection) starts the
  * count again, so the next rest starts at frame 0. A rest frame draws the same
  * inputs again: it pays the steady draw a change owes. Asked for none, the
@@ -87,7 +89,7 @@ export class RenderDemand {
   private dirty = true;
   /** One more draw of unchanged inputs is owed once the view rests: the last draw answered a change (`commit`). */
   private steady = false;
-  /** Ticks with nothing to draw since the last draw, counted while the steady draw is owed. */
+  /** Ticks with nothing to draw since the last draw, counted while the steady draw or rest frame 0 is owed. */
   private idle = 0;
   /** Whether the draw `shouldDraw` last allowed answers `invalidate`. */
   private answering = false;
@@ -142,6 +144,8 @@ export class RenderDemand {
       !within(shown.world, camera.matrixWorld.elements, POSE_TOLERANCE);
     if (changed) return true;
     if (accumulatesIn(mode) && this.rested < restFrames) {
+      // The burst starts where the steady draw would: once the view has really rested.
+      if (this.rested === 0 && ++this.idle < STEADY_AFTER_IDLE_TICKS) return false;
       this.resting = this.rested;
       return true;
     }

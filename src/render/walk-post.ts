@@ -25,10 +25,12 @@
  * its sub-pixel offset for the length of the draw only (the camera's matrices
  * are put back exactly, so render-demand compares the pose it drew), turns the
  * GTAO noise by its angle and skips SMAA, as the jitter antialiases the mean
- * the output pass then shows. The sun's shadow is not jittered: its map is
- * cached and redrawn only when what it shows changed (`sun-shadow.ts`), and a
- * jittered sun would redraw it on every rest frame and once more on the first
- * frame after them, the frame that must stay today's.
+ * the output pass then shows. The sun's shadow map is not redrawn for rest
+ * frames: it is cached and redrawn only when what it shows changed
+ * (`sun-shadow.ts`), and a jittered sun would redraw it on every rest frame
+ * and once more on the first frame after them, the frame that must stay
+ * today's. The shadow edges on screen still converge in the mean like every
+ * other edge, as the beauty pass samples the map through the jittered camera.
  *
  * Mirror invariant: the scene pass draws inside the beauty-pass scope
  * (`shared/scene-pass.ts`), naming the composer buffer it binds, so a mirror
@@ -308,6 +310,8 @@ export class WalkPost implements PostProcessor {
     this.setBalance(this.balance?.live() ?? this.whiteBalance);
     // A capture leaves its own size behind (a clip of N frames resizes once); the live frame takes its size back.
     this.resize(this.liveWidth, this.liveHeight);
+    // The mean's targets come with a draw that answers a change, never with a rest frame (`rest-accumulate-pass.ts`).
+    if (rest === null && this.tier.restFrames > 0) this.accumulate.allocate(this.renderer, this.liveWidth, this.liveHeight);
     this.setRest(rest);
     if (rest === null || rest === 0) {
       this.composer.render(delta);

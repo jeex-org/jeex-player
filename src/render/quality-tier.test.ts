@@ -6,30 +6,9 @@
  */
 
 import { describe, expect, test } from 'bun:test';
-import {
-  QUALITY_TIERS,
-  QualityTierMachine,
-  REST_ACCUMULATION,
-  restFramesFor,
-  startingTier,
-  walkLightingOverridesFor,
-} from './quality-tier.js';
+import { QUALITY_TIERS, QualityTierMachine, startingTier, walkLightingOverridesFor } from './quality-tier.js';
 import { WALK_POST_DEFAULT_TIER, WALK_POST_TUNING } from './walk-post.js';
 import { WALK_LIGHTING_TUNING as T } from './walk-lighting/walk-lighting-tuning.js';
-
-describe('the rest frames a resting walk or tour accumulates', () => {
-  test('32 on high and 8 on low while the switch is on, which it is', () => {
-    expect(REST_ACCUMULATION.on).toBe(true);
-    expect(Object.isFrozen(REST_ACCUMULATION)).toBe(true);
-    expect(restFramesFor('high')).toBe(32);
-    expect(restFramesFor('low')).toBe(8);
-  });
-
-  test('the off switch gives no rest frame on either tier: today`s behaviour', () => {
-    expect(restFramesFor('high', false)).toBe(0);
-    expect(restFramesFor('low', false)).toBe(0);
-  });
-});
 
 describe('QUALITY_TIERS', () => {
   test('high is today`s behaviour: the pixel-ratio cap, the full-resolution AO and three`s default sampling', () => {

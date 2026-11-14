@@ -40,7 +40,8 @@ as described under [Versioning](#versioning).
   drawn before this change, so motion looks the same. The burst is 32 frames on
   the `high` quality tier and 8 on `low`; `orbit`, the top view and the flat
   plan draw as before. Stills and video frames are not averaged. The sun's
-  shadow edges are not softened by it.
+  shadow map is not redrawn for the burst; the shadow edges on screen
+  converge in the average like every other edge.
 - **Every layout issue carries a stable `code` and typed `params`.** A host
   that shows the linter's issues in another language translates the code and
   fills in the params instead of an English sentence. `params` is a union

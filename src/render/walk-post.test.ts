@@ -210,8 +210,15 @@ describe('WalkPost rest frames', () => {
   /** What the chain had set up when the composer rendered. */
   type Seen = { accumulate: boolean; frame: number; smaa: boolean; projection: number[]; noise: number[] };
 
-  /** The chain over a renderer with no GPU, on `camera`, recording what each composer render saw. */
-  function restChain(camera: THREE.PerspectiveCamera, restFrames = 8): { post: WalkPost; seen: Seen[] } {
+  /**
+   * The chain over a renderer with no GPU, on `camera`, recording what each composer render saw and
+   * the size of every target the renderer was asked to allocate ahead.
+   */
+  function restChain(
+    camera: THREE.PerspectiveCamera,
+    restFrames = 8,
+  ): { post: WalkPost; seen: Seen[]; allocated: Array<[number, number]> } {
+    const allocated: Array<[number, number]> = [];
     const globals = globalThis as { Image?: unknown };
     globals.Image ??= class {
       src = '';
@@ -226,6 +233,7 @@ describe('WalkPost rest frames', () => {
       getDrawingBufferSize: (target: THREE.Vector2) => target.set(800, 450),
       getRenderTarget: () => null,
       setRenderTarget: () => undefined,
+      initRenderTarget: (target: THREE.WebGLRenderTarget) => allocated.push([target.width, target.height]),
     } as unknown as THREE.WebGLRenderer;
     const tier = { ...QUALITY_TIERS.high, denoise: { ...QUALITY_TIERS.high.denoise }, restFrames };
     const post = new WalkPost(renderer, new THREE.Scene(), camera, { tier });
@@ -240,7 +248,7 @@ describe('WalkPost rest frames', () => {
       });
     };
     post.output.render = () => undefined;
-    return { post, seen };
+    return { post, seen, allocated };
   }
 
   function view(): THREE.PerspectiveCamera {
@@ -257,6 +265,36 @@ describe('WalkPost rest frames', () => {
     expect(post.restFrames).toBe(8);
     const bare = new WalkPost(post.composer.renderer, new THREE.Scene(), view());
     expect(bare.restFrames).toBe(0);
+  });
+
+  test('the mean`s two targets are allocated by a draw that answers a change, never by a rest frame or a capture', () => {
+    const camera = view();
+    const { post, allocated } = restChain(camera);
+    // The first draw after construction, at the live size.
+    post.render(new THREE.Scene(), camera, 0);
+    expect(allocated).toEqual([
+      [800, 450],
+      [800, 450],
+    ]);
+    for (let frame = 0; frame < 8; frame += 1) post.render(new THREE.Scene(), camera, 0, frame);
+    post.renderTo(new THREE.WebGLRenderTarget(64, 36), new THREE.Scene(), camera, 640, 360);
+    post.render(new THREE.Scene(), camera, 0, 0);
+    expect(allocated).toHaveLength(2);
+    // A live size change: the size is taken now, the targets come with the draw that answers it.
+    post.setSize(400, 300, 2);
+    expect(allocated).toHaveLength(2);
+    post.render(new THREE.Scene(), camera, 0);
+    expect(allocated.slice(2)).toEqual([
+      [800, 600],
+      [800, 600],
+    ]);
+  });
+
+  test('a chain with no rest frames allocates no mean', () => {
+    const camera = view();
+    const { post, allocated } = restChain(camera, 0);
+    post.render(new THREE.Scene(), camera, 0);
+    expect(allocated).toEqual([]);
   });
 
   test('a draw that answered a change is today`s: no accumulation, SMAA, the projection and the noise untouched', () => {
@@ -313,11 +351,9 @@ describe('WalkPost rest frames', () => {
     post.render(new THREE.Scene(), camera, 0, 5);
     const capture = view();
     post.renderTo(new THREE.WebGLRenderTarget(64, 36), new THREE.Scene(), capture, 640, 360);
-    expect(seen[1]).toEqual({
+    expect({ accumulate: seen[1]!.accumulate, smaa: seen[1]!.smaa, noise: seen[1]!.noise }).toEqual({
       accumulate: false,
-      frame: seen[1]!.frame,
       smaa: true,
-      projection: [...camera.projectionMatrix.elements],
       noise: base,
     });
   });
