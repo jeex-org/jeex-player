@@ -25,9 +25,11 @@ import { createLightingContext } from '../../src/lighting/lighting-context.js';
 import { LIGHTING_STANDARD } from '../../src/lighting/lighting-standard.js';
 import type { FurnitureBox, RoomBox, Vec3 } from '../../src/render/walk-lighting/room-volumes.js';
 import type { SceneOp } from '../../src/scene/types.js';
-import { RenderDemand } from '../../src/render/render-demand.js';
+import { RenderDemand, type DemandCounters } from '../../src/render/render-demand.js';
+import { QUALITY_TIERS, type QualityDebug } from '../../src/render/quality-tier.js';
 import { NEW_RESOURCES_SETTLE_MS } from '../../src/render/settle-window.js';
 import { closeContainers, delay, demoScene, nextFrame, openContainer, softwareRasteriser, until } from './support.js';
+import { expectOneBurst, recordDraws, type FollowedDraw } from './render-demand-draws.js';
 
 const MOUNT_TIMEOUT_MS = 300_000;
 const results: Record<string, unknown> = {};
@@ -210,7 +212,8 @@ type Debug = {
   mode: () => string | undefined;
   walkLighting: () => { state: string; stats: unknown };
   applyOps: (ops: SceneOp[]) => { rev?: number; error?: unknown };
-  renderDemand: () => { ticks: number; draws: number };
+  renderDemand: () => DemandCounters;
+  quality: () => QualityDebug;
 };
 
 function debug(): Debug {
@@ -586,6 +589,9 @@ describe('room lighting on the demo apartment', { timeout: MOUNT_TIMEOUT_MS }, (
       drawsAtRefresh = debug().renderDemand().draws;
       REFRESH.apply(this, args);
     });
+    // Every draw from the move on, with its kind, for the rest frames that follow the refresh.
+    const drawn: FollowedDraw[] = [];
+    const commits = recordDraws(drawn, debug().renderDemand());
     expect(debug().applyOps([{ op: 'move_object', assetId: asset.id, position: to }]).error).toBeUndefined();
     await until(() => refreshes > 0, 'the refresh after the debounce', 60_000);
     // A lamp moved: the whole walk lighting re-bakes (grids, then probes) before it is live again.
@@ -609,11 +615,19 @@ describe('room lighting on the demo apartment', { timeout: MOUNT_TIMEOUT_MS }, (
     internals.volumes.boxes.forEach((roomBox, i) => {
       if (roomBox.roomId === ROOM.living) expect(internals.uniforms.jeexProbe.value[i]!.toArray()).toEqual([after.x, after.y, after.z]);
     });
-    // The refresh is drawn, then the view rests: once the settle window its new
-    // probe targets opened has passed (`NEW_RESOURCES_SETTLE_MS`).
+    // The refresh is drawn; once the settle window its new probe targets opened has passed
+    // (`NEW_RESOURCES_SETTLE_MS`), the resting walk draws one burst of the tier's rest frames, then rests.
     await until(() => debug().renderDemand().draws > drawsAtRefresh, 'a draw after the refresh', 10_000);
     await delay(NEW_RESOURCES_SETTLE_MS);
+    const restFrames = QUALITY_TIERS[debug().quality().tier].restFrames;
+    // From the last draw that answered a change: the re-bake going live, or later.
+    const sinceChange = (): FollowedDraw[] => drawn.slice(drawn.findLastIndex((draw) => draw.kind === 'change'));
+    const burst = (): number => sinceChange().length - 1 - sinceChange().findLastIndex((draw) => draw.kind !== 'rest');
+    await until(() => burst() >= restFrames, 'the rest frames after the refresh', 60_000);
     for (let i = 0; i < 3; i += 1) await nextFrame();
+    commits.mockRestore();
+    record('drawsAfterLampMove', sinceChange());
+    expectOneBurst('the rest after the refresh', sinceChange(), restFrames);
     const settled = debug().renderDemand().draws;
     for (let i = 0; i < 30; i += 1) await nextFrame();
     expect(debug().renderDemand().draws).toBe(settled);
