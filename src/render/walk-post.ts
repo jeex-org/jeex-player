@@ -40,7 +40,8 @@
  * `quality-tier.ts`); a disabled stage is skipped by the composer, so `low`
  * draws today's picture. It draws no scene and adds no frame: a draw through
  * the chain is one draw with or without it, and stills and video frames
- * (`renderTo`) carry the glow the live view shows.
+ * (`renderTo`) at the live size carry the glow the live view shows; at
+ * another size the halo keeps its extent in pixels (`glow-pass.ts`).
  *
  * Mirror invariant: the scene pass draws inside the beauty-pass scope
  * (`shared/scene-pass.ts`), naming the composer buffer it binds, so a mirror
@@ -146,14 +147,24 @@ export const WALK_POST_TUNING = Object.freeze({
    * in the bay windows up to 81 (`tests/component/bloom-threshold.test.ts`).
    * `knee`: the high pass's soft edge as a fraction of the threshold, so a
    * value just over it adds little and the full value counts from 1.5 times it.
+   * `mips`: how many of three's five blur mips the halo takes, the narrowest
+   * first. Each mip blurs with a fixed kernel in its own texels, so its reach
+   * is a fixed number of picture pixels (three r186's kernel radius times the
+   * mip's scale): the third about 110, the fourth about 290, the fifth about
+   * 700. With all five, the demo's pendant lifted its own black cord from 7
+   * to 45 levels 150 px above the shade and washed out the door glazing under
+   * it; with the first three the cord keeps its value and the halo round the
+   * shade stays (`tests/component/bloom.test.ts`). Three's pass still blurs
+   * the two wider mips, at a sixteenth and a thirty-second of the picture,
+   * but they add nothing.
    * `strength` and `radius`: three's composite weights. Three adds
-   * 3 x strength x (the sum of its five mip weights at `radius`, 3.0 at 0.3)
-   * of what passes the threshold as halo, so 0.08 adds about 0.7 times a
-   * source's light, spread over the mips and faint per pixel; 0.25 at radius
-   * 0.4 (3.2 times) washed the demo's pendant shade and the door under it
-   * into a white haze and warmed a quarter of the frame.
+   * 3 x strength x (the sum of the kept mips' weights at `radius`: 0.76, 0.68
+   * and 0.6 at 0.3) of what passes the threshold as halo, so 0.08 adds about
+   * half a source's light, faint per pixel; 0.25 at radius 0.4 over five
+   * mips washed the demo's pendant shade and the door under it into a white
+   * haze and warmed a quarter of the frame.
    */
-  bloom: Object.freeze({ threshold: 2.48, knee: 0.5, strength: 0.08, radius: 0.3 }),
+  bloom: Object.freeze({ threshold: 2.48, knee: 0.5, mips: 3, strength: 0.08, radius: 0.3 }),
 });
 
 /** The tuned white balance the chain applies when no room balance answers. */
@@ -414,7 +425,9 @@ export class WalkPost implements PostProcessor {
     // apartment: about 115 ms of links in the first frame through the chain
     // without this), each on a throwaway quad with the target it draws into.
     // Not the output pass's: it replaces its defines at its first render, so
-    // a program compiled before would never be used (`quadMaterials`).
+    // a program compiled before would never be used (`quadMaterials`). Not
+    // the glow's while the tier has none: a switch to high links them at its
+    // first draw.
     // Position and uv only, as three's full-screen quad: a normal attribute is a different program.
     const quad = new THREE.PlaneGeometry(2, 2).deleteAttribute('normal');
     const view = new THREE.OrthographicCamera(-1, 1, 1, -1, 0, 1);
@@ -423,7 +436,8 @@ export class WalkPost implements PostProcessor {
       for (const material of materials) holder.add(new THREE.Mesh(quad, material));
       return holder;
     };
-    const intoBuffers = quadMaterials(this.composer.passes, this.output);
+    const passes = this.composer.passes.filter((pass) => pass !== this.bloom || this.bloom.enabled);
+    const intoBuffers = quadMaterials(passes, this.output);
     try {
       // `compileAsync` creates every program synchronously, before its first
       // await: the target bound here is the one their keys are made with.
@@ -548,7 +562,10 @@ export async function createWalkPost(
 /**
  * The full-screen materials of the chain's passes that draw into its own
  * buffers, compiled ahead on throwaway quads: every pass's but `output`'s,
- * whose defines are replaced at its first render (three r186 `OutputPass`).
+ * whose defines are replaced at its first render (three r186 `OutputPass`),
+ * and but a plain `MeshBasicMaterial`, three's copy to the screen
+ * (`UnrealBloomPass`), drawn only by a pass that renders to the screen, which
+ * in this chain is the output pass alone.
  */
 export function quadMaterials(passes: readonly object[], output: object): THREE.Material[] {
   return passes.filter((pass) => pass !== output).flatMap((pass) => materialsOf(pass));
@@ -558,5 +575,5 @@ export function quadMaterials(passes: readonly object[], output: object): THREE.
 function materialsOf(pass: object): THREE.Material[] {
   return Object.values(pass)
     .flatMap((value: unknown) => (Array.isArray(value) ? (value as unknown[]) : [value]))
-    .filter((value): value is THREE.Material => value instanceof THREE.Material);
+    .filter((value): value is THREE.Material => value instanceof THREE.Material && !(value instanceof THREE.MeshBasicMaterial));
 }

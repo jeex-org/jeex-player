@@ -327,7 +327,13 @@ export const VIEWER_SHELL_TREE: ShellNode = {
               tag: 'div',
               attrs: { class: 'finish-head' },
               children: [
-                { name: 'finish-title', tag: 'span', attrs: { class: 'finish-title' }, text: 'Floor finish' },
+                // The panel fills in the surface's owner when it opens (`selection-panel.ts`).
+                {
+                  name: 'finish-title',
+                  tag: 'span',
+                  attrs: { class: 'finish-title', 'data-i18n': 'panel.floorFinish' },
+                  text: 'Floor finish · {name}',
+                },
                 {
                   name: 'finish-close',
                   tag: 'button',

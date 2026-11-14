@@ -4,6 +4,12 @@
  * over the picture), aimed at a threshold the lighting standard defines in
  * display-referred units.
  *
+ * Reach invariant: the halo takes only the `mips` narrowest mips. A mip's
+ * blur is a fixed kernel in its own texels, so its reach is a fixed number
+ * of picture pixels, and the widest mips lift dark things far from a source;
+ * the halo of a picture of another size has the same extent in pixels, not
+ * the same share of the frame.
+ *
  * Threshold invariant: the stage reads the linear picture BEFORE the output
  * pass applies the camera balance and the exposure (`walk-post.ts`), so the
  * display threshold is turned into the linear one per draw: divided by the
@@ -35,7 +41,7 @@ export function glowThreshold(display: number, exposure: number, balance: Mat3):
 }
 
 /** The stage's tuning, display-referred (`WALK_POST_TUNING.bloom`). */
-export type GlowTuning = { threshold: number; knee: number; strength: number; radius: number };
+export type GlowTuning = { threshold: number; knee: number; mips: number; strength: number; radius: number };
 
 /** The bloom pass with its threshold and knee in display units, aimed per draw by `aim`. */
 export class GlowPass extends UnrealBloomPass {
@@ -45,6 +51,7 @@ export class GlowPass extends UnrealBloomPass {
     // The size is the composer's to set (`EffectComposer.addPass` sizes every pass).
     super(new THREE.Vector2(1, 1), tuning.strength, tuning.radius, tuning.threshold);
     this.tuning = tuning;
+    for (const tint of this.bloomTintColors.slice(tuning.mips)) tint.setScalar(0);
   }
 
   /** Aims the high pass for a picture shown at `exposure` through `balance`: the threshold and its soft knee, linear. */

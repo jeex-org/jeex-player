@@ -43,6 +43,11 @@ import {
   type SetRoomOp,
   type SetRoomPurposeOp,
   type SetSiteOp,
+  type KneeSpace,
+  type LayoutFacts,
+  type SurfaceFacts,
+  type SurfaceTop,
+  type TuckFacts,
 } from './ops.js';
 
 /** A project library's own ids, as its bake minted them. */
@@ -170,6 +175,19 @@ describe('jeex-viewer/ops entry', () => {
     const place: PlaceObjectOp = { op: 'place_object', id: MINTED.placement, asset: ARCHETYPE.sofa_3s, position: { x: 1, y: 0, z: 1 } };
     const batch: SceneOp[] = [rename, place];
     expect(batch.map((op) => op.op)).toEqual(['set_room', 'place_object']);
+  });
+
+  test('the surface facts a layout bank carries can be named on their own, as a host builds a bank of its own', () => {
+    const top: SurfaceTop = { y: 0.74 };
+    const kneeSpace: KneeSpace = { height: 0.68, sides: ['front', 'left'], depth: 0.5 };
+    const tuck: TuckFacts = { depth: 0.3, height: 0.45 };
+    const surfaces: SurfaceFacts = { top, kneeSpace, tuck };
+    const held: LayoutFacts['surfaces'] = surfaces;
+    expect(held).toEqual({
+      top: { y: 0.74 },
+      kneeSpace: { height: 0.68, sides: ['front', 'left'], depth: 0.5 },
+      tuck: { depth: 0.3, height: 0.45 },
+    });
   });
 
   test("a host checks ids with the validator's own rule and translates 1.x catalogue slugs", () => {
