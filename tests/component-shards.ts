@@ -46,6 +46,9 @@ export const COMPONENT_FILE_COST_S: Readonly<Record<string, number>> = {
   'baked-shell.test.ts': 10,
   'baked-surface.test.ts': 39,
   'baked-surface-walk.test.ts': 218,
+  'bloom.test.ts': 4,
+  // Skipped on a software rasteriser: it runs, and proves its spec scenario, only with a GPU switch set (`tests/headless-webgl.ts`).
+  'bloom-threshold.test.ts': 1,
   'camera-preview.test.ts': 1,
   'capture-commands.test.ts': 64,
   // Measured on this machine's SwiftShader with one worker (2026-10-26), not on the hosted runner.

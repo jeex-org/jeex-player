@@ -100,6 +100,13 @@ describe('createViewerShell', () => {
     expect(roots.byName('brand-context').textContent?.trim()).toBe('');
   });
 
+  test('the finish panel`s title is the catalogue`s floor-finish title in the shell`s locale, not a fixed English one', () => {
+    const french = createMessages('fr');
+    const title = createViewerShell(container, french).byName('finish-title').textContent;
+    expect(title).toBe(french.t('panel.floorFinish'));
+    expect(title).not.toBe(createMessages('en').t('panel.floorFinish'));
+  });
+
   test('the root carries lang from the catalogue it was built with', () => {
     const roots = createViewerShell(container, createMessages('ru'));
     expect(roots.root.lang).toBe('ru');

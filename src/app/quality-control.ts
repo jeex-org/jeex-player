@@ -57,6 +57,7 @@ function postInputs(tier: QualityTierName): WalkPostTierInputs {
     denoise: { ...settings.denoise },
     gtaoSamples: settings.gtaoSamples,
     restFrames: settings.restFrames,
+    bloom: settings.bloom,
   };
 }
 

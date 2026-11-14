@@ -1,7 +1,7 @@
 # walk-post-processing Specification
 
 ## Purpose
-What the player draws in walk and tour: a post-processing chain of ambient occlusion, antialiasing, the walk white balance and the display transform, when it is active and how it loads, and how mirrors and captures behave under it. Editing modes render straight to the screen.
+What the player draws in walk and tour: a post-processing chain of ambient occlusion, antialiasing, a glow round bright sources on the high tier, the walk white balance and the display transform, when it is active and how it loads, and how mirrors and captures behave under it. Editing modes render straight to the screen.
 
 ## Requirements
 
@@ -23,7 +23,7 @@ The player SHALL render through the post-processing chain while the camera mode 
 
 ### Requirement: Chain contents
 
-The chain SHALL apply, in order, ground-truth ambient occlusion (world-space radius 0.3 m, at the drawing-buffer resolution, denoised without crossing depth breaks), SMAA and the lighting standard's display transform preceded by the walk white balance (capability `walk-white-balance`) in the same pass, rendering the scene in linear half-float colour without multisampling and tone mapping it exactly once.
+The chain SHALL apply, in order, ground-truth ambient occlusion (world-space radius 0.3 m, at the drawing-buffer resolution, denoised without crossing depth breaks), the rest accumulation (capability `render-loop`), SMAA, the glow (requirement «Glow round bright sources») and the lighting standard's display transform preceded by the walk white balance (capability `walk-white-balance`) in the same pass, rendering the scene in linear half-float colour without multisampling and tone mapping it exactly once.
 
 #### Scenario: Corner darkening
 - **WHEN** a walk view shows a floor-to-wall corner and an open patch of the same floor
@@ -40,6 +40,39 @@ The chain SHALL apply, in order, ground-truth ambient occlusion (world-space rad
 #### Scenario: White balance adds no pass
 - **WHEN** the chain is built
 - **THEN** its last pass applies the white balance and the display transform, and the white balance adds no pass and no render target
+
+### Requirement: Glow round bright sources
+
+On the `high` quality tier the chain SHALL add, after the rest accumulation and SMAA and before the display transform, a glow in linear light round whatever the display would show as flat white, and nothing else. The threshold SHALL be display-referred: the value PBR Neutral shows at 0.97 of white (2.48 before tone mapping, after the walk exposure and the camera balance), converted per draw to linear light through the renderer's exposure and the balance's gain on grey, the live balance for the screen and the capture camera's for a capture. A lit surface SHALL stay under it (the room balance holds a room's lit surfaces about a third of it on average). The glow SHALL stay near its source: it takes only the three narrowest of the pass's five blur mips, so it reaches about 110 picture pixels and leaves a dark object 200 px from a source as it was. Its reach is a number of picture pixels, not a share of the frame: a capture at the live size carries the glow the live view shows, and a capture of another size carries a halo of the same extent in pixels. The stage SHALL draw no scene and add no display draw; on the `low` tier, and on a chain built without a tier, it SHALL NOT run, and the picture SHALL be byte for byte the one drawn without the stage.
+
+#### Scenario: A lit wall stays, a lamp's core glows
+- **WHEN** the demo flat is seen in walk at rest with its lamps on
+- **THEN** no lit wall pixel reaching the glow reads over the threshold, a pendant's lit inside reads several times over it, and the sun's glints in the bay windows read over it
+- **AND** this is measured on a hardware GPU only (the browser tests with a GPU switch set); a software rasteriser skips it, as the room lighting's bake takes too long there
+
+#### Scenario: The glow stays near its source
+- **WHEN** a dark thin object stands about 200 px from a source far over the threshold
+- **THEN** it keeps its value within 2 levels of the picture without the stage, while the pixels just off the source's edge glow
+
+#### Scenario: Glow of the mean
+- **WHEN** a resting view's rest frames alternate between a picture over the threshold and one whose average with it is under the threshold
+- **THEN** the view shows the average without glow, not the average of the frames' glows
+
+#### Scenario: Captures carry the glow
+- **WHEN** a still or a video frame is captured in walk or tour on the high tier at the live view's size
+- **THEN** it carries the glow the live view of the same picture shows
+
+#### Scenario: A capture of another size
+- **WHEN** a still is captured at twice the size of another still of the same view
+- **THEN** the glow beside a source's edge has the same extent in pixels in both, not the same share of the frame
+
+#### Scenario: Low is unchanged
+- **WHEN** the chain runs on the `low` tier
+- **THEN** the screen and every capture are byte for byte the picture of the chain without the stage
+
+#### Scenario: Resize and restore
+- **WHEN** the drawing buffer is resized, or the GPU context is lost and restored
+- **THEN** the glow's targets follow the new size at half resolution, and the chain rebuilt on the restored context glows on the high tier
 
 ### Requirement: What occludes
 

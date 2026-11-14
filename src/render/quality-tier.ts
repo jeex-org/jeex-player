@@ -7,9 +7,10 @@
  * trades drawing-buffer resolution for frame rate on a slow device. The
  * settings below are the drawing buffer's pixel-ratio cap, the occlusion
  * buffer's resolution, the GTAO ray count, the denoise's samples and radius,
- * the probes' bake pace and the rest frames a resting walk or tour view
- * accumulates; today the tiers differ in the cap, the bake pace and the rest
- * frames, the occlusion being the same on both. The tone curve, the exposure,
+ * the probes' bake pace, the rest frames a resting walk or tour view
+ * accumulates and the glow round bright sources; today the tiers differ in
+ * the cap, the bake pace, the rest frames and the glow, the occlusion being
+ * the same on both. The tone curve, the exposure,
  * the sun and its 2048-texel shadow, the lamp occlusion, the sky, SMAA and the
  * half-float targets are identical on every tier — and so is the probes'
  * capture edge, which the probe atlas pins (see `probeSize` below).
@@ -58,6 +59,8 @@ export const QUALITY_TIERS = Object.freeze({
     probesPerFrame: 6,
     /** Rest frames a resting walk or tour view averages (`rest-accumulation.ts`): edges, occlusion noise and fine detail settle within about half a second. */
     restFrames: 32,
+    /** The glow round bright sources (`walk-post.ts`, `glow-pass.ts`). */
+    bloom: true,
   }),
   low: Object.freeze({
     /** A quarter less fill in each direction; the largest single win on a phone GPU. */
@@ -83,6 +86,8 @@ export const QUALITY_TIERS = Object.freeze({
     probesPerFrame: 4,
     /** None: each rest frame is a whole frame of GPU time on the phone tier, and that cost is not measured yet; off until it is. */
     restFrames: 0,
+    /** None: the low tier draws exactly as before the glow stage existed, and its cost on a phone is not measured. */
+    bloom: false,
   }),
 });
 

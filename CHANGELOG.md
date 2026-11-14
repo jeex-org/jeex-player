@@ -9,6 +9,11 @@ as described under [Versioning](#versioning).
 
 ### Added
 
+- **The surface fact types from `jeex-viewer/ops`.** `SurfaceFacts` and its
+  parts `SurfaceTop`, `KneeSpace` and `TuckFacts` (types only) name the
+  surfaces a layout bank carries: a top, the room under it and how far a seat
+  tucks in, so a host that builds a bank of its own types it without
+  restating them.
 - **A ceiling piece may hang only over a host's top.** The asset fact
   `overHost: true` (optional, like `onSurface`; a baked project's
   `ProjectObject` accepts it, and its schema refuses it on an object whose
@@ -42,6 +47,20 @@ as described under [Versioning](#versioning).
   not measured yet); `orbit`, the top view and the flat plan draw as before. Stills and video frames are not averaged. The sun's
   shadow map is not redrawn for the burst; the shadow edges on screen
   converge in the average like every other edge.
+- **Bright sources glow in walk and tour on the `high` quality tier.** A
+  bare bulb, the lit inside of a lamp shade, the sun's glints on window
+  glass and sunlit openings now spread a soft halo instead of ending in a
+  hard flat-white edge. Only what the display would show as flat white glows
+  (brighter than any lit surface: walls, ceilings and a shade's fabric stay
+  as they were, and so does the body of a sky through a window); the glow is
+  computed on the resting view's average, so it does not shimmer while the
+  view converges, and it is tone-mapped with the rest of the picture. The
+  halo stays near its source (about 110 pixels), so a dark cord or a door
+  frame a little further away keeps its colour. Stills and video frames taken
+  in walk and tour at the live view's size carry the same glow the live view
+  shows; at another size the halo keeps its extent in pixels, not its share
+  of the frame. The `low` tier draws exactly as before, and `orbit`, the top view
+  and the flat plan are unchanged. No new option.
 - **Every layout issue carries a stable `code` and typed `params`.** A host
   that shows the linter's issues in another language translates the code and
   fills in the params instead of an English sentence. `params` is a union

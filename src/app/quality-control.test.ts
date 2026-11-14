@@ -102,7 +102,13 @@ describe('QualityControl', () => {
     h.control.set('low');
     expect(h.caps).toEqual([low.pixelRatioCap]);
     expect(h.tiers).toEqual([
-      { aoResolutionScale: low.aoResolutionScale, denoise: { ...low.denoise }, gtaoSamples: low.gtaoSamples, restFrames: low.restFrames },
+      {
+        aoResolutionScale: low.aoResolutionScale,
+        denoise: { ...low.denoise },
+        gtaoSamples: low.gtaoSamples,
+        restFrames: low.restFrames,
+        bloom: low.bloom,
+      },
     ]);
     expect(h.drawnFrames()).toBeGreaterThan(0);
     h.control.set('high');

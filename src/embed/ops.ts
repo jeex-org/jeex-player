@@ -240,12 +240,19 @@ export type { DoorLeaf } from '../layout/door-leaf.js';
  * about something else: `projectLayoutCatalogue` is the only public BUILDER of
  * a bank (the shipped default stays private), which is how a catalogue dialog
  * asks about a BAKED PROJECT, and `LayoutCatalogue` / `LayoutFacts` are the
- * types that let a caller name and hold the bank it built.
+ * types that let a caller name and hold the bank it built; `SurfaceFacts`
+ * with its parts `SurfaceTop`, `KneeSpace` and `TuckFacts` names the
+ * surfaces field of `LayoutFacts` (a top, the room under it, how far a seat
+ * tucks in), so a bank of the host's own is typed without reaching into
+ * `assets/`.
  */
 export { suggestPlacement } from '../layout/free-space.js';
 export type { PlacementRequest, PlacementSuggestion } from '../layout/free-space.js';
 export { projectLayoutCatalogue } from '../layout/layout-lint.js';
 export type { LayoutCatalogue, LayoutFacts } from '../layout/layout-lint.js';
+// The surface facts `LayoutFacts.surfaces` carries, by name: a host that builds
+// a bank of its own types a desk's top, its knee space and a chair's tuck with them.
+export type { SurfaceFacts, SurfaceTop, KneeSpace, TuckFacts } from '../assets/asset-types.js';
 
 export { applyPresetBatch, findPreset, standardPreset, presetCoverage, presetBatchOps } from '../scene/interior-presets.js';
 export type { PresetModel, PresetCoverage } from '../scene/interior-presets.js';

@@ -6,6 +6,10 @@
 import { describe, expect, test } from 'bun:test';
 import * as THREE from 'three';
 import { quadMaterials, WALK_POST_TUNING, WalkPost, type WalkPostTierInputs } from './walk-post.js';
+import { glowThreshold } from './glow-pass.js';
+import { ASSET_FINISHES } from '../materials/asset-finish-catalogue.js';
+import { WALK_LIGHTING_TUNING } from './walk-lighting/walk-lighting-tuning.js';
+import type { Mat3 } from './white-balance.js';
 import { QUALITY_TIERS } from './quality-tier.js';
 import { restJitter, restNoiseAngle, rotateNoise } from './rest-accumulation.js';
 
@@ -19,7 +23,24 @@ describe('WALK_POST_TUNING', () => {
       denoise: { depthPhi: 0.05, normalPhi: 8, lumaPhi: 10, radius: 6, samples: 16 },
       // The calibrated values and their measurement are pinned by `tests/component/walk-glossy.test.ts`.
       whiteBalance: { source: [expect.any(Number), expect.any(Number), expect.any(Number)], degree: expect.any(Number) },
+      bloom: { threshold: 2.48, knee: 0.5, mips: 3, strength: 0.08, radius: 0.3 },
     });
+  });
+
+  test('the glow threshold is where PBR Neutral shows a grey at 0.97 of white, over every lit surface the room balance makes', () => {
+    // The derivation is in `WALK_POST_TUNING.bloom`; the measurement on the demo flat is
+    // `tests/component/bloom-threshold.test.ts`. Three r186's PBR Neutral on a grey of `x` over its knee:
+    const neutral = (x: number): number => 1 - (0.24 * 0.24) / (x - 0.04 + 0.24 - 0.76);
+    expect(neutral(WALK_POST_TUNING.bloom.threshold)).toBeCloseTo(0.97, 3);
+    // A lit white wall's mean and a room's lit highlight quantile stay well under it...
+    expect(WALK_LIGHTING_TUNING.balance.targetLevel).toBeLessThan(WALK_POST_TUNING.bloom.threshold / 2.5);
+    expect(WALK_LIGHTING_TUNING.balance.highlightCap).toBeLessThan(WALK_POST_TUNING.bloom.threshold / 1.4);
+    // ...and the warm bulb finish's own glow under the walk exposure is over it, before any light falls on it
+    // (#ffcf8a at 1.8 today: linear luminance 0.677 x 1.8 x 3.5 = 4.27)...
+    const finish = ASSET_FINISHES.find((entry) => entry.slug === 'lamp_warm')!.pbr;
+    const glow = new THREE.Color(finish.emissive).multiplyScalar(finish.emissiveIntensity!);
+    const bulb = (0.2126 * glow.r + 0.7152 * glow.g + 0.0722 * glow.b) * WALK_LIGHTING_TUNING.walkExposure;
+    expect(bulb).toBeGreaterThan(1.5 * WALK_POST_TUNING.bloom.threshold);
   });
 
   test('is frozen', () => {
@@ -27,6 +48,22 @@ describe('WALK_POST_TUNING', () => {
     expect(Object.isFrozen(WALK_POST_TUNING.denoise)).toBe(true);
     expect(Object.isFrozen(WALK_POST_TUNING.whiteBalance)).toBe(true);
     expect(Object.isFrozen(WALK_POST_TUNING.whiteBalance.source)).toBe(true);
+    expect(Object.isFrozen(WALK_POST_TUNING.bloom)).toBe(true);
+  });
+});
+
+describe('glowThreshold', () => {
+  const IDENTITY: Mat3 = [1, 0, 0, 0, 1, 0, 0, 0, 1];
+
+  test('the display threshold over the exposure and the balance`s gain on a neutral grey, in the linear units the stage reads', () => {
+    expect(glowThreshold(1.67, 1, IDENTITY)).toBeCloseTo(1.67, 12);
+    expect(glowThreshold(1.67, 3.5, IDENTITY)).toBeCloseTo(1.67 / 3.5, 12);
+    // A room opened up by 1.5 stops: what displays as bright needs less linear light.
+    const opened = IDENTITY.map((value) => value * 2 ** 1.5) as unknown as Mat3;
+    expect(glowThreshold(1.67, 3.5, opened)).toBeCloseTo(1.67 / (3.5 * 2 ** 1.5), 12);
+    // A balance that only moves colour keeps the threshold: its rows' luminance weights sum to 1 on grey.
+    const warm: Mat3 = [0.9, 0, 0, 0, 1, 0, 0, 0, 1 + (0.1 * 0.2126) / 0.0722];
+    expect(glowThreshold(1.67, 1, warm)).toBeCloseTo(1.67, 12);
   });
 });
 
@@ -98,6 +135,7 @@ describe('WalkPost per-tier inputs', () => {
     denoise: { ...QUALITY_TIERS.low.denoise, radius: 4, samples: 8 },
     gtaoSamples: 8,
     restFrames: 0,
+    bloom: false,
   };
 
   /** The chain over a renderer with no GPU: nothing is drawn, only the sizes are watched. */
@@ -158,7 +196,7 @@ describe('WalkPost per-tier inputs', () => {
     expect(disposed).toBe(0);
     expect(post.occlusion).toBe(original);
     expect(post.composer.passes[1]).toBe(post.occlusion);
-    expect(post.composer.passes.length).toBe(5);
+    expect(post.composer.passes.length).toBe(6);
     expect(post.occlusion.gtaoMaterial.defines['SAMPLES']!).toBe(8);
     expect(post.occlusion.pdMaterial.uniforms['radius']!.value).toBe(4);
     // The scale applies at once, without waiting for a resize...
@@ -177,6 +215,7 @@ describe('WalkPost per-tier inputs', () => {
       denoise: { ...WALK_POST_TUNING.denoise, radius: 4 },
       gtaoSamples: 16,
       restFrames: 0,
+      bloom: false,
     };
     post.applyTier(sameSamples);
     expect(post.occlusion).toBe(original);
@@ -196,6 +235,82 @@ describe('WalkPost per-tier inputs', () => {
   });
 });
 
+describe('WalkPost glow stage', () => {
+  /** The chain over a renderer with no GPU on `tier` (default: none). */
+  function glowChain(tier?: WalkPostTierInputs): WalkPost {
+    const globals = globalThis as { Image?: unknown };
+    globals.Image ??= class {
+      src = '';
+      onload: (() => void) | null = null;
+      decode(): Promise<void> {
+        return Promise.resolve();
+      }
+    };
+    const renderer = {
+      getPixelRatio: () => 1,
+      getSize: (target: THREE.Vector2) => target.set(800, 450),
+      getDrawingBufferSize: (target: THREE.Vector2) => target.set(800, 450),
+      getRenderTarget: () => null,
+      setRenderTarget: () => undefined,
+      // Records what `compile` links; never settles, so nothing is warmed on this renderer.
+      compileAsync: (scene: THREE.Scene) => {
+        scene.traverse((object) => {
+          if (object instanceof THREE.Mesh) linked.add(object.material as THREE.Material);
+        });
+        return new Promise<void>(() => {});
+      },
+    } as unknown as THREE.WebGLRenderer;
+    return new WalkPost(renderer, new THREE.Scene(), new THREE.PerspectiveCamera(), tier ? { tier } : {});
+  }
+  /** The materials the last chains' `compile` handed the renderer. */
+  const linked = new Set<THREE.Material>();
+  /** The stage's own materials, alone or in its list of blurs. */
+  const glowMaterials = (post: WalkPost): THREE.Material[] =>
+    Object.values(post.bloom)
+      .flatMap((value: unknown) => (Array.isArray(value) ? (value as unknown[]) : [value]))
+      .filter((value): value is THREE.Material => value instanceof THREE.Material);
+  const tierOf = (name: 'high' | 'low'): WalkPostTierInputs => ({ ...QUALITY_TIERS[name], denoise: { ...QUALITY_TIERS[name].denoise } });
+
+  test('sits after the rest accumulation and SMAA, right before the output pass', () => {
+    const post = glowChain(tierOf('high'));
+    expect(post.composer.passes).toEqual([post.beauty, post.occlusion, post.accumulate, post.smaa, post.bloom, post.output]);
+  });
+
+  test('is on on the high tier and off on the low tier and on a chain built without a tier; a tier switch turns it', () => {
+    expect(glowChain(tierOf('high')).bloom.enabled).toBe(true);
+    expect(glowChain(tierOf('low')).bloom.enabled).toBe(false);
+    expect(glowChain().bloom.enabled).toBe(false);
+    const post = glowChain(tierOf('high'));
+    post.applyTier(tierOf('low'));
+    expect(post.bloom.enabled).toBe(false);
+    post.applyTier(tierOf('high'));
+    expect(post.bloom.enabled).toBe(true);
+  });
+
+  test('compile links the stage`s programs only while the tier has it, and never its unused copy to the screen', () => {
+    const low = glowChain(tierOf('low'));
+    linked.clear();
+    void low.compile(new THREE.Scene(), new THREE.PerspectiveCamera());
+    expect(linked.has(low.output.material)).toBe(false);
+    expect(glowMaterials(low).filter((material) => linked.has(material))).toEqual([]);
+    expect(linked.size).toBeGreaterThan(0);
+    const high = glowChain(tierOf('high'));
+    linked.clear();
+    void high.compile(new THREE.Scene(), new THREE.PerspectiveCamera());
+    const glow = glowMaterials(high);
+    expect(glow.filter((material) => !linked.has(material))).toEqual(
+      glow.filter((material) => material instanceof THREE.MeshBasicMaterial),
+    );
+    expect(glow.filter((material) => linked.has(material)).length).toBeGreaterThanOrEqual(8);
+  });
+
+  test('its targets follow the chain`s size at half resolution', () => {
+    const post = glowChain(tierOf('high'));
+    post.setSize(640, 360, 1);
+    expect([post.bloom.renderTargetBright.width, post.bloom.renderTargetBright.height]).toEqual([320, 180]);
+  });
+});
+
 describe('quadMaterials', () => {
   test('the chain compiles every pass material ahead but the output pass, whose defines change at its first render', () => {
     const blur = new THREE.ShaderMaterial();
@@ -203,6 +318,12 @@ describe('quadMaterials', () => {
     const shown = new THREE.ShaderMaterial();
     const output = { material: shown, enabled: true };
     expect(quadMaterials([{ blur, size: 2 }, { edges }, output], output)).toEqual([blur, edges]);
+  });
+
+  test('a pass that keeps its materials in a list (a blur per mip) has every one compiled', () => {
+    const mips = [new THREE.ShaderMaterial(), new THREE.ShaderMaterial()];
+    const output = { material: new THREE.ShaderMaterial() };
+    expect(quadMaterials([{ mips, sizes: [1, 2], screen: new THREE.MeshBasicMaterial() }, output], output)).toEqual(mips);
   });
 });
 
