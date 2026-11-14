@@ -237,6 +237,9 @@ describe('jeex-viewer/ops entry', () => {
       'countIssues',
       'describeIssues',
       'doorClearZones',
+      // The issue codes a host translates a lint issue by, and the English sentence each one renders.
+      'LAYOUT_ISSUE_CODES',
+      'renderLayoutIssue',
       // A door panel's "automatic (now: …)": the resolved hinge and swing, and whether the document names each.
       'doorLeaf',
       'applyPresetBatch',

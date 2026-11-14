@@ -16,6 +16,7 @@ import {
   TOUCH_TOL_M,
   apart,
   boxCentre,
+  layoutIssue,
   nearestFace,
   type LayoutIssue,
   type LayoutRuleModule,
@@ -35,13 +36,13 @@ function itemInWall(ctx: LintContext, item: LintItem, out: LayoutIssue[]): void 
     if (depth > worst.depth) worst = { depth, wallId: solid.wallId };
   }
   if (worst.depth <= TOUCH_TOL_M) return;
-  out.push({
-    rule: 'inside-a-wall',
-    severity: 'error',
-    ids: [item.placement.id, worst.wallId],
-    message: `${item.placement.id} is ${worst.depth.toFixed(2)} m inside wall ${worst.wallId}`,
-    at: boxCentre(item.box!),
-  });
+  out.push(
+    layoutIssue(
+      'object_inside_wall',
+      { placement: item.placement.id, wall: worst.wallId, depth: worst.depth },
+      { severity: 'error', ids: [item.placement.id, worst.wallId], at: boxCentre(item.box!) },
+    ),
+  );
 }
 
 function ruleWalls(ctx: LintContext, out: LayoutIssue[]): void {
@@ -56,13 +57,13 @@ function ruleCaseGoods(ctx: LintContext, out: LayoutIssue[]): void {
     const near = nearestFace(ctx.plan, item.roomId, back) ?? nearestFace(ctx.plan, null, back);
     if (!near) continue;
     if (near.distance <= CASE_GOOD_GAP_M) continue;
-    out.push({
-      rule: 'case-goods-on-a-wall',
-      severity: 'warning',
-      ids: [item.placement.id],
-      message: `${item.placement.id} stands ${near.distance.toFixed(2)} m off the nearest wall face; case goods belong against a wall`,
-      at: centre,
-    });
+    out.push(
+      layoutIssue(
+        'case_good_off_wall',
+        { placement: item.placement.id, distance: near.distance },
+        { severity: 'warning', ids: [item.placement.id], at: centre },
+      ),
+    );
   }
 }
 

@@ -9,6 +9,23 @@ as described under [Versioning](#versioning).
 
 ### Added
 
+- **Every layout issue carries a stable `code` and typed `params`.** A host
+  that shows the linter's issues in another language translates the code and
+  fills in the params instead of an English sentence. `params` is a union
+  keyed by `code`, so checking the code narrows the params; they hold ids,
+  wall faces as `{ wall, side }`, catalogue archetype ids and anchors, and
+  unrounded metres and degrees, never English words. `message` is unchanged
+  and is now rendered from the code and params by `renderLayoutIssue`, which
+  takes the pair as one value: `renderLayoutIssue(issue)` for a `LayoutIssue`,
+  and a code with another code's params does not compile.
+  `jeex-viewer/ops` exports the vocabulary `LAYOUT_ISSUE_CODES`, the renderer
+  and the types `LayoutIssueCode`, `LayoutIssueParams`, `LayoutIssueDetail`
+  and `LayoutIssueFace`; README «Layout issue codes» lists every code with its
+  params and an example sentence. The codes are public API: adding one is a
+  minor change, renaming or removing one, or changing its params, is breaking.
+  So a host that maps codes to its own sentences types its table as
+  `Partial<Record<LayoutIssueCode, …>>` and falls back to `message` for a code
+  it does not know.
 - **`doorLeaf` names the room on each side of a door.** Its answer carries
   `rooms: { in, out }`: the room id the leaf opens into with `swing: 'in'` and
   with `swing: 'out'`, `null` where that side is outside the flat (a facade),
@@ -436,6 +453,10 @@ as described under [Versioning](#versioning).
 
 ### Changed (breaking)
 
+- **`LayoutIssue` requires `code` and `params`.** A custom `LayoutLinter`
+  (the `lint` option of `SceneModel`) builds each issue it returns with a code
+  of `LAYOUT_ISSUE_CODES` and that code's params; the shipped `lintLayout`
+  already does.
 - **The package is `@jeex-org/jeex-viewer`.** GitHub Packages takes scoped
   names only. Install it under the old name through an alias
   (`"jeex-viewer": "npm:@jeex-org/jeex-viewer@<version>"`), and every import
@@ -1072,8 +1093,9 @@ as described under [Versioning](#versioning).
   furniture then reports as «no path» to that door in the merged room, and
   the edit was refused. Such a path error is now old when the door had «no
   free floor in front of it» in a merged room before, at the same approach
-  point, and the batch moves no furniture. Rule 6 writes its three sentences
-  through `circulationSentence` (`layout/layout-issue.ts`).
+  point, and the batch moves no furniture. Rule 6's three issues are told
+  apart by their codes (`door_no_free_floor`, `doors_not_connected`,
+  `main_zone_unreachable`), not by their English.
 - **`strict-new` keeps a blockage the merged room already had.** Removing
   the walls of a furnished room merges it into its neighbour, and the same
   furniture that left its doors with no free floor then reports as a blocked
@@ -1387,7 +1409,9 @@ the embed bridge (`src/embed/protocol.ts`):
 - the set or meaning of `ViewerOptions` keys consumed by
   `mountViewer`/`<jeex-viewer>` (removing a key, changing its default, or
   changing what a value means — additions are minor);
-- `schemaVersion` on the scene document format.
+- `schemaVersion` on the scene document format;
+- the layout issue codes (`LAYOUT_ISSUE_CODES`): renaming or removing a
+  code, or changing its params, is breaking; adding a code is minor.
 
 Not every major bump touches `PROTOCOL_VERSION` — a `ViewerHandle` or
 `ViewerOptions` change local to the in-page API, with no postMessage

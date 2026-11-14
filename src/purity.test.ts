@@ -106,6 +106,7 @@ const PURE_MODULES = [
   'materials/canvas-2d',
   'layout/layout-geometry',
   'layout/layout-issue',
+  'layout/layout-issue-codes',
   'plan/door-swing',
   'doors/door-state',
   'layout/layout-lint',

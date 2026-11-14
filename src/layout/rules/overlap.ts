@@ -12,7 +12,16 @@
  */
 
 import { overlapDepth, quadCentre } from '../layout-geometry.js';
-import { TOUCH_TOL_M, apart, boxCentre, type LayoutIssue, type LayoutRuleModule, type LintContext, type LintItem } from './context.js';
+import {
+  TOUCH_TOL_M,
+  apart,
+  boxCentre,
+  layoutIssue,
+  type LayoutIssue,
+  type LayoutRuleModule,
+  type LintContext,
+  type LintItem,
+} from './context.js';
 import { standsOn, tucksUnder } from './surfaces.js';
 
 /** True when two floor items may share plan space by their facts or by height. */
@@ -33,13 +42,11 @@ function pairIssue(a: LintItem, b: LintItem): LayoutIssue | null {
     const depth = overlapDepth(a.quad, b.quad);
     if (depth <= TOUCH_TOL_M) return null;
     if (combine(a, b)) return null;
-    return {
-      rule: 'no-interpenetration',
-      severity: 'error',
-      ids: [a.placement.id, b.placement.id],
-      message: `${a.placement.id} and ${b.placement.id} overlap by ${depth.toFixed(2)} m`,
-      at: quadCentre([boxCentre(a.box!), boxCentre(b.box!)]),
-    };
+    return layoutIssue(
+      'objects_overlap',
+      { placement: a.placement.id, other: b.placement.id, depth },
+      { severity: 'error', ids: [a.placement.id, b.placement.id], at: quadCentre([boxCentre(a.box!), boxCentre(b.box!)]) },
+    );
   }
   return mountIssue(a, b);
 }
@@ -51,19 +58,17 @@ function pairIssue(a: LintItem, b: LintItem): LayoutIssue | null {
  * a mirror is not. A wall piece and a ceiling piece never meet here.
  */
 function mountIssue(a: LintItem, b: LintItem): LayoutIssue | null {
-  if (!a.mount || !b.mount || a.anchor !== b.anchor) return null;
+  if (!a.mount || !b.mount || a.anchor !== b.anchor || a.anchor === 'floor') return null;
   const vertical = Math.min(a.mount.high, b.mount.high) - Math.max(a.mount.low, b.mount.low);
   if (vertical <= TOUCH_TOL_M) return null;
   if (apart(a.mount.quad, b.mount.quad)) return null;
   const depth = overlapDepth(a.mount.quad, b.mount.quad);
   if (depth <= TOUCH_TOL_M) return null;
-  return {
-    rule: 'no-interpenetration',
-    severity: 'error',
-    ids: [a.placement.id, b.placement.id],
-    message: `${a.placement.id} and ${b.placement.id} overlap by ${depth.toFixed(2)} m on the ${a.anchor}`,
-    at: quadCentre([quadCentre(a.mount.quad), quadCentre(b.mount.quad)]),
-  };
+  return layoutIssue(
+    'mounted_objects_overlap',
+    { placement: a.placement.id, other: b.placement.id, depth, anchor: a.anchor },
+    { severity: 'error', ids: [a.placement.id, b.placement.id], at: quadCentre([quadCentre(a.mount.quad), quadCentre(b.mount.quad)]) },
+  );
 }
 
 function ruleOverlap(ctx: LintContext, out: LayoutIssue[]): void {

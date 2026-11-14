@@ -23,6 +23,7 @@ import type { AssetLayout, SurfaceFacts } from '../../assets/asset-types.js';
 import type { SolvedPlan, WallFace } from '../../plan/plan-solver.js';
 import type { DemoAsset, SceneData, Vec2, Wall } from '../../scene/types.js';
 import type { LayoutIssue, LayoutRule } from '../layout-issue.js';
+import type { LayoutIssueFace } from '../layout-issue-codes.js';
 
 /* ------------------------------------------------------------- tunables --- */
 
@@ -39,12 +40,13 @@ export const DOOR_CLEAR_SPAN = 0.9;
 
 /*
  * The issue vocabulary (`LayoutRule`, `LAYOUT_RULE_IDS`, `layoutRuleOrder`,
- * `LayoutIssue`) lives one layer down in `layout/layout-issue.ts` so that
+ * `LayoutIssue`, and `layoutIssue`, the one builder of an issue from its code
+ * and params) lives one layer down in `layout/layout-issue.ts` so that
  * `SceneModel.apply` can report issues without importing the linter that
  * computes them (`.dependency-cruiser.cjs`, layer `layout/issue`). It is
  * re-exported here unchanged: every rule module already asks this file for it.
  */
-export { LAYOUT_RULE_IDS, layoutRuleOrder } from '../layout-issue.js';
+export { LAYOUT_RULE_IDS, layoutIssue, layoutRuleOrder } from '../layout-issue.js';
 export type { LayoutIssue, LayoutRule } from '../layout-issue.js';
 
 /** One placement, resolved against the object bank and reduced to plan geometry. */
@@ -191,9 +193,9 @@ export function pointToBox(box: Obb, point: Vec2): number {
   return Math.hypot(Math.max(0, lx), Math.max(0, lz));
 }
 
-/** A wall face in an issue's sentence: its side and the wall it belongs to. */
-export function faceLabel(face: WallFace): string {
-  return `side ${face.side} of wall ${face.wallId}`;
+/** A wall face as an issue names it: the wall it belongs to and its side. */
+export function issueFace(face: WallFace): LayoutIssueFace {
+  return { wall: face.wallId, side: face.side };
 }
 
 /** Nearest wall face of `roomId` to a plan point, with the perpendicular gap. */

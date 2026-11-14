@@ -19,8 +19,7 @@
 import { add, boundsOf, dist, distanceToPolygon, mul, pointInPolygon } from '../../plan/plan-geometry.js';
 import { roomCentroid } from '../layout-geometry.js';
 import type { Obb } from '../../plan/plan-geometry.js';
-import { DOOR_CLEAR_M, pointToBox, type LayoutIssue, type LayoutRuleModule, type LintContext } from './context.js';
-import { circulationSentence } from '../layout-issue.js';
+import { DOOR_CLEAR_M, layoutIssue, pointToBox, type LayoutIssue, type LayoutRuleModule, type LintContext } from './context.js';
 import type { Vec2 } from '../../scene/types.js';
 
 /** Half-width of the circulation corridor, metres: a 0.8 m path. */
@@ -165,7 +164,7 @@ function ruleCirculation(ctx: LintContext, out: LayoutIssue[]): void {
     const floor = room.face ?? room.polygon;
     const small = isSmallRoom(floor);
     const half = small ? STANDING_HALF_M : CORRIDOR_HALF_M;
-    const width = (2 * half).toFixed(2);
+    const width = 2 * half;
     const grid = corridorGrid(floor, boxes, half);
     const approaches: Array<{ openingId: string; point: Vec2 }> = [];
     for (const door of ctx.doors) {
@@ -183,13 +182,13 @@ function ruleCirculation(ctx: LintContext, out: LayoutIssue[]): void {
     for (const approach of approaches) {
       const seeds = grid.near(approach.point, DOOR_APPROACH_M);
       if (seeds.length === 0) {
-        out.push({
-          rule: 'circulation',
-          severity: 'error',
-          ids: [approach.openingId, room.roomId],
-          message: circulationSentence.noFloor(approach.openingId, width, room.roomId),
-          at: approach.point,
-        });
+        out.push(
+          layoutIssue(
+            'door_no_free_floor',
+            { opening: approach.openingId, room: room.roomId, width },
+            { severity: 'error', ids: [approach.openingId, room.roomId], at: approach.point },
+          ),
+        );
         continue;
       }
       reachable.push({ openingId: approach.openingId, seeds, point: approach.point });
@@ -201,13 +200,13 @@ function ruleCirculation(ctx: LintContext, out: LayoutIssue[]): void {
     const seen = flood(grid, first.seeds);
     for (const target of reachable.slice(1)) {
       if (target.seeds.some((cell) => seen[cell])) continue;
-      out.push({
-        rule: 'circulation',
-        severity: 'error',
-        ids: [first.openingId, target.openingId, room.roomId],
-        message: circulationSentence.noPath(first.openingId, target.openingId, width, room.roomId),
-        at: target.point,
-      });
+      out.push(
+        layoutIssue(
+          'doors_not_connected',
+          { from: first.openingId, to: target.openingId, room: room.roomId, width },
+          { severity: 'error', ids: [first.openingId, target.openingId, room.roomId], at: target.point },
+        ),
+      );
     }
     // A small room's standing spot is its main zone.
     if (small) continue;
@@ -221,13 +220,13 @@ function ruleCirculation(ctx: LintContext, out: LayoutIssue[]): void {
       }
     }
     if (!reachesCentre) {
-      out.push({
-        rule: 'circulation',
-        severity: 'error',
-        ids: [room.roomId, first.openingId],
-        message: circulationSentence.mainZone(room.roomId, first.openingId),
-        at: centre,
-      });
+      out.push(
+        layoutIssue(
+          'main_zone_unreachable',
+          { room: room.roomId, opening: first.openingId, width },
+          { severity: 'error', ids: [room.roomId, first.openingId], at: centre },
+        ),
+      );
     }
   }
 }

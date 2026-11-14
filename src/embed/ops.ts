@@ -9,7 +9,8 @@
  * shape, the validator the model loads through, the registries interface plus
  * the shipped `CATALOGUE_REGISTRIES` a server-side caller injects, the finish
  * projections, the touched-asset predicates, the plan solver and the layout
- * lint. It also carries the two boundaries the caller reaches for rather than
+ * lint, whose issues carry a stable code and typed params a host translates
+ * (`LAYOUT_ISSUE_CODES`, `renderLayoutIssue`). It also carries the two boundaries the caller reaches for rather than
  * inventing them: the interior-preset helpers (a preset is just a batch of
  * ops) and the `zod/mini` op and scene schemas, so a host can shape-check a
  * document before it hands it to the validator.
@@ -219,6 +220,10 @@ export type { PlanCaveat } from '../plan/floor-ownership.js';
 export { lintLayout, countIssues, describeIssues, doorClearZones } from '../layout/layout-lint.js';
 export type { DoorClearZone, LayoutIssue, LayoutRule, LayoutIssueCounts } from '../layout/layout-lint.js';
 export type { LayoutLinter } from '../layout/layout-issue.js';
+// What a host translates an issue by: the code vocabulary, each code's params and the English renderer
+// `LayoutIssue.message` is built with. The codes are public: adding one is minor, renaming or removing one breaking.
+export { LAYOUT_ISSUE_CODES, renderLayoutIssue } from '../layout/layout-issue-codes.js';
+export type { LayoutIssueCode, LayoutIssueDetail, LayoutIssueFace, LayoutIssueParams } from '../layout/layout-issue-codes.js';
 // `door-swing` and `opening-frame` are already in the entry graph through
 // `lintLayout`; the only new module is `layout/door-leaf.ts`.
 export { doorLeaf } from '../layout/door-leaf.js';

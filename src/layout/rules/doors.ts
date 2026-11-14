@@ -16,6 +16,7 @@ import {
   TOUCH_TOL_M,
   apart,
   doorClearZone,
+  layoutIssue,
   type DoorZone,
   type LayoutIssue,
   type LayoutRuleModule,
@@ -61,13 +62,11 @@ function clearIssue(zone: ClearZone, item: LintItem): LayoutIssue | null {
   if (!item.quad || apart(item.quad, zone.quad)) return null;
   const depth = overlapDepth(item.quad, zone.quad);
   if (depth <= TOUCH_TOL_M) return null;
-  return {
-    rule: 'door-clear-zone',
-    severity: 'error',
-    ids: [zone.door.openingId, item.placement.id],
-    message: `${item.placement.id} stands in the clear zone of ${zone.door.openingId} (${zone.roomId} side)`,
-    at: quadCentre(zone.quad),
-  };
+  return layoutIssue(
+    'door_clear_zone_blocked',
+    { placement: item.placement.id, opening: zone.door.openingId, room: zone.roomId },
+    { severity: 'error', ids: [zone.door.openingId, item.placement.id], at: quadCentre(zone.quad) },
+  );
 }
 
 function ruleDoorClearance(ctx: LintContext, out: LayoutIssue[]): void {
@@ -94,13 +93,11 @@ function sweepHits(sweep: Sweep, item: LintItem): boolean {
 }
 
 function swingIssue(sweep: Sweep, id: string): LayoutIssue {
-  return {
-    rule: 'door-swing-path',
-    severity: 'error',
-    ids: [sweep.door.openingId, id],
-    message: `the leaf of ${sweep.door.openingId} sweeps through ${id}`,
-    at: sweep.door.swing.pivot,
-  };
+  return layoutIssue(
+    'door_leaf_hits_object',
+    { opening: sweep.door.openingId, placement: id },
+    { severity: 'error', ids: [sweep.door.openingId, id], at: sweep.door.swing.pivot },
+  );
 }
 
 function ruleDoorSwing(ctx: LintContext, out: LayoutIssue[]): void {
@@ -110,13 +107,13 @@ function ruleDoorSwing(ctx: LintContext, out: LayoutIssue[]): void {
       for (const wall of ctx.solids) if (overlapDepth(quad, wall.quad) > TOUCH_TOL_M) hitWall.add(wall.wallId);
     }
     for (const wallId of hitWall) {
-      out.push({
-        rule: 'door-swing-path',
-        severity: 'error',
-        ids: [sweep.door.openingId, wallId],
-        message: `the leaf of ${sweep.door.openingId} sweeps through wall ${wallId}`,
-        at: sweep.door.swing.pivot,
-      });
+      out.push(
+        layoutIssue(
+          'door_leaf_hits_wall',
+          { opening: sweep.door.openingId, wall: wallId },
+          { severity: 'error', ids: [sweep.door.openingId, wallId], at: sweep.door.swing.pivot },
+        ),
+      );
     }
     for (const item of ctx.items) if (sweepHits(sweep, item)) out.push(swingIssue(sweep, item.placement.id));
   }

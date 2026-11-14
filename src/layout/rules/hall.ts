@@ -12,6 +12,7 @@ import { doorSweepQuads } from '../../plan/door-swing.js';
 import {
   TOUCH_TOL_M,
   boxCentre,
+  layoutIssue,
   pointToBox,
   positionOf,
   sideZone,
@@ -45,13 +46,13 @@ function ruleHall(ctx: LintContext, out: LayoutIssue[]): void {
         for (const corner of quad) closest = Math.min(closest, pointToBox(rack.box!, corner));
       }
       if (closest >= COAT_RACK_CLEAR_M) continue;
-      out.push({
-        rule: 'hall',
-        severity: 'warning',
-        ids: [rack.placement.id, door.openingId],
-        message: `${rack.placement.id} stands ${closest.toFixed(2)} m from the swing of ${door.openingId}`,
-        at: boxCentre(rack.box!),
-      });
+      out.push(
+        layoutIssue(
+          'coat_rack_in_door_swing',
+          { placement: rack.placement.id, opening: door.openingId, distance: closest },
+          { severity: 'warning', ids: [rack.placement.id, door.openingId], at: boxCentre(rack.box!) },
+        ),
+      );
     }
   }
 
@@ -65,13 +66,13 @@ function ruleHall(ctx: LintContext, out: LayoutIssue[]): void {
     if (!host) continue;
     const sideways = Math.abs(dot(sub(boxCentre(host.box!), centre), { x: -mirror.front.z, z: mirror.front.x }));
     if (sideways <= MIRROR_OFFSET_M) continue;
-    out.push({
-      rule: 'hall',
-      severity: 'warning',
-      ids: [mirror.placement.id, host.placement.id],
-      message: `${mirror.placement.id} is ${sideways.toFixed(2)} m off the centre of ${host.placement.id}`,
-      at: centre,
-    });
+    out.push(
+      layoutIssue(
+        'mirror_off_host_centre',
+        { placement: mirror.placement.id, host: host.placement.id, offset: sideways },
+        { severity: 'warning', ids: [mirror.placement.id, host.placement.id], at: centre },
+      ),
+    );
   }
 
   const entrance = ctx.doors.find((door) => door.wall.openings?.some((opening) => opening.id === door.openingId && opening.entrance));
@@ -81,13 +82,13 @@ function ruleHall(ctx: LintContext, out: LayoutIssue[]): void {
     for (const item of ctx.items) {
       if (!item.quad) continue;
       if (overlapDepth(item.quad, axis) <= TOUCH_TOL_M) continue;
-      out.push({
-        rule: 'hall',
-        severity: 'warning',
-        ids: [entrance.openingId, item.placement.id],
-        message: `${item.placement.id} stands on the axis from ${entrance.openingId} into ${side.roomId}`,
-        at: quadCentre(axis),
-      });
+      out.push(
+        layoutIssue(
+          'entrance_axis_blocked',
+          { placement: item.placement.id, opening: entrance.openingId, room: side.roomId },
+          { severity: 'warning', ids: [entrance.openingId, item.placement.id], at: quadCentre(axis) },
+        ),
+      );
     }
   }
 }

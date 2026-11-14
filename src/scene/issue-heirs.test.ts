@@ -1,6 +1,6 @@
 import { describe, expect, test } from 'bun:test';
 import { heirsOf, inheritedCirculation, inheritedKeys, inheritedPath, issueKey } from './issue-heirs.js';
-import { circulationSentence } from '../layout/layout-issue.js';
+import { layoutIssue } from '../layout/layout-issue.js';
 import type { SceneOp } from './types.js';
 
 /** Readable stand-ins: the module only compares strings, so the ids need not be UUIDs. */
@@ -105,22 +105,22 @@ describe('inheritedPath', () => {
   const merges = [{ from: DINING, to: LIVING, summary: '' }];
   /** D's approach point: where a path error to D is reported, and where its boxed-in error was. */
   const D_POINT = { x: 7.56, z: 5.71 };
-  const noFloor = (opening: string, room: string, at: { x: number; z: number }) => ({
-    rule: 'circulation' as const,
-    ids: [opening, room],
-    message: circulationSentence.noFloor(opening, '0.80', room),
-    at,
-  });
-  const path = {
-    rule: 'circulation' as const,
-    ids: [T, D, LIVING],
-    message: circulationSentence.noPath(T, D, '0.80', LIVING),
-    at: D_POINT,
-  };
+  const noFloor = (opening: string, room: string, at: { x: number; z: number }) =>
+    layoutIssue('door_no_free_floor', { opening, room, width: 0.8 }, { severity: 'error', ids: [opening, room], at });
+  const path = layoutIssue(
+    'doors_not_connected',
+    { from: T, to: D, room: LIVING, width: 0.8 },
+    { severity: 'error', ids: [T, D, LIVING], at: D_POINT },
+  );
   const wallsOnly: SceneOp[] = [{ op: 'remove_wall', wallId: 'wall' }];
 
   test('the target door was boxed in at that same point before, and the batch moved no furniture: inherited', () => {
     expect(inheritedPath(path, [noFloor(D, DINING, D_POINT)], merges, wallsOnly)).toBe(true);
+  });
+
+  test('the sentences are told apart by their code, not their English', () => {
+    const reworded = (issue: ReturnType<typeof noFloor>) => ({ ...issue, message: 'translated' });
+    expect(inheritedPath(reworded(path), [reworded(noFloor(D, DINING, D_POINT))], merges, wallsOnly)).toBe(true);
   });
 
   test('4.2: both doors were clear before, the path between them blocked: new', () => {
@@ -128,7 +128,11 @@ describe('inheritedPath', () => {
   });
 
   test('4.3: an endpoint with another circulation error before does not excuse a new blockage', () => {
-    const mainZone = { rule: 'circulation' as const, ids: [DINING, D], message: circulationSentence.mainZone(DINING, D), at: D_POINT };
+    const mainZone = layoutIssue(
+      'main_zone_unreachable',
+      { room: DINING, opening: D, width: 0.8 },
+      { severity: 'error', ids: [DINING, D], at: D_POINT },
+    );
     expect(inheritedPath(path, [mainZone], merges, wallsOnly)).toBe(false);
   });
 
