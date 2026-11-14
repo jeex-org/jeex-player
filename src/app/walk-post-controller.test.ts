@@ -256,12 +256,14 @@ describe('applyTierInputs', () => {
     denoise: { depthPhi: 0.05, normalPhi: 8, lumaPhi: 10, radius: 4, samples: 8 },
     gtaoSamples: 8,
     restFrames: 0,
+    bloom: false,
   };
   const HIGH = {
     aoResolutionScale: 1,
     denoise: { depthPhi: 0.05, normalPhi: 8, lumaPhi: 10, radius: 6, samples: 16 },
     gtaoSamples: 16,
     restFrames: 32,
+    bloom: true,
   };
 
   test('hands the per-tier inputs to the built walk chain; false while there is none', async () => {

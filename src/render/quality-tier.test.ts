@@ -20,6 +20,7 @@ describe('QUALITY_TIERS', () => {
       probeSize: 128,
       probesPerFrame: 6,
       restFrames: 32,
+      bloom: true,
     });
     // The numbers above are copies of the live tuning, pinned here so a tuning
     // change that forgets the tier fails loudly instead of silently leaving
@@ -29,6 +30,8 @@ describe('QUALITY_TIERS', () => {
     // A chain built without a tier starts on the default inputs (`walk-post.ts`);
     // a ray count the default chain does not share would make `high` the stranger.
     expect(WALK_POST_DEFAULT_TIER.gtaoSamples).toBe(QUALITY_TIERS.high.gtaoSamples);
+    // A chain built without a tier draws no glow: the inputs before tiers existed.
+    expect(WALK_POST_DEFAULT_TIER.bloom).toBe(false);
     expect(QUALITY_TIERS.high.probeSize).toBe(T.probeSize);
     expect(QUALITY_TIERS.high.probesPerFrame).toBe(T.probesPerFrame);
   });
@@ -45,6 +48,8 @@ describe('QUALITY_TIERS', () => {
       probesPerFrame: 4,
       // No rest burst until its cost on the phone tier is measured.
       restFrames: 0,
+      // No glow: the low tier draws exactly as before the bloom stage existed.
+      bloom: false,
     });
     // A reduced occlusion buffer leaves stair-stepped halos on door and table
     // edges: the blend's bilinear upsampling crosses depth (`walk-post.ts`).

@@ -154,12 +154,13 @@ function mirrorRoom(gl: THREE.WebGLRenderer): { scene: THREE.Scene; camera: THRE
   return { scene, camera, scopes };
 }
 
-async function chainOn(gl: THREE.WebGLRenderer, scene: THREE.Scene, camera: THREE.Camera, restFrames = 8): Promise<WalkPost> {
+async function chainOn(gl: THREE.WebGLRenderer, scene: THREE.Scene, camera: THREE.Camera, restFrames = 8, bloom = true): Promise<WalkPost> {
   const tier = {
     aoResolutionScale: 1,
     denoise: { depthPhi: 0.05, normalPhi: 8, lumaPhi: 10, radius: 6, samples: 16 },
     gtaoSamples: 16,
     restFrames,
+    bloom,
   };
   const chain = await createWalkPost(gl, scene, camera, { tier });
   disposers.push(() => chain.dispose());
@@ -178,7 +179,7 @@ describe('rest frames through the chain', () => {
   test('a chain on the low tier (no rest frames), drawn as the gate draws a resting walk, shows render(…, null) byte for byte', async () => {
     const gl = renderer();
     const { scene, camera } = mirrorRoom(gl);
-    const chain = await chainOn(gl, scene, camera, QUALITY_TIERS.low.restFrames);
+    const chain = await chainOn(gl, scene, camera, QUALITY_TIERS.low.restFrames, QUALITY_TIERS.low.bloom);
     const demand = new RenderDemand();
     const rests: Array<number | null> = [];
     let resting: Uint8Array | null = null;
@@ -199,7 +200,7 @@ describe('rest frames through the chain', () => {
     expect(resting!.every((value, index) => value === plain[index])).toBe(true);
   });
 
-  test('rest frames bring no GPU resource the settle window counts: the mean comes with the first draw and with a live resize', async () => {
+  test('rest frames bring no GPU resource the settle window counts: the mean and the glow targets come with the first draw and with a live resize', async () => {
     const gl = renderer();
     const { scene, camera } = mirrorRoom(gl);
     const chain = await chainOn(gl, scene, camera);
