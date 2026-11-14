@@ -11,7 +11,6 @@ import { WALK_LIGHTING_TUNING } from './walk-lighting/walk-lighting-tuning.js';
 import type { Mat3 } from './white-balance.js';
 import { QUALITY_TIERS } from './quality-tier.js';
 import { restJitter, restNoiseAngle, rotateNoise } from './rest-accumulation.js';
-import { LIGHTING_STANDARD } from '../lighting/lighting-standard.js';
 
 describe('WALK_POST_TUNING', () => {
   test('GTAO at 0.3 m world radius on a full-resolution buffer with depth-aware denoise, half-float targets without multisampling', () => {
@@ -23,22 +22,22 @@ describe('WALK_POST_TUNING', () => {
       denoise: { depthPhi: 0.05, normalPhi: 8, lumaPhi: 10, radius: 6, samples: 16 },
       // The calibrated values and their measurement are pinned by `tests/component/walk-glossy.test.ts`.
       whiteBalance: { source: [expect.any(Number), expect.any(Number), expect.any(Number)], degree: expect.any(Number) },
-      bloom: { threshold: 1.67, knee: 0.5, strength: 0.25, radius: 0.4 },
+      bloom: { threshold: 2.48, knee: 0.5, strength: 0.08, radius: 0.3 },
     });
   });
 
-  test('the glow threshold is the room balance`s highlight cap: the brightest a lit surface is let to display', () => {
+  test('the glow threshold is where PBR Neutral shows a grey at 0.97 of white, over every lit surface the room balance makes', () => {
     // The derivation is in `WALK_POST_TUNING.bloom`; the measurement on the demo flat is
-    // `tests/component/bloom-threshold.test.ts`.
-    expect(WALK_POST_TUNING.bloom.threshold).toBe(WALK_LIGHTING_TUNING.balance.highlightCap);
-    // A lit white wall's mean display level stays well under it...
-    expect(WALK_LIGHTING_TUNING.balance.targetLevel).toBeLessThan(WALK_POST_TUNING.bloom.threshold / 1.5);
-    // ...the warm bulb finish's own glow under the walk exposure is over it, before any light falls on it
+    // `tests/component/bloom-threshold.test.ts`. Three r186's PBR Neutral on a grey of `x` over its knee:
+    const neutral = (x: number): number => 1 - (0.24 * 0.24) / (x - 0.04 + 0.24 - 0.76);
+    expect(neutral(WALK_POST_TUNING.bloom.threshold)).toBeCloseTo(0.97, 3);
+    // A lit white wall's mean and a room's lit highlight quantile stay well under it...
+    expect(WALK_LIGHTING_TUNING.balance.targetLevel).toBeLessThan(WALK_POST_TUNING.bloom.threshold / 2.5);
+    expect(WALK_LIGHTING_TUNING.balance.highlightCap).toBeLessThan(WALK_POST_TUNING.bloom.threshold / 1.4);
+    // ...and the warm bulb finish's own glow under the walk exposure is over it, before any light falls on it
     // (#ffcf8a at 1.8: linear luminance 0.677 x 1.8 x 3.5 = 4.27)...
     const bulb = 0.677 * 1.8 * WALK_LIGHTING_TUNING.walkExposure;
-    expect(bulb).toBeGreaterThan(2 * WALK_POST_TUNING.bloom.threshold);
-    // ...and so is a host sky through a window at the standard's brightness.
-    expect(LIGHTING_STANDARD.hdri.skyBrightness).toBeGreaterThan(WALK_POST_TUNING.bloom.threshold);
+    expect(bulb).toBeGreaterThan(1.5 * WALK_POST_TUNING.bloom.threshold);
   });
 
   test('is frozen', () => {

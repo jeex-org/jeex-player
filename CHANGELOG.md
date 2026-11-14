@@ -42,6 +42,17 @@ as described under [Versioning](#versioning).
   not measured yet); `orbit`, the top view and the flat plan draw as before. Stills and video frames are not averaged. The sun's
   shadow map is not redrawn for the burst; the shadow edges on screen
   converge in the average like every other edge.
+- **Bright sources glow in walk and tour on the `high` quality tier.** A
+  bare bulb, the lit inside of a lamp shade, the sun's glints on window
+  glass and sunlit openings now spread a soft halo instead of ending in a
+  hard flat-white edge. Only what the display would show as flat white glows
+  (brighter than any lit surface: walls, ceilings and a shade's fabric stay
+  as they were, and so does the body of a sky through a window); the glow is
+  computed on the resting view's average, so it does not shimmer while the
+  view converges, and it is tone-mapped with the rest of the picture. Stills
+  and video frames taken in walk and tour carry the same glow the live view
+  shows. The `low` tier draws exactly as before, and `orbit`, the top view
+  and the flat plan are unchanged. No new option.
 - **Every layout issue carries a stable `code` and typed `params`.** A host
   that shows the linter's issues in another language translates the code and
   fills in the params instead of an English sentence. `params` is a union

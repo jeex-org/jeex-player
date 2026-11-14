@@ -180,7 +180,7 @@ describe('a resting view glows on the mean', () => {
     expect(glow).toBeGreaterThan(20 * HALF_FLOAT_MEAN);
     // 1.8 T and 0 in turn: the mean is 0.9 T, under the threshold, so the glow of the mean is none.
     const [shown, mean] = draw(Array.from({ length: 8 }, (_, frame) => (frame % 2 === 0 ? 1.8 * T : 0)));
-    expect(mean).toBeCloseTo(0.9 * T, 2);
+    expect(Math.abs(mean - 0.9 * T)).toBeLessThan(HALF_FLOAT_MEAN);
     expect(Math.abs(shown - mean)).toBeLessThan(HALF_FLOAT_MEAN);
     // The mean of the frames' glows would have been the mean plus half the steady glow.
     expect(Math.abs(shown - (mean + glow / 2))).toBeGreaterThan(10 * HALF_FLOAT_MEAN);

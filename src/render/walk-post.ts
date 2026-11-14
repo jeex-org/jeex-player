@@ -1,17 +1,21 @@
 /**
  * The walk and tour post-processing chain: ambient occlusion (GTAO) and SMAA
- * over the lit scene, then the lighting standard's display transform; at rest,
- * the running mean of jittered frames.
+ * over the lit scene, a glow round what is brighter than any lit surface on
+ * the high tier, then the lighting standard's display transform; at rest, the
+ * running mean of jittered frames.
  *
- * With `rest-accumulate-pass.ts`, the only module that imports three's
- * post-processing addons. It is loaded on demand
+ * With `rest-accumulate-pass.ts` and `glow-pass.ts`, the only modules that
+ * import three's post-processing addons. It is loaded on demand
  * (`app/walk-post-controller.ts`): a separate chunk in the ES and demo builds,
  * inline in the IIFE build, which cannot split code.
  *
- * Chain: scene pass → GTAO → rest accumulation → SMAA → output pass, on
- * half-float composer targets without multisampling. The scene pass renders
+ * Chain: scene pass → GTAO → rest accumulation → SMAA → glow → output pass,
+ * on half-float composer targets without multisampling. The scene pass renders
  * into a plain target, where three applies no tone mapping and keeps the
- * working (linear) colour space; SMAA expects linear input; the output pass
+ * working (linear) colour space; SMAA expects linear input; the glow
+ * (`glow-pass.ts`) adds its halo in linear light to the averaged picture, so
+ * a resting view glows on the mean of its frames and the glow does not flicker
+ * with the jitter, and the halo is tone-mapped with the picture; the output pass
  * applies the camera white balance (one linear 3x3 matrix, clamped at zero,
  * `white-balance.ts`), then the renderer's tone mapping (PBR Neutral),
  * exposure and sRGB encoding once. The renderer's own tone mapping setting
@@ -31,6 +35,12 @@
  * and once more on the first frame after them, the frame that must stay
  * today's. The shadow edges on screen still converge in the mean like every
  * other edge, as the beauty pass samples the map through the jittered camera.
+ *
+ * Glow invariant: the tier decides whether the glow stage runs (`high` only,
+ * `quality-tier.ts`); a disabled stage is skipped by the composer, so `low`
+ * draws today's picture. It draws no scene and adds no frame: a draw through
+ * the chain is one draw with or without it, and stills and video frames
+ * (`renderTo`) carry the glow the live view shows.
  *
  * Mirror invariant: the scene pass draws inside the beauty-pass scope
  * (`shared/scene-pass.ts`), naming the composer buffer it binds, so a mirror
@@ -58,6 +68,7 @@ import type { PostProcessor } from './post-processor.js';
 import { ViewerLibError } from '../shared/errors.js';
 import { whiteBalanceMatrix, type Mat3 } from './white-balance.js';
 import { RestAccumulatePass } from './rest-accumulate-pass.js';
+import { GlowPass } from './glow-pass.js';
 import { jitterProjection, restJitter, restNoiseAngle, rotateNoise } from './rest-accumulation.js';
 
 // The walk and tour room lighting travels in this chunk: one lazy load for everything walk adds.
@@ -110,6 +121,39 @@ export const WALK_POST_TUNING = Object.freeze({
    * `tests/component/walk-glossy.test.ts` repeats the measurement.
    */
   whiteBalance: Object.freeze({ source: Object.freeze([1, 0.6846, 0.4076] as const), degree: 0.554 }),
+  /**
+   * The glow stage (`glow-pass.ts`), display-referred: values after the walk
+   * exposure and the camera balance, before tone mapping.
+   *
+   * `threshold`: only what the display transform turns flat white glows, and
+   * a lit surface never is. PBR Neutral (the standard's tone curve) shows a
+   * grey of `x` at `newPeak = 1 - 0.24² / (x - 0.04 - 0.52)` above its knee;
+   * flat white is taken as 0.97 of the display maximum, so the threshold is
+   * `0.56 + 0.0576 / 0.03 = 2.48`. The room balance
+   * (`walk-lighting/room-balance.ts`) puts a white surface's mean at
+   * `targetLevel` (0.85, a third of the threshold) and a room's 97th
+   * percentile of lit surfaces at `highlightCap` (1.67, PBR Neutral 0.95); the
+   * few lit texels above that quantile stay well under 2.48. Over it: a bare
+   * bulb (the warm lamp finish alone, #ffcf8a at 1.8: linear luminance 0.677
+   * x 1.8 x the walk exposure 3.5 = 4.27, before any light falls on it), the
+   * inside of a shade lit at close range by its lamp, the sun's glints and
+   * sunlit openings. A window sky's body does not glow: the standard sets its
+   * median under the knee (`LIGHTING_STANDARD.hdri.skyBrightness`), and so
+   * does a glowing shade's outer fabric (`lamp-shade-emissive.test.ts`), both
+   * bright surfaces, not sources. Measured on the demo flat in walk through
+   * the chain on an NVIDIA GPU: lit walls at most 1.76, a shade's fabric at a
+   * median of 1.1 to 1.4, a pendant's lit inside up to 67 and the sun's glints
+   * in the bay windows up to 81 (`tests/component/bloom-threshold.test.ts`).
+   * `knee`: the high pass's soft edge as a fraction of the threshold, so a
+   * value just over it adds little and the full value counts from 1.5 times it.
+   * `strength` and `radius`: three's composite weights. Three adds
+   * 3 x strength x (the sum of its five mip weights at `radius`, 3.0 at 0.3)
+   * of what passes the threshold as halo, so 0.08 adds about 0.7 times a
+   * source's light, spread over the mips and faint per pixel; 0.25 at radius
+   * 0.4 (3.2 times) washed the demo's pendant shade and the door under it
+   * into a white haze and warmed a quarter of the frame.
+   */
+  bloom: Object.freeze({ threshold: 2.48, knee: 0.5, strength: 0.08, radius: 0.3 }),
 });
 
 /** The tuned white balance the chain applies when no room balance answers. */
@@ -152,9 +196,9 @@ export type WalkPostOptions = {
 
 /**
  * The per-tier inputs the chain takes (quality tiers, `quality-tier.ts`): the
- * occlusion buffer's resolution scale, the GTAO denoise, the GTAO ray count
- * and the rest frames a resting view averages (none: it draws as before they
- * existed). The ray count is a shader define: three sets needsUpdate and relinks
+ * occlusion buffer's resolution scale, the GTAO denoise, the GTAO ray count,
+ * the rest frames a resting view averages (none: it draws as before they
+ * existed) and whether the glow stage runs (off: it draws as before it existed). The ray count is a shader define: three sets needsUpdate and relinks
  * that one program on a live switch (`applyTier`); the denoise is uniforms
  * and defines the material applies itself; the scale is effective at the next
  * `setSize`.
@@ -164,14 +208,16 @@ export type WalkPostTierInputs = {
   denoise: { depthPhi: number; normalPhi: number; lumaPhi: number; radius: number; samples: number };
   gtaoSamples: number;
   restFrames: number;
+  bloom: boolean;
 };
 
-/** The inputs the chain ran with before the tiers existed: the tuning, three's default ray count and no rest frames. */
+/** The inputs the chain ran with before the tiers existed: the tuning, three's default ray count, no rest frames and no glow. */
 export const WALK_POST_DEFAULT_TIER: WalkPostTierInputs = Object.freeze({
   aoResolutionScale: WALK_POST_TUNING.aoResolutionScale,
   denoise: WALK_POST_TUNING.denoise,
   gtaoSamples: 16,
   restFrames: 0,
+  bloom: false,
 });
 
 /** The scene pass, drawing inside the beauty-pass scope a mirror captures in. */
@@ -233,6 +279,7 @@ export class WalkPost implements PostProcessor {
   readonly occlusion: OcclusionPass;
   readonly accumulate: RestAccumulatePass;
   readonly smaa: SMAAPass;
+  readonly bloom: GlowPass;
   readonly output: OutputPass;
   /** The white balance the output pass applies when no balance source answers, row-major. */
   readonly whiteBalance: Mat3;
@@ -275,13 +322,15 @@ export class WalkPost implements PostProcessor {
     this.accumulate = new RestAccumulatePass();
     this.accumulate.enabled = false;
     this.smaa = new SMAAPass();
+    this.bloom = new GlowPass(WALK_POST_TUNING.bloom);
+    this.bloom.enabled = this.tier.bloom;
     this.output = new OutputPass();
     this.whiteBalance = options.whiteBalance ?? WALK_WHITE_BALANCE;
     this.balance = options.balance ?? null;
     const material = this.output.material;
     material.fragmentShader = whiteBalancedOutput(material.fragmentShader);
     material.uniforms['jeexWhiteBalance'] = { value: new THREE.Matrix3().set(...this.whiteBalance) };
-    for (const pass of [this.beauty, this.occlusion, this.accumulate, this.smaa, this.output]) this.composer.addPass(pass);
+    for (const pass of [this.beauty, this.occlusion, this.accumulate, this.smaa, this.bloom, this.output]) this.composer.addPass(pass);
   }
 
   /** The rest frames a resting walk or tour view draws through this chain: the tier's. */
@@ -401,12 +450,14 @@ export class WalkPost implements PostProcessor {
    * GTAO material's SAMPLES define: three sets needsUpdate and relinks only
    * that one program. A rebuilt pass would relink every program of the pass
    * and allocate its targets again — a hitch on a device that is already
-   * slow, and a spike the machine would read as another slow frame. The tone
-   * curve, the exposure, SMAA and the targets are a tier's business never.
+   * slow, and a spike the machine would read as another slow frame. The glow
+   * stage is turned on or off, never rebuilt. The tone curve, the exposure,
+   * SMAA and the targets are a tier's business never.
    */
   applyTier(inputs: WalkPostTierInputs): void {
     if (this.disposed) return;
     this.applyOcclusionTier(inputs);
+    this.bloom.enabled = inputs.bloom;
     this.tier = inputs;
     this.occlusion.setSize(this.width, this.height);
   }
@@ -448,9 +499,10 @@ export class WalkPost implements PostProcessor {
     return this.occlusion.gtaoNoiseTexture.image.data as Uint8Array;
   }
 
-  /** Sets the matrix the output pass applies. */
+  /** Sets the matrix the output pass applies, and aims the glow at what that balance and the exposure show as bright. */
   private setBalance(balance: Mat3): void {
     (this.output.material.uniforms['jeexWhiteBalance']!.value as THREE.Matrix3).set(...balance);
+    this.bloom.aim(this.renderer.toneMappingExposure, balance);
   }
 
   /** Points the two scene-reading passes at `scene` and `camera`. */
@@ -502,7 +554,9 @@ export function quadMaterials(passes: readonly object[], output: object): THREE.
   return passes.filter((pass) => pass !== output).flatMap((pass) => materialsOf(pass));
 }
 
-/** The materials a pass keeps as its own fields: what its full-screen quad draws with. */
+/** The materials a pass keeps as its own fields, alone or in a list (a blur per mip): what its full-screen quad draws with. */
 function materialsOf(pass: object): THREE.Material[] {
-  return Object.values(pass).filter((value): value is THREE.Material => value instanceof THREE.Material);
+  return Object.values(pass)
+    .flatMap((value: unknown) => (Array.isArray(value) ? (value as unknown[]) : [value]))
+    .filter((value): value is THREE.Material => value instanceof THREE.Material);
 }

@@ -44,12 +44,16 @@ const HARDWARE = !softwareRasteriser();
 const BLOOM_POSES = {
   /** The living room's floor lamp and the wall behind it. */
   lamp: { position: [4.6, 1.5, 6.2], target: [2.86, 0.9, 7.45] },
+  /** Under the living room's pendant over the dining table, looking up into its shade. */
+  pendant: { position: [4.9, 1.2, 5.6], target: [5.5, 1.95, 7.06] },
   /** Across the living room towards the bay windows. */
   window: { position: [2.6, 1.6, 6.0], target: [2.4, 0.4, 9.6] },
 } as const;
 
 const CLASS = { wall: 0, emissive: 1, sky: 2 } as const;
 const MASK_CLASSES = 8;
+/** Pixels a wall is shrunk by before it is metered (see `inside`). */
+const EDGE = 2;
 
 const results: Record<string, unknown> = { renderer: RENDERER };
 const luminance = (r: number, g: number, b: number): number => 0.2126 * r + 0.7152 * g + 0.0722 * b;
@@ -67,14 +71,15 @@ const isGlass = (mesh: THREE.Mesh): boolean =>
 
 describe.skipIf(!HARDWARE)(`the bloom threshold on the demo flat in walk (${RENDERER})`, { timeout: MOUNT_TIMEOUT_MS }, () => {
   let handle: ViewerHandle;
-  let chain: WalkPost | null = null;
+  /** Every chain that drew; the viewer builds one in walk. */
+  const chains: WalkPost[] = [];
   let scene: THREE.Scene;
   let renderer: THREE.WebGLRenderer;
 
   beforeAll(async () => {
     const draw = Object.getOwnPropertyDescriptor(WalkPost.prototype, 'render')!.value as WalkPost['render'];
     vi.spyOn(WalkPost.prototype, 'render').mockImplementation(function (this: WalkPost, ...args) {
-      chain = this;
+      chains.push(this);
       scene = args[0];
       draw.apply(this, args);
     });
@@ -89,9 +94,9 @@ describe.skipIf(!HARDWARE)(`the bloom threshold on the demo flat in walk (${REND
     handle.setMode('walk');
     const debug = (window as unknown as { __viewerDebug: { walkLighting: () => { state: string } } }).__viewerDebug;
     await until(() => debug.walkLighting().state === 'live', 'room lighting live', MOUNT_TIMEOUT_MS - 60_000);
-    await until(() => chain !== null, 'the walk chain draws');
+    await until(() => chains.length > 0, 'the walk chain draws');
     await nextFrame();
-    renderer = chain!.composer.renderer;
+    renderer = chains[0]!.composer.renderer;
   }, MOUNT_TIMEOUT_MS);
 
   afterAll(async () => {
@@ -104,24 +109,24 @@ describe.skipIf(!HARDWARE)(`the bloom threshold on the demo flat in walk (${REND
   function pose(name: keyof typeof BLOOM_POSES): THREE.PerspectiveCamera {
     const { position, target } = BLOOM_POSES[name];
     const camera = new THREE.PerspectiveCamera(60, SIZE.w / SIZE.h, 0.05, 200);
-    camera.position.set(...position);
-    camera.lookAt(...target);
+    camera.position.set(position[0], position[1], position[2]);
+    camera.lookAt(target[0], target[1], target[2]);
     camera.updateMatrixWorld();
     return camera;
   }
 
   /** What the bloom stage reads in a still from `camera`: linear RGBA, rows from the bottom. */
   function bloomInput(camera: THREE.Camera): Float32Array {
-    const post = chain!;
+    const post = chains[0]!;
     const pixels = new Float32Array(SIZE.w * SIZE.h * 4);
     const stage = post.bloom;
     const render = stage.render.bind(stage);
     const out = new THREE.WebGLRenderTarget(SIZE.w, SIZE.h);
-    stage.render = (gl, writeBuffer, readBuffer, delta, mask) => {
+    stage.render = (gl, writeBuffer, readBuffer, delta, maskActive) => {
       const half = new Uint16Array(SIZE.w * SIZE.h * 4);
       gl.readRenderTargetPixels(readBuffer, 0, 0, SIZE.w, SIZE.h, half);
       for (let i = 0; i < half.length; i += 1) pixels[i] = THREE.DataUtils.fromHalfFloat(half[i]!);
-      render(gl, writeBuffer, readBuffer, delta, mask);
+      render(gl, writeBuffer, readBuffer, delta, maskActive);
     };
     try {
       post.renderTo(out, scene, camera, SIZE.w, SIZE.h);
@@ -190,15 +195,29 @@ describe.skipIf(!HARDWARE)(`the bloom threshold on the demo flat in walk (${REND
     const camera = pose(name);
     const classes = mask(camera);
     const linear = bloomInput(camera);
-    const balance = chain!.whiteBalanceAt(camera.position);
+    const balance = chains[0]!.whiteBalanceAt(camera.position);
     const exposure = renderer.toneMappingExposure;
     const threshold = WALK_POST_TUNING.bloom.threshold;
     // The display gain the stage judges by: its linear threshold is the display one over this.
     const gain = threshold / glowThreshold(threshold, exposure, balance);
     const display = (i: number): number => gain * luminance(linear[i * 4]!, linear[i * 4 + 1]!, linear[i * 4 + 2]!);
+    /**
+     * Whether pixel `i` and every pixel within `EDGE` of it is of class `kind`: the picture is antialiased and the
+     * mask is not, so a bright source's rim spills into the pixels of its neighbours (up to 12.7 on the wall
+     * behind the pendant's core, 2026-11-14).
+     */
+    const inside = (i: number, kind: number): boolean => {
+      const [x, y] = [i % SIZE.w, Math.floor(i / SIZE.w)];
+      for (let dy = -EDGE; dy <= EDGE; dy += 1)
+        for (let dx = -EDGE; dx <= EDGE; dx += 1) {
+          const [u, v] = [x + dx, y + dy];
+          if (u < 0 || v < 0 || u >= SIZE.w || v >= SIZE.h || classes[v * SIZE.w + u] !== kind) return false;
+        }
+      return true;
+    };
     const stats = (kind: number): Stats => {
       const values: number[] = [];
-      for (let i = 0; i < classes.length; i += 1) if (classes[i] === kind) values.push(display(i));
+      for (let i = 0; i < classes.length; i += 1) if (kind === CLASS.wall ? inside(i, kind) : classes[i] === kind) values.push(display(i));
       values.sort((a, b) => a - b);
       const at = (q: number): number => values[Math.min(values.length - 1, Math.floor(values.length * q))] ?? Number.NaN;
       const over = values.filter((value) => value > threshold).length;
@@ -209,13 +228,21 @@ describe.skipIf(!HARDWARE)(`the bloom threshold on the demo flat in walk (${REND
     return metered;
   }
 
-  test('at the floor lamp: the lit wall behind it stays under the threshold, the lamp`s light-emitting core rises far over it', () => {
+  test('at the floor lamp: the wall it lights from close by stays under the threshold, and so does the shade`s fabric', () => {
     const { wall, emissive, threshold } = meter('lamp');
     expect(wall.pixels).toBeGreaterThan(2000);
     expect(emissive.pixels).toBeGreaterThan(200);
     expect(wall.max).toBeLessThan(threshold);
+    // The fabric reads as a lit surface (its emissive is capped under the knee); only its lit inside, a
+    // pixel or two from this side, crosses.
+    expect(emissive.p99).toBeLessThan(threshold);
+  });
+
+  test('under the pendant: the lamp`s light-emitting core rises far over the threshold, the walls stay under it', () => {
+    const { wall, emissive, threshold } = meter('pendant');
     expect(emissive.over).toBeGreaterThanOrEqual(10);
     expect(emissive.max).toBeGreaterThan(4 * threshold);
+    expect(wall.max).toBeLessThan(threshold);
   });
 
   test('towards the bay: the lit walls stay under the threshold, the sun`s glints in the windows rise far over it', () => {
