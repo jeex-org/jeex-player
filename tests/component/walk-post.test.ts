@@ -152,7 +152,8 @@ describe('the white balance in the output pass', () => {
     for (let channel = 0; channel < 3; channel += 1) expect(Math.abs(got[channel]! - want[channel]!)).toBeLessThanOrEqual(1);
     expect(chain.whiteBalance).toEqual(matrix);
     expect(chain.composer.passes).toHaveLength(plain.composer.passes.length);
-    expect(chain.composer.passes).toHaveLength(4);
+    // The white balance is in the output pass; the fifth pass is the rest accumulation.
+    expect(chain.composer.passes).toHaveLength(5);
   });
 
   test("a balance source drives it: the live frame takes the live balance, a capture its own camera's, and none keeps the chain's", async () => {

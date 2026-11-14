@@ -19,6 +19,7 @@ describe('QUALITY_TIERS', () => {
       gtaoSamples: 16,
       probeSize: 128,
       probesPerFrame: 6,
+      restFrames: 32,
     });
     // The numbers above are copies of the live tuning, pinned here so a tuning
     // change that forgets the tier fails loudly instead of silently leaving
@@ -42,6 +43,8 @@ describe('QUALITY_TIERS', () => {
       // (`walk-lighting/room-probes.ts`); only the bake pace below is the tier's.
       probeSize: 128,
       probesPerFrame: 4,
+      // No rest burst until its cost on the phone tier is measured.
+      restFrames: 0,
     });
     // A reduced occlusion buffer leaves stair-stepped halos on door and table
     // edges: the blend's bilinear upsampling crosses depth (`walk-post.ts`).

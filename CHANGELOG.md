@@ -30,6 +30,18 @@ as described under [Versioning](#versioning).
   (`{ placement, lowest, min }`), about every ceiling piece whose plan centre
   is over no host's top and whose lowest point is under 2.0 m above the
   floor. It is a warning: it refuses no edit and no drag.
+- **A resting walk or tour view converges.** When the camera rests in `walk`
+  or `tour`, the viewer keeps drawing a short burst of frames, each seen
+  through a sub-pixel shift of the camera and another ambient-occlusion noise
+  pattern, and shows their running average: edges lose their stair steps and
+  the occlusion its grain within about half a second, then the view rests and
+  draws nothing, as before. The first picture after any change (a camera move,
+  a resize, an edit, a door, a selection, a mode change) is exactly the one
+  drawn before this change, so motion looks the same. The burst is 32 frames on
+  the `high` quality tier and none on `low` for now (its cost on a phone GPU is
+  not measured yet); `orbit`, the top view and the flat plan draw as before. Stills and video frames are not averaged. The sun's
+  shadow map is not redrawn for the burst; the shadow edges on screen
+  converge in the average like every other edge.
 - **Every layout issue carries a stable `code` and typed `params`.** A host
   that shows the linter's issues in another language translates the code and
   fills in the params instead of an English sentence. `params` is a union

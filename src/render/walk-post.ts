@@ -1,19 +1,36 @@
 /**
  * The walk and tour post-processing chain: ambient occlusion (GTAO) and SMAA
- * over the lit scene, then the lighting standard's display transform.
+ * over the lit scene, then the lighting standard's display transform; at rest,
+ * the running mean of jittered frames.
  *
- * The only module that imports three's post-processing addons. It is loaded
- * on demand (`app/walk-post-controller.ts`): a separate chunk in the ES and
- * demo builds, inline in the IIFE build, which cannot split code.
+ * With `rest-accumulate-pass.ts`, the only module that imports three's
+ * post-processing addons. It is loaded on demand
+ * (`app/walk-post-controller.ts`): a separate chunk in the ES and demo builds,
+ * inline in the IIFE build, which cannot split code.
  *
- * Chain: scene pass → GTAO → SMAA → output pass, on half-float composer
- * targets without multisampling. The scene pass renders into a plain target,
- * where three applies no tone mapping and keeps the working (linear) colour
- * space; SMAA expects linear input; the output pass applies the camera white
- * balance (one linear 3x3 matrix, clamped at zero, `white-balance.ts`), then
- * the renderer's tone mapping (PBR Neutral), exposure and sRGB encoding once. The renderer's
- * own tone mapping setting stays as the lighting standard set it, because the
- * output pass reads it from there.
+ * Chain: scene pass → GTAO → rest accumulation → SMAA → output pass, on
+ * half-float composer targets without multisampling. The scene pass renders
+ * into a plain target, where three applies no tone mapping and keeps the
+ * working (linear) colour space; SMAA expects linear input; the output pass
+ * applies the camera white balance (one linear 3x3 matrix, clamped at zero,
+ * `white-balance.ts`), then the renderer's tone mapping (PBR Neutral),
+ * exposure and sRGB encoding once. The renderer's own tone mapping setting
+ * stays as the lighting standard set it, because the output pass reads it
+ * from there.
+ *
+ * Rest invariant (`rest-accumulation.ts`): a draw that answers a change, and
+ * every capture, is today's picture: the accumulation pass is off, SMAA on,
+ * the projection and three's GTAO noise untouched. Rest frame 0 is the same
+ * picture and starts the mean; every later rest frame moves the projection by
+ * its sub-pixel offset for the length of the draw only (the camera's matrices
+ * are put back exactly, so render-demand compares the pose it drew), turns the
+ * GTAO noise by its angle and skips SMAA, as the jitter antialiases the mean
+ * the output pass then shows. The sun's shadow map is not redrawn for rest
+ * frames: it is cached and redrawn only when what it shows changed
+ * (`sun-shadow.ts`), and a jittered sun would redraw it on every rest frame
+ * and once more on the first frame after them, the frame that must stay
+ * today's. The shadow edges on screen still converge in the mean like every
+ * other edge, as the beauty pass samples the map through the jittered camera.
  *
  * Mirror invariant: the scene pass draws inside the beauty-pass scope
  * (`shared/scene-pass.ts`), naming the composer buffer it binds, so a mirror
@@ -40,6 +57,8 @@ import { withOccludersOnly } from './ao-occluders.js';
 import type { PostProcessor } from './post-processor.js';
 import { ViewerLibError } from '../shared/errors.js';
 import { whiteBalanceMatrix, type Mat3 } from './white-balance.js';
+import { RestAccumulatePass } from './rest-accumulate-pass.js';
+import { jitterProjection, restJitter, restNoiseAngle, rotateNoise } from './rest-accumulation.js';
 
 // The walk and tour room lighting travels in this chunk: one lazy load for everything walk adds.
 export { WalkLighting } from './walk-lighting/walk-lighting.js';
@@ -133,8 +152,9 @@ export type WalkPostOptions = {
 
 /**
  * The per-tier inputs the chain takes (quality tiers, `quality-tier.ts`): the
- * occlusion buffer's resolution scale, the GTAO denoise and the GTAO ray
- * count. The ray count is a shader define: three sets needsUpdate and relinks
+ * occlusion buffer's resolution scale, the GTAO denoise, the GTAO ray count
+ * and the rest frames a resting view averages (none: it draws as before they
+ * existed). The ray count is a shader define: three sets needsUpdate and relinks
  * that one program on a live switch (`applyTier`); the denoise is uniforms
  * and defines the material applies itself; the scale is effective at the next
  * `setSize`.
@@ -143,13 +163,15 @@ export type WalkPostTierInputs = {
   aoResolutionScale: number;
   denoise: { depthPhi: number; normalPhi: number; lumaPhi: number; radius: number; samples: number };
   gtaoSamples: number;
+  restFrames: number;
 };
 
-/** The inputs the chain ran with before the tiers existed: the tuning and three's default ray count. */
+/** The inputs the chain ran with before the tiers existed: the tuning, three's default ray count and no rest frames. */
 export const WALK_POST_DEFAULT_TIER: WalkPostTierInputs = Object.freeze({
   aoResolutionScale: WALK_POST_TUNING.aoResolutionScale,
   denoise: WALK_POST_TUNING.denoise,
   gtaoSamples: 16,
+  restFrames: 0,
 });
 
 /** The scene pass, drawing inside the beauty-pass scope a mirror captures in. */
@@ -209,6 +231,7 @@ export class WalkPost implements PostProcessor {
   readonly composer: EffectComposer;
   readonly beauty: BeautyPass;
   readonly occlusion: OcclusionPass;
+  readonly accumulate: RestAccumulatePass;
   readonly smaa: SMAAPass;
   readonly output: OutputPass;
   /** The white balance the output pass applies when no balance source answers, row-major. */
@@ -224,6 +247,10 @@ export class WalkPost implements PostProcessor {
   private liveWidth: number;
   private liveHeight: number;
   private disposed = false;
+  /** Three's GTAO noise as built, which every rest frame turns from. */
+  private readonly noise: Uint8Array;
+  /** The angle the GTAO noise is turned by now. */
+  private noiseAngle = 0;
 
   constructor(renderer: THREE.WebGLRenderer, scene: THREE.Scene, camera: THREE.Camera, options: WalkPostOptions = {}) {
     this.renderer = renderer;
@@ -244,6 +271,9 @@ export class WalkPost implements PostProcessor {
     this.beauty = new BeautyPass(scene, camera);
     this.occlusion = new OcclusionPass(scene, camera, this.width, this.height, this.tier.aoResolutionScale);
     this.applyOcclusionTier(this.tier);
+    this.noise = Uint8Array.from(this.noiseData());
+    this.accumulate = new RestAccumulatePass();
+    this.accumulate.enabled = false;
     this.smaa = new SMAAPass();
     this.output = new OutputPass();
     this.whiteBalance = options.whiteBalance ?? WALK_WHITE_BALANCE;
@@ -251,7 +281,12 @@ export class WalkPost implements PostProcessor {
     const material = this.output.material;
     material.fragmentShader = whiteBalancedOutput(material.fragmentShader);
     material.uniforms['jeexWhiteBalance'] = { value: new THREE.Matrix3().set(...this.whiteBalance) };
-    for (const pass of [this.beauty, this.occlusion, this.smaa, this.output]) this.composer.addPass(pass);
+    for (const pass of [this.beauty, this.occlusion, this.accumulate, this.smaa, this.output]) this.composer.addPass(pass);
+  }
+
+  /** The rest frames a resting walk or tour view draws through this chain: the tier's. */
+  get restFrames(): number {
+    return this.tier.restFrames;
   }
 
   /** Resolves once SMAA's lookup textures have decoded; rejects when they cannot. */
@@ -270,12 +305,33 @@ export class WalkPost implements PostProcessor {
     return this.balance?.at(position) ?? this.whiteBalance;
   }
 
-  render(scene: THREE.Scene, camera: THREE.Camera, delta: number): void {
+  render(scene: THREE.Scene, camera: THREE.Camera, delta: number, rest: number | null = null): void {
     this.view(scene, camera);
     this.setBalance(this.balance?.live() ?? this.whiteBalance);
     // A capture leaves its own size behind (a clip of N frames resizes once); the live frame takes its size back.
     this.resize(this.liveWidth, this.liveHeight);
-    this.composer.render(delta);
+    // The mean's targets come with a draw that answers a change, never with a rest frame (`rest-accumulate-pass.ts`).
+    if (rest === null && this.tier.restFrames > 0) this.accumulate.allocate(this.renderer, this.liveWidth, this.liveHeight);
+    this.setRest(rest);
+    if (rest === null || rest === 0) {
+      this.composer.render(delta);
+      return;
+    }
+    // The offset and the SMAA skip live for this draw only: the camera's matrices are put back exactly.
+    const projection = [...camera.projectionMatrix.elements];
+    const inverse = [...camera.projectionMatrixInverse.elements];
+    const [dx, dy] = restJitter(rest);
+    jitterProjection(camera.projectionMatrix.elements, dx, dy, this.width, this.height);
+    camera.projectionMatrixInverse.copy(camera.projectionMatrix).invert();
+    const smaa = this.smaa.enabled;
+    this.smaa.enabled = false;
+    try {
+      this.composer.render(delta);
+    } finally {
+      this.smaa.enabled = smaa;
+      camera.projectionMatrix.fromArray(projection);
+      camera.projectionMatrixInverse.fromArray(inverse);
+    }
   }
 
   renderTo(target: THREE.WebGLRenderTarget, scene: THREE.Scene, camera: THREE.Camera, width: number, height: number): void {
@@ -285,6 +341,8 @@ export class WalkPost implements PostProcessor {
       this.view(scene, camera);
       this.setBalance(this.whiteBalanceAt(camera.getWorldPosition(new THREE.Vector3())));
       this.resize(width, height);
+      // A capture is one picture, never averaged.
+      this.setRest(null);
       // Every pass but the last into the composer's buffers, then the output
       // pass once, into the caller's target.
       this.composer.renderToScreen = false;
@@ -368,6 +426,26 @@ export class WalkPost implements PostProcessor {
     this.disposed = true;
     this.composer.dispose();
     for (const pass of this.composer.passes) pass.dispose();
+  }
+
+  /**
+   * Sets the chain up for rest frame `rest` (`null`: a draw that answers a
+   * change, or a capture): the accumulation on at rest only, the GTAO noise
+   * turned by the frame's angle. SMAA is `render`'s to skip, for one draw.
+   */
+  private setRest(rest: number | null): void {
+    this.accumulate.enabled = rest !== null;
+    this.accumulate.frame = rest ?? 0;
+    const angle = restNoiseAngle(rest ?? 0);
+    if (angle === this.noiseAngle) return;
+    this.noiseAngle = angle;
+    rotateNoise(this.noise, angle, this.noiseData());
+    this.occlusion.gtaoNoiseTexture.needsUpdate = true;
+  }
+
+  /** The bytes of the GTAO noise texture the occlusion samples. */
+  private noiseData(): Uint8Array {
+    return this.occlusion.gtaoNoiseTexture.image.data as Uint8Array;
   }
 
   /** Sets the matrix the output pass applies. */

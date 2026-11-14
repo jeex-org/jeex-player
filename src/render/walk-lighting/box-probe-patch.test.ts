@@ -23,6 +23,33 @@ describe('the r186 chunks the patch rewrites', () => {
       for (const anchor of anchors) expect(text).toContain(anchor);
     }
   });
+
+  // A condition on a define the engine no longer sets compiles the patch out without an error,
+  // so every engine define the patched shaders test must still be named by three's own shader text
+  // or be one of the macros `WebGLProgram` puts in every program's prefix.
+  test('every engine define the patched shaders test is still one three names', () => {
+    const own = /^(JEEX_|jeex)/;
+    const prefixMacros = new Set(['texture2DGradEXT']);
+    const engine = [
+      ...Object.values(THREE.ShaderChunk as unknown as Record<string, string>),
+      ...Object.values(THREE.ShaderLib).flatMap((shader) => [shader.vertexShader, shader.fragmentShader]),
+    ].join('\n');
+    const patched = bakeFragmentShader(patchFragmentShader(THREE.ShaderLib.physical.fragmentShader));
+    // Every identifier of every directive's condition: the operands of `defined( X )` and bare names,
+    // not `defined` itself, numbers or operators.
+    const tested = new Set<string>();
+    for (const line of patched.split('\n')) {
+      const condition = /^\s*#\s*(?:if|ifdef|ifndef|elif)\b(.*)$/.exec(line)?.[1]?.replace(/\/\/.*$/, '');
+      if (condition === undefined) continue;
+      for (const [name] of condition.matchAll(/(?<![\w.])[A-Za-z_]\w*/g)) if (name !== 'defined') tested.add(name);
+    }
+    // The extractor itself: the defines the patch's own blocks are guarded by are among them.
+    expect(tested).toContain('USE_ENVMAP');
+    expect(tested).toContain('ENVMAP_TYPE_CUBE_UV');
+    for (const name of tested) if (own.test(name) || prefixMacros.has(name)) tested.delete(name);
+    const unknown = [...tested].filter((name) => !new RegExp(`\\b${name}\\b`).test(engine));
+    expect(unknown).toEqual([]);
+  });
 });
 
 describe('patchFragmentShader', () => {

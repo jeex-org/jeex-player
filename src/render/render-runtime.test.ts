@@ -1488,3 +1488,97 @@ describe('a pixel-ratio change at a fixed CSS box', () => {
     }
   });
 });
+
+describe('a resting walk or tour draws the chain`s rest frames', () => {
+  /** A runtime in `mode` with a camera and a chain asking for `restFrames`, past its first picture; `drawn` records each render's rest index. */
+  async function chained(mode: string, restFrames: number | undefined) {
+    let current = mode;
+    const rig = harness({ mode: () => current });
+    const drawn: Array<number | null> = [];
+    const chain: PostProcessor = {
+      ...(restFrames !== undefined && { restFrames }),
+      render: (_scene, _camera, _delta, rest) => drawn.push(rest ?? null),
+      renderTo: () => undefined,
+      compile: () => Promise.resolve(),
+      setSize: () => undefined,
+      dispose: () => undefined,
+    };
+    rig.runtime.setCamera(new THREE.PerspectiveCamera());
+    rig.runtime.setPostProcessor(chain);
+    rig.runtime.start();
+    await Promise.resolve();
+    await Promise.resolve();
+    rig.tick(16);
+    expect(drawn).toEqual([null]);
+    drawn.length = 0;
+    return { ...rig, drawn, setMode: (next: string) => (current = next) };
+  }
+
+  test.each(['walk', 'tour'])(
+    'in %s every tick draws a rest frame, numbered from 0, until the chain`s count, then nothing',
+    async (mode) => {
+      const { runtime, tick, drawn } = await chained(mode, 4);
+      for (let at = 0; at < 12; at += 1) tick(16);
+      expect(drawn).toEqual([0, 1, 2, 3]);
+      expect(runtime.demand.counters().draws).toBe(5);
+      runtime.dispose();
+    },
+  );
+
+  test('in orbit the chain`s count asks for nothing: the steady draw of today and no rest frame', async () => {
+    const { runtime, tick, drawn } = await chained('orbit', 4);
+    for (let at = 0; at < 12; at += 1) tick(16);
+    expect(drawn).toEqual([null]);
+    runtime.dispose();
+  });
+
+  test('a chain without rest frames draws as today: one steady draw, no rest frame', async () => {
+    for (const count of [undefined, 0]) {
+      const { runtime, tick, drawn } = await chained('walk', count);
+      for (let at = 0; at < 12; at += 1) tick(16);
+      expect(drawn).toEqual([null]);
+      runtime.dispose();
+    }
+  });
+
+  test('a change, a resize and a mode switch reset: their draw is not a rest frame and the count starts again', async () => {
+    const { runtime, tick, drawn, viewport, setMode } = await chained('walk', 3);
+    for (let at = 0; at < 4; at += 1) tick(16);
+    runtime.demand.invalidate();
+    for (let at = 0; at < 8; at += 1) tick(16);
+    viewport.clientWidth = 640;
+    runtime.resize();
+    for (let at = 0; at < 8; at += 1) tick(16);
+    setMode('tour');
+    for (let at = 0; at < 8; at += 1) tick(16);
+    expect(drawn).toEqual([0, 1, null, 0, 1, 2, null, 0, 1, 2, null, 0, 1, 2]);
+    runtime.dispose();
+  });
+
+  test('the settle window after new GPU resources resets: its draws are repeats, the rest frames start when it closes', async () => {
+    const { runtime, tick, drawn } = await chained('walk', 3);
+    const memory = (runtime.renderer.info as unknown as { memory: { textures: number } }).memory;
+    for (let at = 0; at < 4; at += 1) tick(16);
+    memory.textures += 1;
+    runtime.demand.invalidate();
+    tick(16);
+    const inside = Math.floor((NEW_RESOURCES_SETTLE_MS - 1) / 16);
+    for (let at = 0; at < inside; at += 1) tick(16);
+    tick(NEW_RESOURCES_SETTLE_MS);
+    for (let at = 0; at < 6; at += 1) tick(16);
+    expect(drawn).toEqual([0, 1, ...Array.from({ length: 1 + inside }, () => null), 0, 1, 2]);
+    runtime.dispose();
+  });
+
+  test('a post-render hook can tell a rest frame from a draw that answered a change (the quality machine feeds on motion only)', async () => {
+    const { runtime, tick } = await chained('walk', 2);
+    const seen: Array<number | null | 'skipped'> = [];
+    runtime.addPostRenderHook((_delta, now) => seen.push(runtime.lastDrawnAt === now ? runtime.demand.restFrame() : 'skipped'));
+    // Two idle ticks, then the rest frames where the steady draw would come.
+    for (let at = 0; at < 5; at += 1) tick(16);
+    runtime.demand.invalidate();
+    tick(16);
+    expect(seen).toEqual(['skipped', 'skipped', 0, 1, 'skipped', null]);
+    runtime.dispose();
+  });
+});

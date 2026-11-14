@@ -56,6 +56,7 @@ function postInputs(tier: QualityTierName): WalkPostTierInputs {
     aoResolutionScale: settings.aoResolutionScale,
     denoise: { ...settings.denoise },
     gtaoSamples: settings.gtaoSamples,
+    restFrames: settings.restFrames,
   };
 }
 
