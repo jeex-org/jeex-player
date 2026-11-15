@@ -7,7 +7,7 @@ How walk and tour light each room: a light-probe grid per room for indirect ligh
 
 ### Requirement: Room grids in walk and tour
 
-In `walk` and `tour` everything in a room (shell, furniture, fixtures, door leaves, window parts) SHALL be lit indirectly by that room's light-probe grid, with one bounce through doorways; everything outside the rooms by a fixed hemisphere-equivalent grid (requirement «Exterior light under the HDRI» for the HDRI). Grids SHALL be baked before they light the view. A baked surface SHALL take no light from any grid: its lightmap is its indirect light.
+In `walk` and `tour` everything in a room (shell, furniture, fixtures, door leaves, window parts) SHALL be lit indirectly by that room's light-probe grid, chosen per fragment by the room box the fragment's face looks into, except a piece of an opening (door leaf, frame, glazing, bars), which takes on every face the grid of the first room box that holds its object's origin, with one bounce through doorways; everything outside the rooms by a fixed hemisphere-equivalent grid (requirement «Exterior light under the HDRI» for the HDRI). Grids SHALL be baked before they light the view. A baked surface SHALL take no light from any grid: its lightmap is its indirect light.
 
 #### Scenario: Windowless room darker
 - **WHEN** a closed room without a window and a room with a window are compared in walk on a 0.18 grey patch
@@ -20,6 +20,10 @@ In `walk` and `tour` everything in a room (shell, furniture, fixtures, door leav
 #### Scenario: Furniture by the wall
 - **WHEN** a cabinet stands against the bathroom wall with its origin on the floor
 - **THEN** it is lit by the bathroom's grid
+
+#### Scenario: Door leaf in its opening
+- **WHEN** a closed door leaf fills the opening between two rooms
+- **THEN** both of its faces are lit by the grid of the room that holds the leaf's origin, and neither by the exterior grid
 
 #### Scenario: Facade
 - **WHEN** the exterior is seen from a window in walk without an HDRI
@@ -203,7 +207,7 @@ After a furniture edit in walk the probe points SHALL be recomputed from the cur
 
 #### Scenario: With a host sky
 - **WHEN** a probe placement refresh happens in walk with a host sky (HDRI) installed
-- **THEN** the re-captured probe keeps the atlas's fixed sampling and tile size and the rig returns to the state it had before the capture
+- **THEN** the re-captured probe keeps the probe array's fixed face size and levels and the rig returns to the state it had before the capture
 
 #### Scenario: Edit that does not change placement
 - **WHEN** a piece of furniture is moved in walk and no room's probe point changes
@@ -237,9 +241,13 @@ In `walk` and `tour` the emissive term of every material SHALL be capped so its 
 - **WHEN** the same shade is metered in orbit, `plan3d` and the editing look before and after a walk session
 - **THEN** its readings are unchanged
 
-### Requirement: Probe atlas independent of the environment's size
+### Requirement: Probe array independent of the environment's size
 
-The room probes' atlas SHALL be captured and sampled at its own fixed cube size, whatever the size of the scene's environment; a capture SHALL be checked against the atlas's own layout, not against the environment's.
+The room probes' array SHALL be captured and sampled at its own fixed cube size, whatever the size of the scene's environment; a capture SHALL be checked against the array's own layout, not against the environment's. Each face of the array SHALL carry a one-texel border of its neighbours' light, so a rough reflection shows no seam at a cube face edge.
+
+#### Scenario: No seam at a face edge
+- **WHEN** a metal floor of roughness 1 reflects one room's probe across the edge between two cube faces
+- **THEN** the floor reads the same on both sides of the edge within 1 %
 
 #### Scenario: 1K environment
 - **WHEN** an HDRI whose prefiltered cube is 256 is installed and the room probes are captured

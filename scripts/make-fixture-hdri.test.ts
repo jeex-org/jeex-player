@@ -15,7 +15,7 @@ const read = (name: string): Uint8Array => new Uint8Array(readFileSync(resolve(i
 const ascii = (bytes: Uint8Array): string => new TextDecoder('latin1').decode(bytes);
 
 describe('make-fixture-hdri', () => {
-  test('the environment is a small gain-map JPEG: SOI, an hdrgm XMP packet (what three r186 reads) and an MPF segment', () => {
+  test('the environment is a small gain-map JPEG: SOI, an hdrgm XMP packet (what three r187 reads) and an MPF segment', () => {
     const bytes = read(HDRI_FIXTURE_FILES.environment);
     expect(bytes.byteLength).toBeLessThanOrEqual(HDRI_ENVIRONMENT_SIZE_LIMIT);
     expect([bytes[0], bytes[1]]).toEqual([0xff, 0xd8]);

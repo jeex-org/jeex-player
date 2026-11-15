@@ -55,7 +55,8 @@ describe('loading a host sky', () => {
     const before = gl.info.memory.textures;
     const environment = await loadHdriEnvironment(gl, entry, new AbortController().signal);
     expect(environment.cubeSize).toBe(256);
-    expect(environment.texture.mapping).toBe(THREE.CubeUVReflectionMapping);
+    expect(environment.texture.mapping).toBe(THREE.CubeReflectionMapping);
+    expect((environment.texture as THREE.Texture & { isPMREMTexture?: boolean }).isPMREMTexture).toBe(true);
     expect(gl.info.memory.textures).toBe(before + 1);
     const compensated = environment.sky.horizontal * LIGHTING_STANDARD.hdri.loaderCompensation;
     const raw = environment.sky.horizontal / reference.skyHorizontalIrradiance;

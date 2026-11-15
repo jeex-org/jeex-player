@@ -7,6 +7,27 @@ as described under [Versioning](#versioning).
 
 ## [Unreleased]
 
+### Changed (breaking)
+
+- **three.js 0.187 and lighting standard revision 187.** The optional peer
+  dependency `three` is `~0.187.0` (was `~0.186.1`), the package depends on
+  `@types/three` 0.187.0, and `LIGHTING_STANDARD.engineRevision` is `'187'`:
+  `createLightingContext` refuses any other revision with `engine-revision`.
+  A host moves its own `three` to 0.187.x and its `@types/three` to 0.187.0
+  in the same delivery as this version, passes that three.js to the lighting
+  entry, and re-checks anything it calibrated against the standard: r187's
+  PMREM filters environments differently, so materials lit by an environment
+  look slightly different. The walk and tour room lighting is rebuilt on
+  r187's terms (one probe array for the rooms' reflections, one packed atlas
+  for their light-probe grids, the room chosen per fragment, except for the
+  pieces of a door or window, which keep the room of their origin) with no
+  change to options, events or the protocol. The standard's environment
+  `normalisation` was re-set from 0.543 to 0.578 so its grey patch reads 0.18
+  on r187, and `apartment.environmentScale` from 1.8 to about 1.691, derived
+  so their product stays 0.9774 and the apartment's light stays as on r186.
+  `LIGHTING_STANDARD_VERSION` rises to 2: hosts drop previews stored under
+  version 1.
+
 ### Added
 
 - **The surface fact types from `jeex-viewer/ops`.** `SurfaceFacts` and its

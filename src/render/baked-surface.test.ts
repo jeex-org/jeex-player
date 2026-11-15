@@ -30,7 +30,7 @@ function copyCompileHooks(source: THREE.Material, target: THREE.Material): void 
 function compile(material: THREE.Material): Shader {
   const shader = {
     fragmentShader: THREE.ShaderLib.physical.fragmentShader,
-    vertexShader: '',
+    vertexShader: THREE.ShaderLib.physical.vertexShader,
     uniforms: {},
     defines: {},
   } as unknown as Shader;
@@ -38,7 +38,7 @@ function compile(material: THREE.Material): Shader {
   return shader;
 }
 
-describe('the r186 chunks the baked policy rewrites', () => {
+describe('the r187 chunks the baked policy rewrites', () => {
   test('still read exactly as it expects', () => {
     for (const [chunk, anchors] of Object.entries(BAKED_CHUNK_ANCHORS)) {
       const text = (THREE.ShaderChunk as unknown as Record<string, string>)[chunk]!;

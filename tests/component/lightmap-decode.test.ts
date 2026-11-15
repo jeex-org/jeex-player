@@ -11,7 +11,12 @@ import { LIGHTING_STANDARD } from '../../src/lighting/lighting-standard.js';
 import { rgbmDecode } from '../../src/lightmap/rgbm.js';
 import { decorateRgbm } from '../../src/lightmap/lightmap-shader.js';
 import { addShaderTransform, markBakedSurface } from '../../src/render/baked-surface.js';
-import { createWalkUniforms, installWalkPatch, patchFragmentShader } from '../../src/render/walk-lighting/box-probe-patch.js';
+import {
+  createWalkUniforms,
+  installWalkPatch,
+  patchFragmentShader,
+  WALK_TRANSFORM,
+} from '../../src/render/walk-lighting/box-probe-patch.js';
 import { closeRenderers, renderLinear, renderer } from './lightmap-support.js';
 
 afterEach(closeRenderers);
@@ -99,7 +104,9 @@ describe('RGBM decode', () => {
     const root = new THREE.Group();
     root.add(new THREE.Mesh(new THREE.PlaneGeometry(), material));
     expect(installWalkPatch(root, createWalkUniforms())).toBe(1);
-    expect(material.customProgramCacheKey()).toMatch(/\|jeex-walk-lighting@6\|jeex-baked-surface@2\|jeex-lightmap-rgbm-r8@1$/);
+    expect(material.customProgramCacheKey()).toMatch(
+      new RegExp(`\\|${WALK_TRANSFORM.id}@${WALK_TRANSFORM.version}\\|jeex-baked-surface@2\\|jeex-lightmap-rgbm-r8@1$`),
+    );
     // Marked baked, the lightmap carries the editing gain on top of the decode.
     const gain = LIGHTING_STANDARD.baked.exposure.editing;
     const got = readCentre(material);

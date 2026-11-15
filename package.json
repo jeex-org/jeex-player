@@ -127,11 +127,11 @@
     "hooks:install": "lefthook install"
   },
   "dependencies": {
-    "@types/three": "0.186.0",
+    "@types/three": "0.187.0",
     "polygon-clipping": "0.15.7"
   },
   "peerDependencies": {
-    "three": "~0.186.1",
+    "three": "~0.187.0",
     "zod": "^4.6.7"
   },
   "peerDependenciesMeta": {
@@ -156,7 +156,7 @@
     "oxlint": "1.89.0",
     "oxlint-tsgolint": "7.0.2005",
     "publint": "0.3.24",
-    "three": "0.186.1",
+    "three": "0.187.0",
     "ts-json-schema-generator": "2.9.0",
     "typescript": "7.0.2",
     "vite": "8.3.5",

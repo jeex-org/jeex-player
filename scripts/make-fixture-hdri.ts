@@ -26,7 +26,7 @@
  * `v = asin(y) / π + 0.5`, the first row of the file at the top. Sun azimuths
  * are clockwise from +Z towards +X (`90° − atan2(z, x)`).
  *
- * Metadata: three r186's `UltraHDRLoader` reads the gain-map parameters from
+ * Metadata: three r187's `UltraHDRLoader` reads the gain-map parameters from
  * the `hdrgm` XMP packet; it does not recognise libultrahdr 2's ISO 21496-1
  * block (it compares the namespace two bytes too early), so the encoder must
  * write XMP, which takes a single-channel gain map (`-M 0`). The same holds

@@ -15,7 +15,7 @@
 import { describe, expect, test } from 'bun:test';
 import * as THREE from 'three';
 import { environmentIrradiance, environmentRadiance, generateEnvironment, toHalfFloats } from './environment-recipe.js';
-import { LIGHTING_STANDARD, LIGHTING_STANDARD_VERSION } from './lighting-standard.js';
+import { apartmentEnvironmentIntensity, LIGHTING_STANDARD, LIGHTING_STANDARD_VERSION } from './lighting-standard.js';
 
 const RECIPE = LIGHTING_STANDARD.environment.recipe;
 
@@ -26,9 +26,9 @@ function neutral(value: number): number {
 }
 
 describe('LIGHTING_STANDARD', () => {
-  test('is version 1 and frozen at every depth', () => {
-    // The sun presets, the fit tuning and the sun API change no existing rig value.
-    expect(LIGHTING_STANDARD_VERSION).toBe(1);
+  test('is version 2 and frozen at every depth', () => {
+    // r187 and the re-set normalisation changed the reference rig's look, so the version rose to 2.
+    expect(LIGHTING_STANDARD_VERSION).toBe(2);
     const walk = (value: unknown, path: string): void => {
       if (typeof value !== 'object' || value === null) return;
       expect({ path, frozen: Object.isFrozen(value) }).toEqual({ path, frozen: true });
@@ -48,11 +48,16 @@ describe('LIGHTING_STANDARD', () => {
     expect(Object.keys(hdri).sort()).toEqual(['environmentGain', 'loaderCompensation', 'skyBrightness', 'sunConeDeg']);
     for (const value of Object.values(hdri)) expect(Number.isFinite(value) && value > 0).toBe(true);
     expect(Object.isFrozen(hdri)).toBe(true);
-    // The recipe's own values are those the standard was frozen with.
-    expect(LIGHTING_STANDARD.environment.normalisation).toBe(0.543);
-    expect(LIGHTING_STANDARD.apartment.environmentScale).toBe(1.8);
+    // The recipe's own values: the normalisation re-set for r187, the apartment's scale derived from it.
+    expect(LIGHTING_STANDARD.environment.normalisation).toBe(0.578);
+    expect(LIGHTING_STANDARD.apartment.environmentScale).toBeCloseTo(1.691, 3);
     expect(LIGHTING_STANDARD.apartment.sun.intensity).toBe(3);
-    expect(LIGHTING_STANDARD_VERSION).toBe(1);
+    expect(LIGHTING_STANDARD_VERSION).toBe(2);
+  });
+
+  test('the apartment rig keeps the environment intensity it had on r186, 0.543 × 1.8, whatever the normalisation', () => {
+    // r187's PMREM dimmed the reference patch, not the lit rooms: re-anchoring the standard must not move the apartment.
+    expect(apartmentEnvironmentIntensity()).toBeCloseTo(0.543 * 1.8, 12);
   });
 
   test('a write at any depth changes nothing', () => {
@@ -154,10 +159,12 @@ describe('calibration by integration', () => {
     // The rendered patch decides the frozen constant, and it sits below the
     // cosine integral's figure: three adds the specular of a rough dielectric
     // (F0 0.04) on top of the Lambert term and prefilters the environment with
-    // a GGX lobe rather than a cosine one. Measured when the standard was
-    // frozen: analytic normalisation 0.620, rendered 0.543, so the analytic
-    // reading at the frozen constant is 0.160 against the rendered 0.181. The
-    // browser test holds ±2 %; this keeps the two halves from drifting apart.
+    // a GGX lobe rather than a cosine one. Analytic normalisation 0.620;
+    // rendered 0.543 on r186 and 0.578 on r187 (its PMREM dims the rough
+    // patch). The irradiance integral reads 0.2947 per unit of normalisation
+    // (0.160 / 0.543), so the analytic reading is 0.160 at 0.543 and ≈ 0.170
+    // at 0.578, against the rendered 0.181. The browser test holds ±2 %; this keeps the two
+    // halves from drifting apart. The range is unchanged by the re-set.
     const reading = patchReading(LIGHTING_STANDARD.environment.normalisation);
     expect(Math.abs(reading - target) / target).toBeLessThan(0.15);
   });

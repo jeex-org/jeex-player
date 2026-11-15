@@ -29,7 +29,7 @@ describe('WALK_POST_TUNING', () => {
 
   test('the glow threshold is where PBR Neutral shows a grey at 0.97 of white, over every lit surface the room balance makes', () => {
     // The derivation is in `WALK_POST_TUNING.bloom`; the measurement on the demo flat is
-    // `tests/component/bloom-threshold.test.ts`. Three r186's PBR Neutral on a grey of `x` over its knee:
+    // `tests/component/bloom-threshold.test.ts`. Three r187's PBR Neutral on a grey of `x` over its knee:
     const neutral = (x: number): number => 1 - (0.24 * 0.24) / (x - 0.04 + 0.24 - 0.76);
     expect(neutral(WALK_POST_TUNING.bloom.threshold)).toBeCloseTo(0.97, 3);
     // A lit white wall's mean and a room's lit highlight quantile stay well under it...

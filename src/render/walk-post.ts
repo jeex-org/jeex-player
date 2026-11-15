@@ -94,7 +94,7 @@ export const WALK_POST_TUNING = Object.freeze({
   /** Multisampling of the composer targets: none; SMAA smooths the edges. */
   samples: 0,
   /**
-   * GTAO's Poisson denoise (three r186 `PoissonDenoiseShader`): a neighbour's
+   * GTAO's Poisson denoise (three r187 `PoissonDenoiseShader`): a neighbour's
    * weight falls linearly to zero at `depthPhi` metres off the centre's plane
    * and with the normals' cosine to the power `normalPhi`. The pass's own
    * `depthPhi` of 2 m blurred the occlusion of a picture frame or a toilet
@@ -149,7 +149,7 @@ export const WALK_POST_TUNING = Object.freeze({
    * value just over it adds little and the full value counts from 1.5 times it.
    * `mips`: how many of three's five blur mips the halo takes, the narrowest
    * first. Each mip blurs with a fixed kernel in its own texels, so its reach
-   * is a fixed number of picture pixels (three r186's kernel radius times the
+   * is a fixed number of picture pixels (three r187's kernel radius times the
    * mip's scale): the third about 110, the fourth about 290, the fifth about
    * 700. With all five, the demo's pendant lifted its own black cord from 7
    * to 45 levels 150 px above the shade and washed out the door glazing under
@@ -170,7 +170,7 @@ export const WALK_POST_TUNING = Object.freeze({
 /** The tuned white balance the chain applies when no room balance answers. */
 export const WALK_WHITE_BALANCE: Mat3 = whiteBalanceMatrix(WALK_POST_TUNING.whiteBalance.source, WALK_POST_TUNING.whiteBalance.degree);
 
-/** The line of three r186's `OutputShader` the white balance follows: the linear colour just read. */
+/** The line of three r187's `OutputShader` the white balance follows: the linear colour just read. */
 const OUTPUT_READ = 'gl_FragColor = texture2D( tDiffuse, vUv );';
 const OUTPUT_SAMPLER = 'uniform sampler2D tDiffuse;';
 
@@ -280,7 +280,7 @@ class OcclusionPass extends GTAOPass {
   }
 }
 
-/** SMAA's lookup textures as three r186 names them (its type declarations still use older names). */
+/** SMAA's lookup textures as three r187 names them (its type declarations still use older names). */
 type SmaaTextures = { _areaTexture: THREE.Texture; _searchTexture: THREE.Texture };
 
 /** The chain on one renderer; build it with `createWalkPost`. */
@@ -562,7 +562,7 @@ export async function createWalkPost(
 /**
  * The full-screen materials of the chain's passes that draw into its own
  * buffers, compiled ahead on throwaway quads: every pass's but `output`'s,
- * whose defines are replaced at its first render (three r186 `OutputPass`),
+ * whose defines are replaced at its first render (three r187 `OutputPass`),
  * and but a plain `MeshBasicMaterial`, three's copy to the screen
  * (`UnrealBloomPass`), drawn only by a pass that renders to the screen, which
  * in this chain is the output pass alone.

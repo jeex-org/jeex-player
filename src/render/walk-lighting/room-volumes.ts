@@ -7,16 +7,18 @@
  * Boxes per room box:
  * - projection: the room box from the floor to the ceiling, what a reflection
  *   is box-projected onto;
- * - sampling: the projection box inset by `samplingInsetM`, the grid's own
- *   volume (three puts its probes ON that box's surface, so an uninset grid
- *   would bake probes inside the walls);
+ * - sampling: the projection box inset by `samplingInsetM`, the box whose
+ *   surface and lattice the grid's probes sit on (an uninset grid would bake
+ *   probes inside the walls);
+ * - grid: the volume handed to three's grid, the sampling box grown by half a
+ *   probe spacing on every side: three r187 puts each probe at the centre of
+ *   its cell, so the probes land on the sampling box's lattice, its surface
+ *   included;
  * - selection: the room box grown to the wall centreline and past the floor
- *   and the ceiling, the box an object's origin is tested against.
- *
- * Order invariant: three gives an object the FIRST grid whose box contains
- * its origin, so an origin on a shared centreline (a door frame, a door leaf
- * on its hinge) goes to the room listed first. `roomOrder` lists the room a
- * door leaf swings into before the room on the other side.
+ *   and the ceiling, the box a fragment's room lookup point is tested against
+ *   (`box-probe-patch.ts`): where several hold it, the room the face looks
+ *   into owns it, and the room listed first on a tie. `roomOrder` lists the
+ *   room a door leaf swings into before the room on the other side.
  *
  * Pure module: no `three`, no DOM.
  */
@@ -52,6 +54,8 @@ export type RoomBox = {
   roomId: string;
   projection: Box;
   sampling: Box;
+  /** The volume of the grid's cells, one cell per probe: the sampling box grown by half a probe spacing. */
+  grid: Box;
   selection: Box;
   /** Probes along each axis of the sampling box. */
   resolution: Vec3;
@@ -304,7 +308,17 @@ function sideGrowth(rect: Rect, room: VolumeRoom): { minX: number; maxX: number;
 /** Probes along a sampling extent: about one per `gridSpacingM`, at least two. */
 const probesAlong = (extent: number): number => Math.max(2, Math.round(extent / T.gridSpacingM) + 1);
 
-/** Every room box with its three boxes, the probes and the bounds; refused past `maxBoxes`. */
+/** `sampling` grown by half the spacing of `resolution` probes on its surface, per axis: one cell per probe. */
+function cells(sampling: Box, resolution: Vec3): Box {
+  const half = (axis: 'x' | 'y' | 'z'): number => (sampling.max[axis] - sampling.min[axis]) / (resolution[axis] - 1) / 2;
+  const grow = { x: half('x'), y: half('y'), z: half('z') };
+  return {
+    min: { x: sampling.min.x - grow.x, y: sampling.min.y - grow.y, z: sampling.min.z - grow.z },
+    max: { x: sampling.max.x + grow.x, y: sampling.max.y + grow.y, z: sampling.max.z + grow.z },
+  };
+}
+
+/** Every room box with its boxes, the probes and the bounds; refused past `maxBoxes`. */
 export function roomVolumes(input: VolumeInput): VolumesResult {
   const order = roomOrder(
     input.rooms.map((room) => room.roomId),
@@ -324,6 +338,11 @@ export function roomVolumes(input: VolumeInput): VolumesResult {
         height - inset,
         0,
       );
+      const resolution = {
+        x: probesAlong(sampling.max.x - sampling.min.x),
+        y: T.gridLayers,
+        z: probesAlong(sampling.max.z - sampling.min.z),
+      };
       boxes.push({
         roomId,
         projection: box(rect, 0, height, 0),
@@ -335,7 +354,8 @@ export function roomVolumes(input: VolumeInput): VolumesResult {
             max: { x: rect.maxX + grow.maxX, y: height + T.selectionPadM, z: rect.maxZ + grow.maxZ },
           };
         })(),
-        resolution: { x: probesAlong(sampling.max.x - sampling.min.x), y: T.gridLayers, z: probesAlong(sampling.max.z - sampling.min.z) },
+        resolution,
+        grid: cells(sampling, resolution),
       });
     }
     probes.push({ roomId, position: probePoint(room.polygon, input.furniture) });

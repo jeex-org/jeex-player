@@ -1,18 +1,19 @@
 /**
  * The room lighting of walk and tour on one renderer and one scene: the room
- * grids and the exterior grid, their bake, the room probes and their atlas,
+ * grids and their packed atlas with the exterior block, their bake, the room
+ * probes and their array,
  * the shader patch's uniforms and the walk rig, driven one frame at a time by
  * `app/walk-lighting-controller.ts`.
  *
  * Phases: `baking` (grids, a fixed number of probes per frame), `probes` (one
  * room per frame), `live`. Until `live` the screen keeps the direct look: the
- * grids stay hidden and the rig sits in the editing state between slices.
- * The frame the last probe is captured in is the swap frame: every grid is
- * shown and the rig goes to the walk state in that frame, and since the probe
- * captures already drew every object with every grid visible, the swap
- * compiles nothing.
+ * grids are off and the rig sits in the editing state between slices. Each
+ * grid is copied into the packed atlas as each bake pass finishes it. The
+ * frame the last probe is captured in is the swap frame: the grids go on and
+ * the rig goes to the walk state in that frame; the grids are a uniform and
+ * never a define, so the swap compiles nothing.
  *
- * Outside walk and tour (`frame(false)`) the grids are hidden and the rig is
+ * Outside walk and tour (`frame(false)`) the grids are off and the rig is
  * in the editing state, which is exactly the editing look; the bake keeps its
  * progress and a baked apartment is shown again on the next entry.
  *
@@ -54,14 +55,14 @@ import { roomVolumes, type RoomBox, type RoomVolumes, type Vec3, type VolumeInpu
 import { assignLampRoom, lampSignature, type LampEntry } from './lamp-rooms.js';
 import { isArtificialLight } from '../../assets/artificial-light.js';
 import { LAMP_ROOM_KEY } from '../light-order.js';
-import { createExteriorGrid, RoomGrid } from './room-grid.js';
+import { GridAtlas, RoomGrid } from './room-grid.js';
 import { GridBake } from './grid-bake.js';
-import { ProbeAtlas, ProbeCamera, RoomProbes } from './room-probes.js';
-import { atlasLayout, installWalkPatch, walkUniformsFor, setRoomBoxes, type WalkUniforms } from './box-probe-patch.js';
+import { ProbeArray, ProbeCamera, RoomProbes } from './room-probes.js';
+import { installWalkPatch, walkUniformsFor, setRoomBoxes, type WalkUniforms } from './box-probe-patch.js';
 import { WalkRig } from './walk-rig.js';
 import { WALK_LIGHTING_TUNING as T } from './walk-lighting-tuning.js';
 import { HdriSky, type HdriContent, type HdriSkyState, type HdriView } from '../hdri/hdri-sky.js';
-import type { LightProbeGridWebGL } from 'three/addons/lighting/LightProbeGridWebGL.js';
+import { probeArrayLayout } from './probe-layout.js';
 import { EasedBalance, roomBalance } from './room-balance.js';
 import { RoomSampler } from './room-sampler.js';
 import type { Mat3 } from '../white-balance.js';
@@ -179,14 +180,14 @@ function mirrorsOf(scene: THREE.Object3D): THREE.Object3D[] {
   return out;
 }
 
-/** The bytes a grid's atlas and its bounce snapshot take on the GPU (RGBA float). */
-const gridBytes = (grid: RoomGrid): number => grid.resolution.x * grid.resolution.y * 7 * (grid.resolution.z + 2) * 16 * 2;
+/** The bytes a grid's own atlas takes on the GPU (RGBA float); it bakes as three's pass 0 only, so it has no bounce snapshot. */
+const gridBytes = (grid: RoomGrid): number => grid.resolution.x * grid.resolution.y * 7 * (grid.resolution.z + 2) * 16;
 
 /**
  * The per-build overrides the STARTING quality tier asks of the tuning's
  * bake pace (`app/walk-lighting-controller.ts`); absent, the pace stays the
  * tuning's own. The probes' capture edge is deliberately NOT overridable —
- * the probe atlas's tile invariant pins it (`room-probes.ts`). Read once, at
+ * the probe array's layout invariant pins it (`room-probes.ts`). Read once, at
  * the build; a later tier switch never re-opens this bag.
  */
 export type WalkLightingOverrides = { probesPerFrame?: number };
@@ -195,12 +196,12 @@ export class WalkLighting {
   /** The scene's shared uniforms (`walkUniformsFor`): they outlive this lighting, as the patched materials do. */
   readonly uniforms: WalkUniforms;
   readonly rig: WalkRig;
-  /** The atlas sampler's texture while there is no atlas. */
-  private readonly placeholder: THREE.Texture;
+  /** The probe and grid samplers' textures while there are no probes and no grids. */
+  private readonly placeholders: { probes: THREE.Texture; grids: THREE.Texture };
   private readonly renderer: THREE.WebGLRenderer;
   private readonly scene: THREE.Scene;
-  /** The grids' parent: room grids in grid order, the exterior grid last (three takes the first that contains an origin). */
-  private readonly parent = new THREE.Group();
+  /** The grids' switch: the patch's `jeexGridOn`, which the bake, the captures and `show` set. */
+  private readonly lit: { visible: boolean };
   private volumes: RoomVolumes | null = null;
   private furniture: THREE.Object3D | null = null;
   /** The rooms of the loaded document, whose polygons the lamps are assigned by. */
@@ -208,9 +209,9 @@ export class WalkLighting {
   /** The lamps' signature when their rooms were last assigned and the bake started. */
   private lampsSigned = '';
   private grids: RoomGrid[] = [];
-  private exterior: LightProbeGridWebGL | null = null;
-  private atlas: ProbeAtlas | null = null;
-  /** The probes' cube camera, shared by every document's atlas, at the atlas-invariant edge (`room-probes.ts`). */
+  private gridAtlas: GridAtlas | null = null;
+  private atlas: ProbeArray | null = null;
+  /** The probes' cube camera, shared by every document's array, at the layout-invariant edge (`room-probes.ts`). */
   private readonly probeCamera: ProbeCamera;
   /** The bake pace the starting tier asked of the grids. */
   private readonly probesPerFrame: number;
@@ -238,11 +239,18 @@ export class WalkLighting {
     this.probeCamera = new ProbeCamera();
     this.uniforms = walkUniformsFor(scene);
     this.sampler = new RoomSampler(this.uniforms);
-    this.placeholder = this.uniforms.jeexAtlas.value;
+    this.placeholders = { probes: this.uniforms.jeexProbes.value, grids: this.uniforms.jeexGrids.value };
+    const uniforms = this.uniforms;
+    this.lit = {
+      get visible() {
+        return uniforms.jeexGridOn.value === 1;
+      },
+      set visible(on) {
+        uniforms.jeexGridOn.value = on ? 1 : 0;
+      },
+    };
     this.rig = new WalkRig({ scene, renderer, uniforms: this.uniforms });
-    this.sky = new HdriSky({ scene, renderer, exterior: () => this.exterior, sun: () => this.sun() });
-    this.parent.name = 'walk-lighting-grids';
-    scene.add(this.parent);
+    this.sky = new HdriSky({ scene, renderer, exterior: () => this.gridAtlas?.exterior ?? null, sun: () => this.sun() });
   }
 
   get phase(): WalkLightingPhase {
@@ -295,15 +303,11 @@ export class WalkLighting {
     this.furniture = doc.furniture;
     this.rooms = doc.volumes.rooms;
     this.grids = volumes.boxes.map((box) => new RoomGrid(box));
-    this.exterior = createExteriorGrid(LIGHTING_STANDARD.apartment, volumes.bounds);
-    for (const grid of [...this.grids, this.exterior]) {
-      grid.visible = false;
-      this.parent.add(grid);
-    }
-    const layout = atlasLayout(volumes.probes.length);
-    this.atlas = new ProbeAtlas(this.renderer, this.scene, layout, this.probeCamera);
-    this.uniforms.jeexAtlas.value = this.atlas.target.texture;
-    setRoomBoxes(this.uniforms, volumes.boxes, volumes.probes, layout);
+    this.gridAtlas = new GridAtlas(this.renderer, this.grids, LIGHTING_STANDARD.apartment);
+    this.gridAtlas.setUniforms(this.uniforms, volumes.boxes);
+    this.atlas = new ProbeArray(this.renderer, this.scene, volumes.probes.length, this.probeCamera);
+    this.uniforms.jeexProbes.value = this.atlas.target.texture;
+    setRoomBoxes(this.uniforms, volumes.boxes, volumes.probes);
     this.restart();
   }
 
@@ -341,7 +345,7 @@ export class WalkLighting {
       this.current = 'live';
       this.last = this.measure();
     } else if (!this.probes.done && this.probes.step()) {
-      // A relight: one room's probe per frame, written into its tile in place; the last one re-measures the rooms.
+      // A relight: one room's probe per frame, written into its layers in place; the last one re-measures the rooms.
       this.measureDue = true;
     }
     this.show(true);
@@ -427,7 +431,7 @@ export class WalkLighting {
       probe.position = next.position;
       moved.push(probe.roomId);
     });
-    if (moved.length > 0) setRoomBoxes(this.uniforms, volumes.boxes, volumes.probes, atlasLayout(volumes.probes.length));
+    if (moved.length > 0) setRoomBoxes(this.uniforms, volumes.boxes, volumes.probes);
     return moved;
   }
 
@@ -466,7 +470,6 @@ export class WalkLighting {
   dispose(): void {
     this.uniforms.jeexLampScope.value = 0;
     this.release();
-    this.parent.removeFromParent();
     this.rig.dispose();
     this.sky.dispose();
     this.probeCamera.dispose();
@@ -500,11 +503,9 @@ export class WalkLighting {
     const scene = this.scene;
     this.probes = new RoomProbes({
       probes: this.volumes!.probes,
-      layout: atlasLayout(this.volumes!.probes.length),
       rig: this.rig,
       mirrors: () => mirrorsOf(scene),
-      grids: this.grids,
-      exterior: this.exterior!,
+      grids: this.lit,
       capture: this.atlas!.capture,
       copy: this.atlas!.copy,
     });
@@ -513,12 +514,14 @@ export class WalkLighting {
 
   private gridBake(targets: readonly RoomGrid[], probesPerFrame = Number.POSITIVE_INFINITY): GridBake {
     const scene = this.scene;
+    const atlas = this.gridAtlas!;
     return new GridBake({
       renderer: this.renderer,
       scene,
       grids: this.grids,
       targets,
-      exterior: this.exterior!,
+      lit: this.lit,
+      baked: (grid) => atlas.copyGrid(this.grids.indexOf(grid as RoomGrid)),
       rig: this.rig,
       exclusions: () => bakeExclusions(scene, this.furniture),
       layerExclusions: () => furnitureRenderables(this.furniture),
@@ -527,15 +530,14 @@ export class WalkLighting {
     });
   }
 
-  /** Shows the room lighting (every grid, the walk rig) or the editing look. */
+  /** Shows the room lighting (the grids on, the walk rig) or the editing look. */
   private show(on: boolean): void {
-    for (const grid of this.grids) grid.visible = on;
-    if (this.exterior) this.exterior.visible = on;
+    this.lit.visible = on && this.gridAtlas !== null;
     if (this.rig.state !== (on ? 'walk' : 'editing')) this.rig.setState(on ? 'walk' : 'editing');
   }
 
   private measure(): WalkLightingStats {
-    const layout = atlasLayout(this.volumes!.probes.length);
+    const probes = probeArrayLayout(this.volumes!.probes.length);
     return {
       boxes: this.grids.length,
       gridProbes: this.bake!.stats.probes,
@@ -543,24 +545,21 @@ export class WalkLighting {
       bakeMs: Math.round(this.bake!.stats.ms),
       probeFrames: this.probes!.stats.frames,
       probeMs: Math.round(this.probes!.stats.ms),
-      memoryBytes: layout.width * layout.height * 8 + this.grids.reduce((sum, grid) => sum + gridBytes(grid), 0),
+      memoryBytes: probes.bytes + this.gridAtlas!.layout.bytes + this.grids.reduce((sum, grid) => sum + gridBytes(grid), 0),
     };
   }
 
-  /** Frees the grids and the atlas of the current document. */
+  /** Frees the grids, the grid atlas and the probe array of the current document. */
   private release(): void {
     this.show(false);
-    for (const grid of this.grids) {
-      grid.removeFromParent();
-      grid.dispose();
-    }
-    this.exterior?.removeFromParent();
-    this.exterior?.dispose();
+    for (const grid of this.grids) grid.dispose();
+    this.gridAtlas?.dispose();
     this.atlas?.dispose();
-    this.uniforms.jeexAtlas.value = this.placeholder;
+    this.uniforms.jeexProbes.value = this.placeholders.probes;
+    this.uniforms.jeexGrids.value = this.placeholders.grids;
     this.uniforms.jeexBoxCount.value = 0;
     this.grids = [];
-    this.exterior = null;
+    this.gridAtlas = null;
     this.atlas = null;
     this.balances.clear();
     this.eased.reset();

@@ -185,7 +185,7 @@ class SunRig extends Rig implements ApartmentRig {
     super('apartment', group, environment, intensity, forget);
     this.sun = sun;
     this.shadowMapSize = size;
-    // three r186 calls a directional shadow's `updateMatrices` from the shadow
+    // three r187 calls a directional shadow's `updateMatrices` from the shadow
     // pass alone, once per light it actually draws: counting the calls counts
     // the draws without reaching into the renderer.
     const shadow = sun.shadow;

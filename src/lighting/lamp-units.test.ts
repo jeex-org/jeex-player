@@ -21,8 +21,8 @@ describe('lamp units', () => {
     expect(Math.abs(blenderPower(1.2) - 4 * Math.PI * 1.2)).toBeLessThan(1e-9);
   });
 
-  test('adding lamp.exposure leaves the standard at version 1', () => {
-    expect(LIGHTING_STANDARD_VERSION).toBe(1);
+  test('adding lamp.exposure leaves the standard at its current version, 2', () => {
+    expect(LIGHTING_STANDARD_VERSION).toBe(2);
     expect(LIGHTING_STANDARD.lamp.exposure).toBeCloseTo((1.2 * 4 * Math.PI) / 400, 12);
     expect(Object.isFrozen(LIGHTING_STANDARD.lamp)).toBe(true);
   });

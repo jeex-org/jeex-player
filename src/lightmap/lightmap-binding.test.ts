@@ -14,12 +14,15 @@ import type { LightBake } from './light-bake.js';
 import { LightBakeError } from './light-bake-error.js';
 import { bindLightBake } from './lightmap-binding.js';
 import { rgbmRangeOf } from './lightmap-shader.js';
-import { createWalkUniforms, installWalkPatch } from '../render/walk-lighting/box-probe-patch.js';
+import { createWalkUniforms, installWalkPatch, WALK_TRANSFORM } from '../render/walk-lighting/box-probe-patch.js';
 import { AssetLoader } from '../geometry/asset-loader.js';
 import { projectBank } from '../assets/project-catalogue.js';
 import { parseProjectManifest } from '../assets/project-manifest.schema.js';
 import { lampLightTag } from '../assets/artificial-light.js';
 import { LAMP_PROJECT_FIXTURE as LAMPS } from '../../tests/fixtures/project/fixture-ids.js';
+
+/** The walk patch's part of a program key, at the version its one owner pins. */
+const WALK = `${WALK_TRANSFORM.id}@${WALK_TRANSFORM.version}`;
 
 const DIR = new URL('../../tests/fixtures/lightmap-calibration/', import.meta.url);
 const sidecar = (): LightBake => JSON.parse(readFileSync(new URL('sidecar.json', DIR), 'utf8')) as LightBake;
@@ -58,7 +61,7 @@ describe('bindLightBake', () => {
     expect(clone.lightMap).toBe(texture);
     const shader = {
       fragmentShader: THREE.ShaderLib.physical.fragmentShader,
-      vertexShader: '',
+      vertexShader: THREE.ShaderLib.physical.vertexShader,
       uniforms: {},
     } as unknown as THREE.WebGLProgramParametersWithUniforms;
     clone.onBeforeCompile(shader, undefined as never);
@@ -141,7 +144,7 @@ describe('bindLightBake', () => {
     const clone = materialOf(root, CALIBRATION_NODES.floor);
     const shader = {
       fragmentShader: THREE.ShaderLib.physical.fragmentShader,
-      vertexShader: '',
+      vertexShader: THREE.ShaderLib.physical.vertexShader,
       uniforms: {},
     } as unknown as THREE.WebGLProgramParametersWithUniforms;
     clone.onBeforeCompile(shader, undefined as never);
@@ -161,7 +164,7 @@ describe('bindLightBake', () => {
     const patched = materialOf(patchedRoot, CALIBRATION_NODES.floor);
     const plain = materialOf(plainRoot, CALIBRATION_NODES.floor);
     expect(plain.customProgramCacheKey()).toBe(patched.customProgramCacheKey());
-    expect(plain.customProgramCacheKey()).toBe('jeex||jeex-walk-lighting@6|jeex-baked-surface@2|jeex-lightmap-rgbm-r8@1');
+    expect(plain.customProgramCacheKey()).toBe(`jeex||${WALK}|jeex-baked-surface@2|jeex-lightmap-rgbm-r8@1`);
   });
 
   test('a source that already carries the walk lighting gives its clone the patch, the policy and the decode, without touching the source', async () => {
@@ -172,15 +175,15 @@ describe('bindLightBake', () => {
     const clone = materialOf(root, CALIBRATION_NODES.floor);
     const shader = {
       fragmentShader: THREE.ShaderLib.physical.fragmentShader,
-      vertexShader: '',
+      vertexShader: THREE.ShaderLib.physical.vertexShader,
       uniforms: {},
     } as unknown as THREE.WebGLProgramParametersWithUniforms;
     clone.onBeforeCompile(shader, undefined as never);
     expect(shader.fragmentShader).toContain('jeexLocate( - vViewPosition, normal );');
     expect(shader.fragmentShader).toContain('#define JEEX_BAKED_SURFACE');
     expect(shader.fragmentShader).toContain('#define lightMapIntensity ( lightMapIntensity * lightMapTexel.a * JEEX_RGBM_RANGE )');
-    expect(clone.customProgramCacheKey()).toMatch(/\|jeex-walk-lighting@6\|jeex-baked-surface@2\|jeex-lightmap-rgbm-r8@1$/);
-    expect(source.customProgramCacheKey()).toMatch(/\|jeex-walk-lighting@6$/);
+    expect(clone.customProgramCacheKey()).toMatch(new RegExp(`\\|${WALK}\\|jeex-baked-surface@2\\|jeex-lightmap-rgbm-r8@1$`));
+    expect(source.customProgramCacheKey()).toMatch(new RegExp(`\\|${WALK}$`));
   });
 
   test('refuses a missing, ambiguous, multi-material or UV-less mesh, and UV1 outside its rect, changing nothing', async () => {

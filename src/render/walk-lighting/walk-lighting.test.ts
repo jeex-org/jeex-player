@@ -27,7 +27,7 @@ describe('WalkLighting', () => {
     const shader = {
       uniforms: {} as Record<string, THREE.IUniform>,
       fragmentShader: THREE.ShaderLib.standard.fragmentShader,
-      vertexShader: '',
+      vertexShader: THREE.ShaderLib.standard.vertexShader,
     };
     material.onBeforeCompile(shader as unknown as THREE.WebGLProgramParametersWithUniforms, {} as THREE.WebGLRenderer);
     expect(shader.uniforms['jeexBoxProbes']!.value).toBe(1);
@@ -41,7 +41,7 @@ describe('WalkLighting', () => {
     expect(lighting.phase).toBe('empty');
     lighting.frame(true);
     expect(lighting.rig.state).toBe('editing');
-    expect(scene.getObjectByName('walk-lighting-grids')!.children).toHaveLength(0);
+    expect(lighting.uniforms.jeexGridOn.value).toBe(0);
     lighting.dispose();
   });
 

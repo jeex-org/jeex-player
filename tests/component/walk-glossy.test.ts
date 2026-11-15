@@ -22,7 +22,7 @@ import { commands } from 'vitest/browser';
 import { InlineSceneRepository, mountViewer } from '../../src/app/viewer-api.js';
 import type { ViewerHandle } from '../../src/app/viewer-handle.js';
 import { WalkLighting, WalkPost } from '../../src/render/walk-post.js';
-import { atlasLayout, setRoomBoxes, type WalkUniforms } from '../../src/render/walk-lighting/box-probe-patch.js';
+import { setRoomBoxes, type WalkUniforms } from '../../src/render/walk-lighting/box-probe-patch.js';
 import type { RoomBox, RoomProbe } from '../../src/render/walk-lighting/room-volumes.js';
 import type { Mat3, Rgb } from '../../src/render/white-balance.js';
 import { openingMaterialFacts } from '../../src/geometry/opening-kinds.js';
@@ -228,7 +228,7 @@ describe.skipIf(!HARDWARE)(`walk gloss and white balance in the demo living room
     const placed = { ...probe.position };
     const move = (to: { x: number; y: number; z: number }): void => {
       probe.position = { ...to };
-      setRoomBoxes(lighting.uniforms, lighting.volumes.boxes, lighting.volumes.probes, atlasLayout(lighting.volumes.probes.length));
+      setRoomBoxes(lighting.uniforms, lighting.volumes.boxes, lighting.volumes.probes);
       lighting.refresh.call(lighting as unknown as WalkLighting, { all: false, grids: [], probes: [LIVING] }, null);
     };
     move(position);

@@ -2,7 +2,7 @@
  * Which index each light gets in three's per-type light arrays for one
  * render, and the baked-surface masks over those indices.
  *
- * Adapter pinned to three r186.1 (`WebGLRenderer.projectObject` and
+ * Adapter pinned to three r187 (`WebGLRenderer.projectObject` and
  * `WebGLLights.setup`): a light is collected in scene traversal order when
  * every ancestor is visible and its own layers pass the camera's (a light
  * failing the layer test is skipped, its children are not); the collected

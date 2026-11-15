@@ -19,7 +19,6 @@ import { decorateRgbm } from '../../src/lightmap/lightmap-shader.js';
 import { markBakedSurface, setLampBaked } from '../../src/render/baked-surface.js';
 import { APARTMENT_FILL_LIGHT_NAME, createLightingContext } from '../../src/lighting/lighting-context.js';
 import { lightMasks } from '../../src/render/light-order.js';
-import { packAtlas, type Rgb } from '../../src/render/walk-lighting/exterior-sh.js';
 import { RoomGrid } from '../../src/render/walk-lighting/room-grid.js';
 import { createWalkUniforms, installWalkPatch } from '../../src/render/walk-lighting/box-probe-patch.js';
 import type { RoomBox } from '../../src/render/walk-lighting/room-volumes.js';
@@ -135,14 +134,17 @@ function addGrid(scene: THREE.Scene): void {
     roomId: 'grid',
     projection: { min: { x: -3, y: -3, z: -3 }, max: { x: 3, y: 3, z: 3 } },
     sampling: { min: { x: -3, y: -3, z: -3 }, max: { x: 3, y: 3, z: 3 } },
+    grid: { min: { x: -3, y: -3, z: -3 }, max: { x: 3, y: 3, z: 3 } },
     selection: { min: { x: -3, y: -3, z: -3 }, max: { x: 3, y: 3, z: 3 } },
     resolution: { x: 2, y: 2, z: 2 },
   };
   const grid = new RoomGrid(volume);
-  const coefficients: Rgb[] = Array.from({ length: 9 }, () => [0, 0, 0] as Rgb);
-  coefficients[0] = [0.4 / 0.886227, 0.3 / 0.886227, 0.2 / 0.886227];
-  const atlas = packAtlas(coefficients, 2);
-  const texture = new THREE.Data3DTexture(atlas.data, 2, 2, atlas.depth);
+  // Three's own atlas for a grid of two probes a side: seven RGBA sub-volumes stacked along z, four slices
+  // deep with the padding; a constant grid fills only the first, which carries the constant coefficient.
+  const depth = 7 * 4;
+  const data = new Float32Array(2 * 2 * depth * 4);
+  for (let texel = 0; texel < 2 * 2 * 4; texel += 1) data.set([0.4 / 0.886227, 0.3 / 0.886227, 0.2 / 0.886227, 0], texel * 4);
+  const texture = new THREE.Data3DTexture(data, 2, 2, depth);
   texture.type = THREE.FloatType;
   texture.minFilter = THREE.NearestFilter;
   texture.magFilter = THREE.NearestFilter;

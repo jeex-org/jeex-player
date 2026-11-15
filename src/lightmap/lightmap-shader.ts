@@ -2,7 +2,7 @@
  * The RGBM decode of a lightmap, as a shader transform of a standard or
  * physical material.
  *
- * three r186 adds `lightMapTexel.rgb * lightMapIntensity` to the diffuse
+ * three r187 adds `lightMapTexel.rgb * lightMapIntensity` to the diffuse
  * irradiance and ignores the texel's alpha. An RGBM texel stores linear light
  * as `rgb × M × range`, so the transform defines `lightMapIntensity` as
  * `( lightMapIntensity * lightMapTexel.a * range )` right after the uniform's
@@ -27,7 +27,7 @@ import type * as THREE from 'three';
 import { addShaderTransform } from '../render/baked-surface.js';
 import { LightBakeError } from './light-bake-error.js';
 
-/** The include the decode is placed after; in every lit material's fragment shader of r186. */
+/** The include the decode is placed after; in every lit material's fragment shader of r187. */
 const PARS_TOKEN = '#include <lightmap_pars_fragment>';
 /** The same place once the include is expanded. */
 const PARS_DECLARATION = 'uniform float lightMapIntensity;';

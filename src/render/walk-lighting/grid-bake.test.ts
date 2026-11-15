@@ -7,7 +7,7 @@ type Call = {
   start: number;
   count: number;
   pass: number;
-  visible: string[];
+  lit: boolean;
   hidden: boolean;
   masks: number[];
   state: UniformState;
@@ -15,53 +15,46 @@ type Call = {
 
 function setup(options: { probesPerFrame: number; throwOn?: number; only?: string } = { probesPerFrame: 5 }) {
   const calls: Call[] = [];
+  const baked: string[] = [];
   let state: UniformState = 'editing';
   const furniture = { visible: true };
   const mirror = { visible: true };
+  const lit = { visible: false };
   // Furniture renderables: a body, a transmissive body, a shade with a non-default mask.
   const renderables = [{ layers: { mask: 1 } }, { layers: { mask: 1 } }, { layers: { mask: 5 } }];
-  const all: BakeGrid[] = [];
-  const grid = (name: string, probes: number): BakeGrid & { name: string } => {
-    const g = {
-      name,
-      visible: false,
-      resolution: { x: probes, y: 1, z: 1 },
-      bake(_renderer: unknown, _scene: unknown, o: { start: number; count: number; pass: number }) {
-        if (options.throwOn !== undefined && calls.length === options.throwOn) throw new Error('lost');
-        calls.push({
-          grid: name,
-          start: o.start,
-          count: o.count,
-          pass: o.pass,
-          // three makes the baking grid visible itself; the rest is ours.
-          visible: all.filter((other) => other.visible || other === g).map((other) => (other as unknown as { name: string }).name),
-          hidden: !furniture.visible && !mirror.visible,
-          masks: renderables.map((r) => r.layers.mask),
-          state,
-        });
-      },
-    };
-    all.push(g);
-    return g;
-  };
+  const grid = (name: string, probes: number): BakeGrid & { name: string } => ({
+    name,
+    resolution: { x: probes, y: 1, z: 1 },
+    bake(_renderer: unknown, _scene: unknown, o: { start: number; count: number; pass: number }) {
+      if (options.throwOn !== undefined && calls.length === options.throwOn) throw new Error('lost');
+      calls.push({
+        grid: name,
+        start: o.start,
+        count: o.count,
+        pass: o.pass,
+        lit: lit.visible,
+        hidden: !furniture.visible && !mirror.visible,
+        masks: renderables.map((r) => r.layers.mask),
+        state,
+      });
+    },
+  });
   const a = grid('a', 7);
   const b = grid('b', 3);
-  const exterior = grid('exterior', 0);
-  all.pop();
-  all.push(exterior);
   const bake = new GridBake({
     renderer: {} as never,
     scene: {} as never,
     grids: [a, b],
     ...(options.only === undefined ? {} : { targets: [a, b].filter((g) => g.name === options.only) }),
-    exterior,
+    lit,
+    baked: (done) => baked.push(`${(done as unknown as { name: string }).name}:${calls.at(-1)!.pass}`),
     rig: { setState: (next) => (state = next) },
     exclusions: () => [furniture, mirror],
     layerExclusions: () => renderables,
     probesPerFrame: options.probesPerFrame,
     cubemapSize: 8,
   });
-  return { bake, calls, a, b, exterior, furniture, mirror, renderables, state: () => state };
+  return { bake, calls, baked, a, b, lit, furniture, mirror, renderables, state: () => state };
 }
 
 describe('GridBake', () => {
@@ -82,25 +75,25 @@ describe('GridBake', () => {
     expect(bake.step()).toBe(true);
   });
 
-  test('pass 0 sees only the baking grid, pass 1 every room grid and the exterior grid', () => {
+  test('pass 0 bakes with the grids off, pass 1 with them on', () => {
     const { bake, calls } = setup();
     while (!bake.step());
-    expect(calls.filter((c) => c.pass === 0).map((c) => c.visible)).toEqual([['a'], ['a'], ['b']]);
-    for (const call of calls.filter((c) => c.pass === 1)) expect(call.visible).toEqual(['a', 'b', 'exterior']);
+    expect(calls.filter((c) => c.pass === 0).map((c) => c.lit)).toEqual([false, false, false]);
+    for (const call of calls.filter((c) => c.pass === 1)) expect(call.lit).toBe(true);
+  });
+
+  test('hands each grid to the packed atlas when a pass has finished it', () => {
+    const { bake, baked } = setup();
+    while (!bake.step());
+    expect(baked).toEqual(['a:0', 'b:0', 'a:1', 'b:1']);
   });
 
   test('every call runs in the capture state with the exclusions hidden; between frames all is back', () => {
-    const { bake, calls, a, b, exterior, furniture, mirror, state } = setup();
+    const { bake, calls, lit, furniture, mirror, state } = setup({ probesPerFrame: 12 });
     bake.step();
+    expect(calls.some((c) => c.lit)).toBe(true);
     expect(calls.every((c) => c.state === 'capture' && c.hidden)).toBe(true);
-    expect([state(), furniture.visible, mirror.visible, a.visible, b.visible, exterior.visible]).toEqual([
-      'editing',
-      true,
-      true,
-      false,
-      false,
-      false,
-    ]);
+    expect([state(), furniture.visible, mirror.visible, lit.visible]).toEqual(['editing', true, true, false]);
   });
 
   test('every call sees the furniture renderables on no layer; between frames each has its own mask back', () => {
@@ -118,9 +111,9 @@ describe('GridBake', () => {
   });
 
   test('restores everything when a call throws, and rethrows', () => {
-    const { bake, furniture, a, state } = setup({ probesPerFrame: 20, throwOn: 1 });
+    const { bake, furniture, lit, state } = setup({ probesPerFrame: 20, throwOn: 3 });
     expect(() => bake.step()).toThrow('lost');
-    expect([state(), furniture.visible, a.visible]).toEqual(['editing', true, false]);
+    expect([state(), furniture.visible, lit.visible]).toEqual(['editing', true, false]);
   });
 
   test('counts frames and probes for the measurement', () => {
@@ -141,12 +134,13 @@ describe('GridBake of no grids', () => {
 });
 
 describe('GridBake of some grids', () => {
-  test('bakes only the targets, with every room grid visible in pass 1', () => {
-    const { bake, calls } = setup({ probesPerFrame: 100, only: 'b' });
+  test('bakes only the targets, with the grids on in pass 1', () => {
+    const { bake, calls, baked } = setup({ probesPerFrame: 100, only: 'b' });
     expect(bake.step()).toBe(true);
-    expect(calls.map((c) => [c.grid, c.pass, c.visible])).toEqual([
-      ['b', 0, ['b']],
-      ['b', 1, ['a', 'b', 'exterior']],
+    expect(calls.map((c) => [c.grid, c.pass, c.lit])).toEqual([
+      ['b', 0, false],
+      ['b', 1, true],
     ]);
+    expect(baked).toEqual(['b:0', 'b:1']);
   });
 });

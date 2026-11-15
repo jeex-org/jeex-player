@@ -5,7 +5,7 @@
  *
  * Environment: one small adapter over three's `UltraHDRLoader`. The bytes are
  * fetched here with the caller's signal (the loader takes none) and handed to
- * `parse`; three r186 throws the asynchronous decode error of the embedded
+ * `parse`; three r187 throws the asynchronous decode error of the embedded
  * images from inside its own `.catch`, where no caller can catch it, so the
  * adapter points that one error callback (`_applyGainmapToSDR`'s last
  * argument) at its own rejection. Re-check the hook on every three upgrade.
@@ -37,7 +37,7 @@ import {
 
 /** The prefiltered environment of one HDRI and what its sun is. */
 export type HdriEnvironment = {
-  /** Cube-UV PMREM texture, for `scene.environment` and capture backgrounds. */
+  /** PMREM cube texture, for `scene.environment` and capture backgrounds. */
   readonly texture: THREE.Texture;
   /** Edge of the PMREM's largest cube face, texels. */
   readonly cubeSize: number;
@@ -55,7 +55,7 @@ export type HdriSkyTexture = { readonly texture: THREE.Texture; dispose(): void 
 
 type Fetch = (url: string, init: { signal: AbortSignal }) => Promise<Response>;
 
-/** The loader's private decode step and its callbacks, as three r186 declares them. */
+/** The loader's private decode step and its callbacks, as three r187 declares them. */
 type GainMapStep = (
   metadata: unknown,
   sdr: Uint8Array,
@@ -83,7 +83,7 @@ function decodeGainMap(buffer: ArrayBuffer): Promise<{ data: Uint16Array; width:
     hooks._applyGainmapToSDR = (metadata, sdr, gainMap, onSuccess) =>
       step.call(loader, metadata, sdr, gainMap, onSuccess, (error) => reject(asError(error)));
     try {
-      // r186 hands over `data`; its type declarations still call the field `hdrBuffer`.
+      // r187 hands over `data`; its type declarations still call the field `hdrBuffer`.
       loader.parse(buffer, (texture) => resolve(texture as unknown as { data: Uint16Array; width: number; height: number }));
     } catch (error) {
       reject(asError(error));
@@ -136,7 +136,7 @@ export async function loadHdriEnvironment(
     equirect.dispose();
   }
   target.texture.name = 'HdriEnvironment';
-  return { texture: target.texture, cubeSize: target.height / 4, sky, gain, sunIntensity, dispose: () => target.dispose() };
+  return { texture: target.texture, cubeSize: target.width, sky, gain, sunIntensity, dispose: () => target.dispose() };
 }
 
 /** Fetches and decodes the display sky of `entry`. */

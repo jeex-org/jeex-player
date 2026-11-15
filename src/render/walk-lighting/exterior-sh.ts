@@ -4,7 +4,7 @@
  * walk and tour switch off as lights (they reach through walls) and give back
  * to everything outside the rooms through a fixed, unbaked grid.
  *
- * Basis and evaluation are three r186's (`lightprobes_pars_fragment`): the
+ * Basis and evaluation are three r187's (`lightprobes_pars_fragment`): the
  * coefficients are radiance coefficients in three's basis, and
  * `evaluateSH` is the shader's irradiance polynomial, so what is tested here is
  * what the shader computes.
@@ -87,17 +87,10 @@ export function exteriorSH(lights: ExteriorLights): Rgb[] {
   return sky.map((a, i) => [0, 1, 2].map((c) => a[c]! + light[i]![c]!) as unknown as Rgb);
 }
 
-/**
- * The coefficients as three's probe-grid atlas for a grid of `size` probes per
- * side: seven RGBA sub-volumes stacked along z, each `size + 2` slices deep
- * (one padding slice at each end), every texel of a sub-volume the same.
- */
-export function packAtlas(
-  coefficients: readonly Rgb[],
-  size: number,
-): { data: Float32Array; width: number; height: number; depth: number } {
+/** The nine coefficients as three's seven RGBA packs (`LightProbeGridWebGL`'s repack shaders). */
+function packs(coefficients: readonly Rgb[]): number[][] {
   const c = coefficients;
-  const packs = [
+  return [
     [c[0]![0], c[0]![1], c[0]![2], c[1]![0]],
     [c[1]![1], c[1]![2], c[2]![0], c[2]![1]],
     [c[2]![2], c[3]![0], c[3]![1], c[3]![2]],
@@ -105,13 +98,24 @@ export function packAtlas(
     [c[5]![1], c[5]![2], c[6]![0], c[6]![1]],
     [c[6]![2], c[7]![0], c[7]![1], c[7]![2]],
     [c[8]![0], c[8]![1], c[8]![2], 0],
-  ];
+  ] as number[][];
+}
+
+type Packed = { data: Float32Array; width: number; height: number; depth: number };
+
+/**
+ * The coefficients as one block of the packed grid atlas (`probe-layout.ts`)
+ * for a grid of `size` probes per side: the seven sub-volumes stacked along
+ * y, each `size + 2` rows high, the block `size + 2` texels wide and deep,
+ * borders and padding included, every texel of a sub-volume the same.
+ */
+export function packBlock(coefficients: readonly Rgb[], size: number): Packed {
+  const all = packs(coefficients);
   const padded = size + 2;
-  const depth = 7 * padded;
-  const data = new Float32Array(size * size * depth * 4);
-  for (let z = 0; z < depth; z += 1) {
-    const pack = packs[Math.floor(z / padded)]!;
-    for (let i = 0; i < size * size; i += 1) data.set(pack, (z * size * size + i) * 4);
-  }
-  return { data, width: size, height: size, depth };
+  const height = 7 * padded;
+  const data = new Float32Array(padded * height * padded * 4);
+  for (let z = 0; z < padded; z += 1)
+    for (let y = 0; y < height; y += 1)
+      for (let x = 0; x < padded; x += 1) data.set(all[Math.floor(y / padded)]!, ((z * height + y) * padded + x) * 4);
+  return { data, width: padded, height, depth: padded };
 }

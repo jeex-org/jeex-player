@@ -19,7 +19,7 @@
 import { TEMPERATURE_RANGE } from './temperature-range.js';
 
 /** Appearance version of the standard; raised with every intentional change of the look. */
-export const LIGHTING_STANDARD_VERSION = 1;
+export const LIGHTING_STANDARD_VERSION = 2;
 
 /** A three-component vector as plain data. */
 export type Triple = readonly [number, number, number];
@@ -70,6 +70,20 @@ function deepFreeze<T>(value: T): DeepReadonly<T> {
 }
 
 /**
+ * `environment.normalisation`, re-set for three r187: 0.543 until then (the
+ * patch read 0.181 on r186 and 0.17144 on r187), 0.578 since (it reads
+ * 0.18116, the 8-bit level nearest 0.18). r187's PMREM dims the environment
+ * term of a roughness-1 surface: the patch lost 4.8 %, while the apartment's
+ * lit rooms moved only -0.54 %. So the standard is re-anchored and the
+ * apartment keeps its measured light: its scale is derived from the
+ * environment intensity it had on r186.
+ */
+const ENVIRONMENT_NORMALISATION = 0.578;
+
+/** The apartment rig's `scene.environmentIntensity`, as measured on r186 (0.543 × 1.8). */
+const APARTMENT_ENVIRONMENT_INTENSITY = 0.543 * 1.8;
+
+/**
  * The standard. Read-only at every depth.
  *
  * `environment.normalisation` is the `scene.environmentIntensity` that makes
@@ -85,7 +99,7 @@ function deepFreeze<T>(value: T): DeepReadonly<T> {
  */
 export const LIGHTING_STANDARD = deepFreeze({
   /** The three.js `REVISION` the standard is calibrated for; any other is refused. */
-  engineRevision: '186',
+  engineRevision: '187',
   display: {
     toneMapping: 'neutral',
     exposure: 1,
@@ -116,7 +130,7 @@ export const LIGHTING_STANDARD = deepFreeze({
         { azimuth: -150, elevation: 20, width: 40, height: 24, softness: 10, radiance: 2 },
       ],
     } satisfies EnvironmentRecipe,
-    normalisation: 0.543,
+    normalisation: ENVIRONMENT_NORMALISATION,
   },
   reference: {
     environmentScale: 1,
@@ -128,7 +142,8 @@ export const LIGHTING_STANDARD = deepFreeze({
     },
   },
   apartment: {
-    environmentScale: 1.8,
+    /** `APARTMENT_ENVIRONMENT_INTENSITY / normalisation`, about 1.691: the apartment's light does not follow a recalibration. */
+    environmentScale: APARTMENT_ENVIRONMENT_INTENSITY / ENVIRONMENT_NORMALISATION,
     hemisphere: { sky: '#fffcf6', ground: '#6d675f', intensity: 0.9 },
     sun: {
       colour: '#fff4e6',
@@ -228,7 +243,7 @@ export const LIGHTING_STANDARD = deepFreeze({
    * window sky at exposure 1, before the walk chain's output pass.
    * Measured 2026-10-24 on three clear-sky panoramas (sun at 8°, 43° and
    * 10.5°, 1K gain-map environments, 2K skies):
-   * - `loaderCompensation`: three r186's decode against the panoramas' own
+   * - `loaderCompensation`: three r187's decode against the panoramas' own
    *   float data reads 0.949 to 0.956 of the sky (0.958 on the synthetic
    *   test fixture, `tests/component/hdri-assets.test.ts`); 1 / 0.952.
    * - `environmentGain`: an open-air horizontal card under the 43° panorama

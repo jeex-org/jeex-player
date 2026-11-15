@@ -58,7 +58,7 @@ const SERVED = /\/lazy-jeex-viewer-basis-transcoder-[A-Za-z0-9_-]+\.(js|wasm)$/;
 /** The module whose default transcoder URLs are replaced. */
 const KTX2_LOADER = /[\\/]three[\\/]examples[\\/]jsm[\\/]loaders[\\/]KTX2Loader\.js$/;
 
-/** The two default-URL declarations, as three 0.186 writes them. */
+/** The two default-URL declarations, as three 0.187 writes them. */
 const DEFAULT_URLS = [
   /new URL\(\s*'\.\.\/libs\/basis\/basis_transcoder\.wasm',\s*import\.meta\.url\s*\)\.toString\(\)/,
   /new URL\(\s*'\.\.\/libs\/basis\/basis_transcoder\.js',\s*import\.meta\.url\s*\)\.toString\(\)/,

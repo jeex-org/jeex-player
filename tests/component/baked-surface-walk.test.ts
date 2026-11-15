@@ -20,17 +20,15 @@ import { WalkLighting } from '../../src/render/walk-post.js';
 import { markBakedSurface, setBakedLightMode, setLampBaked } from '../../src/render/baked-surface.js';
 import { LIGHTING_STANDARD } from '../../src/lighting/lighting-standard.js';
 import {
-  atlasLayout,
   createWalkUniforms,
   installWalkPatch,
   setRoomBoxes,
   setUniformState,
-  TILE,
   type UniformState,
   type WalkUniforms,
 } from '../../src/render/walk-lighting/box-probe-patch.js';
-import { packAtlas, type Rgb } from '../../src/render/walk-lighting/exterior-sh.js';
-import { RoomGrid } from '../../src/render/walk-lighting/room-grid.js';
+import { GridAtlas, RoomGrid } from '../../src/render/walk-lighting/room-grid.js';
+import { constantGrids, constantProbes } from './walk-grids.js';
 import type { RoomBox } from '../../src/render/walk-lighting/room-volumes.js';
 import { WALK_LIGHTING_TUNING as T } from '../../src/render/walk-lighting/walk-lighting-tuning.js';
 import { closeContainers, demoScene, nextFrame, openContainer, until } from './support.js';
@@ -55,11 +53,11 @@ afterEach(() => {
   }
 });
 
-/** Looks at the unit plane at `x` head-on from +z. */
-function camera(x = 0): THREE.OrthographicCamera {
+/** Looks at the unit plane at `(x, y)` head-on from +z. */
+function camera(x = 0, y = 0): THREE.OrthographicCamera {
   const view = new THREE.OrthographicCamera(-1, 1, 1, -1, 0.1, 20);
-  view.position.set(x, 0, 1.5);
-  view.lookAt(x, 0, 0);
+  view.position.set(x, y, 1.5);
+  view.lookAt(x, y, 0);
   return view;
 }
 
@@ -122,25 +120,10 @@ const room = (min: number, max: number): RoomBox => ({
   roomId: 'room',
   projection: cube(min, max),
   sampling: cube(min + 0.5, max - 0.5),
+  grid: cube(min, max),
   selection: cube(min - 0.2, max + 0.2),
   resolution: { x: 2, y: 2, z: 2 },
 });
-
-/** A constant-irradiance grid over `box`. */
-function constantGrid(box: RoomBox, level: number): RoomGrid {
-  const grid = new RoomGrid(box);
-  const coefficients: Rgb[] = Array.from({ length: 9 }, () => [0, 0, 0] as Rgb);
-  coefficients[0] = [level / 0.886227, level / 0.886227, level / 0.886227];
-  const atlas = packAtlas(coefficients, 2);
-  const texture = new THREE.Data3DTexture(atlas.data, 2, 2, atlas.depth);
-  texture.type = THREE.FloatType;
-  texture.minFilter = THREE.NearestFilter;
-  texture.magFilter = THREE.NearestFilter;
-  texture.needsUpdate = true;
-  grid.texture = texture;
-  grid.resolution.set(2, 2, 2);
-  return grid;
-}
 
 /** A scene with a studio-like environment (or a black one), walk uniforms over one room box, the patch installed. */
 function walkScene(
@@ -155,7 +138,7 @@ function walkScene(
   scene.environment = pmrem.fromScene(source, 0).texture;
   pmrem.dispose();
   const uniforms = createWalkUniforms();
-  setRoomBoxes(uniforms, [box], [{ roomId: box.roomId, position: { x: 0, y: 0, z: 0 } }], atlasLayout(1));
+  setRoomBoxes(uniforms, [box], [{ roomId: box.roomId, position: { x: 0, y: 0, z: 0 } }]);
   return { scene, uniforms };
 }
 
@@ -170,7 +153,8 @@ describe('the lightmap of a baked surface in walk', () => {
     const gl = renderer();
     const box = room(-3, 3);
     const { scene, uniforms } = walkScene(gl, box);
-    scene.add(plane(baked(0.05)), constantGrid(box, 0.4));
+    scene.add(plane(baked(0.05)));
+    constantGrids(uniforms, [{ box: box, colour: [0.4, 0.4, 0.4] }]);
     installWalkPatch(scene, uniforms);
     const view = camera();
     enter(scene, uniforms, 'editing');
@@ -192,7 +176,8 @@ describe('the lightmap of a baked surface in walk', () => {
     // A live wall lit by a room grid of the irradiance the baked wall's lightmap carries in walk.
     const read = (material: THREE.Material, level: number): number => {
       const { scene, uniforms } = walkScene(gl, box);
-      scene.add(plane(material), constantGrid(box, level));
+      scene.add(plane(material));
+      constantGrids(uniforms, [{ box: box, colour: [level, level, level] }]);
       installWalkPatch(scene, uniforms);
       enter(scene, uniforms, 'walk');
       return luminance(centre(gl, scene, camera()));
@@ -210,7 +195,8 @@ describe('the lightmap of a baked surface in walk', () => {
     const gl = renderer();
     const box = room(-3, 3);
     const { scene, uniforms } = walkScene(gl, box);
-    scene.add(plane(grey({ lightMap: lightmap(0.5), lightMapIntensity: 1 })), constantGrid(box, 0.4));
+    scene.add(plane(grey({ lightMap: lightmap(0.5), lightMapIntensity: 1 })));
+    constantGrids(uniforms, [{ box: box, colour: [0.4, 0.4, 0.4] }]);
     installWalkPatch(scene, uniforms);
     setUniformState(uniforms, 'walk');
     setBakedLightMode(scene, 'editing');
@@ -223,7 +209,8 @@ describe('the lightmap of a baked surface in walk', () => {
     const gl = renderer();
     const box = room(-3, 3);
     const { scene, uniforms } = walkScene(gl, box);
-    scene.add(plane(baked(0.05), 10), constantGrid(room(7, 13), 0.4));
+    scene.add(plane(baked(0.05), 10));
+    constantGrids(uniforms, [{ box: box, colour: [0.4, 0.4, 0.4] }]);
     installWalkPatch(scene, uniforms);
     const view = camera(10);
     enter(scene, uniforms, 'editing');
@@ -262,15 +249,15 @@ describe('the lightmap of a baked surface in walk', () => {
     const box = room(-3, 3);
     const readWith = (material: THREE.Material, level: number): number => {
       const { scene, uniforms } = walkScene(gl, box);
-      scene.add(plane(material), constantGrid(box, level));
+      scene.add(plane(material));
+      constantGrids(uniforms, [{ box: box, colour: [level, level, level] }]);
       installWalkPatch(scene, uniforms);
       setUniformState(uniforms, 'walk');
       return luminance(centre(gl, scene, camera()));
     };
-    const floor = baked(0.3);
-    expect(near(readWith(floor, 0.8), readWith(floor, 0.4))).toBe(true);
-    const card = grey();
-    expect(readWith(card, 0.8)).toBeGreaterThan(1.5 * readWith(card, 0.4));
+    // A fresh material per read: a patched material keeps the uniforms (and so the grids) it was first compiled with.
+    expect(near(readWith(baked(0.3), 0.8), readWith(baked(0.3), 0.4))).toBe(true);
+    expect(readWith(grey(), 0.8)).toBeGreaterThan(1.5 * readWith(grey(), 0.4));
   });
 });
 
@@ -302,12 +289,10 @@ describe('reflections on a baked surface in walk', () => {
     const gl = renderer();
     const box = room(-3, 3);
     const glossy = { color: 0x000000, roughness: 0.2, specularIntensity: 1, clearcoat: 1, clearcoatRoughness: 0.1 };
-    const atlas = new THREE.DataTexture(new Float32Array(TILE.width * TILE.height * 4).fill(0.5), TILE.width, TILE.height);
-    atlas.type = THREE.FloatType;
-    atlas.needsUpdate = true;
+    const atlas = constantProbes(0.5);
     const readIn = (material: THREE.Material, probes: boolean): number => {
       const { scene, uniforms } = walkScene(gl, box, { blackEnvironment: true });
-      uniforms.jeexAtlas.value = atlas;
+      uniforms.jeexProbes.value = atlas;
       scene.add(plane(material));
       installWalkPatch(scene, uniforms);
       setUniformState(uniforms, 'walk');
@@ -324,40 +309,81 @@ describe('reflections on a baked surface in walk', () => {
 });
 
 describe('a real grid capture', () => {
-  test('sees the baked walls’ lightmap times the walk gain, in the capture state as in walk', () => {
+  test('sees the baked walls’ lightmap times the walk gain, in the capture state as in walk, each probe where three puts it', () => {
     const gl = renderer();
     const box = room(-2, 2);
-    const bakeWith = (walls: THREE.Material, state: 'capture' | 'walk'): number => {
+    // Card points over the probe columns at opposite corners, x and y -1.5 and 1.5: each reads one probe of the
+    // 2 x 2 x 2 grid at its texel centre (and the +z layer through the card's normal), so a block copied one texel
+    // off in x, y or z reads another probe, or nothing.
+    const points = [-1.5, 1.5] as const;
+    type Reading = { patch: number[]; three: number[] };
+    const bakeWith = (walls: THREE.Material, state: 'capture' | 'walk'): Reading => {
       const { scene, uniforms } = walkScene(gl, box, { blackEnvironment: true });
       const shell = new THREE.Mesh(new THREE.BoxGeometry(4, 4, 4), walls);
       scene.add(shell);
+      // A bright strip along the +x, +y edge of the room: the probes near it see far more light than the
+      // probes across the room, so the grid varies strongly in x and in y.
+      const strip = new THREE.Mesh(
+        new THREE.BoxGeometry(0.4, 0.4, 3.8),
+        new THREE.MeshBasicMaterial({ color: new THREE.Color().setRGB(12, 12, 12, THREE.LinearSRGBColorSpace) }),
+      );
+      strip.position.set(1.7, 1.7, 0);
+      scene.add(strip);
       const grid = new RoomGrid(box);
-      scene.add(grid);
+      const atlas = new GridAtlas(gl, [grid], LIGHTING_STANDARD.apartment);
+      atlas.setUniforms(uniforms, [box]);
       installWalkPatch(scene, uniforms);
       enter(scene, uniforms, state);
       grid.bake(gl, scene, { start: 0, count: 8, pass: 0, cubemapSize: 8 });
+      atlas.copyGrid(0);
+      uniforms.jeexGridOn.value = 1;
       enter(scene, uniforms, 'editing');
       shell.visible = false;
+      strip.visible = false;
       const card = plane(grey());
       card.scale.setScalar(0.25);
       scene.add(card);
-      return luminance(centre(gl, scene, camera()));
+      // The card is lit by the packed grids through the walk patch, as every material in walk is.
+      installWalkPatch(scene, uniforms);
+      const read = (target: THREE.Scene, mesh: THREE.Mesh, p: number): number => {
+        mesh.position.set(p, p, 0);
+        return luminance(centre(gl, target, camera(p, p)));
+      };
+      const patch = points.map((p) => read(scene, card, p));
+      // The same grid lighting a card the way three itself does, from the grid's own texture: no atlas, no copy.
+      const own = new THREE.Scene();
+      own.add(grid);
+      const plain = plane(grey());
+      plain.scale.setScalar(0.25);
+      own.add(plain);
+      const three = points.map((p) => read(own, plain, p));
+      atlas.dispose();
+      grid.dispose();
+      return { patch, three };
     };
     const side = { side: THREE.BackSide };
     const map = 0.05;
     const reference = bakeWith(grey({ lightMap: lightmap(map), lightMapIntensity: GAIN.walk, ...side }), 'capture');
     const capture = bakeWith(baked(map, side), 'capture');
     const walk = bakeWith(baked(map, side), 'walk');
-    expect(reference).toBeGreaterThan(0.01);
-    expect(near(capture, reference, 0.02)).toBe(true);
-    expect(near(walk, capture, 0.02)).toBe(true);
+    results['grid'] = { reference, capture, walk };
+    const [far, close] = reference.three;
+    // The strip makes the two corners differ several times over, so a probe read in the other's place shows.
+    expect(far!).toBeGreaterThan(0.01);
+    expect(close!).toBeGreaterThan(3 * far!);
+    points.forEach((_, i) => {
+      // The packed atlas reads each probe as three's own grid does.
+      expect(near(reference.patch[i]!, reference.three[i]!, 0.02)).toBe(true);
+      expect(near(capture.patch[i]!, reference.patch[i]!, 0.02)).toBe(true);
+      expect(near(walk.patch[i]!, capture.patch[i]!, 0.02)).toBe(true);
+    });
   });
 });
 
 /* ------------------------------------------- the mounted demo, shell baked */
 
 const MOUNT_TIMEOUT_MS = 300_000;
-/** Program counts of the mounted part, printed at the end for the report. */
+/** The grid capture's readings and the program counts of the mounted part, printed at the end for the report. */
 const results: Record<string, unknown> = {};
 afterAll(() => {
   console.info(`baked-surface-walk: ${JSON.stringify(results)}`);

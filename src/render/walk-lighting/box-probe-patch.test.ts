@@ -1,7 +1,7 @@
 import { describe, expect, test } from 'bun:test';
 import * as THREE from 'three';
 import {
-  atlasLayout,
+  byOrigin,
   createWalkUniforms,
   ENGINE_CHUNK_ANCHORS,
   guardBumpNormal,
@@ -16,7 +16,7 @@ import { chunkMarker, expandOwnedChunks } from '../shader-compose.js';
 import { WALK_LIGHTING_TUNING } from './walk-lighting-tuning.js';
 import { bakeFragmentShader } from '../baked-surface-glsl.js';
 
-describe('the r186 chunks the patch rewrites', () => {
+describe('the r187 chunks the patch rewrites', () => {
   test('still read exactly as the patch expects', () => {
     for (const [chunk, anchors] of Object.entries(ENGINE_CHUNK_ANCHORS)) {
       const text = (THREE.ShaderChunk as unknown as Record<string, string>)[chunk]!;
@@ -45,7 +45,7 @@ describe('the r186 chunks the patch rewrites', () => {
     }
     // The extractor itself: the defines the patch's own blocks are guarded by are among them.
     expect(tested).toContain('USE_ENVMAP');
-    expect(tested).toContain('ENVMAP_TYPE_CUBE_UV');
+    expect(tested).toContain('ENVMAP_TYPE_PMREM');
     for (const name of tested) if (own.test(name) || prefixMacros.has(name)) tested.delete(name);
     const unknown = [...tested].filter((name) => !new RegExp(`\\b${name}\\b`).test(engine));
     expect(unknown).toEqual([]);
@@ -64,7 +64,6 @@ describe('patchFragmentShader', () => {
     expect(patchFragmentShader(expandOwnedChunks(THREE.ShaderLib.physical.fragmentShader))).toBe(physical);
     expect(physical).toContain('#include <lights_fragment_end>');
     expect(physical).toContain('#include <envmap_physical_pars_fragment>');
-    expect(physical).toContain('uniform sampler2D jeexAtlas;');
     expect(physical).toContain('outgoingLight *= mix( jeexOutside, 1.0, jeexInRoom );');
   });
 
@@ -104,13 +103,13 @@ describe('patchFragmentShader', () => {
   });
 
   test("keeps the grid's irradiance apart so the walk can hand it to the environment's place", () => {
-    expect(physical).toContain('jeexGridIrradiance = getLightProbeGridIrradiance( probeWorldPos, probeWorldNormal );');
+    expect(physical).toContain('jeexGridIrradiance = jeexGridLight( );');
     expect(physical).toContain('irradiance -= jeexGridIrradiance * jeexMove;');
   });
 
   test('a baked surface skips the grid sample, the hand-over and the diffuse scale', () => {
-    const grid = physical.indexOf('jeexGridIrradiance = getLightProbeGridIrradiance');
-    expect(physical.lastIndexOf('#ifndef JEEX_BAKED_SURFACE', grid)).toBeGreaterThan(physical.lastIndexOf('#endif', grid));
+    const grid = physical.indexOf('jeexGridIrradiance = jeexGridLight');
+    expect(physical.lastIndexOf('! defined( JEEX_BAKED_SURFACE )', grid)).toBeGreaterThan(physical.lastIndexOf('#endif', grid));
     const move = physical.indexOf('float jeexMove');
     expect(physical.lastIndexOf('! defined( JEEX_BAKED_SURFACE )', move)).toBeGreaterThan(physical.lastIndexOf('#endif', move));
     const scale = physical.indexOf('float jeexDiffuseScale = mix(');
@@ -136,10 +135,45 @@ describe('installWalkPatch', () => {
     const shader = {
       uniforms: {} as Record<string, THREE.IUniform>,
       fragmentShader: THREE.ShaderLib.standard.fragmentShader,
-      vertexShader: '',
+      vertexShader: THREE.ShaderLib.standard.vertexShader,
     };
     shared.onBeforeCompile(shader as unknown as THREE.WebGLProgramParametersWithUniforms, {} as THREE.WebGLRenderer);
     expect(shader.uniforms['jeexDiffuse']).toBe(uniforms.jeexDiffuse);
+    expect(shader.vertexShader).toContain('jeexOrigin = modelMatrix[ 3 ].xyz;');
+    expect(shader.uniforms['jeexByOrigin']!.value).toBe(0);
+  });
+
+  test('a piece of an opening, and only it, takes its grid by its origin', () => {
+    const opening = new THREE.Group();
+    opening.userData['surface'] = 'opening';
+    const leaf = new THREE.Group();
+    leaf.userData['isDoorLeaf'] = true;
+    // A frame is tagged as a parametric wall by the opening builder; it is still a piece of the opening.
+    const frameMaterial = new THREE.MeshStandardMaterial();
+    const frame = new THREE.Mesh(new THREE.BoxGeometry(), frameMaterial);
+    frame.userData['isParametricWall'] = true;
+    const panel = new THREE.Mesh(new THREE.BoxGeometry(), frameMaterial);
+    const glass = new THREE.Mesh(new THREE.PlaneGeometry(), new THREE.MeshPhysicalMaterial());
+    leaf.add(panel, glass);
+    opening.add(frame, leaf);
+    const cabinet = new THREE.Mesh(new THREE.BoxGeometry(), new THREE.MeshStandardMaterial());
+    expect([frame, panel, glass, cabinet].map((mesh) => byOrigin(mesh))).toEqual([true, true, true, false]);
+    const root = new THREE.Group();
+    root.add(opening, cabinet);
+    installWalkPatch(root, createWalkUniforms());
+    const flag = (mesh: THREE.Mesh): unknown => {
+      const shader = {
+        uniforms: {} as Record<string, THREE.IUniform>,
+        fragmentShader: THREE.ShaderLib.standard.fragmentShader,
+        vertexShader: THREE.ShaderLib.standard.vertexShader,
+      };
+      (mesh.material as THREE.Material).onBeforeCompile(
+        shader as unknown as THREE.WebGLProgramParametersWithUniforms,
+        {} as THREE.WebGLRenderer,
+      );
+      return shader.uniforms['jeexByOrigin']!.value;
+    };
+    expect([frame, panel, glass, cabinet].map((mesh) => flag(mesh))).toEqual([1, 1, 1, 0]);
   });
 });
 
@@ -168,16 +202,16 @@ describe('uniform states', () => {
     expect(uniforms.jeexSun.value).toBe(1);
   });
 
-  test('room boxes fill the arrays with their tiles and probe points', () => {
+  test('room boxes fill the arrays with their rooms and probe points', () => {
     const uniforms = createWalkUniforms();
     const box = (x: number): RoomBox => ({
       roomId: `r${x}`,
       projection: { min: { x, y: 0, z: 0 }, max: { x: x + 1, y: 2.5, z: 1 } },
       sampling: { min: { x, y: 0, z: 0 }, max: { x: x + 1, y: 2.5, z: 1 } },
       selection: { min: { x: x - 0.05, y: -0.2, z: -0.05 }, max: { x: x + 1.05, y: 2.7, z: 1.05 } },
+      grid: { min: { x, y: 0, z: 0 }, max: { x: x + 1, y: 2.5, z: 1 } },
       resolution: { x: 2, y: 2, z: 2 },
     });
-    const layout = atlasLayout(2);
     setRoomBoxes(
       uniforms,
       [box(0), box(2)],
@@ -185,13 +219,11 @@ describe('uniform states', () => {
         { roomId: 'r0', position: { x: 0.5, y: 1.5, z: 0.5 } },
         { roomId: 'r2', position: { x: 2.5, y: 1.5, z: 0.5 } },
       ],
-      layout,
     );
     expect(uniforms.jeexBoxCount.value).toBe(2);
     expect(uniforms.jeexBoxMax.value[1]!.toArray()).toEqual([3, 2.5, 1]);
     expect(uniforms.jeexSelMin.value[0]!.toArray()).toEqual([-0.05, -0.2, -0.05]);
     expect(uniforms.jeexProbe.value[1]!.toArray()).toEqual([2.5, 1.5, 0.5]);
-    expect(uniforms.jeexTile.value[1]!.toArray()).toEqual([0, 512]);
     // Each box carries its room's index, the probe order.
     expect(uniforms.jeexBoxRoom.value.slice(0, 2)).toEqual([0, 1]);
   });
@@ -203,6 +235,7 @@ describe('uniform states', () => {
       projection: { min: { x, y: 0, z: 0 }, max: { x: x + 1, y: 2.5, z: 1 } },
       sampling: { min: { x, y: 0, z: 0 }, max: { x: x + 1, y: 2.5, z: 1 } },
       selection: { min: { x, y: 0, z: 0 }, max: { x: x + 1, y: 2.5, z: 1 } },
+      grid: { min: { x, y: 0, z: 0 }, max: { x: x + 1, y: 2.5, z: 1 } },
       resolution: { x: 2, y: 2, z: 2 },
     });
     setRoomBoxes(
@@ -212,7 +245,6 @@ describe('uniform states', () => {
         { roomId: 'a', position: { x: 1.5, y: 1.5, z: 0.5 } },
         { roomId: 'b', position: { x: 0.5, y: 1.5, z: 0.5 } },
       ],
-      atlasLayout(2),
     );
     expect(uniforms.jeexBoxRoom.value.slice(0, 3)).toEqual([1, 0, 1]);
   });
@@ -252,19 +284,10 @@ describe('the lamp gate', () => {
     expect(bakeFragmentShader(physical)).toContain('jeexPointDiffuse[ i ]');
   });
 
-  test('the scope uniform defaults off and the transform version is 6', () => {
+  test('the scope and grid uniforms default off and the transform version is 8', () => {
     expect(createWalkUniforms().jeexLampScope.value).toBe(0);
-    expect(WALK_TRANSFORM.version).toBe(6);
-  });
-});
-
-describe('atlasLayout', () => {
-  test('stacks 384 x 512 tiles in one column up to eight rooms, then adds columns', () => {
-    expect(atlasLayout(3)).toMatchObject({ columns: 1, rows: 3, width: 384, height: 1536 });
-    const nine = atlasLayout(9);
-    expect(nine).toMatchObject({ columns: 2, rows: 5, width: 768, height: 2560 });
-    expect(nine.tiles[5]).toEqual({ x: 384, y: 0 });
-    expect(atlasLayout(16).height).toBeLessThanOrEqual(4096);
+    expect(createWalkUniforms().jeexGridOn.value).toBe(0);
+    expect(WALK_TRANSFORM.version).toBe(8);
   });
 });
 

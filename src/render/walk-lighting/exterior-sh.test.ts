@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'bun:test';
-import { directionalSH, evaluateSH, exteriorSH, hemisphereSH, packAtlas, srgbToLinear, type Rgb } from './exterior-sh.js';
+import { directionalSH, evaluateSH, exteriorSH, hemisphereSH, packBlock, srgbToLinear, type Rgb } from './exterior-sh.js';
 import { LIGHTING_STANDARD } from '../../lighting/lighting-standard.js';
 
 /** Unit normals spread over the sphere (a Fibonacci lattice). */
@@ -51,16 +51,16 @@ describe('exteriorSH', () => {
   });
 });
 
-describe('packAtlas', () => {
-  test("lays the nine coefficients out in three's seven sub-volumes, padding slices included", () => {
+describe('packBlock', () => {
+  test('lays the nine coefficients out in the packed atlas’s seven sub-volumes along y, borders included', () => {
     const coefficients = Array.from({ length: 9 }, (_, i) => [i * 3 + 1, i * 3 + 2, i * 3 + 3] as Rgb);
-    const { data, width, height, depth } = packAtlas(coefficients, 2);
-    expect([width, height, depth]).toEqual([2, 2, 7 * 4]);
+    const { data, width, height, depth } = packBlock(coefficients, 2);
+    expect([width, height, depth]).toEqual([4, 7 * 4, 4]);
     const texel = (x: number, y: number, z: number) =>
       Array.from(data.slice(((z * height + y) * width + x) * 4, ((z * height + y) * width + x) * 4 + 4));
     expect(texel(0, 0, 0)).toEqual([1, 2, 3, 4]);
-    expect(texel(1, 1, 3)).toEqual([1, 2, 3, 4]);
-    expect(texel(0, 1, 4)).toEqual([5, 6, 7, 8]);
-    expect(texel(1, 0, 6 * 4 + 2)).toEqual([25, 26, 27, 0]);
+    expect(texel(3, 3, 3)).toEqual([1, 2, 3, 4]);
+    expect(texel(1, 4, 2)).toEqual([5, 6, 7, 8]);
+    expect(texel(2, 6 * 4 + 2, 1)).toEqual([25, 26, 27, 0]);
   });
 });
