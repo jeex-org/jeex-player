@@ -81,3 +81,22 @@ export function modelFrameBox(dims: readonly [number, number, number]): THREE.Gr
   group.add(mesh);
   return group;
 }
+
+/**
+ * A round rod across the model frame whose node is TURNED: a cylinder lying
+ * along x (radius `dims[1] / 2`, so `dims[2]` must equal `dims[1]`), rotated
+ * 45° about its own axis, its lowest point at y = 0. Its exact box is `dims`;
+ * the box of its geometry's own box turned with the node is about 41 % taller
+ * and deeper, the way a palm's fronds measured 5–7 % off before.
+ */
+export function modelFrameTurnedRod(dims: readonly [number, number, number]): THREE.Group {
+  const radius = dims[1] / 2;
+  const geometry = new THREE.CylinderGeometry(radius, radius, dims[0], 64);
+  geometry.rotateZ(Math.PI / 2);
+  const mesh = new THREE.Mesh(geometry, new THREE.MeshStandardMaterial());
+  mesh.position.y = radius;
+  mesh.rotation.x = Math.PI / 4;
+  const group = new THREE.Group();
+  group.add(mesh);
+  return group;
+}

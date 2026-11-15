@@ -92,6 +92,49 @@ describe('setBodyMirror', () => {
     expect(aura.matrix.determinant()).toBeGreaterThan(0);
   });
 
+  test('a turned node holding an asymmetric mesh is reflected about its exact centre: the bounds stay', () => {
+    // A triangle turned 45° about z: its own box, turned, is centred at x = 0,
+    // while the turned triangle spans x 0..0.707 (a frond on a turned node).
+    const geometry = new THREE.BufferGeometry();
+    geometry.setAttribute('position', new THREE.Float32BufferAttribute([0, 0, 0, 1, 0, 0, 1, 1, 0], 3));
+    const node = new THREE.Group();
+    node.rotation.z = Math.PI / 4;
+    node.add(new THREE.Mesh(geometry));
+    const body = new THREE.Group();
+    body.add(node);
+    const group = new THREE.Group();
+    group.add(body);
+    const exact = (): THREE.Box3 => {
+      group.updateMatrixWorld(true);
+      return new THREE.Box3().setFromObject(group, true);
+    };
+    const bounds = exact();
+    setBodyMirror(group, { x: true });
+    expect(exact().min.distanceTo(bounds.min)).toBeLessThan(1e-6);
+    expect(exact().max.distanceTo(bounds.max)).toBeLessThan(1e-6);
+  });
+
+  test('an instanced mesh is reflected about the centre of all its instances, as three measures it', () => {
+    // Instances at x = 0 and x = 2 of a 0.2 m box: the instances span x -0.1..2.1,
+    // while the prototype geometry alone spans -0.1..0.1.
+    const mesh = new THREE.InstancedMesh(new THREE.BoxGeometry(0.2, 0.2, 0.2), new THREE.MeshStandardMaterial(), 2);
+    mesh.setMatrixAt(0, new THREE.Matrix4().makeTranslation(0, 0, 0));
+    mesh.setMatrixAt(1, new THREE.Matrix4().makeTranslation(2, 0, 0));
+    const body = new THREE.Group();
+    body.add(mesh);
+    const group = new THREE.Group();
+    group.add(body);
+    const exact = (): THREE.Box3 => {
+      group.updateMatrixWorld(true);
+      mesh.computeBoundingBox();
+      return new THREE.Box3().setFromObject(group, true);
+    };
+    const bounds = exact();
+    setBodyMirror(group, { x: true });
+    expect(exact().min.distanceTo(bounds.min)).toBeLessThan(1e-6);
+    expect(exact().max.distanceTo(bounds.max)).toBeLessThan(1e-6);
+  });
+
   test('a body joining later (a model upgrade) is reflected the same way', () => {
     const first = placement();
     setBodyMirror(first.group, { x: true });

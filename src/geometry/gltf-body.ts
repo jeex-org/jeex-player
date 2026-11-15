@@ -54,18 +54,20 @@ function bboxDeviation(size: THREE.Vector3, dims: ModelRequest['dims']): number 
   return Math.round(worst * 100);
 }
 
-/** Everything the catalogue conventions promise about the geometry, checked and reported. */
-function checkConventions(group: THREE.Group, request: ModelRequest): string[] {
+/** Everything the catalogue conventions promise about the geometry, checked and reported, with the exact box it was checked on. */
+function checkConventions(group: THREE.Group, request: ModelRequest): { warnings: string[]; box: THREE.Box3 } {
   const warnings: string[] = [];
-  const box = new THREE.Box3().setFromObject(group);
-  if (box.isEmpty()) return ['empty-model'];
+  // Precise: a turned node's geometry box, turned, is larger than the turned
+  // geometry (a palm's fronds read 5-7 % over), and the check would blame the asset.
+  const box = new THREE.Box3().setFromObject(group, true);
+  if (box.isEmpty()) return { warnings: ['empty-model'], box };
   const size = box.getSize(new THREE.Vector3());
   const deviation = bboxDeviation(size, request.dims);
   if (deviation > BBOX_TOLERANCE * 100) warnings.push(`bbox-off-by-${deviation}`);
   const centredX = Math.abs(box.min.x + box.max.x) <= PIVOT_TOLERANCE;
   const centredZ = Math.abs(box.min.z + box.max.z) <= PIVOT_TOLERANCE;
   if (Math.abs(box.min.y) > PIVOT_TOLERANCE || !centredX || !centredZ) warnings.push('pivot-off-floor');
-  return warnings;
+  return { warnings, box };
 }
 
 /** The finish material for one glTF material, or `undefined` when nothing binds it. */
@@ -91,6 +93,8 @@ export type GltfBodyOptions = {
  *
  * `scene` is the caller's own clone (`model-source.ts` hands out one per
  * placement), so the materials swapped in here never reach the cached parse.
+ * `box` is the body's exact box (every vertex), measured once for the checks;
+ * dressing moves nothing, so a caller that needs the top reads it here.
  */
 export function prepareGltfBody(
   scene: THREE.Group,
@@ -98,8 +102,8 @@ export function prepareGltfBody(
   finishes: FinishRegistry,
   placementFinishes: Readonly<Record<string, string>>,
   options: GltfBodyOptions = {},
-): ModelOutcome {
-  const warnings = checkConventions(scene, request);
+): ModelOutcome & { readonly box: THREE.Box3 } {
+  const { warnings, box } = checkConventions(scene, request);
   const slots = slotsByMaterialName(request.materialSlots);
   const unbound = new Set<string>();
 
@@ -120,5 +124,5 @@ export function prepareGltfBody(
   // `bytes: 0` — this function DRESSES a container someone else fetched; the
   // transfer was charged to the project budget by the source that made it
   // (`model-source.ts`), and charging it twice would stop a bake early.
-  return { group: scene, triangles: countTriangles(scene), warnings, bytes: 0 };
+  return { group: scene, triangles: countTriangles(scene), warnings, bytes: 0, box };
 }

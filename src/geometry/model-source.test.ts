@@ -6,6 +6,7 @@ import { prepareGltfBody } from './gltf-body.js';
 import { FinishRegistry } from '../assets/asset-finishes.js';
 import { ARCHETYPE, VARIANT } from '../assets/catalogue-ids.js';
 import { FINISH } from '../materials/finish-ids.js';
+import { modelFrameTurnedRod } from '../fixtures/hanging-pendant.js';
 import { ViewerLibError, isViewerLibError } from '../shared/errors.js';
 import type { Ktx2Support } from '../materials/ktx2.js';
 import type { KTX2Loader } from 'three/addons/loaders/KTX2Loader.js';
@@ -575,6 +576,16 @@ describe('prepareGltfBody', () => {
     expect(materialNames(outcome.group)).toEqual(['seat', FINISH.oak_natural]);
     finishes.dispose();
     source.dispose();
+  });
+
+  test('a turned node within its dims is measured exactly: no bbox or pivot warning', () => {
+    // A node's own rotation must not inflate the box: the box of a turned
+    // geometry box is larger than the turned geometry (a palm's fronds read
+    // 5-7 % over and 1 cm off the floor before).
+    const finishes = new FinishRegistry();
+    const outcome = prepareGltfBody(modelFrameTurnedRod([0.6, 0.3, 0.3]), { ...request, dims: [0.6, 0.3, 0.3] }, finishes, {});
+    expect(outcome.warnings.filter((warning) => !warning.startsWith('unbound-material'))).toEqual([]);
+    finishes.dispose();
   });
 
   test('dims the model does not match are reported, never corrected', async () => {
