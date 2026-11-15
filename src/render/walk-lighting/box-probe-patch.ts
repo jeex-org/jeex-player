@@ -76,12 +76,19 @@ export const PROBE_HANDOVER_ROUGHNESS = 0.1;
 /**
  * The probe's roughness-to-level mapping, `jeexProbeMip`: three r187's
  * `roughnessToMip` over the probe's own levels, whatever size the scene's
- * environment is (an HDRI is larger than the studio's).
+ * environment is (an HDRI is larger than the studio's), except at the mirror
+ * end. Three's mapping turns its minimum roughness into level 0.44, a blend
+ * of the mirror level with the next (roughness 0.106), which softens a
+ * mirror's window image; below `PROBE_HANDOVER_ROUGHNESS` three's level is
+ * scaled by a smoothstep from 0 at `PROBE_MIRROR_ROUGHNESS` to 1 at the
+ * hand-over, so the read reaches level 0 without a step in value or slope.
  */
 export const PROBE_MIP_GLSL = /* glsl */ `
 float jeexProbeMip( const in float roughness ) {
 	float r = clamp( roughness, 0.0, 1.0 );
-	return clamp( ${PROBE_PMREM_MAX_LOD}.0 * r * ( 2.0 - r ), 0.0, ${PROBE_LEVELS - 1}.0 );
+	float mip = ${PROBE_PMREM_MAX_LOD}.0 * r * ( 2.0 - r );
+	if ( r < ${PROBE_HANDOVER_ROUGHNESS} ) mip *= smoothstep( ${PROBE_MIRROR_ROUGHNESS}, ${PROBE_HANDOVER_ROUGHNESS}, r );
+	return clamp( mip, 0.0, ${PROBE_LEVELS - 1}.0 );
 }
 `;
 

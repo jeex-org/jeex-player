@@ -251,7 +251,7 @@ describe('room lighting decided per fragment', { timeout: TIMEOUT_MS }, () => {
     const min = Math.min(...row);
     const contrast = (max - min) / (max + min);
     results['mirror'] = { probe, max, min, contrast };
-    // The probe's mirror level keeps 0.77 of it; a level one roughness step blurrier (0.106) leaves 0.65.
+    // The probe's mirror level alone keeps 0.89 of it, three's blend at 0.045 0.77; a level one roughness step blurrier (0.106) leaves 0.65.
     expect(contrast).toBeGreaterThan(0.72);
     w.dispose();
   });
