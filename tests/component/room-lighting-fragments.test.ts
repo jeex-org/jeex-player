@@ -9,11 +9,11 @@
  *   own `roughnessToMip`: level 0 at the mirror end, a continuous hand-over,
  *   and three's value exactly above it;
  * - the room grid a fragment is lit by is chosen per fragment from the room
- *   boxes, so the two cases the room's grown selection box exists for keep
- *   their room: a cabinet standing against a wall (partly outside the grid's
- *   inset sampling box) and a door leaf in its opening (on the wall
- *   centreline between two rooms), each face lit by the room it faces and
- *   never by the exterior grid.
+ *   boxes, so a cabinet standing against a wall (partly outside the grid's
+ *   inset sampling box) is lit by the room each face looks into and never by
+ *   the exterior grid; a piece of an opening (a door leaf on the wall
+ *   centreline between two rooms) takes one room's grid, the room of its
+ *   origin, across its whole face.
  *
  * Measurements are written to `test-results/room-lighting-fragments.json`
  * (git-ignored).
@@ -256,7 +256,7 @@ describe('room lighting decided per fragment', { timeout: TIMEOUT_MS }, () => {
     w.dispose();
   });
 
-  test('a cabinet against a wall and a door leaf in its opening are lit by the room each face looks into, never by the exterior', () => {
+  test('a cabinet against a wall is lit by the room each face looks into, a door leaf in its opening by the room of its origin on both faces', () => {
     // Two rooms on either side of a 0.1 m wall at x = 4.0 to 4.1, a closed door leaf filling its opening.
     const A: Rect = { x0: 0, x1: 4, z0: 0, z1: 4 };
     const B: Rect = { x0: 4.1, x1: 8.1, z0: 0, z1: 4 };
@@ -282,8 +282,20 @@ describe('room lighting decided per fragment', { timeout: TIMEOUT_MS }, () => {
         const white = new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 1, metalness: 0 });
         // The cabinet stands on room A's floor against the shared wall, deeper than the grid's inset.
         box(scene, white, [3.4, 0, 0.8], [4, 0.9, 1.8]);
-        // The door leaf fills the opening, 4 cm thick, its faces 3 cm inside the wall's faces.
-        box(scene, white, [4.03, 0, 2.5], [4.07, 2, 3.3]);
+        // The door leaf fills the opening, 4 cm thick, its faces 3 cm inside the wall's faces, built as the
+        // opening builder builds it: a leaf group in the opening's group, its origin on the wall centreline,
+        // where room A (the room it swings into, listed first) holds it.
+        const opening = new THREE.Group();
+        opening.userData['surface'] = 'opening';
+        const leaf = new THREE.Group();
+        leaf.userData['isDoorLeaf'] = true;
+        leaf.position.set(4.05, 0, 2.5);
+        const face = new THREE.Mesh(new THREE.BoxGeometry(0.04, 2, 0.8), white.clone());
+        face.position.set(0, 1, 0.4);
+        Object.assign(face.userData, opening.userData);
+        leaf.add(face);
+        opening.add(leaf);
+        scene.add(opening);
       },
     );
     const centre = (from: THREE.Vector3Like, to: THREE.Vector3Like): [number, number, number] => {
@@ -296,7 +308,8 @@ describe('room lighting decided per fragment', { timeout: TIMEOUT_MS }, () => {
     const leafB = centre({ x: 6.6, y: 1, z: 2.9 }, { x: 4.07, y: 1, z: 2.9 });
     results['rooms'] = { cabinetFront, cabinetTop, leafA, leafB };
     for (const red of [cabinetFront, cabinetTop, leafA]) expect(red[0]).toBeGreaterThan(red[1] * 2);
-    expect(leafB[1]).toBeGreaterThan(leafB[0] * 2);
+    // The leaf's face into room B is lit by room A's grid too.
+    expect(leafB[0]).toBeGreaterThan(leafB[1] * 2);
     w.dispose();
   });
 });
