@@ -3,6 +3,8 @@
  *
  * - the room probes are seamless across a cube face edge at the roughest
  *   level (each probe face carries a one-texel border of its neighbours);
+ * - a mirror surface (roughness at three's minimum) reads the probe's sharp
+ *   level, the PMREM's mirror level, so a sharp edge stays sharp in it;
  * - the room grid a fragment is lit by is chosen per fragment from the room
  *   boxes, so the two cases the room's grown selection box exists for keep
  *   their room: a cabinet standing against a wall (partly outside the grid's
@@ -169,6 +171,33 @@ describe('room lighting decided per fragment', { timeout: TIMEOUT_MS }, () => {
     results['seam'] = { probe, edgeX, edge, before, after, step };
     expect(before[0] / before[2]).toBeGreaterThan(1.3);
     expect(step).toBeLessThan(0.01);
+    w.dispose();
+  });
+
+  test('a mirror floor (roughness at three’s minimum) reads the probe’s sharp level: ceiling stripes keep their contrast', () => {
+    const A: Rect = { x0: 0, x1: 4, z0: 0, z1: 4 };
+    const w = world([{ id: '019a8b3c-1f00-7000-8000-00000000000c', rect: A }], [], (scene) => {
+      shell(scene, A);
+      // Bright stripes under the ceiling, 8 cm apart: about five probe texels each at the probe's distance.
+      for (let x = 0.4; x < 3.6; x += 0.16) panel(scene, [4, 4, 4], [x, HEIGHT_M - 0.03, 0.4], [x + 0.08, HEIGHT_M - 0.01, 3.6]);
+      const floor = new THREE.Mesh(
+        new THREE.PlaneGeometry(4, 4),
+        new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0, metalness: 1 }),
+      );
+      floor.rotation.x = -Math.PI / 2;
+      floor.position.set(2, 0.001, 2);
+      scene.add(floor);
+    });
+    const probe = w.probes()[0]!.position;
+    const { at } = w.shoot({ x: probe.x, y: 1.2, z: probe.z }, { x: probe.x, y: 0, z: probe.z }, { fov: 30, up: { x: 0, y: 0, z: -1 } });
+    // One row across the stripes' reflection, through the image centre.
+    const row = Array.from({ length: 200 }, (_, i) => luminance(at(60 + i, w.size.h / 2)));
+    const max = Math.max(...row);
+    const min = Math.min(...row);
+    const contrast = (max - min) / (max + min);
+    results['mirror'] = { probe, max, min, contrast };
+    // The probe's mirror level keeps 0.77 of it; a level one roughness step blurrier (0.106) leaves 0.65.
+    expect(contrast).toBeGreaterThan(0.72);
     w.dispose();
   });
 
