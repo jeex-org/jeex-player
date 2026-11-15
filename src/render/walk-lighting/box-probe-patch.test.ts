@@ -159,14 +159,16 @@ describe('installWalkPatch', () => {
     opening.userData['surface'] = 'opening';
     const leaf = new THREE.Group();
     leaf.userData['isDoorLeaf'] = true;
-    const panel = new THREE.Mesh(new THREE.BoxGeometry(), new THREE.MeshStandardMaterial());
-    const jamb = new THREE.Mesh(new THREE.BoxGeometry(), new THREE.MeshStandardMaterial());
-    jamb.userData['isParametricWall'] = true;
-    const frame = new THREE.Mesh(new THREE.BoxGeometry(), new THREE.MeshStandardMaterial());
-    leaf.add(panel);
-    opening.add(leaf, jamb, frame);
+    // A frame is tagged as a parametric wall by the opening builder; it is still a piece of the opening.
+    const frameMaterial = new THREE.MeshStandardMaterial();
+    const frame = new THREE.Mesh(new THREE.BoxGeometry(), frameMaterial);
+    frame.userData['isParametricWall'] = true;
+    const panel = new THREE.Mesh(new THREE.BoxGeometry(), frameMaterial);
+    const glass = new THREE.Mesh(new THREE.PlaneGeometry(), new THREE.MeshPhysicalMaterial());
+    leaf.add(panel, glass);
+    opening.add(frame, leaf);
     const cabinet = new THREE.Mesh(new THREE.BoxGeometry(), new THREE.MeshStandardMaterial());
-    expect([panel, frame, jamb, cabinet].map((mesh) => byOrigin(mesh))).toEqual([true, true, false, false]);
+    expect([frame, panel, glass, cabinet].map((mesh) => byOrigin(mesh))).toEqual([true, true, true, false]);
     const root = new THREE.Group();
     root.add(opening, cabinet);
     installWalkPatch(root, createWalkUniforms());
@@ -182,7 +184,7 @@ describe('installWalkPatch', () => {
       );
       return shader.uniforms['jeexByOrigin']!.value;
     };
-    expect([panel, frame, jamb, cabinet].map((mesh) => flag(mesh))).toEqual([1, 1, 0, 0]);
+    expect([frame, panel, glass, cabinet].map((mesh) => flag(mesh))).toEqual([1, 1, 1, 0]);
   });
 });
 
