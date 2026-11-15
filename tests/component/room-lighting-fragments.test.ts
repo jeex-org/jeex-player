@@ -253,8 +253,10 @@ describe('room lighting decided per fragment', { timeout: TIMEOUT_MS }, () => {
     const min = Math.min(...row);
     const contrast = (max - min) / (max + min);
     results['mirror'] = { probe, max, min, contrast };
-    // The probe's mirror level alone keeps 0.89 of it, three's blend at 0.045 0.77; a level one roughness step blurrier (0.106) leaves 0.65.
-    expect(contrast).toBeGreaterThan(0.72);
+    // The probe's mirror level alone keeps 0.89 of it; three's own mapping at 0.045 (level 0.44, a blend with the
+    // next level) keeps 0.77, and a level one roughness step blurrier (0.106) 0.65. The bound sits halfway between
+    // the first two, about 0.06 from each: above it, the reflection read the sharp level, not three's blend.
+    expect(contrast).toBeGreaterThan(0.83);
     w.dispose();
   });
 
