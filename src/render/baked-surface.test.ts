@@ -30,7 +30,7 @@ function copyCompileHooks(source: THREE.Material, target: THREE.Material): void 
 function compile(material: THREE.Material): Shader {
   const shader = {
     fragmentShader: THREE.ShaderLib.physical.fragmentShader,
-    vertexShader: '',
+    vertexShader: THREE.ShaderLib.physical.vertexShader,
     uniforms: {},
     defines: {},
   } as unknown as Shader;
