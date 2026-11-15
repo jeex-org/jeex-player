@@ -5,6 +5,9 @@
  *   level (each probe face carries a one-texel border of its neighbours);
  * - a mirror surface (roughness at three's minimum) reads the probe's sharp
  *   level, the PMREM's mirror level, so a sharp edge stays sharp in it;
+ * - the probe's roughness-to-level mapping, run on the GPU beside three's
+ *   own `roughnessToMip`: level 0 at the mirror end, a continuous hand-over,
+ *   and three's value exactly above it;
  * - the room grid a fragment is lit by is chosen per fragment from the room
  *   boxes, so the two cases the room's grown selection box exists for keep
  *   their room: a cabinet standing against a wall (partly outside the grid's
@@ -22,6 +25,7 @@ import { commands } from 'vitest/browser';
 import { WalkLighting } from '../../src/render/walk-post.js';
 import { createLightingContext } from '../../src/lighting/lighting-context.js';
 import type { RoomProbe } from '../../src/render/walk-lighting/room-volumes.js';
+import { PROBE_HANDOVER_ROUGHNESS, PROBE_MIP_GLSL, PROBE_PMREM_MAX_LOD } from '../../src/render/walk-lighting/box-probe-patch.js';
 import { closeContainers, openContainer } from './support.js';
 
 const TIMEOUT_MS = 300_000;
@@ -130,6 +134,42 @@ function world(
   return { size, shoot, probes, dispose };
 }
 
+/** `jeexProbeMip` and three r187's own `roughnessToMip` (over the probe's levels) at each roughness, on the GPU. */
+function probeLevels(roughness: readonly number[]): Array<{ ours: number; three: number }> {
+  const chunk = THREE.ShaderChunk.envmap_common_pars_fragment;
+  const three = /float roughnessToMip\( const in float roughness \) \{[\s\S]*?\n\t\t\}/.exec(chunk)?.[0];
+  expect(three).toBeDefined();
+  const canvas = document.createElement('canvas');
+  openContainer(8, 8).appendChild(canvas);
+  const gl = new THREE.WebGLRenderer({ canvas });
+  const target = new THREE.WebGLRenderTarget(roughness.length, 1, { type: THREE.FloatType });
+  const material = new THREE.ShaderMaterial({
+    uniforms: { values: { value: [...roughness] } },
+    defines: { ENVMAP_MAX_LOD: `${PROBE_PMREM_MAX_LOD}.0`, COUNT: roughness.length },
+    vertexShader: 'void main() { gl_Position = vec4( position.xy, 0.0, 1.0 ); }',
+    fragmentShader: `uniform float values[ COUNT ];
+${PROBE_MIP_GLSL}
+${three!}
+void main() {
+	float r = values[ int( gl_FragCoord.x ) ];
+	gl_FragColor = vec4( jeexProbeMip( r ), roughnessToMip( r ), 0.0, 1.0 );
+}`,
+  });
+  const quad = new THREE.Mesh(new THREE.PlaneGeometry(2, 2), material);
+  const scene = new THREE.Scene();
+  scene.add(quad);
+  gl.setRenderTarget(target);
+  gl.render(scene, new THREE.OrthographicCamera());
+  const pixels = new Float32Array(roughness.length * 4);
+  gl.readRenderTargetPixels(target, 0, 0, roughness.length, 1, pixels);
+  gl.setRenderTarget(null);
+  target.dispose();
+  material.dispose();
+  gl.dispose();
+  gl.forceContextLoss();
+  return roughness.map((_, i) => ({ ours: pixels[i * 4]!, three: pixels[i * 4 + 1]! }));
+}
+
 const luminance = ([r, g, b]: readonly number[]): number => 0.2126 * r! + 0.7152 * g! + 0.0722 * b!;
 
 describe('room lighting decided per fragment', { timeout: TIMEOUT_MS }, () => {
@@ -172,6 +212,21 @@ describe('room lighting decided per fragment', { timeout: TIMEOUT_MS }, () => {
     expect(before[0] / before[2]).toBeGreaterThan(1.3);
     expect(step).toBeLessThan(0.01);
     w.dispose();
+  });
+
+  test('the probe’s roughness-to-level mapping reads level 0 at the mirror end and hands over to three’s own, unchanged above', () => {
+    const below = PROBE_HANDOVER_ROUGHNESS - 1e-4;
+    const [mirror, clamped, justBelow, handOver, rough, roughest] = probeLevels([0.02, 0.045, below, PROBE_HANDOVER_ROUGHNESS, 0.5, 1]);
+    results['levels'] = { mirror, clamped, justBelow, handOver, rough, roughest };
+    // A mirror finish (0.02) and three's minimum roughness (0.045) read the mirror level alone.
+    expect(mirror!.ours).toBe(0);
+    expect(clamped!.ours).toBe(0);
+    // At the hand-over the read is three's own value; just below it, within the slope's step.
+    expect(handOver!.ours).toBe(handOver!.three);
+    expect(Math.abs(justBelow!.ours - justBelow!.three)).toBeLessThan(2e-3);
+    // Rough surfaces keep three's mapping exactly.
+    expect(rough!.ours).toBe(rough!.three);
+    expect(roughest!.ours).toBe(roughest!.three);
   });
 
   test('a mirror floor (roughness at three’s minimum) reads the probe’s sharp level: ceiling stripes keep their contrast', () => {

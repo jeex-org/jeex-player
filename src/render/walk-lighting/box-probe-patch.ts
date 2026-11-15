@@ -63,6 +63,27 @@ export const WALK_TRANSFORM = Object.freeze({ id: WALK_TRANSFORM_ID, version: 8 
 export const PROBE_PMREM_MAX_LOD = 5;
 /** Levels of the probe array. */
 const PROBE_LEVELS = PROBE_PMREM_MAX_LOD + 1;
+/**
+ * The mirror end of the probe's roughness-to-level mapping: at and below this
+ * roughness a reflection reads the probe's mirror level alone. It is r186's
+ * minimum roughness, the higher of the two engines' floors (r187's is 0.045),
+ * so a mirror finish keeps the sharp window image three r186 gave it.
+ */
+export const PROBE_MIRROR_ROUGHNESS = 0.0525;
+/** Where the mirror end hands over to three r187's own mapping, which holds unchanged above it. */
+export const PROBE_HANDOVER_ROUGHNESS = 0.1;
+
+/**
+ * The probe's roughness-to-level mapping, `jeexProbeMip`: three r187's
+ * `roughnessToMip` over the probe's own levels, whatever size the scene's
+ * environment is (an HDRI is larger than the studio's).
+ */
+export const PROBE_MIP_GLSL = /* glsl */ `
+float jeexProbeMip( const in float roughness ) {
+	float r = clamp( roughness, 0.0, 1.0 );
+	return clamp( ${PROBE_PMREM_MAX_LOD}.0 * r * ( 2.0 - r ), 0.0, ${PROBE_LEVELS - 1}.0 );
+}
+`;
 
 /** The exact r187 lines the patch replaces or anchors on, per chunk. */
 export const ENGINE_CHUNK_ANCHORS = Object.freeze({
@@ -216,9 +237,6 @@ const PARS = /* glsl */ `
 #if defined( USE_ENVMAP ) && defined( ENVMAP_TYPE_PMREM )
 #define JEEX_MAX_BOXES ${T.maxBoxes}
 #define JEEX_GRIDS
-// The probes' own PMREM levels, whatever size the scene's environment is (an HDRI is larger than the studio's).
-#define JEEX_PROBE_MAX_LOD ${PROBE_PMREM_MAX_LOD}.0
-#define JEEX_PROBE_LEVELS ${PROBE_LEVELS}.0
 uniform float jeexDiffuse;
 uniform float jeexOutside;
 uniform float jeexSun;
@@ -317,10 +335,10 @@ vec3 jeexProbeLevel( const in vec3 direction, const in float level, const in flo
 	return textureLod( jeexProbes, vec3( uv, layers + face ), level ).rgb;
 }
 
-// r187's roughness to PMREM level over the probe's own levels; array level k holds PMREM level k.
+${PROBE_MIP_GLSL}
+// A probe reflection at the level its roughness maps to; array level k holds PMREM level k.
 vec3 jeexProbeSample( const in vec3 direction, const in float roughness, const in float layers ) {
-	float r = clamp( roughness, 0.0, 1.0 );
-	float mip = clamp( JEEX_PROBE_MAX_LOD * r * ( 2.0 - r ), 0.0, JEEX_PROBE_LEVELS - 1.0 );
+	float mip = jeexProbeMip( roughness );
 	float mipF = fract( mip );
 	float mipInt = floor( mip );
 	vec3 lower = jeexProbeLevel( direction, mipInt, layers );
