@@ -1,6 +1,6 @@
 /**
  * The layouts of the walk lighting's two textures: the room probes' 2D array
- * (six layers a room, one per cube face, with a mip chain from 128 to 8
+ * (six layers a room, one per cube face, with a mip chain from 128 to 4
  * texels) and the packed atlas every light-probe grid is copied into.
  *
  * Packed atlas: each grid gets one block of `(nx + 2) x 7 (ny + 2) x (nz + 2)`
@@ -23,8 +23,8 @@ export const WEBGL2_MINIMUMS = Object.freeze({ arrayLayers: 256, size3d: 256 });
 
 /** Edge of a probe face at the array's largest level, texels. */
 const FACE_SIZE = 128;
-/** Levels of the probe array: 128, 64, 32, 16 and 8 texels. */
-const LEVELS = 5;
+/** Levels of the probe array: 128, 64, 32, 16, 8 and 4 texels, one per level of a probe's PMREM. */
+const LEVELS = 6;
 /** RGBA16F. */
 const PROBE_TEXEL_BYTES = 8;
 /** RGBA32F, the type of three's own grid atlas, which the blocks are copied from. */

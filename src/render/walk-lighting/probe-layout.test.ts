@@ -13,13 +13,13 @@ describe('the probe array', () => {
     expect(layout.layers).toBeLessThanOrEqual(WEBGL2_MINIMUMS.arrayLayers);
   });
 
-  test('has 128 texel faces and a mip chain down to 8 texels', () => {
+  test('has 128 texel faces and a mip chain down to 4 texels, one level per level of a probe’s PMREM', () => {
     const layout = probeArrayLayout(9);
     expect(layout.faceSize).toBe(128);
-    expect(layout.levels).toBe(5);
-    expect(layout.faceSize >> (layout.levels - 1)).toBe(8);
+    expect(layout.levels).toBe(6);
+    expect(layout.faceSize >> (layout.levels - 1)).toBe(4);
     // RGBA16F: 8 bytes a texel, every level of every layer.
-    expect(layout.bytes).toBe(54 * 8 * (128 ** 2 + 64 ** 2 + 32 ** 2 + 16 ** 2 + 8 ** 2));
+    expect(layout.bytes).toBe(54 * 8 * (128 ** 2 + 64 ** 2 + 32 ** 2 + 16 ** 2 + 8 ** 2 + 4 ** 2));
   });
 });
 

@@ -54,15 +54,15 @@ import { WALK_LIGHTING_TUNING as T } from './walk-lighting-tuning.js';
 import { installLightDrawHook, LIGHT_UNIFORMS } from '../light-uniforms.js';
 
 /** The patch's transform: one program variant, whatever the state; the version changes with the shader text. */
-export const WALK_TRANSFORM = Object.freeze({ id: WALK_TRANSFORM_ID, version: 7 });
+export const WALK_TRANSFORM = Object.freeze({ id: WALK_TRANSFORM_ID, version: 8 });
 /**
  * The last level of a room probe's PMREM: three r187 prefilters a probe into a
  * cube of at least 256 texels a face with mips down to 8 texels, and the probe
- * array holds its levels 1 to 5 (`room-probes.ts`).
+ * array holds its levels 0 to 5 at half their size (`room-probes.ts`).
  */
 export const PROBE_PMREM_MAX_LOD = 5;
 /** Levels of the probe array. */
-const PROBE_LEVELS = PROBE_PMREM_MAX_LOD;
+const PROBE_LEVELS = PROBE_PMREM_MAX_LOD + 1;
 
 /** The exact r187 lines the patch replaces or anchors on, per chunk. */
 export const ENGINE_CHUNK_ANCHORS = Object.freeze({
@@ -317,10 +317,10 @@ vec3 jeexProbeLevel( const in vec3 direction, const in float level, const in flo
 	return textureLod( jeexProbes, vec3( uv, layers + face ), level ).rgb;
 }
 
-// r187's roughness to PMREM level over the probe's own levels; the array starts at the PMREM's level 1.
+// r187's roughness to PMREM level over the probe's own levels; array level k holds PMREM level k.
 vec3 jeexProbeSample( const in vec3 direction, const in float roughness, const in float layers ) {
 	float r = clamp( roughness, 0.0, 1.0 );
-	float mip = clamp( JEEX_PROBE_MAX_LOD * r * ( 2.0 - r ) - 1.0, 0.0, JEEX_PROBE_LEVELS - 1.0 );
+	float mip = clamp( JEEX_PROBE_MAX_LOD * r * ( 2.0 - r ), 0.0, JEEX_PROBE_LEVELS - 1.0 );
 	float mipF = fract( mip );
 	float mipInt = floor( mip );
 	vec3 lower = jeexProbeLevel( direction, mipInt, layers );

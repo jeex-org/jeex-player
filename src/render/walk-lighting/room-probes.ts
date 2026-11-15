@@ -12,9 +12,10 @@
  *
  * Layout invariant: a 128 px probe's PMREM is a cube of 256 texels a face
  * with mips down to 8 (`PROBE_PMREM_MAX_LOD`), whatever the size of the
- * scene's environment; the array holds its levels 1 to 5 (128 to 8 texels)
- * and `step` fails loudly when a capture's cube differs. Each array face
- * carries a one-texel border written from the extended face plane, so a
+ * scene's environment; the array holds all six of its levels, level for
+ * level (128 to 4 texels: level 0 is the mirror level, the 128 px capture
+ * itself), and `step` fails loudly when a capture's cube differs. Each array
+ * face carries a one-texel border holding its neighbours' edge texels, so a
  * bilinear read at a face edge takes the neighbouring face's light and a
  * rough reflection shows no seam.
  */
@@ -104,10 +105,13 @@ export class RoomProbes {
 }
 
 /**
- * Writes one face of one level: every texel, border included, is the PMREM
- * cube read at the direction through the texel's centre on the face plane,
- * extended past the face's edge for the border (`jeexFace` in the patch is
- * the inverse).
+ * Writes one face of one level: every interior texel is the PMREM cube read
+ * at the direction through the texel's centre on the face plane (`jeexFace`
+ * in the patch is the inverse). A border texel beside an edge is the
+ * neighbouring face's edge texel, read at that texel's own direction, so a
+ * bilinear read at the edge mixes the same two texels from either face and
+ * the probe is continuous across it at every level, the 4 texel one
+ * included. A corner texel keeps the extended face plane's direction.
  */
 const COPY_SHADER = {
   vertexShader: /* glsl */ `void main() { gl_Position = vec4( position.xy, 0.0, 1.0 ); }`,
@@ -118,14 +122,23 @@ const COPY_SHADER = {
     uniform float faceSize;
     void main() {
       vec2 st = ( ( gl_FragCoord.xy - 1.0 ) / ( faceSize - 2.0 ) ) * 2.0 - 1.0;
+      // The face's own axis; a border texel folds onto the neighbouring face's edge texel.
+      float m = 1.0;
+      if ( abs( st.x ) > 1.0 && abs( st.y ) <= 1.0 ) {
+        m = 2.0 - abs( st.x );
+        st.x = sign( st.x );
+      } else if ( abs( st.y ) > 1.0 && abs( st.x ) <= 1.0 ) {
+        m = 2.0 - abs( st.y );
+        st.y = sign( st.y );
+      }
       vec3 d;
-      if ( face == 0 ) d = vec3( 1.0, st.y, st.x );
-      else if ( face == 1 ) d = vec3( -1.0, st.y, st.x );
-      else if ( face == 2 ) d = vec3( st.x, 1.0, st.y );
-      else if ( face == 3 ) d = vec3( st.x, -1.0, st.y );
-      else if ( face == 4 ) d = vec3( st.x, st.y, 1.0 );
-      else d = vec3( st.x, st.y, -1.0 );
-      gl_FragColor = vec4( textureLod( source, d, level + 1.0 ).rgb, 1.0 );
+      if ( face == 0 ) d = vec3( m, st.y, st.x );
+      else if ( face == 1 ) d = vec3( - m, st.y, st.x );
+      else if ( face == 2 ) d = vec3( st.x, m, st.y );
+      else if ( face == 3 ) d = vec3( st.x, - m, st.y );
+      else if ( face == 4 ) d = vec3( st.x, st.y, m );
+      else d = vec3( st.x, st.y, - m );
+      gl_FragColor = vec4( textureLod( source, d, level ).rgb, 1.0 );
     }
   `,
 };

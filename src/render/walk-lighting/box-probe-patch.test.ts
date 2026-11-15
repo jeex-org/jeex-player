@@ -258,10 +258,10 @@ describe('the lamp gate', () => {
     expect(bakeFragmentShader(physical)).toContain('jeexPointDiffuse[ i ]');
   });
 
-  test('the scope and grid uniforms default off and the transform version is 7', () => {
+  test('the scope and grid uniforms default off and the transform version is 8', () => {
     expect(createWalkUniforms().jeexLampScope.value).toBe(0);
     expect(createWalkUniforms().jeexGridOn.value).toBe(0);
-    expect(WALK_TRANSFORM.version).toBe(7);
+    expect(WALK_TRANSFORM.version).toBe(8);
   });
 });
 
