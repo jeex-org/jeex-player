@@ -359,6 +359,14 @@ as described under [Versioning](#versioning).
 
 ### Fixed
 
+- **A GLB with turned nodes is measured exactly.** The asset check measured
+  a model by its nodes' geometry boxes turned with the nodes, which is larger
+  than the turned geometry: a palm whose fronds are rotated nodes was
+  reported `bbox-off-by-7` and `pivot-off-floor` although it matched its dims,
+  a hanging GLB with a turned node hung a little low, and a mirrored one was
+  reflected about a wrong centre and shifted. All three now measure the
+  vertices, once per load; an instanced or batched mesh is measured by its
+  box over every instance, as three measures it.
 - **A placement turned by other than a quarter turn is judged where it is
   drawn.** The layout linter, the drag's legality field and settle, the
   free-space probe and the plan's fixture outlines built a placement's

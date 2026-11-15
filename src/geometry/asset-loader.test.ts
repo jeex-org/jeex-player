@@ -12,7 +12,7 @@ import { apartmentScene } from '../demo/scene-data.js';
 import type { DemoAsset } from '../scene/types.js';
 import type { ModelOutcome, ModelRequest } from './model-source.js';
 import { PROJECT_FIXTURE } from '../../tests/fixtures/project/fixture-ids.js';
-import { HANGING, hangingManifest, modelFrameBox } from '../fixtures/hanging-pendant.js';
+import { HANGING, hangingManifest, modelFrameBox, modelFrameTurnedRod } from '../fixtures/hanging-pendant.js';
 import { LAMP_PROJECT_FIXTURE as LAMPS } from '../../tests/fixtures/project/fixture-ids.js';
 import { ARTIFICIAL_LIGHT_KEY, isArtificialLight } from '../assets/artificial-light.js';
 import { lampCandela } from '../lighting/lamp-units.js';
@@ -238,7 +238,7 @@ describe('a project object, which has no builder', () => {
 
 /* ------------------------------------------- ceiling bodies hang (1.052 m pendant) --- */
 
-function hangingLoader(): AssetLoader {
+function hangingLoader(model: () => THREE.Group = () => modelFrameBox(HANGING.dims)): AssetLoader {
   const manifest = hangingManifest();
   const bank = projectBank(manifest, PROJECT_BASE);
   return new AssetLoader([], {
@@ -247,7 +247,7 @@ function hangingLoader(): AssetLoader {
     catalogue: bank.catalogue,
     resolveFinish: bank.resolveFinish,
     modelUrl: (asset) => bank.modelUrl(asset),
-    modelSource: () => Promise.resolve({ group: modelFrameBox(HANGING.dims), triangles: 12, warnings: [], bytes: 0 }),
+    modelSource: () => Promise.resolve({ group: model(), triangles: 12, warnings: [], bytes: 0 }),
   });
 }
 
@@ -290,6 +290,20 @@ describe('a ceiling body no builder made hangs from the ceiling plane', () => {
       expect(glb.min[axis]).toBeCloseTo(standIn.min[axis], 3);
       expect(glb.max[axis]).toBeCloseTo(standIn.max[axis], 3);
     }
+    loader.dispose();
+  });
+
+  test('a GLB with a turned node hangs by its exact top, not its turned box', async () => {
+    const loader = hangingLoader(() => modelFrameTurnedRod([0.6, 0.3, 0.3]));
+    const { group } = loader.load(HANGING_PLACEMENT);
+    const upgrade = await loader.upgrade(HANGING_PLACEMENT, new AbortController().signal);
+    if (!upgrade) throw new Error('the pendant should have a model');
+    for (const child of [...group.children]) child.removeFromParent();
+    group.add(upgrade.body);
+    group.updateMatrixWorld(true);
+    const glb = new THREE.Box3().setFromObject(group, true);
+    expect(glb.max.y).toBeCloseTo(HANGING.ceiling, 3);
+    expect(glb.min.y).toBeCloseTo(HANGING.ceiling - 0.3, 3);
     loader.dispose();
   });
 

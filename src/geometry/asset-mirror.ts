@@ -26,16 +26,23 @@ export const MIRROR_USERDATA_KEY = 'mirror';
 
 const scratchBox = new THREE.Box3();
 const scratchMatrix = new THREE.Matrix4();
+const scratchVertex = new THREE.Vector3();
 
-/** The bounds of `nodes`, in the frame their parent sits in. */
+/**
+ * The exact bounds of `nodes`, in the frame their parent sits in: every vertex
+ * through its accumulated matrix, as three's precise `expandByObject` walks
+ * it (a turned node's geometry box, turned, is larger than the turned geometry
+ * and off its centre). An instanced or batched mesh is measured by its own
+ * box over every instance, as three measures it. Meshes only (furniture has no
+ * points or lines), read in their static pose (the catalogue has no skinned
+ * or morph-animated bodies).
+ */
 function boundsInParent(nodes: readonly THREE.Object3D[]): THREE.Box3 {
   const box = new THREE.Box3();
   for (const node of nodes) {
     node.traverse((object) => {
       if (!(object instanceof THREE.Mesh)) return;
       const geometry = object.geometry as THREE.BufferGeometry;
-      if (!geometry.boundingBox) geometry.computeBoundingBox();
-      if (!geometry.boundingBox) return;
       // The mesh's matrix up to (and including) `node`, not the world: the
       // placement group's own pose must not enter the centre.
       scratchMatrix.identity();
@@ -44,7 +51,18 @@ function boundsInParent(nodes: readonly THREE.Object3D[]): THREE.Box3 {
         scratchMatrix.premultiply(at.matrix);
         if (at === node) break;
       }
-      box.union(scratchBox.copy(geometry.boundingBox).applyMatrix4(scratchMatrix));
+      const position = geometry.getAttribute('position');
+      if (position && !(object instanceof THREE.InstancedMesh) && !(object instanceof THREE.BatchedMesh)) {
+        for (let i = 0; i < position.count; i++) box.expandByPoint(object.getVertexPosition(i, scratchVertex).applyMatrix4(scratchMatrix));
+        return;
+      }
+      if (object instanceof THREE.InstancedMesh || object instanceof THREE.BatchedMesh) {
+        if (!object.boundingBox) object.computeBoundingBox();
+        if (object.boundingBox) box.union(scratchBox.copy(object.boundingBox).applyMatrix4(scratchMatrix));
+        return;
+      }
+      if (!geometry.boundingBox) geometry.computeBoundingBox();
+      if (geometry.boundingBox) box.union(scratchBox.copy(geometry.boundingBox).applyMatrix4(scratchMatrix));
     });
   }
   return box;

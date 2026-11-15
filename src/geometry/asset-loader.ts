@@ -430,7 +430,8 @@ export class AssetLoader {
     const loaded = await source(request, signal);
     const prepared = prepareGltfBody(loaded.group, request, this.finishes, asset.finishes, { baked: asset.baked });
     prepared.group.name = `${asset.variantId}-gltf`;
-    hangFromCeiling(prepared.group, asset, new THREE.Box3().setFromObject(prepared.group).max.y);
+    // The exact box the checks measured: a turned node must not lift the top.
+    hangFromCeiling(prepared.group, asset, prepared.box.max.y);
     return {
       body: prepared.group,
       triangles: prepared.triangles,
