@@ -126,6 +126,11 @@ r187 PMREM cube (`src/render/walk-lighting/room-probes.ts`), the grids are baked
 r187's (`src/render/walk-lighting/box-probe-patch.test.ts`). The lighting standard's
 `engineRevision` is `'187'`; the peer range is `~0.187.0`.
 
+r187's PMREM dims the standard's roughness-1 grey patch by 4.8 % (0.181 to 0.17144) while the
+apartment's lit rooms moved only -0.54 %, so `environment.normalisation` is re-set from 0.543
+to the measured 0.578 (the patch reads 0.18116 again) and `apartment.environmentScale` is
+derived from r186's product 0.543 × 1.8, so the apartment keeps its measured light.
+
 | Package        | Version   | Was       | Command                                                 |
 | -------------- | --------- | --------- | ------------------------------------------------------- |
 | `three`        | `0.187.0` | `0.186.1` | `npm view three version`, `npm view three dist-tags`    |

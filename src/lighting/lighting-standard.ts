@@ -70,6 +70,20 @@ function deepFreeze<T>(value: T): DeepReadonly<T> {
 }
 
 /**
+ * `environment.normalisation`, re-set for three r187: 0.543 until then (the
+ * patch read 0.181 on r186 and 0.17144 on r187), 0.578 since (it reads
+ * 0.18116, the 8-bit level nearest 0.18). r187's PMREM dims the environment
+ * term of a roughness-1 surface: the patch lost 4.8 %, while the apartment's
+ * lit rooms moved only -0.54 %. So the standard is re-anchored and the
+ * apartment keeps its measured light: its scale is derived from the
+ * environment intensity it had on r186.
+ */
+const ENVIRONMENT_NORMALISATION = 0.578;
+
+/** The apartment rig's `scene.environmentIntensity`, as measured on r186 (0.543 × 1.8). */
+const APARTMENT_ENVIRONMENT_INTENSITY = 0.543 * 1.8;
+
+/**
  * The standard. Read-only at every depth.
  *
  * `environment.normalisation` is the `scene.environmentIntensity` that makes
@@ -116,7 +130,7 @@ export const LIGHTING_STANDARD = deepFreeze({
         { azimuth: -150, elevation: 20, width: 40, height: 24, softness: 10, radiance: 2 },
       ],
     } satisfies EnvironmentRecipe,
-    normalisation: 0.543,
+    normalisation: ENVIRONMENT_NORMALISATION,
   },
   reference: {
     environmentScale: 1,
@@ -128,7 +142,8 @@ export const LIGHTING_STANDARD = deepFreeze({
     },
   },
   apartment: {
-    environmentScale: 1.8,
+    /** `APARTMENT_ENVIRONMENT_INTENSITY / normalisation`, about 1.691: the apartment's light does not follow a recalibration. */
+    environmentScale: APARTMENT_ENVIRONMENT_INTENSITY / ENVIRONMENT_NORMALISATION,
     hemisphere: { sky: '#fffcf6', ground: '#6d675f', intensity: 0.9 },
     sun: {
       colour: '#fff4e6',

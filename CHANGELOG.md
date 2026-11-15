@@ -21,7 +21,10 @@ as described under [Versioning](#versioning).
   r187's terms (one probe array for the rooms' reflections, one packed atlas
   for their light-probe grids, the room chosen per fragment, except for the
   pieces of a door or window, which keep the room of their origin) with no
-  change to options, events or the protocol.
+  change to options, events or the protocol. The standard's environment
+  normalisation was re-set so its grey patch reads 0.18 on r187, with the
+  apartment rig's environment scale derived so its light stays as on r186;
+  hosts re-check anything calibrated against the standard.
 
 ### Added
 
