@@ -612,11 +612,11 @@ export function patchVertexShader(source: string): string {
 /**
  * Whether `mesh` is a piece of an opening, lit by the grid of its origin's
  * room: a mesh inside an opening's group (`surface: 'opening'`, the opening
- * builder's tag), its door leaves, frames and glazing, but not the wall parts
- * the group also holds (`isParametricWall`), which are walls.
+ * builder's tag), its door leaves, frames, bars and glazing. A frame's
+ * origin already sits off the wall centreline on the side its leaf opens
+ * into (`geometry/shell-origins.ts`), so the frame takes the leaf's room.
  */
 export function byOrigin(mesh: THREE.Object3D): boolean {
-  if (mesh.userData['isParametricWall'] === true) return false;
   for (let at: THREE.Object3D | null = mesh; at; at = at.parent) if (at.userData['surface'] === 'opening') return true;
   return false;
 }
@@ -640,7 +640,7 @@ export function installWalkPatch(root: THREE.Object3D, uniforms: WalkUniforms): 
       const target = material as Patchable;
       if (!target.isMeshStandardMaterial || target[PATCHED]) continue;
       target[PATCHED] = true;
-      // Per material: an opening's materials are its own (`geometry/opening-kinds.ts`).
+      // Per material: an opening's materials are its own (`geometry/opening-kinds.ts`), shared by its pieces only.
       const origin = { value: byOrigin(mesh) ? 1 : 0 };
       addShaderTransform(target, WALK_TRANSFORM.id, WALK_TRANSFORM.version, (shader) => {
         Object.assign(shader.uniforms, uniforms, { jeexPointRoom: LIGHT_UNIFORMS.jeexPointRoom, jeexByOrigin: origin });
