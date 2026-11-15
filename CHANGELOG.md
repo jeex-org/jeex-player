@@ -22,9 +22,11 @@ as described under [Versioning](#versioning).
   for their light-probe grids, the room chosen per fragment, except for the
   pieces of a door or window, which keep the room of their origin) with no
   change to options, events or the protocol. The standard's environment
-  normalisation was re-set so its grey patch reads 0.18 on r187, with the
-  apartment rig's environment scale derived so its light stays as on r186;
-  hosts re-check anything calibrated against the standard.
+  `normalisation` was re-set from 0.543 to 0.578 so its grey patch reads 0.18
+  on r187, and `apartment.environmentScale` from 1.8 to about 1.691, derived
+  so their product stays 0.9774 and the apartment's light stays as on r186.
+  `LIGHTING_STANDARD_VERSION` rises to 2: hosts drop previews stored under
+  version 1.
 
 ### Added
 

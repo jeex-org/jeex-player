@@ -26,9 +26,9 @@ function neutral(value: number): number {
 }
 
 describe('LIGHTING_STANDARD', () => {
-  test('is version 1 and frozen at every depth', () => {
-    // The sun presets, the fit tuning and the sun API change no existing rig value.
-    expect(LIGHTING_STANDARD_VERSION).toBe(1);
+  test('is version 2 and frozen at every depth', () => {
+    // r187 and the re-set normalisation changed the reference rig's look, so the version rose to 2.
+    expect(LIGHTING_STANDARD_VERSION).toBe(2);
     const walk = (value: unknown, path: string): void => {
       if (typeof value !== 'object' || value === null) return;
       expect({ path, frozen: Object.isFrozen(value) }).toEqual({ path, frozen: true });
@@ -52,12 +52,12 @@ describe('LIGHTING_STANDARD', () => {
     expect(LIGHTING_STANDARD.environment.normalisation).toBe(0.578);
     expect(LIGHTING_STANDARD.apartment.environmentScale).toBeCloseTo(1.691, 3);
     expect(LIGHTING_STANDARD.apartment.sun.intensity).toBe(3);
-    expect(LIGHTING_STANDARD_VERSION).toBe(1);
+    expect(LIGHTING_STANDARD_VERSION).toBe(2);
   });
 
   test('the apartment rig keeps the environment intensity it had on r186, 0.543 × 1.8, whatever the normalisation', () => {
     // r187's PMREM dimmed the reference patch, not the lit rooms: re-anchoring the standard must not move the apartment.
-    expect(apartmentEnvironmentIntensity()).toBe(0.543 * 1.8);
+    expect(apartmentEnvironmentIntensity()).toBeCloseTo(0.543 * 1.8, 12);
   });
 
   test('a write at any depth changes nothing', () => {
@@ -161,8 +161,9 @@ describe('calibration by integration', () => {
     // (F0 0.04) on top of the Lambert term and prefilters the environment with
     // a GGX lobe rather than a cosine one. Analytic normalisation 0.620;
     // rendered 0.543 on r186 and 0.578 on r187 (its PMREM dims the rough
-    // patch), so the analytic reading at the frozen constant is 0.169 against
-    // the rendered 0.181. The browser test holds ±2 %; this keeps the two
+    // patch). The irradiance integral reads 0.2947 per unit of normalisation
+    // (0.160 / 0.543), so the analytic reading is 0.160 at 0.543 and ≈ 0.170
+    // at 0.578, against the rendered 0.181. The browser test holds ±2 %; this keeps the two
     // halves from drifting apart. The range is unchanged by the re-set.
     const reading = patchReading(LIGHTING_STANDARD.environment.normalisation);
     expect(Math.abs(reading - target) / target).toBeLessThan(0.15);

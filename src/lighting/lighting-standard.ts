@@ -19,7 +19,7 @@
 import { TEMPERATURE_RANGE } from './temperature-range.js';
 
 /** Appearance version of the standard; raised with every intentional change of the look. */
-export const LIGHTING_STANDARD_VERSION = 1;
+export const LIGHTING_STANDARD_VERSION = 2;
 
 /** A three-component vector as plain data. */
 export type Triple = readonly [number, number, number];
