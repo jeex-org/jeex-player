@@ -11,7 +11,11 @@
  * - with the grids on (`jeexGridOn`: walk, tour and the bake's captures), the
  *   fragment's irradiance gains the light-probe grid of the room box its
  *   lookup point lies in, read from the packed grid atlas (`room-grid.ts`),
- *   or the exterior block outside every box; inside a room with the
+ *   or the exterior block outside every box; a piece of an opening (a door
+ *   leaf, a frame, glazing: `byOrigin`) takes instead the grid of the first
+ *   room box that holds its object's origin, so one leaf or frame is lit by
+ *   one room across its whole face, as three r186 lit every object; inside a
+ *   room with the
  *   environment's diffuse off, that irradiance takes the environment's place
  *   in three's image-based path, so rough metals keep their
  *   multiple-scattering energy and nothing is counted twice;
@@ -266,6 +270,9 @@ uniform float jeexBlend;
 uniform float jeexPush;
 uniform float jeexLampScope;
 uniform float jeexBoxRoom[ JEEX_MAX_BOXES ];
+// 1 on a piece of an opening, whose grid is chosen by its object's origin (\`jeexOrigin\`), 0 elsewhere.
+uniform float jeexByOrigin;
+varying vec3 jeexOrigin;
 #if NUM_POINT_LIGHTS > 0
 uniform float jeexPointRoom[ NUM_POINT_LIGHTS ];
 #endif
@@ -393,10 +400,21 @@ vec3 jeexGridIrradianceAt( const in int g, const in vec3 worldPos, const in vec3
 	return max( result, vec3( 0.0 ) );
 }
 
-// The grids' irradiance on the receiver: its room box's grid, the exterior block outside every box.
+// The first room box that holds the point, boundaries included; -1 outside every box.
+int jeexBoxAt( const in vec3 p ) {
+	for ( int i = 0; i < JEEX_MAX_BOXES; i ++ ) {
+		if ( i >= jeexBoxCount ) break;
+		if ( jeexInside( p, i ) >= 0.0 ) return i;
+	}
+	return -1;
+}
+
+// The grids' irradiance on the receiver: its room box's grid (the box of its object's origin on a piece of an
+// opening), the exterior block outside every box.
 vec3 jeexGridLight( ) {
 	if ( jeexGridOn < 0.5 ) return vec3( 0.0 );
-	return jeexGridIrradianceAt( jeexBox >= 0 ? jeexBox : JEEX_MAX_BOXES, jeexWorldPos, jeexPushDir );
+	int box = jeexByOrigin > 0.5 ? jeexBoxAt( jeexOrigin ) : jeexBox;
+	return jeexGridIrradianceAt( box >= 0 ? box : JEEX_MAX_BOXES, jeexWorldPos, jeexPushDir );
 }
 
 vec3 jeexRadiance( const in vec3 viewDir, const in vec3 normal, const in float roughness ) {
@@ -581,6 +599,28 @@ const EMISSIVE_CAP = /* glsl */ `
 	totalEmissiveRadiance *= min( 1.0, jeexEmissiveCap / max( max( totalEmissiveRadiance.r, totalEmissiveRadiance.g ), max( totalEmissiveRadiance.b, 1e-6 ) ) );
 #endif`;
 
+/** The vertex side of the per-object grid rule: the object's origin, in world space. */
+const ORIGIN_VERTEX = /* glsl */ `#include <project_vertex>
+	jeexOrigin = modelMatrix[ 3 ].xyz;`;
+
+/** `source`, a standard or physical vertex shader, passing its object's origin to the fragment. */
+export function patchVertexShader(source: string): string {
+  const out = replaceAnchor(source, '#include <common>', '#include <common>\nvarying vec3 jeexOrigin;', WALK_TRANSFORM_ID);
+  return replaceAnchor(out, '#include <project_vertex>', ORIGIN_VERTEX, WALK_TRANSFORM_ID);
+}
+
+/**
+ * Whether `mesh` is a piece of an opening, lit by the grid of its origin's
+ * room: a mesh inside an opening's group (`surface: 'opening'`, the opening
+ * builder's tag), its door leaves, frames and glazing, but not the wall parts
+ * the group also holds (`isParametricWall`), which are walls.
+ */
+export function byOrigin(mesh: THREE.Object3D): boolean {
+  if (mesh.userData['isParametricWall'] === true) return false;
+  for (let at: THREE.Object3D | null = mesh; at; at = at.parent) if (at.userData['surface'] === 'opening') return true;
+  return false;
+}
+
 const PATCHED = Symbol('jeex-walk-patch');
 type Patchable = THREE.MeshStandardMaterial & { [PATCHED]?: true };
 
@@ -600,8 +640,11 @@ export function installWalkPatch(root: THREE.Object3D, uniforms: WalkUniforms): 
       const target = material as Patchable;
       if (!target.isMeshStandardMaterial || target[PATCHED]) continue;
       target[PATCHED] = true;
+      // Per material: an opening's materials are its own (`geometry/opening-kinds.ts`).
+      const origin = { value: byOrigin(mesh) ? 1 : 0 };
       addShaderTransform(target, WALK_TRANSFORM.id, WALK_TRANSFORM.version, (shader) => {
-        Object.assign(shader.uniforms, uniforms, { jeexPointRoom: LIGHT_UNIFORMS.jeexPointRoom });
+        Object.assign(shader.uniforms, uniforms, { jeexPointRoom: LIGHT_UNIFORMS.jeexPointRoom, jeexByOrigin: origin });
+        shader.vertexShader = patchVertexShader(shader.vertexShader);
         shader.fragmentShader = patchFragmentShader(shader.fragmentShader);
       });
       installLightDrawHook(target);

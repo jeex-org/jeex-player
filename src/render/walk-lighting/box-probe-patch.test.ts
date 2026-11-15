@@ -1,6 +1,7 @@
 import { describe, expect, test } from 'bun:test';
 import * as THREE from 'three';
 import {
+  byOrigin,
   createWalkUniforms,
   ENGINE_CHUNK_ANCHORS,
   guardBumpNormal,
@@ -110,9 +111,10 @@ describe('patchFragmentShader', () => {
     expect(physical.indexOf('jeexGridIrradiance = jeexGridLight( );')).toBeLessThan(physical.indexOf('#if NUM_LIGHT_PROBE_GRIDS > 0'));
   });
 
-  test('picks the grid per fragment: the box that owns the receiver, the exterior block outside every box', () => {
+  test("picks the grid per fragment (by the object's origin on a piece of an opening), the exterior block outside every box", () => {
     expect(physical).toContain('jeexBox = i;');
-    expect(physical).toContain('return jeexGridIrradianceAt( jeexBox >= 0 ? jeexBox : JEEX_MAX_BOXES, jeexWorldPos, jeexPushDir );');
+    expect(physical).toContain('int box = jeexByOrigin > 0.5 ? jeexBoxAt( jeexOrigin ) : jeexBox;');
+    expect(physical).toContain('return jeexGridIrradianceAt( box >= 0 ? box : JEEX_MAX_BOXES, jeexWorldPos, jeexPushDir );');
     expect(physical).toContain('if ( jeexGridOn < 0.5 ) return vec3( 0.0 );');
   });
 
@@ -144,10 +146,43 @@ describe('installWalkPatch', () => {
     const shader = {
       uniforms: {} as Record<string, THREE.IUniform>,
       fragmentShader: THREE.ShaderLib.standard.fragmentShader,
-      vertexShader: '',
+      vertexShader: THREE.ShaderLib.standard.vertexShader,
     };
     shared.onBeforeCompile(shader as unknown as THREE.WebGLProgramParametersWithUniforms, {} as THREE.WebGLRenderer);
     expect(shader.uniforms['jeexDiffuse']).toBe(uniforms.jeexDiffuse);
+    expect(shader.vertexShader).toContain('jeexOrigin = modelMatrix[ 3 ].xyz;');
+    expect(shader.uniforms['jeexByOrigin']!.value).toBe(0);
+  });
+
+  test('a piece of an opening, and only it, takes its grid by its origin', () => {
+    const opening = new THREE.Group();
+    opening.userData['surface'] = 'opening';
+    const leaf = new THREE.Group();
+    leaf.userData['isDoorLeaf'] = true;
+    const panel = new THREE.Mesh(new THREE.BoxGeometry(), new THREE.MeshStandardMaterial());
+    const jamb = new THREE.Mesh(new THREE.BoxGeometry(), new THREE.MeshStandardMaterial());
+    jamb.userData['isParametricWall'] = true;
+    const frame = new THREE.Mesh(new THREE.BoxGeometry(), new THREE.MeshStandardMaterial());
+    leaf.add(panel);
+    opening.add(leaf, jamb, frame);
+    const cabinet = new THREE.Mesh(new THREE.BoxGeometry(), new THREE.MeshStandardMaterial());
+    expect([panel, frame, jamb, cabinet].map((mesh) => byOrigin(mesh))).toEqual([true, true, false, false]);
+    const root = new THREE.Group();
+    root.add(opening, cabinet);
+    installWalkPatch(root, createWalkUniforms());
+    const flag = (mesh: THREE.Mesh): unknown => {
+      const shader = {
+        uniforms: {} as Record<string, THREE.IUniform>,
+        fragmentShader: THREE.ShaderLib.standard.fragmentShader,
+        vertexShader: THREE.ShaderLib.standard.vertexShader,
+      };
+      (mesh.material as THREE.Material).onBeforeCompile(
+        shader as unknown as THREE.WebGLProgramParametersWithUniforms,
+        {} as THREE.WebGLRenderer,
+      );
+      return shader.uniforms['jeexByOrigin']!.value;
+    };
+    expect([panel, frame, jamb, cabinet].map((mesh) => flag(mesh))).toEqual([1, 1, 0, 0]);
   });
 });
 
