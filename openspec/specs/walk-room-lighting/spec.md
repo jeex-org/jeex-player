@@ -7,7 +7,7 @@ How walk and tour light each room: a light-probe grid per room for indirect ligh
 
 ### Requirement: Room grids in walk and tour
 
-In `walk` and `tour` everything in a room (shell, furniture, fixtures, door leaves, window parts) SHALL be lit indirectly by that room's light-probe grid, chosen per fragment by the room box the fragment's face looks into, with one bounce through doorways; everything outside the rooms by a fixed hemisphere-equivalent grid (requirement «Exterior light under the HDRI» for the HDRI). Grids SHALL be baked before they light the view. A baked surface SHALL take no light from any grid: its lightmap is its indirect light.
+In `walk` and `tour` everything in a room (shell, furniture, fixtures, door leaves, window parts) SHALL be lit indirectly by that room's light-probe grid, chosen per fragment by the room box the fragment's face looks into, except a piece of an opening (door leaf, frame, glazing, bars), which takes on every face the grid of the first room box that holds its object's origin, with one bounce through doorways; everything outside the rooms by a fixed hemisphere-equivalent grid (requirement «Exterior light under the HDRI» for the HDRI). Grids SHALL be baked before they light the view. A baked surface SHALL take no light from any grid: its lightmap is its indirect light.
 
 #### Scenario: Windowless room darker
 - **WHEN** a closed room without a window and a room with a window are compared in walk on a 0.18 grey patch
@@ -23,7 +23,7 @@ In `walk` and `tour` everything in a room (shell, furniture, fixtures, door leav
 
 #### Scenario: Door leaf in its opening
 - **WHEN** a closed door leaf fills the opening between two rooms
-- **THEN** each of its faces is lit by the grid of the room that face looks into, and neither by the exterior grid
+- **THEN** both of its faces are lit by the grid of the room that holds the leaf's origin, and neither by the exterior grid
 
 #### Scenario: Facade
 - **WHEN** the exterior is seen from a window in walk without an HDRI

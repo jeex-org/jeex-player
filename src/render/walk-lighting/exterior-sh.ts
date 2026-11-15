@@ -104,23 +104,6 @@ function packs(coefficients: readonly Rgb[]): number[][] {
 type Packed = { data: Float32Array; width: number; height: number; depth: number };
 
 /**
- * The coefficients as three's probe-grid atlas for a grid of `size` probes per
- * side: seven RGBA sub-volumes stacked along z, each `size + 2` slices deep
- * (one padding slice at each end), every texel of a sub-volume the same.
- */
-export function packAtlas(coefficients: readonly Rgb[], size: number): Packed {
-  const all = packs(coefficients);
-  const padded = size + 2;
-  const depth = 7 * padded;
-  const data = new Float32Array(size * size * depth * 4);
-  for (let z = 0; z < depth; z += 1) {
-    const pack = all[Math.floor(z / padded)]!;
-    for (let i = 0; i < size * size; i += 1) data.set(pack, (z * size * size + i) * 4);
-  }
-  return { data, width: size, height: size, depth };
-}
-
-/**
  * The coefficients as one block of the packed grid atlas (`probe-layout.ts`)
  * for a grid of `size` probes per side: the seven sub-volumes stacked along
  * y, each `size + 2` rows high, the block `size + 2` texels wide and deep,

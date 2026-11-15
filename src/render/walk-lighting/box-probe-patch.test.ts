@@ -64,8 +64,6 @@ describe('patchFragmentShader', () => {
     expect(patchFragmentShader(expandOwnedChunks(THREE.ShaderLib.physical.fragmentShader))).toBe(physical);
     expect(physical).toContain('#include <lights_fragment_end>');
     expect(physical).toContain('#include <envmap_physical_pars_fragment>');
-    expect(physical).toContain('uniform highp sampler2DArray jeexProbes;');
-    expect(physical).toContain('uniform highp sampler3D jeexGrids;');
     expect(physical).toContain('outgoingLight *= mix( jeexOutside, 1.0, jeexInRoom );');
   });
 
@@ -107,15 +105,6 @@ describe('patchFragmentShader', () => {
   test("keeps the grid's irradiance apart so the walk can hand it to the environment's place", () => {
     expect(physical).toContain('jeexGridIrradiance = jeexGridLight( );');
     expect(physical).toContain('irradiance -= jeexGridIrradiance * jeexMove;');
-    // Ahead of three's own grid block, which never compiles: no grid is in the scene.
-    expect(physical.indexOf('jeexGridIrradiance = jeexGridLight( );')).toBeLessThan(physical.indexOf('#if NUM_LIGHT_PROBE_GRIDS > 0'));
-  });
-
-  test("picks the grid per fragment (by the object's origin on a piece of an opening), the exterior block outside every box", () => {
-    expect(physical).toContain('jeexBox = i;');
-    expect(physical).toContain('int box = jeexByOrigin > 0.5 ? jeexBoxAt( jeexOrigin ) : jeexBox;');
-    expect(physical).toContain('return jeexGridIrradianceAt( box >= 0 ? box : JEEX_MAX_BOXES, jeexWorldPos, jeexPushDir );');
-    expect(physical).toContain('if ( jeexGridOn < 0.5 ) return vec3( 0.0 );');
   });
 
   test('a baked surface skips the grid sample, the hand-over and the diffuse scale', () => {

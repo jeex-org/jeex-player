@@ -16,7 +16,7 @@ import { InlineSceneRepository, mountViewer } from '../../src/app/viewer-api.js'
 import type { ViewerHandle } from '../../src/app/viewer-handle.js';
 // Static, so Vite pre-bundles the chunk's three addons before the first test instead of reloading mid-test.
 import { WalkLighting, WalkPost } from '../../src/render/walk-post.js';
-import { createWalkUniforms, installWalkPatch, setRoomBoxes } from '../../src/render/walk-lighting/box-probe-patch.js';
+import { byOrigin, createWalkUniforms, installWalkPatch, setRoomBoxes } from '../../src/render/walk-lighting/box-probe-patch.js';
 import { WALK_LIGHTING_TUNING as T } from '../../src/render/walk-lighting/walk-lighting-tuning.js';
 import type { ProbeArray } from '../../src/render/walk-lighting/room-probes.js';
 import { createLightingContext } from '../../src/lighting/lighting-context.js';
@@ -190,6 +190,11 @@ const WALK_TO_EDITING_MAX = 0.47;
  * read 1.136, r187 1.149. It pins what a visitor sees, which the fixed-balance bound above does not.
  */
 const WALK_SHOWN_TO_EDITING_MAX = 1.16;
+/**
+ * Lower bound of the live-balance ratio, as far under its measured 1.149 as the fixed-balance lower bound,
+ * 0.25, sits under its 0.4599 (0.54 of it): a walk look that loses the room's light fails it.
+ */
+const WALK_SHOWN_TO_EDITING_MIN = 0.62;
 
 /** Grey 0.18 matte cards facing +x: one in the windowless WC, one in the living room. */
 const PATCHES = {
@@ -342,7 +347,9 @@ describe('room lighting on the demo apartment', { timeout: MOUNT_TIMEOUT_MS }, (
     expect(programs()).toBe(first);
   });
 
-  test('every shell mesh and every bathroom furniture origin lies in its own room’s selection box first', () => {
+  // Shell and furniture take their grid per fragment (the cabinet and door-leaf case of `room-lighting-fragments`);
+  // a piece of an opening takes the grid of the first room box that holds its object's origin.
+  test('every piece of an interior door takes, by its origin, the room its leaf takes, and never the exterior grid', () => {
     const order = lighting.volumes.boxes;
     const first = (object: THREE.Object3D): string | null => {
       const { x, y, z } = new THREE.Vector3().setFromMatrixPosition(object.matrixWorld);
@@ -350,26 +357,25 @@ describe('room lighting on the demo apartment', { timeout: MOUNT_TIMEOUT_MS }, (
         x >= min.x && x <= max.x && y >= min.y && y <= max.y && z >= min.z && z <= max.z;
       return order.find((candidate) => inside(candidate))?.roomId ?? null;
     };
-    const wrong: string[] = [];
+    const doors: THREE.Object3D[] = [];
     lighting.scene.traverse((object) => {
-      const data = object.userData;
-      const roomId = data['roomId'] as string | undefined;
-      const shell =
-        (object as THREE.Mesh).isMesh &&
-        (data['surface'] === 'floor' || data['isCeiling'] === true || (data['surface'] === 'wall' && roomId !== undefined));
-      if (shell && first(object) !== roomId) wrong.push(`${object.name}:${roomId}->${first(object)}`);
+      if (object.userData['surface'] !== 'opening') return;
+      const leaf = object.children.find((child) => child.userData['isDoorLeaf'] === true);
+      if (leaf && leaf.userData['isExteriorWall'] !== true) doors.push(object);
     });
-    expect(wrong).toEqual([]);
-    const bathroom = demoScene().assets.filter((asset) => asset.room === ROOM.bathroom);
-    expect(bathroom.length).toBeGreaterThan(0);
-    for (const asset of bathroom) {
-      const group = lighting.scene.getObjectByProperty('name', asset.id) ?? null;
-      const meshes: THREE.Object3D[] = [];
-      group?.traverse((object) => {
-        if ((object as THREE.Mesh).isMesh) meshes.push(object);
+    expect(doors.length).toBeGreaterThan(0);
+    const wrong: string[] = [];
+    for (const door of doors) {
+      const leaf = door.children.find((child) => child.userData['isDoorLeaf'] === true)!;
+      const pieces: THREE.Object3D[] = [];
+      door.traverse((object) => {
+        if ((object as THREE.Mesh).isMesh && byOrigin(object)) pieces.push(object);
       });
-      for (const mesh of meshes) expect(first(mesh)).toBe(ROOM.bathroom);
+      const leafRoom = first(leaf);
+      for (const piece of pieces)
+        if (leafRoom === null || first(piece) !== leafRoom) wrong.push(`${door.name}/${piece.name}:${leafRoom}->${first(piece)}`);
     }
+    expect(wrong).toEqual([]);
   });
 
   test('calibration: the windowless WC reads at most 0.35 of the living room; measured values recorded', async () => {
@@ -447,6 +453,7 @@ describe('room lighting on the demo apartment', { timeout: MOUNT_TIMEOUT_MS }, (
     expect(walkLiving / editingLiving).toBeGreaterThan(0.25);
     expect(walkLiving / editingLiving).toBeLessThan(WALK_TO_EDITING_MAX);
     const shownLiving = (results['walkBalanceOn'] as { living: number }).living;
+    expect(shownLiving / editingLiving).toBeGreaterThan(WALK_SHOWN_TO_EDITING_MIN);
     expect(shownLiving / editingLiving).toBeLessThan(WALK_SHOWN_TO_EDITING_MAX);
     expect(Math.abs(walk - editing) / editing).toBeLessThan(0.05);
   });

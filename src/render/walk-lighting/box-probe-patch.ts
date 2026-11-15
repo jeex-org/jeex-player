@@ -53,6 +53,7 @@
 
 import * as THREE from 'three';
 import { addShaderTransform, chunkMarker, expandOwnedChunks, replaceAnchor, WALK_TRANSFORM_ID } from '../shader-compose.js';
+import { PROBE_FACE_SIZE } from './probe-layout.js';
 import type { RoomBox, RoomProbe } from './room-volumes.js';
 import { WALK_LIGHTING_TUNING as T } from './walk-lighting-tuning.js';
 import { installLightDrawHook, LIGHT_UNIFORMS } from '../light-uniforms.js';
@@ -344,7 +345,7 @@ float jeexFace( const in vec3 d, out vec2 st ) {
 vec3 jeexProbeLevel( const in vec3 direction, const in float level, const in float layers ) {
 	vec2 st;
 	float face = jeexFace( direction, st );
-	float faceSize = exp2( 7.0 - level );
+	float faceSize = exp2( ${Math.log2(PROBE_FACE_SIZE)}.0 - level );
 	vec2 uv = ( ( st * 0.5 + 0.5 ) * ( faceSize - 2.0 ) + 1.0 ) / faceSize;
 	return textureLod( jeexProbes, vec3( uv, layers + face ), level ).rgb;
 }

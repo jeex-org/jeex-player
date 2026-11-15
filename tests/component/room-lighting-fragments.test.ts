@@ -221,12 +221,14 @@ describe('room lighting decided per fragment', { timeout: TIMEOUT_MS }, () => {
     // A mirror finish (0.02) and three's minimum roughness (0.045) read the mirror level alone.
     expect(mirror!.ours).toBe(0);
     expect(clamped!.ours).toBe(0);
-    // At the hand-over the read is three's own value; just below it, within the slope's step.
-    expect(handOver!.ours).toBe(handOver!.three);
+    // At the hand-over the read is three's own value; just below it, within the slope's step. The two are
+    // separate GPU expressions, so they are compared to 5e-6 of a level (a compiler may order the operations
+    // otherwise); a hand-over off by 0.005 of roughness already misses three's level by over 0.02.
+    expect(handOver!.ours).toBeCloseTo(handOver!.three, 5);
     expect(Math.abs(justBelow!.ours - justBelow!.three)).toBeLessThan(2e-3);
-    // Rough surfaces keep three's mapping exactly.
-    expect(rough!.ours).toBe(rough!.three);
-    expect(roughest!.ours).toBe(roughest!.three);
+    // Rough surfaces keep three's mapping, to the same 5e-6 of a level.
+    expect(rough!.ours).toBeCloseTo(rough!.three, 5);
+    expect(roughest!.ours).toBeCloseTo(roughest!.three, 5);
   });
 
   test('a mirror floor (roughness at three’s minimum) reads the probe’s sharp level: ceiling stripes keep their contrast', () => {
@@ -292,7 +294,6 @@ describe('room lighting decided per fragment', { timeout: TIMEOUT_MS }, () => {
         leaf.position.set(4.05, 0, 2.5);
         const face = new THREE.Mesh(new THREE.BoxGeometry(0.04, 2, 0.8), white.clone());
         face.position.set(0, 1, 0.4);
-        Object.assign(face.userData, opening.userData);
         leaf.add(face);
         opening.add(leaf);
         scene.add(opening);

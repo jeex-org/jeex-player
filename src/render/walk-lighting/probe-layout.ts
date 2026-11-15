@@ -22,7 +22,7 @@
 export const WEBGL2_MINIMUMS = Object.freeze({ arrayLayers: 256, size3d: 256 });
 
 /** Edge of a probe face at the array's largest level, texels. */
-const FACE_SIZE = 128;
+export const PROBE_FACE_SIZE = 128;
 /** Levels of the probe array: 128, 64, 32, 16, 8 and 4 texels, one per level of a probe's PMREM. */
 const LEVELS = 6;
 /** RGBA16F. */
@@ -36,8 +36,8 @@ export type ProbeArrayLayout = { faceSize: number; levels: number; layers: numbe
 export function probeArrayLayout(rooms: number): ProbeArrayLayout {
   const layers = Math.max(1, rooms) * 6;
   let texels = 0;
-  for (let level = 0; level < LEVELS; level += 1) texels += (FACE_SIZE >> level) ** 2;
-  return { faceSize: FACE_SIZE, levels: LEVELS, layers, bytes: layers * texels * PROBE_TEXEL_BYTES };
+  for (let level = 0; level < LEVELS; level += 1) texels += (PROBE_FACE_SIZE >> level) ** 2;
+  return { faceSize: PROBE_FACE_SIZE, levels: LEVELS, layers, bytes: layers * texels * PROBE_TEXEL_BYTES };
 }
 
 type Resolution = { readonly x: number; readonly y: number; readonly z: number };
