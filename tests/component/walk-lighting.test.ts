@@ -175,6 +175,22 @@ const ROOM = {
   bathroom: '01a15f1b-dbbd-7630-93f2-2522489e6e62',
 };
 
+/**
+ * Upper bound of «walk living / editing living» under the fixed balance (`bakeOnly`). It was 0.45 and was re-set
+ * on the move to three r187 from measured values, not by recalibrating any lighting constant: three r186 read
+ * 0.4450, r187 reads 0.4599. The +3.29 log points split into the engine, 0.54 (the editing look 0.54 % darker
+ * under r187's PMREM and its minimum roughness); the probe atlas and grid work of the move, 1.36 (under the fixed
+ * balance only: with the live balance the same patch read 0.22 % darker); and the window frames, bars and glass
+ * taking the grid of their object's origin, as every piece of an opening does, 1.39.
+ */
+const WALK_TO_EDITING_MAX = 0.47;
+
+/**
+ * Upper bound of the same ratio with the live room balance, as the viewer shows the living room: three r186
+ * read 1.136, r187 1.149. It pins what a visitor sees, which the fixed-balance bound above does not.
+ */
+const WALK_SHOWN_TO_EDITING_MAX = 1.16;
+
 /** Grey 0.18 matte cards facing +x: one in the windowless WC, one in the living room. */
 const PATCHES = {
   wc: {
@@ -360,6 +376,8 @@ describe('room lighting on the demo apartment', { timeout: MOUNT_TIMEOUT_MS }, (
     const wc = await bakeOnly(() => patch('wc'));
     const living = await bakeOnly(() => patch('living'));
     record('walk', { wc, living, ratio: wc / living, ambient: T.ambientFloor, exposure: T.walkExposure });
+    // The same cards as the viewer shows them, with the live room balance.
+    record('walkBalanceOn', { wc: await patch('wc'), living: await patch('living') });
     // The components, for the calibration: no ambient floor, exposure 1.
     const ambient = lighting.rig.ambient.intensity;
     const exposure = lighting.renderer.toneMappingExposure;
@@ -427,7 +445,9 @@ describe('room lighting on the demo apartment', { timeout: MOUNT_TIMEOUT_MS }, (
     // The calibration target: the window room reads about a third of the studio-lit editing look.
     const walkLiving = (results['walk'] as { living: number }).living;
     expect(walkLiving / editingLiving).toBeGreaterThan(0.25);
-    expect(walkLiving / editingLiving).toBeLessThan(0.45);
+    expect(walkLiving / editingLiving).toBeLessThan(WALK_TO_EDITING_MAX);
+    const shownLiving = (results['walkBalanceOn'] as { living: number }).living;
+    expect(shownLiving / editingLiving).toBeLessThan(WALK_SHOWN_TO_EDITING_MAX);
     expect(Math.abs(walk - editing) / editing).toBeLessThan(0.05);
   });
 

@@ -19,8 +19,9 @@ as described under [Versioning](#versioning).
   PMREM filters environments differently, so materials lit by an environment
   look slightly different. The walk and tour room lighting is rebuilt on
   r187's terms (one probe array for the rooms' reflections, one packed atlas
-  for their light-probe grids, the room chosen per fragment) with no change
-  to options, events or the protocol.
+  for their light-probe grids, the room chosen per fragment, except for the
+  pieces of a door or window, which keep the room of their origin) with no
+  change to options, events or the protocol.
 
 ### Added
 
